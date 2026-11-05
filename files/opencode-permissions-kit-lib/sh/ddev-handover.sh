@@ -582,6 +582,26 @@ ddev_handover_root() {
     dhr_user="${2:-}"
     dhr_group="${3:-}"
     dhr_dev="${4:-}"
+    # Root-form refusal (review c X1, issue #245): ddev's find below
+    # gets the UNSTRIPPED operand — in review c's probe `link/.` and
+    # `link//` both descended the TARGET through the belt's one-slash
+    # strip. No valid stored root carries these forms (the writer
+    # refuses them, the reader loops skip them); the belt for direct
+    # and future callers refuses them outright — the writer's form set
+    # (absolute, no dot/empty segments, no whitespace; blocklist #247).
+    case "$dhr_root" in
+        /*) ;;
+        *)
+            printf '%s\n' "  warn: $dhr_root is not an absolute path — refusing the ddev handover" >&2
+            return 1
+            ;;
+    esac
+    case "$dhr_root" in
+        *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]*)
+            printf '%s\n' "  warn: $dhr_root is a malformed root (dot/empty segment or whitespace) — refusing the ddev handover" >&2
+            return 1
+            ;;
+    esac
     # Root-operand belt (review a X2, rc hardened b X2, issue #245):
     # [ -d ] below follows a link; every current caller gates before
     # the call (install.sh's handover loop since a X1) — this is the

@@ -859,6 +859,16 @@ S245B_ERR=$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$S
 # loudly instead of the old silent rc-0 no-op.
 S245D_ERR=$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$S245/dangling" "$(id -gn)" 2>&1) &&
     S245D_RC=0 || S245D_RC=$?
+# c X1 arms: the belt refuses the dodge spellings outright (form arms
+# before the [ -L ] belt) — executed in review c, the FULL baseline ran
+# through `link/.` onto the target under the old one-slash-strip-only
+# shape; non-absolute roots refuse too (the writer's form set).
+S245E_ERR=$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$S245/link/." "$(id -gn)" 2>&1) &&
+    S245E_RC=0 || S245E_RC=$?
+S245F_ERR=$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$S245/link//" "$(id -gn)" 2>&1) &&
+    S245F_RC=0 || S245F_RC=$?
+S245G_ERR=$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "." "$(id -gn)" 2>&1) &&
+    S245G_RC=0 || S245G_RC=$?
 if [ "$S245A_RC" -ne 0 ] &&
     printf '%s' "$S245A_ERR" | grep -qF 'is a symlink — refusing the group baseline' &&
     [ "$(_s245_mode)" = "$_s245_before" ] &&
@@ -866,10 +876,15 @@ if [ "$S245A_RC" -ne 0 ] &&
     [ "$S245B_RC" -ne 0 ] &&
     printf '%s' "$S245B_ERR" | grep -qF 'is a symlink — refusing the group baseline' &&
     [ "$S245D_RC" -ne 0 ] &&
-    printf '%s' "$S245D_ERR" | grep -qF 'is a symlink — refusing the group baseline'; then
-    pass "fs_baseline_root: live/dangling/slash-spelling link roots all refused loudly, tree untouched (#245, b X4)"
+    printf '%s' "$S245D_ERR" | grep -qF 'is a symlink — refusing the group baseline' &&
+    [ "$S245E_RC" -ne 0 ] && [ "$S245F_RC" -ne 0 ] &&
+    printf '%s' "$S245E_ERR" | grep -qF 'is a malformed root' &&
+    printf '%s' "$S245F_ERR" | grep -qF 'is a malformed root' &&
+    [ "$S245G_RC" -ne 0 ] &&
+    printf '%s' "$S245G_ERR" | grep -qF 'is not an absolute path'; then
+    pass "fs_baseline_root: live/dangling/slash/dot/relative link roots all refused loudly, tree untouched (#245, b X4, c X1)"
 else
-    fail "fs_baseline_root must refuse live/dangling/slash link roots (rcA=$S245A_RC rcB=$S245B_RC rcD=$S245D_RC) (#245)"
+    fail "fs_baseline_root must refuse every dodge spelling (A=$S245A_RC B=$S245B_RC D=$S245D_RC E=$S245E_RC F=$S245F_RC G=$S245G_RC) (#245)"
 fi
 
 # 12b. config.sh refresh(): the REAL extracted function over a fixture
@@ -996,16 +1011,30 @@ fi
 # sibling fs_baseline_root shape. rc 0 let a caller stamp "applied"
 # over nothing (executed in the b review); the warn alone did not stop
 # the unconditional stamp writes. Function extracted, never sourced.
-S245X2_ERR=$(sh -c '
-    eval "$(sed -n "/^ddev_handover_root() {/,/^}$/p" "$1")"
-    ddev_handover_root "$2" u g d' _ \
-    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/ddev-handover.sh" \
-    "$S245/link" 2>&1) && S245X2_RC=0 || S245X2_RC=$?
+# c X1 arms ride along: the form spellings (`link/.`, `link//`) and a
+# non-absolute root refuse too — review c's probe had the find walk
+# descend the TARGET through the old one-slash-only belt.
+_s245_dhr() {
+    sh -c '
+        eval "$(sed -n "/^ddev_handover_root() {/,/^}$/p" "$1")"
+        ddev_handover_root "$2" u g d' _ \
+        "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/ddev-handover.sh" \
+        "$1" 2>&1
+}
+S245X2_ERR=$(_s245_dhr "$S245/link") && S245X2_RC=0 || S245X2_RC=$?
+S245X3_ERR=$(_s245_dhr "$S245/link/.") && S245X3_RC=0 || S245X3_RC=$?
+S245X4_ERR=$(_s245_dhr "$S245/link//") && S245X4_RC=0 || S245X4_RC=$?
+S245X5_ERR=$(_s245_dhr ".") && S245X5_RC=0 || S245X5_RC=$?
 if [ "$S245X2_RC" -ne 0 ] &&
-    printf '%s' "$S245X2_ERR" | grep -qF 'is a symlink — refusing the ddev handover'; then
-    pass "ddev_handover_root belt refuses a link root with rc 1 (#245, b X2)"
+    printf '%s' "$S245X2_ERR" | grep -qF 'is a symlink — refusing the ddev handover' &&
+    [ "$S245X3_RC" -ne 0 ] && [ "$S245X4_RC" -ne 0 ] &&
+    printf '%s' "$S245X3_ERR" | grep -qF 'is a malformed root' &&
+    printf '%s' "$S245X4_ERR" | grep -qF 'is a malformed root' &&
+    [ "$S245X5_RC" -ne 0 ] &&
+    printf '%s' "$S245X5_ERR" | grep -qF 'is not an absolute path'; then
+    pass "ddev_handover_root belt refuses link, dodge spellings and non-absolute roots, all rc 1 (#245, b X2, c X1)"
 else
-    fail "ddev_handover_root belt must refuse link roots with rc 1 (rc=$S245X2_RC err=$S245X2_ERR) (#245, b X2)"
+    fail "ddev_handover_root belt must refuse every dodge spelling (X2=$S245X2_RC X3=$S245X3_RC X4=$S245X4_RC X5=$S245X5_RC) (#245)"
 fi
 if sed 's/^[[:space:]]*#.*$//' "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/status.sh" |
     grep -qF 'ui_atten "$root" "symlinked root — register the target directory instead"'; then

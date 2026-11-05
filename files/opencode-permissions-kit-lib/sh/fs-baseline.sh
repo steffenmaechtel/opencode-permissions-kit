@@ -355,25 +355,50 @@ _fsb_pass() {
 fs_baseline_root() {
     fsb_root="$1"
     fsb_group="$2"
+    # Root-form refusal (review c X1, issue #245): the belt below
+    # strips ONE trailing slash — `link//` lands on `link/` where
+    # [ -L ] is false, `link/.` has nothing to strip, and [ -d ]
+    # follows both (executed in review c: the FULL baseline ran
+    # through `link/.` onto the target, rc 0). No valid stored root
+    # carries these forms — the writer refuses them, the reader loops
+    # skip them — so the belt for direct and future callers refuses
+    # them outright: the writer's form set (absolute, no dot/empty
+    # segments, no whitespace; the system-path blocklist rides #247).
+    case "$fsb_root" in
+        /*) ;;
+        *)
+            printf '  error: %s is not an absolute path — refusing the group baseline\n' "$fsb_root" >&2
+            return 1
+            ;;
+    esac
+    case "$fsb_root" in
+        *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]*)
+            printf '  error: %s is a malformed root (dot/empty segment or whitespace) — refusing the group baseline\n' \
+                "$fsb_root" >&2
+            return 1
+            ;;
+    esac
     # Symlinked root refusal (issue #245), BEFORE the [ -n ] && [ -d ]
     # arm (review b X4): that arm follows a link and returns 0 — a
     # dangling link was a completely silent no-op for exactly the
     # direct/future callers the belt exists for. [ -L ] is true for a
-    # dangling link too (lstat sees the link itself), so both live and
-    # dangling links refuse loudly here. Every pass below the old
-    # position would have been a silent no-op on a live link — the
-    # find walks start at the link itself and visit nothing (measured,
-    # issue #245) — while the callers print "baseline applied" over a
-    # tree that got NOTHING. Fail loud: rc 1 plus the reason line —
-    # under the shipped set -e callers (config.sh, update.sh,
-    # install.sh all run set -eu) the rc aborts before any success
-    # line; the loop-side gates keep those flows from reaching the
-    # belt at all. Not a guarantee for future NON-set-e callers: they
-    # receive the rc and the reason, a caller that ignores both can
-    # still print its own success line (review a Q2). The
-    # trailing-slash strip is dodge-proofing: [ -L "path/" ] is false
-    # (kernel resolution through the slash — measured), and a raw-conf
-    # caller may hand the stored spelling through.
+    # dangling link too (lstat sees the link itself), so a bare link
+    # spelling — live or dangling — refuses loudly here; the slash/dot
+    # spellings that dodge [ -L ] are the form arms' catch above.
+    # Every pass below the old position would have been a silent
+    # no-op on a live link — the find walks start at the link itself
+    # and visit nothing (measured, issue #245) — while the callers
+    # print "baseline applied" over a tree that got NOTHING. Fail
+    # loud: rc 1 plus the reason line — under the shipped set -e
+    # callers (config.sh, update.sh, install.sh all run set -eu) the
+    # rc aborts before any success line; the loop-side gates keep
+    # those flows from reaching the belt at all. Not a guarantee for
+    # future NON-set-e callers: they receive the rc and the reason, a
+    # caller that ignores both can still print its own success line
+    # (review a Q2). The trailing-slash strip is dodge-proofing:
+    # [ -L "path/" ] is false (kernel resolution through the slash —
+    # measured), and a raw-conf caller may hand the stored spelling
+    # through.
     if [ -L "${fsb_root%/}" ]; then
         printf '  error: %s is a symlink — refusing the group baseline (register the target directory instead)\n' \
             "$fsb_root" >&2
