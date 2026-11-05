@@ -5,11 +5,11 @@
 # Background: the Windows user was detected via powershell.exe / cmd.exe,
 # which are frequently not on a WSL PATH — the probe failed silently, the
 # Windows CA (priority 1) was skipped, and an untrusted CA got reused
-# (browsers showed ddev sites as "not secure"). Both scripts now scan
-# /mnt/c/Users/*/AppData/Local/mkcert directly; update.sh also had the
-# search priorities inverted (Linux before Windows) — now matches install.
-# status.sh reports a fingerprint mismatch between the opencode CAROOT
-# and a found Windows CA.
+# (browsers showed ddev sites as "not secure"). install.sh now scans
+# /mnt/c/Users/*/AppData/Local/mkcert directly; update.sh carries no CA
+# provisioning at all anymore (legacy cleanup — pinned by the absence
+# check below). status.sh reports a fingerprint mismatch between the
+# opencode CAROOT and a found Windows CA.
 #
 # Static asserts on the repo files (no root, no WSL required).
 # Run: sh tests/unit/test-mkcert-reuse.sh
@@ -46,12 +46,12 @@ check() {
     fi
 }
 
-line_of() { grep -nF "$2" "$1" | head -1 | cut -d: -f1; }
+# line_of: first line (in the comment-stripped file, #385) containing $2.
+# The strip substitutes (never deletes), so the numbers stay real lines.
+line_of() { sed 's/^[[:space:]]*#.*$//' "$1" | grep -nF "$2" | head -1 | cut -d: -f1; }
 
 inst_win=$(line_of "$INSTALL" '/mnt/c/Users/*/AppData/Local/mkcert')
 inst_linux=$(line_of "$INSTALL" '$DEV_HOME/.local/share/mkcert/rootCA.pem')
-upd_win=$(line_of "$UPDATE" '/mnt/c/Users/*/AppData/Local/mkcert')
-upd_linux=$(line_of "$UPDATE" '/home/$DEFAULT_USER/.local/share/mkcert/rootCA.pem')
 
 echo ""
 echo "mkcert CA reuse Tests"

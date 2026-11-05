@@ -147,11 +147,15 @@ assert_exitcode "no --allow mode: exits non-zero" 1 python3 "$PARSER" --allow "$
 # --- 13b. Bundled template: TYPO3 ext_localconf.php carve-out (issue #23) ---
 # opencode applies the LAST matching rule, so each "*ext_localconf.php":
 # "allow" must sit after a "*conf.php": "deny" (read AND edit section).
+# JSONC comments (//) are stripped before the line greps (#385): the
+# template carries 90+ // lines, a commented rule must not anchor a pin.
+# The strip substitutes (never deletes) — numbering stays real.
 TPL="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/templates/opencode.jsonc"
-D1=$(grep -n '"\*conf\.php": "deny"' "$TPL" | sed -n 1p | cut -d: -f1)
-D2=$(grep -n '"\*conf\.php": "deny"' "$TPL" | sed -n 2p | cut -d: -f1)
-A1=$(grep -n '"\*ext_localconf\.php": "allow"' "$TPL" | sed -n 1p | cut -d: -f1)
-A2=$(grep -n '"\*ext_localconf\.php": "allow"' "$TPL" | sed -n 2p | cut -d: -f1)
+TPL_STRIPPED="$(sed 's/^[[:space:]]*\/\/.*$//' "$TPL")"
+D1=$(printf '%s\n' "$TPL_STRIPPED" | grep -n '"\*conf\.php": "deny"' | sed -n 1p | cut -d: -f1)
+D2=$(printf '%s\n' "$TPL_STRIPPED" | grep -n '"\*conf\.php": "deny"' | sed -n 2p | cut -d: -f1)
+A1=$(printf '%s\n' "$TPL_STRIPPED" | grep -n '"\*ext_localconf\.php": "allow"' | sed -n 1p | cut -d: -f1)
+A2=$(printf '%s\n' "$TPL_STRIPPED" | grep -n '"\*ext_localconf\.php": "allow"' | sed -n 2p | cut -d: -f1)
 assert_exitcode "carve-out: read allow after deny (issue #23)" 0 \
     sh -c "[ \"${A1:-0}\" -gt \"${D1:-999999}\" ]"
 assert_exitcode "carve-out: edit allow after deny (issue #23)" 0 \

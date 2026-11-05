@@ -226,9 +226,12 @@ for _pair in "m:m" "move:m" "c:c" "copy:c" "s:s" "skip:s"; do
         pass "agents form '$_in' normalizes to '$_want' (V1)" ||
         fail "agents form '$_in' normalizes to '$_want' (V1, got '$_opk_ag')"
 done
-# and it runs BEFORE the dispatch that fires the migration loop
-_norm_ln=$(grep -n 'normalize-agents-forms' "$_install_sh" | head -1 | cut -d: -f1)
-_disp_ln=$(grep -n 'm | move | c | copy)' "$_install_sh" | head -1 | cut -d: -f1)
+# and it runs BEFORE the dispatch that fires the migration loop.
+# Comment-stripped + live anchor (#385): the old pin grepped the
+# COMMENT naming 'normalize-agents-forms' (install.sh:2461) — a live
+# instance of the #384 b b1 class; the normalization ARM is the anchor.
+_norm_ln=$(sed 's/^[[:space:]]*#.*$//' "$_install_sh" | grep -nF 'm | move) _opk_ag=m ;;' | head -1 | cut -d: -f1)
+_disp_ln=$(sed 's/^[[:space:]]*#.*$//' "$_install_sh" | grep -n 'm | move | c | copy)' | head -1 | cut -d: -f1)
 [ -n "$_norm_ln" ] && [ -n "$_disp_ln" ] && [ "$_norm_ln" -lt "$_disp_ln" ] &&
     pass "normalization precedes the migration dispatch (V1)" ||
     fail "normalization precedes the migration dispatch (V1)"
@@ -393,9 +396,9 @@ if [ -n "$_outer_bail" ]; then
         fail "outer selection guard exits on the 5th empty read (W14, rc $_w14_rc)"
 fi
 # and --yes takes the documented skip: the SKIP_PROMPTS elif sits before
-# the interactive prompt block (order pin)
-_skip_ln=$(grep -n 'elif \[ "\$SKIP_PROMPTS" = true \]; then' "$_install_sh" | head -1 | cut -d: -f1)
-_prompt_ln=$(grep -n 'ui_section "Project roots"' "$_install_sh" | head -1 | cut -d: -f1)
+# the interactive prompt block (order pin; comment-stripped operands, #385)
+_skip_ln=$(sed 's/^[[:space:]]*#.*$//' "$_install_sh" | grep -n 'elif \[ "\$SKIP_PROMPTS" = true \]; then' | head -1 | cut -d: -f1)
+_prompt_ln=$(sed 's/^[[:space:]]*#.*$//' "$_install_sh" | grep -n 'ui_section "Project roots"' | head -1 | cut -d: -f1)
 [ -n "$_skip_ln" ] && [ -n "$_prompt_ln" ] && [ "$_skip_ln" -lt "$_prompt_ln" ] &&
     pass "--yes skip branch precedes the interactive prompt (W14)" ||
     fail "--yes skip branch precedes the interactive prompt (W14)"
@@ -721,8 +724,8 @@ if [ -n "$(sed -n '/^_distro_gate() {/,/^}/p' "$INSTALL")" ]; then
 else
     fail "_distro_gate extractable from install.sh"
 fi
-_dg_call_ln=$(grep -n '^    _distro_gate ' "$INSTALL" | head -1 | cut -d: -f1)
-_dg_menu_ln=$(grep -n 'ui_menu "How do you want to install?"' "$INSTALL" | head -1 | cut -d: -f1)
+_dg_call_ln=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -n '^    _distro_gate ' | head -1 | cut -d: -f1)
+_dg_menu_ln=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -n 'ui_menu "How do you want to install?"' | head -1 | cut -d: -f1)
 [ -n "$_dg_call_ln" ] && [ -n "$_dg_menu_ln" ] && [ "$_dg_call_ln" -lt "$_dg_menu_ln" ] &&
     pass "distro gate runs before the first interactive menu (order pin)" ||
     fail "distro gate runs before the first interactive menu (gate=$_dg_call_ln menu=$_dg_menu_ln)"
@@ -941,9 +944,9 @@ if grep -qF '_root_user_gate "$DEFAULT_USER"' "$INSTALL"; then
 else
     fail "do_plan_phase wires DEFAULT_USER into _root_user_gate (verbatim call pin)"
 fi
-_rug_call_ln=$(grep -n '^    _root_user_gate ' "$INSTALL" | head -1 | cut -d: -f1)
-_rug_charset_ln=$(grep -n "Invalid user name" "$INSTALL" | head -1 | cut -d: -f1)
-_rug_distro_ln=$(grep -n '^    _distro_gate ' "$INSTALL" | head -1 | cut -d: -f1)
+_rug_call_ln=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -n '^    _root_user_gate ' | head -1 | cut -d: -f1)
+_rug_charset_ln=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -n "Invalid user name" | head -1 | cut -d: -f1)
+_rug_distro_ln=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -n '^    _distro_gate ' | head -1 | cut -d: -f1)
 if [ -n "$_rug_call_ln" ] && [ -n "$_rug_charset_ln" ] && [ -n "$_rug_distro_ln" ] &&
     [ "$_rug_charset_ln" -lt "$_rug_call_ln" ] && [ "$_rug_call_ln" -lt "$_rug_distro_ln" ]; then
     pass "root gate runs after the charset gate, before the distro gate (order pin)"

@@ -265,8 +265,10 @@ else
 fi
 # the --version early-exec must stay ahead of the advisory block: scripts and
 # the official installer parse that output, the warning must never pollute it
-_verline=$(grep -n -m1 -- '--version | -v | -h | --help)' "$WRAPPER" | cut -d: -f1)
-_advline=$(grep -n -m1 '/sh/advisories.sh' "$WRAPPER" | cut -d: -f1)
+# (comment-stripped operands, #385 — comments around both blocks name the
+# subjects; one quoting a full literal must not become the anchor)
+_verline=$(sed 's/^[[:space:]]*#.*$//' "$WRAPPER" | grep -n -m1 -- '--version | -v | -h | --help)' | cut -d: -f1)
+_advline=$(sed 's/^[[:space:]]*#.*$//' "$WRAPPER" | grep -n -m1 '/sh/advisories.sh' | cut -d: -f1)
 if [ -n "$_verline" ] && [ -n "$_advline" ] && [ "$_verline" -lt "$_advline" ]; then
     pass "wrapper: --version early-exec stays ahead of the advisory check"
 else
@@ -438,8 +440,8 @@ if grep -qF 'medium) SEVERITY=moderate ;;' "$SCAN"; then
 else
     fail "advisory-watch.sh: GitHub's medium maps to the kit's moderate (F1)"
 fi
-_known_ln="$(grep -n 'grep -qxF "\$ID"' "$SCAN" | head -1 | cut -d: -f1)"
-_valid_ln="$(grep -n 'scan_advisory_valid "\$ID"' "$SCAN" | head -1 | cut -d: -f1)"
+_known_ln="$(sed 's/^[[:space:]]*#.*$//' "$SCAN" | grep -n 'grep -qxF "\$ID"' | head -1 | cut -d: -f1)"
+_valid_ln="$(sed 's/^[[:space:]]*#.*$//' "$SCAN" | grep -n 'scan_advisory_valid "\$ID"' | head -1 | cut -d: -f1)"
 if [ -n "$_known_ln" ] && [ -n "$_valid_ln" ] && [ "$_known_ln" -lt "$_valid_ln" ]; then
     pass "advisory-watch.sh: known-id dedup runs before shape validation (F1)"
 else
@@ -447,8 +449,8 @@ else
 fi
 # V12: the gh-issue dedup must also run before validation, and the id
 # charset gate must precede BOTH dedups (the gh search embeds the id).
-_tracked_ln="$(grep -n 'TRACKED=\$(gh issue list' "$SCAN" | head -1 | cut -d: -f1)"
-_idclean_ln="$(grep -n 'scan_id_clean "\$ID"' "$SCAN" | head -1 | cut -d: -f1)"
+_tracked_ln="$(sed 's/^[[:space:]]*#.*$//' "$SCAN" | grep -n 'TRACKED=\$(gh issue list' | head -1 | cut -d: -f1)"
+_idclean_ln="$(sed 's/^[[:space:]]*#.*$//' "$SCAN" | grep -n 'scan_id_clean "\$ID"' | head -1 | cut -d: -f1)"
 if [ -n "$_idclean_ln" ] && [ -n "$_tracked_ln" ] && [ "$_idclean_ln" -lt "$_tracked_ln" ] &&
     [ -n "$_valid_ln" ] && [ "$_tracked_ln" -lt "$_valid_ln" ]; then
     pass "advisory-watch.sh: id gate -> both dedups -> validation (V12)"

@@ -985,12 +985,23 @@ rm -rf "$VN"
 E2ELIB="$SCRIPT_DIR/../e2e/lib.sh"
 check "fix a M1: status tier-1 probe runs ddev from / — no caller cwd" \
     sh -c 'grep -qF "(cd / && \"\$_st_bin\" --version)" "$1" && ! grep -qF "[ -n \"\$_st_bin\" ] && _st_ver=" "$1"' _ "$STATUS"
+# e2e_cleanup body, comment-stripped once (#387 a a1): the presence arm
+# and the NR anchors below must not ride comment lines — the body
+# carries a ~10-line comment block around the dump gate, one comment
+# naming e2e_dump_container would anchor the pin and hide motion of
+# the live call. e2e_finish likewise (#387 b b1): the negative arm
+# must not false-FAIL on a prose mention of the dump in its comments.
+_ecl_str="$(awk '/^e2e_cleanup\(\)/,/^}/' "$E2ELIB" | sed 's/^[[:space:]]*#.*$//')"
+_efn_str="$(awk '/^e2e_finish\(\)/,/^}/' "$E2ELIB" | sed 's/^[[:space:]]*#.*$//')"
 check "fix a M2: e2e dump hooked in e2e_cleanup (every exit path), not e2e_finish" \
-    sh -c "awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | grep -q e2e_dump_container && ! awk '/^e2e_finish\(\)/,/^}/' \"\$1\" | grep -q e2e_dump_container" _ "$E2ELIB"
+    sh -c "test -n \"\$1\" && test -n \"\$2\" && printf '%s\n' \"\$1\" | grep -q e2e_dump_container && ! printf '%s\n' \"\$2\" | grep -q e2e_dump_container" _ "$_ecl_str" "$_efn_str"
 check "fix a M2: the dump precedes the cleanup rm (evidence before destruction)" \
-    sh -c "awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | awk '/e2e_dump_container/{if (d == 0) d = NR} /^[[:space:]]*docker rm -f/{if (r == 0) r = NR} END{exit !(d > 0 && r > 0 && d < r)}'" _ "$E2ELIB"
+    sh -c "printf '%s\n' \"\$1\" | awk '/e2e_dump_container/{if (d == 0) d = NR} /^[[:space:]]*docker rm -f/{if (r == 0) r = NR} END{exit !(d > 0 && r > 0 && d < r)}'" _ "$_ecl_str"
+# _e2e_dump_strip body, comment-stripped (#387 c c1 / d d1 — the whole
+# block greps stripped streams; the raw shape stays in the deferred family)
+_eds_str="$(awk '/^_e2e_dump_strip\(\)/,/^}/' "$E2ELIB" | sed 's/^[[:space:]]*#.*$//')"
 check "fix a S3: symlinks stripped from the dump (docker cp preserves them)" \
-    sh -c "awk '/^_e2e_dump_strip\(\)/,/^}/' \"\$1\" | grep -q -- '-type l -delete'" _ "$E2ELIB"
+    sh -c "printf '%s\n' \"\$1\" | grep -q -- '-type l -delete'" _ "$_eds_str"
 check "fix a Q3: install.sh probes the ddev version subcommand from /" \
     sh -c 'grep -q "env HOME=\"\$DEV_HOME\" sh -c .cd / && exec" "$1" && ! grep -q "\"\$DDEV_BIN_DEV\" version" "$1"' _ "$INSTALL"
 check "fix a M3: config.sh probes the ddev version from /" \
@@ -1022,13 +1033,13 @@ check "fix b M1: install.sh root probe from / (consistency)" \
 check "fix b M1: update.sh root fallback probe from / (consistency)" \
     sh -c 'grep -qF "(cd / && \"\$_ddev_bin\" --version)" "$1" && ! grep -qF "\"\$_ddev_bin\" --version 2>/dev/null" "$1"' _ "$UPDATE"
 check "fix b M4/S3: dump gate sees the exit status, not only counted failures" \
-    sh -c "awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | grep -qF '_ecc_rc=\$?' && awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | grep -qF '\"\$_ecc_rc\" -ne 0'" _ "$E2ELIB"
+    sh -c "printf '%s\n' \"\$1\" | grep -qF '_ecc_rc=\$?' && printf '%s\n' \"\$1\" | grep -qF '\"\$_ecc_rc\" -ne 0'" _ "$_ecl_str"
 check "fix b M4: dump fires before the keep branches (red --debug runs get evidence)" \
-    sh -c "awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | awk '/e2e_dump_container/{if (d == 0) d = NR} /E2E_KEEP.*keeping container/{if (k == 0) k = NR} END{exit !(d > 0 && k > 0 && d < k)}'" _ "$E2ELIB"
+    sh -c "printf '%s\n' \"\$1\" | awk '/e2e_dump_container/{if (d == 0) d = NR} /E2E_KEEP.*keeping container/{if (k == 0) k = NR} END{exit !(d > 0 && k > 0 && d < k)}'" _ "$_ecl_str"
 check "fix b M4: E2E_KEEP stays dump-free by design" \
-    sh -c "awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | grep -qF '[ \"\${E2E_KEEP:-0}\" != \"1\" ]'" _ "$E2ELIB"
+    sh -c "printf '%s\n' \"\$1\" | grep -qF '[ \"\${E2E_KEEP:-0}\" != \"1\" ]'" _ "$_ecl_str"
 check "fix b S1: strip notice is conditional — success and failure arms both named" \
-    sh -c "awk '/^_e2e_dump_strip\(\)/,/^}/' \"\$1\" | grep -q 'symlinks stripped' && awk '/^_e2e_dump_strip\(\)/,/^}/' \"\$1\" | grep -q 'strip failed'" _ "$E2ELIB"
+    sh -c "printf '%s\n' \"\$1\" | grep -q 'symlinks stripped' && printf '%s\n' \"\$1\" | grep -q 'strip failed'" _ "$_eds_str"
 # Functional L1 pin for the strip failure path (find untraversable subdir):
 # extract _e2e_dump_strip, run it against a scratch dump with a 000-dir and
 # a surviving symlink — the WARNING arm must fire and the link must survive.
@@ -1071,7 +1082,10 @@ check "fix c M1: no bare ddev-hosts invocation remains outside the helper (invoc
 check "fix c S1: ddev-migrate absolutizes a relative dump-dir" \
     sh -c "grep -qF 'dm_dir=\"\$PWD/\$dm_dir\"' \"\$1\" && grep -qF 'case \"\$dm_dir\" in' \"\$1\"" _ "$MIGRATESH"
 check "fix d M1: empty-dir refusal precedes the absolutization (guard hoisted)" \
-    sh -c 'g=$(grep -nF "[ -n \"\$dm_dir\" ] ||" "$1" | head -1 | cut -d: -f1); c=$(grep -nF "case \"\$dm_dir\" in" "$1" | head -1 | cut -d: -f1); test -n "$g" && test -n "$c" && test "$g" -lt "$c"' _ "$MIGRATESH"
+    sh -c 's=$(sed "s/^[[:space:]]*#.*\$//" "$1");
+        g=$(printf "%s\n" "$s" | grep -nF "[ -n \"\$dm_dir\" ] ||" | head -1 | cut -d: -f1);
+        c=$(printf "%s\n" "$s" | grep -nF "case \"\$dm_dir\" in" | head -1 | cut -d: -f1);
+        test -n "$g" && test -n "$c" && test "$g" -lt "$c"' _ "$MIGRATESH"
 check "fix c L1: container guard precedes the dumps mkdir" \
     sh -c "awk '/^e2e_dump_container\(\)/,/^}/' \"\$1\" | grep -vE '^[[:space:]]*#' | awk '/E2E_CONTAINER/{if (g == 0) g = NR} /mkdir -p/{if (m == 0) m = NR} END{exit !(g > 0 && m > 0 && g < m)}'" _ "$E2ELIB"
 check "fix c L2: the rc capture is the FIRST statement of the trap handler" \

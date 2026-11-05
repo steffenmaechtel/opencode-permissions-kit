@@ -613,9 +613,9 @@ fi
 
 # The uid/gid capture must happen BEFORE the user removal: after userdel
 # the name no longer resolves and only the numeric ids can still match
-# the orphaned files.
-CAPTURE_LINE=$(grep -n 'UN_OC_UID=' "$UNINSTALL" | head -1 | cut -d: -f1)
-USERDEL_LINE=$(grep -n 'sudo userdel -r' "$UNINSTALL" | head -1 | cut -d: -f1)
+# the orphaned files. (Comment-stripped operands, #385.)
+CAPTURE_LINE=$(sed 's/^[[:space:]]*#.*$//' "$UNINSTALL" | grep -n 'UN_OC_UID=' | head -1 | cut -d: -f1)
+USERDEL_LINE=$(sed 's/^[[:space:]]*#.*$//' "$UNINSTALL" | grep -n 'sudo userdel -r' | head -1 | cut -d: -f1)
 if [ -n "$CAPTURE_LINE" ] && [ -n "$USERDEL_LINE" ] && [ "$CAPTURE_LINE" -lt "$USERDEL_LINE" ]; then
     pass "ownership revert: ids captured before userdel (orphan-proof)"
 else

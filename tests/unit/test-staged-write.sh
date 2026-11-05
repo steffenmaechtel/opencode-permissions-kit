@@ -382,7 +382,9 @@ fi
 # still discriminating — no count here, unlike bin/opk's exactly-twice
 # pins; wording corrected 0.0.45f W3).
 _dh_order() {
-    _dh_blk=$(sed -n "/^$1()/,/^}/p" "$HANDOVER")
+    # comment-stripped at extraction (#385): sed s/// keeps the line
+    # numbers stable for the -lt comparison below
+    _dh_blk=$(sed -n "/^$1()/,/^}/p" "$HANDOVER" | sed 's/^[[:space:]]*#.*$//')
     _dh_cl=$(printf '%s\n' "$_dh_blk" | grep -nF 'chmod -R g+w "' | head -1 | cut -d: -f1)
     _dh_hl=$(printf '%s\n' "$_dh_blk" | grep -nF 'chown -R "' | head -1 | cut -d: -f1)
     [ -n "$_dh_cl" ] && [ -n "$_dh_hl" ] || return 1
@@ -564,7 +566,7 @@ check "gates: install.sh agents-migration operand gate" \
 # (walk while the copied-in tree is still dev-owned; chown-first is the
 # scan-then-act window on re-installs over a live agent) — static line
 # order inside _opk_migrate_one (defined indented inside Step 8a).
-_mig_blk="$(sed -n '/^    _opk_migrate_one() {/,/^    }$/p' "$INSTALL")"
+_mig_blk="$(sed -n '/^    _opk_migrate_one() {/,/^    }$/p' "$INSTALL" | sed 's/^[[:space:]]*#.*$//')"
 _mig_chmod="$(printf '%s\n' "$_mig_blk" | grep -nF 'find "$_opk_dst" -type d -exec chmod g+rwxs' | cut -d: -f1)"
 _mig_chown="$(printf '%s\n' "$_mig_blk" | grep -nF 'chown -R "$OPENCODE_USER:$OPENCODE_GROUP" "$_opk_dst"' | cut -d: -f1)"
 if [ -n "$_mig_chmod" ] && [ -n "$_mig_chown" ] && [ "$_mig_chmod" -lt "$_mig_chown" ]; then
