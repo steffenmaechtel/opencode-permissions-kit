@@ -171,6 +171,14 @@ assert_contains "raw-disk: corrected \"> /dev/sd*\" deny present (#378)" \
     '"> /dev/sd*": "deny"' "$TPL_STRIPPED"
 assert_not_contains "raw-disk: dead stray-colon form gone (#378)" \
     '">: /dev/sd*"' "$TPL_STRIPPED"
+# Append-redirect siblings (#390 round a, A2): ">> /dev/sdb" matched
+# neither the corrected deny nor the "> /etc/*" sibling — both deny rules
+# carry an append form now (class sweep: these two are the only redirect
+# denies). Presence pins in the waived #378 shape: no fnmatch probes.
+assert_contains "raw-disk: append-redirect deny present (#390 a A2)" \
+    '">> /dev/sd*": "deny"' "$TPL_STRIPPED"
+assert_contains "etc-redirect: append-redirect deny present (#390 a A2)" \
+    '">> /etc/*": "deny"' "$TPL_STRIPPED"
 
 # --- 14. --tools: no permission.bash → no tools ---
 OUT=$(python3 "$PARSER" --tools "$FIXTURES/block-comments.jsonc" 2>/dev/null || true)

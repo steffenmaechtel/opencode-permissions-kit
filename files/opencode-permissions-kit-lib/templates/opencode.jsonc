@@ -114,6 +114,7 @@
             // matching rule, so these override any broader allow above.
             "rm -rf /*": "deny",
             "> /dev/sd*": "deny",
+            ">> /dev/sd*": "deny",
             "dd if=/dev/zero*": "deny",
             "dd of=/dev/sd*": "deny",
             "dd if=/dev/urandom of=/*": "deny",
@@ -127,6 +128,7 @@
             "chgrp -R * /*": "deny",
             "mount *": "deny",
             "> /etc/*": "deny",
+            ">> /etc/*": "deny",
             "shred /*": "deny",
             // CONTAINER TOOLS — the global config denies docker/ddev so
             // nothing is granted implicitly; a project opts in via its own
