@@ -136,6 +136,29 @@ rc_is 1 "mixed suite: any failure -> rc 1"
 has "Passed: 3" "mixed run: passes tallied"
 has "Failed: 2" "mixed run: failures tallied"
 
+# --- 7. row bytes under the coverage shell (bash) --------------------------------
+# Fidelity arm (the #397 CI failure): the coverage run executes suites
+# with a PATH shim resolving sh to bash (#343), and bash echo does NOT
+# interpret \033 -- rows must not rely on echo escape interpretation.
+# The harness prints via printf '%b', so the bytes are identical under
+# both shells. On a host without bash the arm degrades to sh (which
+# still pins the row bytes, just not the cross-shell property -- kcov
+# itself needs bash, so such hosts never run the coverage job).
+_arm_sh="sh"
+command -v bash >/dev/null 2>&1 && _arm_sh="bash"
+_arm_rc=0
+_arm_out="$($_arm_sh -c '. "$1"; pass one; fail boom' x "$HARNESS" 2>&1)" || _arm_rc=$?
+if arm_plain | grep -qF '[0;32mPASS[0m  one'; then
+    ok "PASS row bytes identical under $_arm_sh (coverage-shell fidelity)"
+else
+    bad "PASS row bytes identical under $_arm_sh (coverage-shell fidelity)"
+fi
+if arm_plain | grep -qF '[0;31mFAIL[0m  boom'; then
+    ok "FAIL row bytes identical under $_arm_sh (coverage-shell fidelity)"
+else
+    bad "FAIL row bytes identical under $_arm_sh (coverage-shell fidelity)"
+fi
+
 # --- summary gate (independent on purpose -- see header) ------------------------
 echo ""
 if [ "$bad" -gt 0 ]; then

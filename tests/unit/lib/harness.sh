@@ -13,9 +13,13 @@
 #     . "$SCRIPT_DIR/lib/harness.sh"
 #
 # Provides:
-#   pass / fail          the counted PASS/FAIL rows (identical bytes to
-#                        the duplicated definitions: colors, two-space
-#                        indent, message last)
+#   pass / fail          the counted PASS/FAIL rows -- printf '%b' based,
+#                        byte-identical to the old echo definitions under
+#                        sh/dash (the suites' runtime) AND under bash
+#                        (the coverage shell: scripts/coverage.sh
+#                        resolves sh to bash for kcov, and bash echo
+#                        does not interpret \033 -- PR #397 CI caught
+#                        the echo form differing there)
 #   check <desc> cmd...  pass/fail around a command's rc
 #   assert_eq <desc> <expected> <actual>
 #                        string-equality assertion with expected/got
@@ -55,11 +59,11 @@ passed=0
 failures=0
 
 pass() {
-    echo "  ${GREEN}PASS${NC}  $1"
+    printf '  %bPASS%b  %s\n' "$GREEN" "$NC" "$1"
     passed=$((passed + 1))
 }
 fail() {
-    echo "  ${RED}FAIL${NC}  $1"
+    printf '  %bFAIL%b  %s\n' "$RED" "$NC" "$1"
     failures=$((failures + 1))
 }
 
@@ -82,9 +86,9 @@ suite_done() {
     _label="$1"
     echo ""
     echo "===================================="
-    echo "  ${GREEN}Passed: $passed${NC}"
+    printf '  %bPassed: %s%b\n' "$GREEN" "$passed" "$NC"
     if [ "$failures" -gt 0 ]; then
-        echo "  ${RED}Failed: $failures${NC}"
+        printf '  %bFailed: %s%b\n' "$RED" "$failures" "$NC"
         exit 1
     fi
     echo "  All $_label passed."
