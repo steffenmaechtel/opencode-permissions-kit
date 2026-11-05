@@ -17,28 +17,15 @@
 # Run: sh tests/unit/test-workflows.sh
 set -u
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 WF_TEST="$REPO/.github/workflows/test-unit.yml"
+# Shared harness (issue #394): pass/fail, colors, counters
+# (and check/assert_eq where present) live in lib/harness.sh now.
+. "$REPO/tests/unit/lib/harness.sh"
 WF_E2E="$REPO/.github/workflows/test-e2e.yml"
 WF_DDEV_E2E="$REPO/.github/workflows/test-e2e-ddev.yml"
 WF_ADVISORY="$REPO/.github/workflows/advisory-watch.yml"
 WF_PAGES="$REPO/.github/workflows/pages.yml"
-
-failures=0
-passed=0
-
-pass() {
-    echo "  ${GREEN}PASS${NC}  $1"
-    passed=$((passed + 1))
-}
-fail() {
-    echo "  ${RED}FAIL${NC}  $1"
-    failures=$((failures + 1))
-}
 
 TMP_REQ="$(mktemp)"
 TMP_755="$(mktemp)"

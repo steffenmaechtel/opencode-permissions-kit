@@ -13,30 +13,17 @@
 # Run: sh tests/unit/test-pages.sh
 set -u
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 WF="$REPO/.github/workflows/pages.yml"
 INDEX="$REPO/.github/pages/index.md"
 CONFIG="$REPO/.github/pages/_config.yml"
+# Shared harness (issue #394): pass/fail, colors, counters
+# (and check/assert_eq where present) live in lib/harness.sh now.
+. "$REPO/tests/unit/lib/harness.sh"
 
 ENTRY_INSTALL="https://steffenmaechtel.github.io/opencode-permissions-kit/install.sh"
 ENTRY_UPDATE="https://steffenmaechtel.github.io/opencode-permissions-kit/update.sh"
 RAW_BRANCH="https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/refs/heads/<branch>/"
-
-failures=0
-passed=0
-
-pass() {
-    echo "  ${GREEN}PASS${NC}  $1"
-    passed=$((passed + 1))
-}
-fail() {
-    echo "  ${RED}FAIL${NC}  $1"
-    failures=$((failures + 1))
-}
 
 # --- 1. deploy workflow ---------------------------------------------------
 

@@ -36,14 +36,10 @@
 
 set -u
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+# Shared harness (issue #394): pass/fail, colors, counters
+# (and check/assert_eq where present) live in lib/harness.sh now.
+. "$REPO_ROOT/tests/unit/lib/harness.sh"
 cd "$REPO_ROOT" || exit 1
-
-pass() { echo "  PASS  $1"; }
-fail() {
-    echo "  FAIL  $1"
-    failures=$((failures + 1))
-}
-failures=0
 
 if ! command -v shfmt >/dev/null 2>&1; then
     echo "  error  shfmt is not installed -- run tests/check-host.sh"

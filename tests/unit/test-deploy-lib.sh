@@ -13,25 +13,12 @@
 # Run: sh tests/unit/test-deploy-lib.sh
 set -u
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$SCRIPT_DIR/../.." && pwd)"
 LIB="$REPO/files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
-
-failures=0
-passed=0
-
-pass() {
-    echo "  ${GREEN}PASS${NC}  $1"
-    passed=$((passed + 1))
-}
-fail() {
-    echo "  ${RED}FAIL${NC}  $1"
-    failures=$((failures + 1))
-}
+# Shared harness (issue #394): pass/fail, colors, counters
+# (and check/assert_eq where present) live in lib/harness.sh now.
+. "$SCRIPT_DIR/lib/harness.sh"
 
 check() {
     _d="$1"
