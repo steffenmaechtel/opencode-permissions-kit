@@ -155,8 +155,7 @@ mode_allows_other() {
     [ $((0$m & 0004)) -ne 0 ]
 }
 mode_is_restricted() { ! mode_allows_other "$1"; }
-TMPDIR=$(mktemp -d)
-trap 'rm -rf "$TMPDIR"' EXIT INT TERM
+TMPDIR=$(work_new)
 mkdir -p "$TMPDIR/open" "$TMPDIR/locked"
 chmod 777 "$TMPDIR/open"
 chmod 770 "$TMPDIR/locked"

@@ -14,8 +14,7 @@ PARSER="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/py/jsonc-parser.py"
 # (and check/assert_eq where present) live in lib/harness.sh now.
 . "$SCRIPT_DIR/lib/harness.sh"
 
-TMPDIR=$(mktemp -d)
-trap 'rm -rf "$TMPDIR"' EXIT INT TERM
+TMPDIR=$(work_new)
 
 echo ""
 echo "Git-Config Toggle (SECURE_GIT) Tests"

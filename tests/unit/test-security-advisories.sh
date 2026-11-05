@@ -315,14 +315,7 @@ fi
 # shell metacharacters must stay literal data — and be rejected outright;
 # single quotes hand the payload to the guard as TEXT, the marker file
 # proves nothing anywhere ever executed it
-PWNED_DIR="$(mktemp -d)"
-# Cover every mktemp receiver of this suite on abort and signals (#283):
-# the suite had no trap at all, so a set -e abort between creation and
-# the inline rm leaked the scratch in /tmp. Receivers created further
-# down (FEED_PY/FEED_JSON) sit in the same list unset-safe — an unset
-# operand expands empty and rm -rf skips it. Sibling idiom: the
-# EXIT INT TERM scratch traps in test-fs-baseline.sh / test-project-paths.sh.
-trap 'rm -rf "${PWNED_DIR:-}" "${FEED_PY:-}" "${FEED_JSON:-}"' EXIT INT TERM
+PWNED_DIR="$(work_new)"
 PWNED="$PWNED_DIR/pwned"
 if scan_advisory_valid 'GHSA-632h$(touch '"$PWNED"')' "high" "<1.0.216" "1.0.216"; then
     fail "scan guard: command-substitution payload rejected"
@@ -372,7 +365,7 @@ fi
 # IFS whitespace — empty fields collapse and shift columns under read),
 # JSON null fields coerce to "" instead of killing the parse, and the
 # shell boundary maps GitHub's "medium" onto the kit's "moderate".
-FEED_PY="$(mktemp)"
+FEED_PY="$(work_new_file)"
 sed -n "/python3 -c '/,/2>\\/dev\\/null); then/p" "$SCAN" |
     sed -e "1s/^.*python3 -c '//" -e '$d' >"$FEED_PY"
 if [ -s "$FEED_PY" ] && grep -q '^import json,sys' "$FEED_PY"; then
@@ -380,7 +373,7 @@ if [ -s "$FEED_PY" ] && grep -q '^import json,sys' "$FEED_PY"; then
 else
     fail "advisory-watch.sh: feed parser extractable"
 fi
-FEED_JSON="$(mktemp)"
+FEED_JSON="$(work_new_file)"
 cat >"$FEED_JSON" <<'EOF'
 [
  {"ghsa_id":"GHSA-1111-1111-1111","severity":"medium","html_url":"https://example/1",

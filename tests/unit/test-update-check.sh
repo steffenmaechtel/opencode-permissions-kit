@@ -35,8 +35,7 @@ else
     fail "shipped lib sh/update-check.sh not found at $LIB (run from the checkout)"
 fi
 
-WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT INT TERM
+WORK="$(work_new)"
 
 # Mirror fixture: KIT_UPDATE_HOST=file://$WORK/kit makes the lib fetch
 # $WORK/kit/<channel>/VERSION — curl reads file:// URLs like any other.

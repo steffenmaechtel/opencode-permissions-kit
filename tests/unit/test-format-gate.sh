@@ -113,12 +113,11 @@ else
 fi
 
 # --- 2+3. editorconfig equivalence + discrimination (scratch probe) -------------
-_scratch="$(mktemp -d)"
+_scratch="$(work_new)"
 if [ ! -d "$_scratch" ]; then
     echo "  error  scratch setup failed (mktemp) -- aborting (D4 guard)"
     exit 1
 fi
-trap 'rm -rf "${_scratch:-}" "${_isf:-}"' EXIT INT TERM
 
 # The probe violates every gate dimension (review a C8, #301 — carry
 # the axes a flags/editorconfig drift would change): tab indent,
@@ -209,8 +208,9 @@ fi
 # success stub proves the SHFMT_BIN_DIR destination redirect positively
 # (review b D2: failure-path assertions alone cannot), a stale
 # .shfmt.tmp.* orphan is swept by a successful run (review b D7), and
-# the scratch dir joins the trap (review b D5). No network anywhere.
-_isf="$(mktemp -d)"
+# the scratch dir registers with the work registry (#395; review b D5
+# made it trap-covered). No network anywhere.
+_isf="$(work_new)"
 if [ -d "$_isf" ]; then
     mkdir -p "$_isf/bin"
     # failing curl: `curl -fsSL -o <path> <url>` -> $3 is the -o

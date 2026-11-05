@@ -42,8 +42,7 @@ TUIPLUGIN="$REPO/files/opencode-permissions-kit-lib/sh/tui-plugin.sh"
 # load-bearing the moment a call does.
 umask 022
 
-WORK=$(mktemp -d)
-trap 'rm -rf "$WORK"' EXIT INT TERM
+WORK=$(work_new)
 
 echo ""
 echo "staged-write + handover symlink gates (0.0.39g S1/S2 + follow-ups)"

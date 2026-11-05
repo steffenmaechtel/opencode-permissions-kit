@@ -42,9 +42,7 @@ check_fail() {
     fi
 }
 
-WORK=$(mktemp -d)
-# widen to the bare _w5dir/F3ROOT receivers + signal arms (#283)
-trap 'rm -rf "${WORK:-}" "${_w5dir:-}" "${F3ROOT:-}"' EXIT INT TERM
+WORK=$(work_new)
 
 echo ""
 echo "ddev database migration Tests (issue #15)"
@@ -896,7 +894,7 @@ check "run-as never runs a command-less env" \
 # the genuine no-manifest case, a mktemp failure returned 1 SILENTLY.
 # Distinct messages now. The root guard is bypassed with an id shim —
 # every path under test exits before the first sudo call.
-_w5dir="$(mktemp -d)"
+_w5dir="$(work_new)"
 mkdir -p "$_w5dir/bin" "$_w5dir/bin-mk" "$_w5dir/dump"
 printf '#!/bin/sh\necho 0\n' >"$_w5dir/bin/id"
 cp "$_w5dir/bin/id" "$_w5dir/bin-mk/id"
@@ -955,7 +953,7 @@ check_fail "import no longer word-splits an env string" \
 # The list arm's bare `[ "$dm_found" = 0 ] && echo` tail made the arm
 # exit 1 whenever dump directories EXISTED — success read as failure.
 # Drive the real binary against a scratch backup root both ways.
-F3ROOT=$(mktemp -d)
+F3ROOT=$(work_new)
 mkdir -p "$F3ROOT/ddev-migration-20261020-1200"
 printf 'db.sql\n' >"$F3ROOT/ddev-migration-20261020-1200/db.sql"
 F3RC=0
