@@ -90,9 +90,12 @@ check "empty cache fails loud (FAIL message + adjacent exit 1, #224 b W1)" \
     sh -c "grep -q 'cannot resolve opencode version and no cached version available' \"\$1\" && grep -A1 'cannot resolve opencode version' \"\$1\" | grep -q 'exit 1'" _ "$LIB"
 # The pin must not just EXIST but WIN: the assignment has to sit before the
 # default resolution, or the resolved value is clobbered after the fact
-# (#224 a W6 — presence-only would stay green under reordering).
-_pin_ln=$(grep -n 'OC_VERSION="\$E2E_OC_VERSION"' "$LIB" | head -1 | cut -d: -f1)
-_res_ln=$(grep -n 'OC_VERSION=\$(npm_dist_latest "\$target")' "$LIB" | head -1 | cut -d: -f1)
+# (#224 a W6 — presence-only would stay green under reordering). Both
+# greps run over the comment-stripped lib (#385): a future comment
+# quoting either literal must not become the pin's anchor.
+_pin_ln=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -n 'OC_VERSION="\$E2E_OC_VERSION"' | head -1 | cut -d: -f1)
+_res_ln=$(sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    grep -n 'OC_VERSION=\$(npm_dist_latest "\$target")' | head -1 | cut -d: -f1)
 if [ -n "$_pin_ln" ] && [ -n "$_res_ln" ] && [ "$_pin_ln" -lt "$_res_ln" ]; then
     pass "a pin wins before any resolution (order pinned, line $_pin_ln < $_res_ln)"
 else
