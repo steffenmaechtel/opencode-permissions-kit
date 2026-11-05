@@ -161,6 +161,17 @@ assert_exitcode "carve-out: read allow after deny (issue #23)" 0 \
 assert_exitcode "carve-out: edit allow after deny (issue #23)" 0 \
     sh -c "[ \"${A2:-0}\" -gt \"${D2:-999999}\" ]"
 
+# --- 13c. Bundled template: raw-disk redirect deny must not be dead (#378) ---
+# The rule shipped broken since the initial commit: ">: /dev/sd*" (stray
+# colon) matched nothing, so raw-disk redirects fell through to the "*":
+# "ask" catch-all. Corrected to the "> /etc/*" sibling shape — pin keeps
+# the corrected form in and the dead form out (fixed strings, comment-
+# stripped template, same discipline as 13b).
+assert_contains "raw-disk: corrected \"> /dev/sd*\" deny present (#378)" \
+    '"> /dev/sd*": "deny"' "$TPL_STRIPPED"
+assert_not_contains "raw-disk: dead stray-colon form gone (#378)" \
+    '">: /dev/sd*"' "$TPL_STRIPPED"
+
 # --- 14. --tools: no permission.bash → no tools ---
 OUT=$(python3 "$PARSER" --tools "$FIXTURES/block-comments.jsonc" 2>/dev/null || true)
 assert_empty "tools: no bash section → no tools" "$OUT"

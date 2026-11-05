@@ -113,7 +113,7 @@
             // Must come AFTER the allow rules: opencode applies the LAST
             // matching rule, so these override any broader allow above.
             "rm -rf /*": "deny",
-            ">: /dev/sd*": "deny",
+            "> /dev/sd*": "deny",
             "dd if=/dev/zero*": "deny",
             "dd of=/dev/sd*": "deny",
             "dd if=/dev/urandom of=/*": "deny",
