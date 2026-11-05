@@ -17,6 +17,17 @@ Multiple paths at once are fine, and `~` works. System paths (`/`, `/usr`,
 `/var/www/vhosts` or `~/dev`. Adding a root applies the **group baseline**
 (group `opencode`, setgid, default ACLs `g:opencode:rwx`) in one step.
 
+A project root must be a **real directory** — a path that is itself a
+symlink is refused (`projects add`, `handover`, `refresh`, `opk update`,
+and the uninstaller all skip it with a warning). The baseline would
+silently do nothing on a link while reporting success, so register the
+link's target directory instead:
+
+```bash
+opk config projects add /var/www/vhosts/new-project   # a real directory, not a link
+readlink -f /var/www/vhosts/my-link                   # resolve a link to its target first
+```
+
 Roots below your home directory (like `~/dev`) work too: adding or
 refreshing a root also grants **traverse-only** ACLs (`g:opencode:--x`, no
 listing/reading) on ancestors that would otherwise block the agent — a home

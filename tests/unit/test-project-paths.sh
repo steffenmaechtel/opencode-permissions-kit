@@ -157,6 +157,73 @@ for p in $ACCEPT; do
     fi
 done
 
+# --- issue #245: a root entry that IS a symlink is refused -----------
+# Measured (issue #245 comment, ext4 + overlayfs): every consumer of a
+# symlinked conf root operates on the wrong object — the find-based
+# baseline passes visit NOTHING (a silent no-op under the callers'
+# "baseline applied" lines), chmod g-s / setfacl -R -x dereference onto
+# the TARGET. The writer refuses links outright. The fixture lives in
+# scratch (blocklisted /tmp): the REASON line discriminates the symlink
+# arm from the blocklist, which fires either way — and must NOT fire
+# for the real directory next to the link.
+_pp245w="$(mktemp -d)"
+# widened later by the #357 a C1 trap chain; this narrow one covers the
+# window until then (the #280 c C1 leak class)
+trap 'rm -rf "$_pp245w"' EXIT INT TERM
+mkdir -p "$_pp245w/realroot"
+ln -s "$_pp245w/realroot" "$_pp245w/linkroot"
+_pp245_err=$(project_path_sane "$_pp245w/linkroot" 2>&1 >/dev/null) && _pp245_rc=0 || _pp245_rc=$?
+if [ "$_pp245_rc" -ne 0 ] &&
+    printf '%s' "$_pp245_err" | grep -qF "is a symlink — project roots must be real directories"; then
+    pass "refuses a symlinked root, with the symlink reason on stderr (#245)"
+else
+    fail "refuses a symlinked root with reason (rc=$_pp245_rc err=$_pp245_err) (#245)"
+fi
+# The trailing-slash spelling must hit the SAME arm: the entry-time
+# ${1%/} strip normalizes before the [ -L ] — a lexical gate keyed on
+# the raw input would dodge it ([ -L "path/" ] is false, measured).
+_pp245_err=$(project_path_sane "$_pp245w/linkroot/" 2>&1 >/dev/null) && _pp245_rc=0 || _pp245_rc=$?
+if [ "$_pp245_rc" -ne 0 ] &&
+    printf '%s' "$_pp245_err" | grep -qF "is a symlink — project roots must be real directories"; then
+    pass "trailing-slash spelling of the link: same refusal (#245)"
+else
+    fail "trailing-slash spelling of the link must refuse the same way (rc=$_pp245_rc) (#245)"
+fi
+# Discrimination: a REAL directory under the same scratch prefix is
+# rejected by the blocklist (scratch is /tmp), NOT by the symlink arm —
+# the symlink reason must stay absent (over-firing would break plan-time
+# validation of real directories everywhere).
+_pp245_err=$(project_path_sane "$_pp245w/realroot" 2>&1 >/dev/null) && _pp245_rc=0 || _pp245_rc=$?
+if [ "$_pp245_rc" -ne 0 ] &&
+    ! printf '%s' "$_pp245_err" | grep -qF "is a symlink"; then
+    pass "real directory: blocklist refusal, symlink arm silent (#245)"
+else
+    fail "real directory must not trip the symlink arm (rc=$_pp245_rc err=$_pp245_err) (#245)"
+fi
+
+# --- review a Q1: caller refusal messages must not misname the cause ------
+# project_path_sane returns 1 for system paths, symlinks, relative and
+# dot forms alike; each caller prints ONE message for every refusal —
+# the old "is a system path" wording was factually false for the new
+# symlink arm (learnings L2: a fix that adds a rejection cause sweeps
+# every message that enumerates causes). Presence counts carry the
+# comment-strip rider; the absence pin needs none (conventions
+# "Source-counting pins").
+_q1i=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" |
+    grep -cF 'is not a valid project root (system path, symlink, or malformed form)')
+_q1c=$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" |
+    grep -cF 'is not a valid project root (system path, symlink, or malformed form)')
+if [ "$_q1i" -eq 3 ] && [ "$_q1c" -eq 2 ]; then
+    pass "caller refusal messages enumerate the real causes at all five sites (a Q1)"
+else
+    fail "caller refusal messages must enumerate the real causes (install=$_q1i/3 config=$_q1c/2) (a Q1)"
+fi
+if grep -qF 'is a system path' "$INSTALL" "$CONFIG"; then
+    fail "no caller message may claim 'is a system path' for every refusal (a Q1)"
+else
+    pass "no caller message claims 'is a system path' anymore (a Q1)"
+fi
+
 # ~ expansion lands in _PP_NORM as an absolute path
 if project_path_sane "~/dev" && [ "${_PP_NORM#${HOME}/}" = "dev" ] && [ "${#_PP_NORM}" -gt "${#HOME}" ]; then
     pass "~ expands to \$HOME path (got $_PP_NORM)"
@@ -292,7 +359,7 @@ _pin_dir=$(mktemp -d)
 # same idiom (the scratch traps in test-fs-baseline.sh and
 # test-ddev-migrate.sh; the house-wide sweep is #283).
 # Re-registered at the _f2bW block below to cover that dir too.
-trap 'rm -rf "$_pin_dir"' EXIT INT TERM
+trap 'rm -rf "$_pin_dir" "$_pp245w"' EXIT INT TERM
 sed '/_PP_NORM/d' "$INSTALL" >"$_pin_dir/install-no-norm"
 _pin_bare=$(sh -c 'set -e; _pn=$(grep -c "$1" "$2"); echo reached' \
     _ '_PP_NORM' "$_pin_dir/install-no-norm") || true
@@ -332,7 +399,7 @@ _f2bW="$(mktemp -d)"
 # widen the (#280 c C1 / #280 d S2) EXIT/INT/TERM trap to this scratch
 # dir (replaces the pin-block registration — both variables are set
 # from here on)
-trap 'rm -rf "$_pin_dir" "$_f2bW"' EXIT INT TERM
+trap 'rm -rf "$_pin_dir" "$_f2bW" "$_pp245w"' EXIT INT TERM
 _f2bG="$(sed -n '/^case "$OPENCODE_USER" in$/,/^esac$/p' "$CONFIG")"
 if [ -n "$_f2bG" ] && printf '%s' "$_f2bG" | grep -q 'falling back'; then
     pass "config.sh OPENCODE_USER shape gate extractable (pr-00263 a F2b)"
@@ -404,7 +471,7 @@ OPRW="$(mktemp -d)"
 # REPLACES the action -- registering only OPRW here dropped $_f2bW
 # (created above) from its only cleanup path, one leaked /tmp dir per
 # green run. The idiom the file documents: every scratch joins the trap
-trap 'rm -rf "$_pin_dir" "$_f2bW" "$OPRW"' EXIT INT TERM
+trap 'rm -rf "$_pin_dir" "$_f2bW" "$OPRW" "$_pp245w"' EXIT INT TERM
 # shellcheck disable=SC1090
 . "$PATH_SANE"
 mkdir -p "$OPRW/proj/sub/deep" "$OPRW/other/mid"
@@ -539,7 +606,7 @@ fi
 # behavioral leak pin over /tmp would race foreign processes
 _opr_traps=$(grep -n "^trap 'rm -rf" "$0" | tail -1 | cut -d: -f2-)
 case "$_opr_traps" in
-    *'$_pin_dir'*'$_f2bW'*'$OPRW'*)
+    *'$_pin_dir'*'$_f2bW'*'$OPRW'*'$_pp245w'*)
         pass "final trap registration still covers every scratch dir (C1)"
         ;;
     *)

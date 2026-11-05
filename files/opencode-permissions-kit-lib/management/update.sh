@@ -1062,6 +1062,37 @@ if [ "$ONLY_BINARY" != true ]; then
         _ho_announced=false
         while IFS= read -r root; do
             [ -z "$root" ] && continue
+            # Form gate, writer parity (review a S1/S2, completed b X1,
+            # issue #245): `link/.` dodges the [ -L ] gate below and
+            # the helper belt's strip (recursive baseline on the link's
+            # target); `link//` reaches the belt as `link/` and its
+            # rc-1 refusal aborts the whole update under set -e; a bare
+            # `.` or relative spelling would hand fs_baseline_root the
+            # invoking CWD (measured, b X1). Absolute first, then
+            # dots/empty segments, then whitespace — the writer's arm
+            # order (path-sane.sh); the blocklist rides #247.
+            case "$root" in
+                /*) ;;
+                *)
+                    ui_warn "skip $root (not an absolute project path)"
+                    continue
+                    ;;
+            esac
+            case "$root" in
+                *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]*)
+                    ui_warn "skip $root (malformed project path — dot, empty segment, or whitespace)"
+                    continue
+                    ;;
+            esac
+            root="${root%/}"
+            [ -n "$root" ] || continue
+            # Symlinked root gate (issue #245), before [ -d ] (review
+            # a S3): a dangling link is a symlink first — [ -d ] would
+            # swallow it silently under the green summary lines.
+            if [ -L "$root" ]; then
+                ui_warn "skip $root (symlink — register the target directory instead)"
+                continue
+            fi
             [ -d "$root" ] || continue
             if [ "$REFRESH" != true ] &&
                 ddev_handover_stamp_valid "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"; then

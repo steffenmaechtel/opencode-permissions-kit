@@ -582,6 +582,43 @@ ddev_handover_root() {
     dhr_user="${2:-}"
     dhr_group="${3:-}"
     dhr_dev="${4:-}"
+    # Root-form refusal (review c X1, issue #245): ddev's find below
+    # gets the UNSTRIPPED operand — in review c's probe `link/.` and
+    # `link//` both descended the TARGET through the belt's one-slash
+    # strip. No valid stored root carries these forms (the writer
+    # refuses them, the reader loops skip them); the belt for direct
+    # and future callers refuses them outright — the writer's form set
+    # (absolute, no dot/empty segments, no whitespace; blocklist #247).
+    case "$dhr_root" in
+        /*) ;;
+        *)
+            printf '%s\n' "  warn: $dhr_root is not an absolute path — refusing the ddev handover" >&2
+            return 1
+            ;;
+    esac
+    case "$dhr_root" in
+        *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]*)
+            printf '%s\n' "  warn: $dhr_root is a malformed root (dot/empty segment or whitespace) — refusing the ddev handover" >&2
+            return 1
+            ;;
+    esac
+    # Root-operand belt (review a X2, rc hardened b X2, issue #245):
+    # [ -d ] below follows a link; every current caller gates before
+    # the call (install.sh's handover loop since a X1) — this is the
+    # backstop for direct and future callers, the sibling
+    # fs_baseline_root belt shape INCLUDING the rc: return 1, not the
+    # quiet 0 of the empty/nonexistent arm — a caller that ignores the
+    # warn would otherwise write the "applied" stamp over nothing (the
+    # false-green both belts prevent; executed in review b X2). The
+    # walk on a link root is a silent no-op (find without -L never
+    # enters it, measured). The strip covers a trailing-slash spelling
+    # ([ -L "path/" ] is false); before [ -d ] so a dangling link
+    # refuses as a symlink (a S3).
+    if [ -L "${dhr_root%/}" ]; then
+        printf '%s\n' "  warn: $dhr_root is a symlink — refusing the ddev handover""\
+ (register the target directory instead)" >&2
+        return 1
+    fi
     [ -n "$dhr_root" ] && [ -d "$dhr_root" ] || return 0
     # Prune vendor/node_modules/testdata (issue #21/#29 pattern): a .ddev
     # found there belongs to a shipped test fixture, not to a project —

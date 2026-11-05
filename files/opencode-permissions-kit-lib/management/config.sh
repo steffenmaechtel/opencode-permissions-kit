@@ -374,13 +374,22 @@ projects_add() {
     sudo mkdir -p "$(dirname "$PROJECTS_CONF")"
     for p in $TARGETS; do
         if ! project_path_sane "$p"; then
-            ui_error "'$p' is a system path — refusing to add it (chgrp -R/setfacl -R would run over it)."
+            ui_error "'$p' is not a valid project root (system path, symlink, or malformed form) — refusing to add it."
             continue
         fi
         p="${_PP_NORM:-$p}"
         if _p_abs=$(cd "$p" 2>/dev/null && pwd); then p="$_p_abs"; fi
         if ! [ -d "$p" ]; then
             ui_warn "skip $p (not a directory)"
+            continue
+        fi
+        # Symlinked root gate (issue #245): the writer check above
+        # refuses links; this is the immediately-before-acting recheck
+        # (L5 — the cd+pwd normalization keeps the logical spelling, it
+        # does not resolve the link). A link root would get a silent
+        # no-op baseline/handover under the success lines below.
+        if [ -L "$p" ]; then
+            ui_warn "skip $p (symlink — register the target directory instead)"
             continue
         fi
         if [ -f "$PROJECTS_CONF" ] && grep -qxF "$p" "$PROJECTS_CONF"; then
@@ -758,6 +767,40 @@ refresh() {
     if [ -f "$PROJECTS_CONF" ]; then
         while IFS= read -r p; do
             [ -z "$p" ] && continue
+            # Form gate, writer parity (review a S1/S2, completed b X1,
+            # issue #245): raw-conf entries no writer gate ever saw —
+            # dot/empty-segment spellings (`link/.`) dodge the [ -L ]
+            # gate below ([ -L "path/." ] is false, measured) AND the
+            # helper belt's one-slash strip, putting the recursive
+            # baseline on the link's target; a double slash (`link//`)
+            # reaches the belt as `link/` and its rc-1 refusal aborts
+            # the whole run under set -e; a bare `.` or relative
+            # spelling would hand fs_baseline_root the invoking CWD
+            # (measured, b X1). Absolute first, then dots/empty
+            # segments, then whitespace — the writer's arm order
+            # (path-sane.sh); the system-path blocklist rides #247.
+            case "$p" in
+                /*) ;;
+                *)
+                    ui_warn "skip $p (not an absolute project path)"
+                    continue
+                    ;;
+            esac
+            case "$p" in
+                *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]*)
+                    ui_warn "skip $p (malformed project path — dot, empty segment, or whitespace)"
+                    continue
+                    ;;
+            esac
+            p="${p%/}"
+            [ -n "$p" ] || continue
+            # Symlinked root gate (issue #245), before [ -d ] (review
+            # a S3): a dangling link is a symlink first — [ -d ] would
+            # swallow it silently under the green summary below.
+            if [ -L "$p" ]; then
+                ui_warn "skip $p (symlink — register the target directory instead)"
+                continue
+            fi
             [ -d "$p" ] || continue
             # Shared helper with live per-pass progress (issue #14).
             fs_baseline_root "$p" "$OPENCODE_GROUP" "$OPENCODE_USER"
@@ -809,13 +852,22 @@ handover() {
     [ -z "$TARGETS" ] && die "Usage: config.sh handover <path...>"
     for p in $TARGETS; do
         if ! project_path_sane "$p"; then
-            ui_error "'$p' is a system path — refusing to touch it (the handover chowns below it)."
+            ui_error "'$p' is not a valid project root (system path, symlink, or malformed form) — refusing to touch it."
             continue
         fi
         p="${_PP_NORM:-$p}"
         if _p_abs=$(cd "$p" 2>/dev/null && pwd); then p="$_p_abs"; fi
         if ! [ -d "$p" ]; then
             ui_warn "skip $p (not a directory)"
+            continue
+        fi
+        # Symlinked root gate (issue #245): the writer check above
+        # refuses links; this is the immediately-before-acting recheck
+        # (L5 — the cd+pwd normalization keeps the logical spelling, it
+        # does not resolve the link). A link root would get a silent
+        # no-op baseline/handover under the success lines below.
+        if [ -L "$p" ]; then
+            ui_warn "skip $p (symlink — register the target directory instead)"
             continue
         fi
         ui_info "ddev handover on $p (.ddev + settings dirs + typo3 bootstrap root) ..."

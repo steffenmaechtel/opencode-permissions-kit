@@ -1095,7 +1095,7 @@ do_plan_phase() {
             # in parse_args (0.0.42f S2) — pathname expansion can never
             # widen this loop's word list.
             if ! project_path_sane "$_fp"; then
-                ui_error "'$_fp' is a system path — refusing to use it as a project root."
+                ui_error "'$_fp' is not a valid project root (system path, symlink, or malformed form) — refusing to use it."
                 ui_info "Use a dedicated folder like /var/www/vhosts or /home/<you>/projects."
                 exit 1
             fi
@@ -1126,7 +1126,7 @@ do_plan_phase() {
                 # under --yes. Only validate what was actually entered.
                 if [ -n "$_p" ]; then
                     if ! project_path_sane "$_p"; then
-                        ui_error "'$_p' is a system path — the kit would chgrp -R/setfacl -R over it."
+                        ui_error "'$_p' is not a valid project root (system path, symlink, or malformed form)."
                         ui_info "Use a dedicated folder like /var/www/vhosts, ~/dev or ~/projects."
                         continue
                     fi
@@ -1389,7 +1389,7 @@ do_plan_phase() {
                             if project_path_sane "$p"; then
                                 _custom="$_custom $_PP_NORM"
                             else
-                                ui_error "'$p' is a system path — rejected."
+                                ui_error "'$p' is not a valid project root (system path, symlink, or malformed form) — rejected."
                                 _bad=1
                             fi
                         done
@@ -1902,6 +1902,17 @@ do_deploy_phase() {
         esac
         if [ "$ans" != "n" ]; then
             for root in $PROJECTS_ROOTS; do
+                # Symlinked root gate (issue #245): the writer refuses
+                # links, this is the scan->act recheck (L5) — the
+                # baseline passes would silently no-op on a link
+                # (measured, issue #245) while this loop prints its
+                # success line right below. Before [ -d ] on purpose
+                # (review a S3): a dangling link is a symlink first,
+                # [ -d ] would swallow it silently.
+                if [ -L "$root" ]; then
+                    ui_warn "skip $root (symlink — register the target directory instead)"
+                    continue
+                fi
                 [ -d "$root" ] || continue
                 # Group baseline via the shared helper: chgrp + setgid +
                 # group rw + default ACLs, .git included (issue #17), with a
@@ -1932,6 +1943,18 @@ do_deploy_phase() {
             [ "$_ds" = "ddev" ] && DDEV_DEV_OWNED=false
         fi
         for root in $PROJECTS_ROOTS; do
+            # Symlinked root gate (review a X1, issue #245): the sibling
+            # baseline loop above got its gate first — this loop writes
+            # the handover stamp and the "applied" audit line for the
+            # SAME root and must refuse it identically. Reachable with
+            # no writer check at all: preset-menu selections enter
+            # PROJECTS_ROOTS by [ -d ] only, project_path_sane never
+            # runs for them. Before [ -d ] for the same S3 reason as
+            # the baseline loop (dangling link = symlink first).
+            if [ -L "$root" ]; then
+                ui_warn "skip $root (symlink — register the target directory instead)"
+                continue
+            fi
             [ -d "$root" ] || continue
             ddev_handover_root "$root" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
             ddev_handover_stamp_write "$root" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
