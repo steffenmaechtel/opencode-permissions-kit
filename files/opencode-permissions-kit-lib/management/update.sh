@@ -261,9 +261,13 @@ ensure_local_file() {
 }
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
-# Binary-only mode (--only-binary) needs NO kit files at all — when running
-# from the installed library, skip the self-fetch (and the per-file heal loop
-# below, which would re-fetch the whole kit for the deployed layout).
+# Binary-only mode (--only-binary) needs no kit FETCH — when running
+# from the installed library, skip the self-fetch (and the per-file heal
+# loop below, which would re-fetch the whole kit for the deployed
+# layout). Since #346 wave 2 the phase functions live in
+# sh/update-core.sh, so binary-only still needs that lib present next to
+# this script or in $LIBDIR (the resolver below fails loud otherwise —
+# run one full update first when upgrading from a pre-wave library).
 # --binary-path ALONE does a full update PLUS the binary swap, so it must NOT
 # skip the fetch (review 0.0.29: from the installed library it would have
 # crashed the deploy section with FILES_ROOT=/usr/local/lib).

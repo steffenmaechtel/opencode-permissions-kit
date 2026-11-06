@@ -76,9 +76,10 @@ check "update.sh sources update-core.sh checkout-first" \
 check "update.sh errors loud on a missing lib (no silent phase drops)" \
     sh -c 'grep -qF "error: update-core.sh not found" "$1"' _ "$UPDATE"
 check "update.sh sequences the phases in run order" \
-    sh -c 'grep -qF "    update_redeploy_library" "$1" \
-        && grep -qF "update_binary_resecure" "$1" \
-        && grep -qF "    update_finalize_tui_files" "$1"' _ "$UPDATE"
+    sh -c '_l1=$(grep -nF "    update_redeploy_library" "$1" | head -1 | cut -d: -f1)
+        _l2=$(grep -nF "update_binary_resecure" "$1" | head -1 | cut -d: -f1)
+        _l3=$(grep -nF "    update_finalize_tui_files" "$1" | head -1 | cut -d: -f1)
+        [ -n "$_l1" ] && [ -n "$_l2" ] && [ -n "$_l3" ] && [ "$_l1" -lt "$_l2" ] && [ "$_l2" -lt "$_l3" ]' _ "$UPDATE"
 
 # --- 4. library re-deploy section: executes from the lib -------------------------
 _lib_run() {

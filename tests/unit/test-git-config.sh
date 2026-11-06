@@ -136,9 +136,13 @@ if [ "$_git_sd_install" -ge 2 ] && [ "$_git_sd_update" -ge 2 ]; then
 else
     fail "issue #116: safe.directory git calls are CWD-safe (git -C /): install=$_git_sd_install update=$_git_sd_update"
 fi
+# The entry file gets the same rider treatment as its sibling legs
+# (comment-strip + continuation join): a commented example must not
+# false-red the pin and a wrapped call must not escape it.
+_opk_update_e_j=$(sed -e ':a' -e '/\\$/N; s/\\\n/ /; ta' "$UPDATE" | grep -v '^[[:space:]]*#' || true)
 if ! printf '%s\n' "$_opk_install_j" | grep -qE '(sudo -u "[^"]+"|sudo -u [A-Za-z_$]+) (-H )?git config --global' &&
     ! printf '%s\n' "$_opk_update_j" | grep -qE '(sudo -u "[^"]+"|sudo -u [A-Za-z_$]+) (-H )?git config --global' &&
-    ! grep -qE '(sudo -u "[^"]+"|sudo -u [A-Za-z_$]+) (-H )?git config --global' "$UPDATE"; then
+    ! printf '%s\n' "$_opk_update_e_j" | grep -qE '(sudo -u "[^"]+"|sudo -u [A-Za-z_$]+) (-H )?git config --global'; then
     pass "issue #116: no bare (CWD-inheriting) git config --global calls remain"
 else
     fail "issue #116: bare git config --global call remains (CWD-inheriting)"

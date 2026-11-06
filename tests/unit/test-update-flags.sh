@@ -58,13 +58,8 @@ else
 fi
 
 # --- 1. flag parsing (static extraction, same pattern as test-install-args) ------
-extract_fn() {
-    sed -n "/^$1() {/,/^}/p" "$UPDATE"
-}
-
-# Same shape against the phase lib (#346 wave 2): the binary helpers are
-# top-level definitions in update-core.sh, so function extraction works
-# unchanged on that file.
+# The binary helpers are top-level definitions in sh/update-core.sh
+# since #346 wave 2, so function extraction works on that file.
 extract_core_fn() {
     sed -n "/^$1() {/,/^}/p" "$UPDATE_CORE"
 }
@@ -672,13 +667,13 @@ check "uninstall twin probes at the same authority (issue #164)" \
 OC164_BLOCK="$(sed -n '/^        _oc_expected=/,/^        fi$/p' "$UPDATE_CORE")"
 # #198 a W5: a drifted end anchor over-captures to EOF — bound the block
 # so anchor drift fails HERE, loudly, instead of surfacing later as a
-# confusing S1/S2 'got:' dump (the block is 28 lines: 21 after #211 a
+# confusing S1/S2 'got:' dump (the block is 29 lines: 21 after #211 a
 # F17's atomic stage+mv, +7 from #211 b W8's trap registration and mv
-# -semantics comments).
+# -semantics comments, +1 from the #346 wave-2 area comment shape).
 if [ -n "$OC164_BLOCK" ] &&
     [ "$(printf '%s\n' "$OC164_BLOCK" | wc -l)" -le 30 ] &&
     printf '%s' "$OC164_BLOCK" | grep -qF 'sudo test -f /etc/openchamber/policy.json'; then
-    pass "openchamber gate block extractable from update.sh (issue #164)"
+    pass "openchamber gate block extractable from update-core.sh (issue #164)"
 else
     fail "openchamber gate block not extractable (anchor drift?)"
     OC164_BLOCK=""
@@ -781,7 +776,7 @@ fi
 # missing home -> loud skip; healthy home -> the hook line is appended.
 _hk_block="$(sed -n '/^    # Root-shell installs (issue #192)/,/^    fi$/p' "$UPDATE_CORE")"
 if [ -n "$_hk_block" ]; then
-    pass "shell-startup hook block extractable from update.sh (issue #192)"
+    pass "shell-startup hook block extractable from update-core.sh (issue #192)"
     _hk_run() {
         # $1=DEFAULT_USER $2=uid|empty=id-fails $3=DEFAULT_HOME — sudo runs
         # inlined (the suite is rootless), ui/log echo, so arms assert on
@@ -882,7 +877,7 @@ if [ -n "$_hk_block" ]; then
         fail "id-probe failure: sentinel uid provisions, no false uid-0 skip (rc=$_rc out=$_out)"
     fi
 else
-    fail "shell-startup hook block extractable from update.sh (issue #192)"
+    fail "shell-startup hook block extractable from update-core.sh (issue #192)"
 fi
 # DEFAULT_HOME is getent-resolved once, beside the DEFAULT_USER default
 # (V14 sibling resolution — every developer-side site below rides it).
@@ -968,7 +963,7 @@ if [ -n "$_du_line" ]; then
         fail "update.sh id probe: unresolvable developer resolves to sentinel 1 (rc=$_rc out=$_out)"
     fi
 else
-    fail "update.sh id probe line extractable from update.sh"
+    fail "update.sh id probe line extractable from update-core.sh"
 fi
 
 # --- git safe.directory audit honesty (#211 a F4) --------------------------------
@@ -980,7 +975,7 @@ fi
 # ~/.gitconfig never matters — environment-dependence class 0.0.46a F2).
 _f4_block="$(sed -n '/^    # The audit line must match reality/,/^    fi$/p' "$UPDATE_CORE")"
 if [ -n "$_f4_block" ]; then
-    pass "safe.directory block extractable from update.sh (#211 a F4)"
+    pass "safe.directory block extractable from update-core.sh (#211 a F4)"
     _f4_run() {
         (
             OPENCODE_USER=ocuser
@@ -1033,7 +1028,7 @@ if [ -n "$_f4_block" ]; then
         fail "already set: audit notes it, no redundant add (out=$_out)"
     fi
 else
-    fail "safe.directory block extractable from update.sh (#211 a F4)"
+    fail "safe.directory block extractable from update-core.sh (#211 a F4)"
 fi
 # The install.sh twin carries the same honest arms (sweep pin).
 if grep -q 'git safe.directory NOT ensured' "$SCRIPT_DIR/../../files/install.sh"; then
@@ -1058,7 +1053,7 @@ printf 'dh_marker() { echo LIBDIR; }\n' >"$F5/ldir/sh/ddev-handover.sh"
 _f5_loop_wbb="$(sed -n '/#211 a F5, wsl-browser-bridge site/,/^    done$/p' "$UPDATE_CORE")"
 _f5_loop_dh="$(sed -n '/#211 a F5, ddev-handover site/,/^        done$/p' "$UPDATE_CORE")"
 if [ -n "$_f5_loop_wbb" ] && [ -n "$_f5_loop_dh" ]; then
-    pass "both first-wins loops extractable from update.sh (#211 a F5)"
+    pass "both first-wins loops extractable from update-core.sh (#211 a F5)"
     _f5_eval() {
         (
             FILES_ROOT="$F5/froot"
@@ -1089,7 +1084,7 @@ if [ -n "$_f5_loop_wbb" ] && [ -n "$_f5_loop_dh" ]; then
         fail "LIBDIR fallback when checkout copy absent (handover) (#211 a F5)"
     fi
 else
-    fail "both first-wins loops extractable from update.sh (#211 a F5)"
+    fail "both first-wins loops extractable from update-core.sh (#211 a F5)"
 fi
 rm -rf "$F5"
 
@@ -1100,7 +1095,7 @@ rm -rf "$F5"
 # Extract the real block and drive both arms.
 _f6_block="$(sed -n '/^    if \[ -f "\$FILES_ROOT\/etc\/umask.sh" \]; then$/,/^    fi$/p' "$UPDATE_CORE")"
 if [ -n "$_f6_block" ]; then
-    pass "umask block extractable from update.sh (#211 a F6)"
+    pass "umask block extractable from update-core.sh (#211 a F6)"
     _f6_run() {
         # $1 = FILES_ROOT (missing or present umask.sh)
         (
@@ -1138,7 +1133,7 @@ if [ -n "$_f6_block" ]; then
     fi
     rm -rf "$F6"
 else
-    fail "umask block extractable from update.sh (#211 a F6)"
+    fail "umask block extractable from update-core.sh (#211 a F6)"
 fi
 
 # --- xdg_open_real_exists fail-safe stub (#211 a F7) --------------------------------
