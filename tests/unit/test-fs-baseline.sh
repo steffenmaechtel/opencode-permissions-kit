@@ -118,8 +118,11 @@ OUT3="$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2-nope" "$3"' _ "$LIB" "$
 assert_eq "missing root: no output, no error" "" "$OUT3"
 
 # --- 6. wiring: all three callers use the helper -------------------------------------
-# update.sh calls fs_baseline_root from its phase lib since #346 wave 2.
-for f in "$INSTALL" "$UPDATE_CORE" "$CONFIG"; do
+# update.sh calls fs_baseline_root from its phase lib since #346 wave 2,
+# install.sh likewise since wave 3 (#407 b B1: the $INSTALL leg matched
+# only the bootstrap stub definer — the real call lives in
+# install-core.sh, same class as round a's P1).
+for f in "$INSTALL_CORE" "$UPDATE_CORE" "$CONFIG"; do
     if grep -q 'fs_baseline_root' "$f"; then
         pass "$(basename "$f") runs the baseline through fs_baseline_root"
     else

@@ -12,11 +12,11 @@
 # effects (definitions and comments only). The functions run in the
 # CALLER's shell under its `set -eu`: they read the globals install.sh
 # sets before the phase calls (KIT_BRANCH, VERSION, LIBDIR, SCRIPT_DIR,
-# OPENCODE_USER, SKIP_PROMPTS, PREDEFINED_PROJECTS, SECURE_GIT_CONFIG,
-# CONTAINER_BACKEND_OPT, SKIP_DDEV_MIGRATION, MIGRATE_AGENTS_OPT,
-# DDEV_DEV_OWNED, DDEV_SETTINGS_GIVEN, GIT_FLAG_GIVEN,
-# OPENCHAMBER_POLICY_OPT/GIVEN, FORCE_UNSUPPORTED_DISTRO via
-# _distro_gate) and call the entry's
+# OPENCODE_USER, OPENCODE_GROUP, SKIP_PROMPTS, PREDEFINED_PROJECTS,
+# SECURE_GIT_CONFIG, CONTAINER_BACKEND_OPT, SKIP_DDEV_MIGRATION,
+# MIGRATE_AGENTS_OPT, DDEV_DEV_OWNED, DDEV_SETTINGS_GIVEN,
+# GIT_FLAG_GIVEN, OPENCHAMBER_POLICY_OPT/GIVEN, FORCE_UNSUPPORTED_DISTRO
+# via _distro_gate) and call the entry's
 # helpers (banner, confirm, _yes_no_backup_menu, _distro_gate,
 # _py3_health_probe, _root_user_gate, _tmp_track) plus the shared libs
 # install.sh sources first (ui_*, log, kit_source'd sh/ helpers:
