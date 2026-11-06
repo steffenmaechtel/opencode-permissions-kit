@@ -142,6 +142,7 @@ The deployed library mirrors the repository layout
 | `/usr/local/lib/opencode-permissions-kit/sh/advisories.sh` | Shared helper: security-advisory database |
 | `/usr/local/lib/opencode-permissions-kit/sh/fs-baseline.sh` | Shared helper: group baseline recursion |
 | `/usr/local/lib/opencode-permissions-kit/sh/git-check.sh` | Shared helper: git presence/version probe |
+| `/usr/local/lib/opencode-permissions-kit/sh/install-core.sh` | Shared helper: the install run's phase functions |
 | `/usr/local/lib/opencode-permissions-kit/sh/wsl-browser-bridge.sh` | Shared helper: WSL browser bridge deploy |
 | `/usr/local/lib/opencode-permissions-kit/sh/log.sh` | Shared helper: audit logging |
 | `/usr/local/lib/opencode-permissions-kit/sh/path-sane.sh` | Shared helper: project-root policy gate |

@@ -18,6 +18,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 UPDATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh"
 UPDATE_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/update-core.sh"
+INSTALL_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/install-core.sh"
 KIT="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opk"
 TUIPLUGIN="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/tui-plugin.sh"
 CLI_MD="$SCRIPT_DIR/../../docs/reference/cli.md"
@@ -558,7 +559,9 @@ fi
 INSTALL="$SCRIPT_DIR/../../files/install.sh"
 _f1_dir="$WORK/f1stamp"
 mkdir -p "$_f1_dir"
-sed -n '/_stamp_ver=/,/major stamp skipped/p' "$INSTALL" >"$_f1_dir/stampblock"
+# The major-stamp block moved with do_deploy_phase — install-core.sh
+# since #346 wave 3.
+sed -n '/_stamp_ver=/,/major stamp skipped/p' "$INSTALL_CORE" >"$_f1_dir/stampblock"
 if [ -s "$_f1_dir/stampblock" ]; then
     # Scoping tripwires (0.0.44g G1): the end anchor above is PROSE (the
     # log line) — a rewording would silently run the range to EOF and
@@ -578,12 +581,14 @@ if [ -s "$_f1_dir/stampblock" ]; then
 else
     fail "install-time stamp block extractable (F1)"
 fi
+# #407 a P2: the guarded stamp block lives in install-core.sh since
+# wave 3 — the absence covers BOTH files (the suite's own idiom).
 check "install-time stamp has no bare default-to-1 (F1)" \
-    sh -c "! grep -qE '^[[:space:]]+OPENCODE_MAJOR=1\$' \"\$1\"" _ "$INSTALL"
+    sh -c "! grep -qE '^[[:space:]]+OPENCODE_MAJOR=1\$' \"\$1\" && ! grep -qE '^[[:space:]]+OPENCODE_MAJOR=1\$' \"\$2\"" _ "$INSTALL" "$INSTALL_CORE"
 check "preflight probes the reused binary bounded (F1)" \
-    sh -c "grep -qF 'timeout 10 \"\$_pf_oc_bin\" --version' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -qF 'timeout 10 \"\$_pf_oc_bin\" --version' \"\$1\"" _ "$INSTALL_CORE"
 check "preflight warns instead of aborting on an unresponsive binary (F1)" \
-    sh -c "grep -qF 'does not answer --version' \"\$1\" && grep -qF \"the install reuses this binary\" \"\$1\"" _ "$INSTALL"
+    sh -c "grep -qF 'does not answer --version' \"\$1\" && grep -qF \"the install reuses this binary\" \"\$1\"" _ "$INSTALL_CORE"
 
 # --- streamed stdin guard (0.0.45c S8) + help-text drift (D2) ---------------------
 # A streamed update (curl | sudo bash) has the script body on stdin: the
@@ -616,7 +621,7 @@ check "update re-apply is byte-gated on kit-shaped content (0.0.47a F1)" \
         && grep -qF 'diverges from the kit pin (admin-owned content) — left untouched' \"\$1\"" _ "$UPDATE_CORE"
 check "install twin carries the same admin-content gate (0.0.47a F1)" \
     sh -c "grep -qF 'diverges from the kit pin' \"\$1\"" _ \
-    "$SCRIPT_DIR/../../files/install.sh"
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/install-core.sh"
 
 # --- issue #164: presence probes run at the write's authority ---------------------
 # The openchamber gate probed /etc/openchamber/policy.json at INVOKING-user
@@ -650,7 +655,7 @@ check "update openchamber presence probe escalates like the write (issue #164)" 
         && ! grep -qF '[ -f /etc/openchamber/policy.json ]' \"\$2\"" _ "$UPDATE_CORE" "$UPDATE"
 check "install twin probes at the same authority (issue #164)" \
     sh -c "grep -qF 'sudo test -f /etc/openchamber/policy.json' \"\$1\"" _ \
-    "$SCRIPT_DIR/../../files/install.sh"
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/install-core.sh"
 check "uninstall twin probes at the same authority (issue #164)" \
     sh -c "grep -qF 'sudo test -f /etc/openchamber/policy.json' \"\$1\" \
         && grep -qF 'sudo grep -q ' \"\$1\"" _ \
@@ -1030,8 +1035,9 @@ if [ -n "$_f4_block" ]; then
 else
     fail "safe.directory block extractable from update-core.sh (#211 a F4)"
 fi
-# The install.sh twin carries the same honest arms (sweep pin).
-if grep -q 'git safe.directory NOT ensured' "$SCRIPT_DIR/../../files/install.sh"; then
+# The install.sh twin carries the same honest arms (sweep pin; the
+# safe.directory arms live in install-core.sh since #346 wave 3).
+if grep -q 'git safe.directory NOT ensured' "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/install-core.sh"; then
     pass "install.sh twin logs NOT-ensured on failure too (#211 a F4 sweep)"
 else
     fail "install.sh twin logs NOT-ensured on failure too (#211 a F4 sweep)"

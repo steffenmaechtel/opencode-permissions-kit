@@ -26,6 +26,7 @@ THEME="$TUIDIR/opencode-danger.theme.json"
 TUIJSON="$TUIDIR/tui.json"
 TUIDANGER="$TUIDIR/tui-danger.json"
 INSTALL="$REPO/files/install.sh"
+INSTALL_CORE="$REPO/files/opencode-permissions-kit-lib/sh/install-core.sh"
 UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
 UPDATE_CORE="$REPO/files/opencode-permissions-kit-lib/sh/update-core.sh"
 DEPLOYLIB="$REPO/files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
@@ -117,13 +118,13 @@ check_no "plugin never touches the user's theme (no theme.set/install)" \
 check "install.sh fetch list includes the tui payload" \
     grep -q 'opencode-permissions-kit-lib/tui/kit-mode.tsx' "$INSTALL"
 check "install.sh deploys the plugin to LIBDIR/tui (lib_deploy manifest)" \
-    sh -c 'grep -qF "opencode-permissions-kit-lib/tui/kit-mode.tsx 644" "$2" && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL" "$DEPLOYLIB"
+    sh -c 'grep -qF "opencode-permissions-kit-lib/tui/kit-mode.tsx 644" "$2" && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL_CORE" "$DEPLOYLIB"
 check "install.sh installs the opencode-user tui.json (marker policy)" \
-    grep -q 'grep -q .\"_opencode_permissions_kit\". \"\$OC_TUI_CONF\"' "$INSTALL"
+    grep -q 'grep -q .\"_opencode_permissions_kit\". \"\$OC_TUI_CONF\"' "$INSTALL_CORE"
 check "install.sh installs the default-user danger theme" \
-    grep -q 'opencode-danger.theme.json" "$DEFAULT_THEME_DIR' "$INSTALL"
+    grep -q 'opencode-danger.theme.json" "$DEFAULT_THEME_DIR' "$INSTALL_CORE"
 check "install.sh keeps user-managed tui.json (skip branch)" \
-    grep -q 'existing $OC_TUI_CONF kept' "$INSTALL"
+    grep -q 'existing $OC_TUI_CONF kept' "$INSTALL_CORE"
 
 # --- update.sh wiring ---------------------------------------------------------
 check "update.sh KIT_FILES includes the tui payload" \
@@ -175,9 +176,11 @@ check "2x plugin render is defensive (try/catch)" \
 check "install.sh fetch list includes the 2x plugin" \
     grep -q 'opencode-permissions-kit-lib/tui/kit-mode-2x.tsx' "$INSTALL"
 check "install.sh deploys the 2x plugin to LIBDIR/tui (lib_deploy manifest)" \
-    sh -c 'grep -qF "opencode-permissions-kit-lib/tui/kit-mode-2x.tsx 644" "$2" && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL" "$DEPLOYLIB"
-check "install.sh registers the 2x plugin as a discovered plugin dir (major-gated, shared helper)" \
-    sh -c 'grep -qF "kit_source \"\$SCRIPT_DIR/opencode-permissions-kit-lib/sh/tui-plugin.sh\"" "$1" && grep -qF "tui_plugin_sync_user \"\$OPENCODE_MAJOR\"" "$1"' _ "$INSTALL"
+    sh -c 'grep -qF "opencode-permissions-kit-lib/tui/kit-mode-2x.tsx 644" "$2" && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL_CORE" "$DEPLOYLIB"
+check "install.sh registers the 2x plugin as a discovered plugin dir (major-gated, shared helper)"
+# split legs (#346 wave 3): kit_source bootstrap stays on the entry,
+# the 2x registration call lives in do_deploy_phase (the lib)
+sh -c 'grep -qF "kit_source \"\$SCRIPT_DIR/opencode-permissions-kit-lib/sh/tui-plugin.sh\"" "$2" && grep -qF "tui_plugin_sync_user \"\$OPENCODE_MAJOR\"" "$1"' _ "$INSTALL_CORE" "$INSTALL"
 check "install.sh unregisters inert cli.json path entries (2x cleanup, via sh/tui-plugin.sh)" \
     grep -qF 'tui-register.py" "$_tp_user_dir/cli.json" unregister' "$TUIPLUGIN"
 check "update.sh fetch list includes the 2x plugin" \

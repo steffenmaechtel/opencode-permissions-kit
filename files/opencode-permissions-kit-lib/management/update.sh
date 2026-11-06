@@ -131,6 +131,7 @@ KIT_BASE_URL="${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/
 KIT_FILES="install.sh \
 VERSION \
 opencode-permissions-kit-lib/sh/path-sane.sh \
+opencode-permissions-kit-lib/sh/install-core.sh \
 opencode-permissions-kit-lib/management/config.sh \
 opencode-permissions-kit-lib/management/doctor.sh \
 opencode-permissions-kit-lib/management/update.sh \

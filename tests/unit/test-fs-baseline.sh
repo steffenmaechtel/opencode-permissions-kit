@@ -18,6 +18,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LIB="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/fs-baseline.sh"
 INSTALL="$SCRIPT_DIR/../../files/install.sh"
+INSTALL_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/install-core.sh"
 UPDATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh"
 UPDATE_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/update-core.sh"
 CONFIG="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh"
@@ -117,9 +118,16 @@ OUT3="$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2-nope" "$3"' _ "$LIB" "$
 assert_eq "missing root: no output, no error" "" "$OUT3"
 
 # --- 6. wiring: all three callers use the helper -------------------------------------
-# update.sh calls fs_baseline_root from its phase lib since #346 wave 2.
-for f in "$INSTALL" "$UPDATE_CORE" "$CONFIG"; do
-    if grep -q 'fs_baseline_root' "$f"; then
+# update.sh calls fs_baseline_root from its phase lib since #346 wave 2,
+# install.sh likewise since wave 3 (#407 b B1: the $INSTALL leg matched
+# only the bootstrap stub definer — the real call lives in
+# install-core.sh, same class as round a's P1). Call-form pattern
+# (#407 c C1/C2: the opening quote of the first argument matches CALL
+# SITES only — the lib's header comment and the entries' stub-definer
+# code lines (`fs_baseline_root() {`) must not keep a leg green after
+# the real call is deleted; proven by scratch deletion probe).
+for f in "$INSTALL_CORE" "$UPDATE_CORE" "$CONFIG"; do
+    if grep -q 'fs_baseline_root "' "$f"; then
         pass "$(basename "$f") runs the baseline through fs_baseline_root"
     else
         fail "$(basename "$f") runs the baseline through fs_baseline_root"
@@ -134,7 +142,9 @@ grep -q 'opencode-permissions-kit-lib/sh/fs-baseline.sh' "$UPDATE" &&
 grep -q 'large trees: this can take a while' "$UPDATE_CORE" &&
     pass "update.sh hints before the ddev handover scan (issue #14)" ||
     fail "update.sh hints before the ddev handover scan (issue #14)"
-grep -q 'large trees: this can take minutes' "$INSTALL" &&
+# The hint line lives in do_plan_phase's getfacl backup (install-core.sh
+# since #346 wave 3).
+grep -q 'large trees: this can take minutes' "$INSTALL_CORE" &&
     pass "install.sh hints before the getfacl backup (issue #14)" ||
     fail "install.sh hints before the getfacl backup (issue #14)"
 
@@ -972,15 +982,15 @@ fi
 # review a X1); config.sh counts THREE (projects add, handover,
 # refresh). The ddev_handover_root belt (a X2) and status.sh's
 # symlink report (a X4) ride the same rider'd shape.
-S245I=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" |
-    grep -cF 'ui_warn "skip $root (symlink — register the target directory instead)"')
+S245I=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" |
+    grep -cF 'ui_warn "skip $root (symlink — register the target directory instead)"' || true)
 if [ "$S245I" -ge 2 ]; then
     pass "install.sh: BOTH \$PROJECTS_ROOTS loops carry the symlink skip arm (#245, a X1)"
 else
     fail "install.sh must gate both \$PROJECTS_ROOTS loops (found $S245I of 2) (#245, a X1)"
 fi
 S245C=$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" |
-    grep -cF 'ui_warn "skip $p (symlink — register the target directory instead)"')
+    grep -cF 'ui_warn "skip $p (symlink — register the target directory instead)"' || true)
 if [ "$S245C" -ge 3 ]; then
     pass "config.sh symlink skip arms wired at all three sites (add, handover, refresh) (#245)"
 else
@@ -1050,7 +1060,7 @@ fi
             if (buf ~ /ddev_handover_root/) { printf "%s", buf; exit }
             inl = 0
         }
-    ' "$INSTALL"
+    ' "$INSTALL_CORE"
 } >"$S245/run-install-handover.sh"
 S245H_OUT=$(sh "$S245/run-install-handover.sh" 2>&1)
 if [ "$(printf '%s\n' "$S245H_OUT" | grep -c '^HO: ')" -eq 1 ] &&

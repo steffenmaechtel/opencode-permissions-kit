@@ -125,6 +125,10 @@ opencode-permissions-kit-lib/sh/log.sh 755
 # recursive group baseline; sourced by install.sh and config.sh with
 # fail-closed stubs.
 opencode-permissions-kit-lib/sh/path-sane.sh 644
+# install-core.sh: the install run's phase functions (issue #346), sourced
+# by install.sh from its checkout/fetch tree (kit_source, no LIBDIR
+# fallback — install.sh never runs from the installed tree)
+opencode-permissions-kit-lib/sh/install-core.sh 644
 opencode-permissions-kit-lib/sh/render-agent-config.sh 644
 opencode-permissions-kit-lib/sh/secure-binary.sh 644
 opencode-permissions-kit-lib/sh/shell-warn.sh 755

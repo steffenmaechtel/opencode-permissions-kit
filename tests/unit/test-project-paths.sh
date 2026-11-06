@@ -15,6 +15,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 INSTALL="$SCRIPT_DIR/../../files/install.sh"
+INSTALL_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/install-core.sh"
 CONFIG="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh"
 PATH_SANE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/path-sane.sh"
 # Shared harness (issue #394): pass/fail, colors, counters
@@ -196,16 +197,18 @@ fi
 # every message that enumerates causes). Presence counts carry the
 # comment-strip rider; the absence pin needs none (conventions
 # "Source-counting pins").
-_q1i=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" |
-    grep -cF 'is not a valid project root (system path, symlink, or malformed form)')
+# #346 wave 3: install's three refusal sites moved to install-core.sh;
+# the count keeps its || true guard (grep -c aborts on zero under set -e).
+_q1i=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" |
+    grep -cF 'is not a valid project root (system path, symlink, or malformed form)' || true)
 _q1c=$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" |
-    grep -cF 'is not a valid project root (system path, symlink, or malformed form)')
+    grep -cF 'is not a valid project root (system path, symlink, or malformed form)' || true)
 if [ "$_q1i" -eq 3 ] && [ "$_q1c" -eq 2 ]; then
     pass "caller refusal messages enumerate the real causes at all five sites (a Q1)"
 else
     fail "caller refusal messages must enumerate the real causes (install=$_q1i/3 config=$_q1c/2) (a Q1)"
 fi
-if grep -qF 'is a system path' "$INSTALL" "$CONFIG"; then
+if grep -qF 'is a system path' "$INSTALL" "$INSTALL_CORE" "$CONFIG"; then
     fail "no caller message may claim 'is a system path' for every refusal (a Q1)"
 else
     pass "no caller message claims 'is a system path' anymore (a Q1)"
@@ -310,19 +313,20 @@ done
 # issue #216 (its normalization is pinned behaviorally by the ~ arms
 # above) — count install.sh's own sites only.
 INSTALL="$SCRIPT_DIR/../../files/install.sh"
+INSTALL_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/install-core.sh"
 # Guarded count (#260, the #244 f W1 class): grep -c prints 0 AND exits
 # 1 on zero matches — under set -e the bare assignment aborted the suite
 # before the -ge 4 check could record its FAIL (#244 h W2). Comment-strip
 # rider (#261, the #244 g W1 class): commented-out lines stop counting —
 # full-line comments only (#244 h W6 residual).
-_norm_sites=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -c '_PP_NORM' || true)
+_norm_sites=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" | grep -c '_PP_NORM' || true)
 if [ "$_norm_sites" -ge 3 ]; then
     pass "install.sh uses _PP_NORM in all project entry points ($_norm_sites sites)"
 else
     fail "install.sh uses _PP_NORM in all project entry points (only $_norm_sites sites)"
 fi
-if grep -q '_fp_norm="$_fp_norm \$_PP_NORM"' "$INSTALL" &&
-    grep -q '_custom="$_custom \$_PP_NORM"' "$INSTALL"; then
+if grep -q '_fp_norm="$_fp_norm \$_PP_NORM"' "$INSTALL_CORE" &&
+    grep -q '_custom="$_custom \$_PP_NORM"' "$INSTALL_CORE"; then
     pass "install.sh: --projects and custom dialog store the expanded path"
 else
     fail "install.sh: --projects and custom dialog store the expanded path"

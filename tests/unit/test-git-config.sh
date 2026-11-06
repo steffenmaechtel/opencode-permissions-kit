@@ -110,6 +110,7 @@ fi
 #   b) the completion panel showed the mapping backwards,
 #   c) a re-install silently ignored the choice (config never re-rendered).
 INSTALL="$SCRIPT_DIR/../../files/install.sh"
+INSTALL_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/install-core.sh"
 UPDATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh"
 UPDATE_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/update-core.sh"
 
@@ -126,8 +127,9 @@ UPDATE_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/update-core
 # satisfy the threshold); `|| true` keeps set -e from aborting the suite
 # on a zero count instead of failing the check.
 # #346 wave 2: update.sh's safe.directory block lives in
-# sh/update-core.sh — the counts read the lib.
-_opk_install_j=$(sed -e ':a' -e '/\\$/N; s/\\\n/ /; ta' "$INSTALL" | grep -v '^[[:space:]]*#' || true)
+# sh/update-core.sh — the counts read the lib. Wave 3: install.sh's
+# block moved the same way — the counts read install-core.sh.
+_opk_install_j=$(sed -e ':a' -e '/\\$/N; s/\\\n/ /; ta' "$INSTALL_CORE" | grep -v '^[[:space:]]*#' || true)
 _opk_update_j=$(sed -e ':a' -e '/\\$/N; s/\\\n/ /; ta' "$UPDATE_CORE" | grep -v '^[[:space:]]*#' || true)
 _git_sd_install=$(printf '%s\n' "$_opk_install_j" | grep -c 'git -C / config --global --get-all safe.directory\|git -C / config --global --add safe.directory' || true)
 _git_sd_update=$(printf '%s\n' "$_opk_update_j" | grep -c 'git -C / config --global --get-all safe.directory\|git -C / config --global --add safe.directory' || true)
@@ -239,8 +241,10 @@ else
 fi
 
 # Wiring: all three call sites must use the shared helper.
+# #346 wave 3: the kit_source stays in the entry's bootstrap; the call
+# moved into do_plan_phase (install-core.sh).
 if grep -q 'kit_source.*sh/git-check.sh' "$INSTALL" &&
-    grep -q '^[[:space:]]*git_check_report$' "$INSTALL"; then
+    grep -q '^[[:space:]]*git_check_report$' "$INSTALL_CORE"; then
     pass "issue #118: install.sh sources + calls git_check_report (pre-flight)"
 else
     fail "issue #118: install.sh git-check wiring missing"
@@ -269,8 +273,8 @@ else
     fail "install.sh: default is git BLOCKED (SECURE_GIT_CONFIG=true)"
 fi
 
-if grep -q 'yes" \]; then SECURE_GIT_CONFIG=false' "$INSTALL" ||
-    grep -Eq '=\s*"yes"\s*\]\s*&&\s*SECURE_GIT_CONFIG=false' "$INSTALL"; then
+if grep -q 'yes" \]; then SECURE_GIT_CONFIG=false' "$INSTALL_CORE" ||
+    grep -Eq '=\s*"yes"\s*\]\s*&&\s*SECURE_GIT_CONFIG=false' "$INSTALL_CORE"; then
     pass "install.sh: Standard 'allow git' maps to SECURE_GIT_CONFIG=false"
 else
     fail "install.sh: Standard 'allow git' maps to SECURE_GIT_CONFIG=false"
@@ -285,8 +289,8 @@ fi
 
 # The re-install path must back up + re-render the agent config with the
 # chosen git setting (never silently keep a stale one).
-if grep -q 'opencode.jsonc-existing' "$INSTALL" &&
-    grep -q 'config re-applied' "$INSTALL"; then
+if grep -q 'opencode.jsonc-existing' "$INSTALL_CORE" &&
+    grep -q 'config re-applied' "$INSTALL_CORE"; then
     pass "install.sh: re-install re-renders the agent config (backup kept)"
 else
     fail "install.sh: re-install re-renders the agent config (backup kept)"

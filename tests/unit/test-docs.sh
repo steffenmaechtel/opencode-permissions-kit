@@ -243,13 +243,15 @@ grep -q 'skipped security checks instead' "$REPO_ROOT/docs/reference/cli.md" ||
     echo "FAIL cli.md: advisories exception clause missing from the missing-library claim (#256 a W3)" >>"$TMP"
 
 # --- a W5 (pr-00256): getting-started's agent-resources Enter default -------
-# tracks the ui_menu default letter in install.sh (claim-drift guard, both
-# directions: flipping the menu default or the docs word goes red).
+# tracks the ui_menu default letter in the installer (claim-drift guard,
+# both directions: flipping the menu default or the docs word goes red).
+# The menu call lives in do_deploy_phase — install-core.sh since #346
+# wave 3.
 # #256 b B1: the capture is [a-z], NOT the mapped set — an out-of-vocabulary
 # default letter must land in the unmapped guard below with the right
 # message; with [mcs] the sed stopped matching and the guard was dead code
 # (the drift misfired the anchor-drift tripwire instead).
-_w5_def="$(sed -n 's/.*ui_menu "Bring the developer.s agent resources over?" "\([a-z]\)".*/\1/p' "$REPO_ROOT/files/install.sh" | head -n 1)"
+_w5_def="$(sed -n 's/.*ui_menu "Bring the developer.s agent resources over?" "\([a-z]\)".*/\1/p' "$REPO_ROOT/files/opencode-permissions-kit-lib/sh/install-core.sh" | head -n 1)"
 if [ -z "$_w5_def" ]; then
     echo "FAIL getting-started.md: agent-resources menu default extraction empty — anchor drift? (#256 a W5)" >>"$TMP"
 fi

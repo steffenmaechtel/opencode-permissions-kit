@@ -17,6 +17,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 INSTALL="$SCRIPT_DIR/../../files/install.sh"
+INSTALL_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/install-core.sh"
 UPDATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh"
 UPDATE_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/update-core.sh"
 STATUS="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/status.sh"
@@ -30,9 +31,6 @@ STATUS_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core
 # The strip substitutes (never deletes), so the numbers stay real lines.
 line_of() { sed 's/^[[:space:]]*#.*$//' "$1" | grep -nF "$2" | head -1 | cut -d: -f1; }
 
-inst_win=$(line_of "$INSTALL" '/mnt/c/Users/*/AppData/Local/mkcert')
-inst_linux=$(line_of "$INSTALL" '$DEV_HOME/.local/share/mkcert/rootCA.pem')
-
 echo ""
 echo "mkcert CA reuse Tests"
 echo "====================="
@@ -44,16 +42,21 @@ check "update.sh passes sh -n" sh -n "$UPDATE"
 check "status.sh passes sh -n" sh -n "$STATUS"
 
 # --- install.sh detection ----------------------------------------------------
+# The CA-reuse detection lives in do_ddev_phase — install-core.sh since
+# #346 wave 3 (the line_of order pin reads the lib; the absence pins
+# cover BOTH files).
+inst_win=$(line_of "$INSTALL_CORE" '/mnt/c/Users/*/AppData/Local/mkcert')
+inst_linux=$(line_of "$INSTALL_CORE" '$DEV_HOME/.local/share/mkcert/rootCA.pem')
 check "install.sh scans /mnt/c/Users profiles directly (glob)" \
-    sh -c "grep -qF '/mnt/c/Users/*/AppData/Local/mkcert' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -qF '/mnt/c/Users/*/AppData/Local/mkcert' \"\$1\"" _ "$INSTALL_CORE"
 check "install.sh no longer invokes powershell.exe" \
-    sh -c "! grep -q 'powershell.exe -NoProfile' \"\$1\"" _ "$INSTALL"
+    sh -c "! grep -q 'powershell.exe -NoProfile' \"\$1\" && ! grep -q 'powershell.exe -NoProfile' \"\$2\"" _ "$INSTALL" "$INSTALL_CORE"
 check "install.sh no longer invokes cmd.exe" \
-    sh -c "! grep -q 'cmd.exe /c' \"\$1\"" _ "$INSTALL"
+    sh -c "! grep -q 'cmd.exe /c' \"\$1\" && ! grep -q 'cmd.exe /c' \"\$2\"" _ "$INSTALL" "$INSTALL_CORE"
 check "install.sh requires the CA key too (signing needs it)" \
-    sh -c "grep -qF '\"\$wca/rootCA-key.pem\"' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -qF '\"\$wca/rootCA-key.pem\"' \"\$1\"" _ "$INSTALL_CORE"
 check "install.sh keeps the developer-Linux CAROOT fallback" \
-    sh -c "grep -qF '\$DEV_HOME/.local/share/mkcert/rootCA.pem' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -qF '\$DEV_HOME/.local/share/mkcert/rootCA.pem' \"\$1\"" _ "$INSTALL_CORE"
 check "install.sh: Windows scan comes before the Linux fallback" \
     test -n "$inst_win" -a -n "$inst_linux" -a "$inst_win" -lt "$inst_linux"
 
