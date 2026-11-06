@@ -48,13 +48,15 @@ bad() {
     bad=$((bad + 1))
 }
 
-# The registry pin cells below create real receivers (_lc_iso, _sig_iso,
-# their cell scripts and _sig_out) -- this suite owns their cleanup with
-# its OWN trap, like it owns its own counters (independence, header
-# above: the main shell never sources the harness under test). The cell
-# child scripts are printf-written into scratch with literal "$" text --
-# embedded child scripts, the sandbox floor's documented invisible shape:
-# child scripts own their cleanup, the floor does not scan them. Function
+# The registry pin cells below create real receivers (the isolated
+# TMPDIRs, their cell scripts and the a1h receivers) -- this suite owns
+# their cleanup with its OWN trap (_meta_cleanup's operand list is the
+# authoritative inventory), like it owns its own counters (independence,
+# header above: the main shell never sources the harness under test).
+# The cell child scripts are printf-written into scratch with literal
+# "$" text -- embedded child scripts, the sandbox floor's documented
+# invisible shape: child scripts own their cleanup, the floor does not
+# scan them (the a1h cell is a quoted heredoc, the same shape). Function
 # form: the receiver list does not fit one line and the floor reads the
 # arms off the trap's physical line.
 _meta_cleanup() {
@@ -228,12 +230,14 @@ fi
 #     recv_gone pins, the leak cell and the signal cell go red
 #     (receivers stay; the gone control arms prove the cells were
 #     discriminating all along)
-#   - delete the `>>"$_WORK_REG"` append from _work_emit -> the FIVE
+#   - delete the `>>"$_WORK_REG"` append from _work_emit -> the SIX
 #     _work_emit-routed recv_gone arms go red while the ISDIR/ISFILE
 #     shape pins stay green; the work_register/work_register_var arms
 #     stay green TOO -- their appends are their own inline sites
-#     (round A B2: the red set is 5 of 7 arms; those two sites are
-#     discriminated by the _af_case pins below, not by this sabotage)
+#     (round A B2 + re-review F1: the red set is 6 of 8 arms; those two
+#     sites are discriminated by the _af_case pins below, not by this
+#     sabotage). The leak cell's armed pin and the signal window pin
+#     red under this sabotage as well.
 arm 'W="$(work_new)"; echo "RECV=$W"; test -d "$W" && echo ISDIR; suite_done demo'
 rc_is 0 "work_new suite exits green"
 has ISDIR "work_new creates a directory receiver"

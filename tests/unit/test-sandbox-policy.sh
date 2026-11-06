@@ -380,7 +380,7 @@ trap_scan() {
         awk -v f="$f" -v dq='"' -v sq="'" -v wnames='work_new|work_new_file|work_register|work_register_var' '
             function workline(s,  _i, _ch, _ins, _ind, _out) {
                 # the own-call view for check 4b: single-quoted spans
-                # blanked (X placeholder), trailing comment cut, double
+                # blanked (skipped entirely), trailing comment cut, double
                 # quotes kept -- a real suite calls work_* bare or inside
                 # "$( )"; single quotes carry child-code strings
                 # (meta-suite arm() lines) that run in children, where a

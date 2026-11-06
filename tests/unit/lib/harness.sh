@@ -149,11 +149,11 @@ suite_done() {
 # TMPDIR reassignment (round A A6): the registry path freezes at SOURCE
 # time -- harmless, appends and cleanup agree on the frozen path. But a
 # suite that reassigns TMPDIR after sourcing (the git-config /
-# mkcert-reuse / wsl-exposure shape) must make the NEW TMPDIR's scratch
-# a work_new/work_register receiver if its old trap covered it: the
-# registry does not auto-adopt it. The reverse shape (TMPDIR set before
-# sourcing) embeds the registry inside that scratch -- do not rm it
-# mid-suite.
+# mkcert-reuse / wsl-exposure / ddev-as-opencode shape) must make the
+# NEW TMPDIR's scratch a work_new/work_register receiver if its old
+# trap covered it: the registry does not auto-adopt it. The reverse
+# shape (TMPDIR set before sourcing) embeds the registry inside that
+# scratch -- do not rm it mid-suite.
 #
 # The registry never re-arms itself. A suite that keeps its own trap
 # statement after a work_* call silently disarms the central cleanup
@@ -192,7 +192,8 @@ _work_cleanup() {
                 echo "work registry: could not remove [$_we]" >&2
         fi
     done <"$_WORK_REG"
-    rm -f -- "$_WORK_REG"
+    rm -f -- "$_WORK_REG" 2>/dev/null ||
+        echo "work registry: could not remove the registry file [$_WORK_REG]" >&2
     return 0
 }
 trap _work_cleanup EXIT INT TERM
