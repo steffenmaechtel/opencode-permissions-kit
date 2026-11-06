@@ -22,8 +22,7 @@ BRIDGE_SH="$REPO/files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh"
 # (and check/assert_eq where present) live in lib/harness.sh now.
 . "$REPO/tests/unit/lib/harness.sh"
 
-WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT INT TERM
+WORK="$(work_new)"
 
 # Hermetic driver: sourced helper + overrides, zero privileges.
 CONF="$WORK/etc/wsl.conf"

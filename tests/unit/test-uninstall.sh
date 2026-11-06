@@ -19,9 +19,7 @@ INSTALL="$SCRIPT_DIR/../../files/install.sh"
 # (and check/assert_eq where present) live in lib/harness.sh now.
 . "$SCRIPT_DIR/lib/harness.sh"
 
-WORK="$(mktemp -d)"
-# widen to the bare _un_w2 receiver + signal arms (#283)
-trap 'rm -rf "${WORK:-}" "${_un_w2:-}"' EXIT INT TERM
+WORK="$(work_new)"
 
 # Fake sudo: logs the command line, always succeeds. Keeps the test
 # unprivileged while letting uninstall.sh build its full command list.
@@ -682,7 +680,7 @@ fi
 # skips silently. Fixture two: a readable .agents arms the backup branch
 # (test -d, ls -A, mkdir, cp all logged). Fixture three: a nonexistent
 # home enters none of them (no WARNING noise for what does not exist).
-_un_w2="$(mktemp -d)"
+_un_w2="$(work_new)"
 mkdir -p "$_un_w2/fake-home/opencodeux/.agents" "$_un_w2/fake-home/opencodeux2" "$_un_w2/backups"
 echo skills >"$_un_w2/fake-home/opencodeux/.agents/agents.md"
 printf '#!/bin/sh\necho "sudo $*" >> "%s/log"\nexec "$@"\n' "$_un_w2" >"$_un_w2/sudo"

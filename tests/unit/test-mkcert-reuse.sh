@@ -75,8 +75,7 @@ check "status.sh names the fix (clear traefik certs + restart)" \
 # Simulate the install.sh scan logic against a fake profile tree (the same
 # shell snippets, copied verbatim) — verifies user-dir skipping via the
 # CA-file requirement and the label extraction.
-TMPDIR=$(mktemp -d)
-trap 'rm -rf "$TMPDIR"' EXIT INT TERM
+TMPDIR=$(work_new)
 mkdir -p "$TMPDIR/Users/Public/AppData/Local/mkcert" \
     "$TMPDIR/Users/mail/AppData/Local/mkcert"
 touch "$TMPDIR/Users/Public/AppData/Local/mkcert/rootCA.pem" # no key -> skipped

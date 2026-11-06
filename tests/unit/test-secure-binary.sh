@@ -28,8 +28,7 @@ check() {
     if "$@" >/dev/null 2>&1; then pass "$_d"; else fail "$_d"; fi
 }
 
-WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT INT TERM
+WORK="$(work_new)"
 BIN="$WORK/opencode"
 echo '#!/bin/sh' >"$BIN"
 chmod 755 "$BIN"

@@ -36,8 +36,7 @@ cd "$REPO_ROOT" || exit 1
 RUNNER="scripts/coverage.sh"
 IA="tests/unit/test-install-args.sh"
 WF=".github/workflows/test-unit.yml"
-WORK="$(mktemp -d)"
-trap 'rm -rf "${WORK:?}"' EXIT INT TERM
+WORK="$(work_new)"
 
 _strip() { sed 's/^[[:space:]]*#.*$//' "$1"; }
 

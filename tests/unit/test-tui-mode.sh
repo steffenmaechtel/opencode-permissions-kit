@@ -189,14 +189,7 @@ check "uninstall.sh removes the 2x plugin dir and cli.json entries" \
 
 # tui-register.py functional behavior (cli.json is user-owned state)
 check "tui-register.py exists" test -f "$REGISTER"
-T2X=$(mktemp -d)
-# ONE merged trap (0.0.41f C4): a second EXIT trap would REPLACE the
-# cleanup — chain both scratch dirs in one action. Registered here, at
-# the first receiver, so the abort window up to the old registration
-# point is covered too (#283); TUIWORK is pre-initialized empty below
-# and set unset-safe — rm skips it until it exists.
-trap 'rm -rf "${T2X:-}" "${TUIWORK:-}"' EXIT INT TERM
-TUIWORK=""
+T2X=$(work_new)
 check "register: creates minimal cli.json" \
     python3 "$REGISTER" "$T2X/cli.json" register /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx &&
     grep -q '"package": "/usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx"' "$T2X/cli.json"
@@ -251,7 +244,7 @@ check "first-run cli.json parses and carries the plugin entry" \
 # Step 8c and update.sh's sync_tui_registration. Runs here as the
 # current user: TR_SUDO wraps sudo with a stub that drops chown (a
 # non-root chown always fails; ownership is asserted by the e2e suites).
-TUIWORK=$(mktemp -d)
+TUIWORK=$(work_new)
 mkdir -p "$TUIWORK/tps/bin"
 cat >"$TUIWORK/tps/bin/sudo-stub" <<'EOF'
 #!/bin/sh

@@ -16,10 +16,7 @@ OLD_DATA="$REPO/internal/reviews-meta/2026-10-10/data"
 # (and check/assert_eq where present) live in lib/harness.sh now.
 . "$REPO/tests/unit/lib/harness.sh"
 
-WORK="$(mktemp -d /tmp/opencode-test-meta-aggregate.XXXXXX)"
-# Trap the receiver on exit and signals (#283): the suite had no trap
-# and no inline rm — the scratch leaked on EVERY run, not just aborts.
-trap 'rm -rf "${WORK:-}"' EXIT INT TERM
+WORK="$(work_new /tmp/opencode-test-meta-aggregate.XXXXXX)"
 
 # --- compat: frozen 2026-10-10 data regenerates identically -------------------
 mkdir -p "$WORK/old"

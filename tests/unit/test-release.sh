@@ -18,8 +18,7 @@ RELEASE="$SCRIPT_DIR/../../scripts/release.sh"
 # (and check/assert_eq where present) live in lib/harness.sh now.
 . "$SCRIPT_DIR/lib/harness.sh"
 
-WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT INT TERM
+WORK="$(work_new)"
 
 # mkrepo: fresh sandbox at $WORK/r with origin=$WORK/origin.git, master
 # holding one commit (VERSION=1.2.3 + the release script), all pushed.

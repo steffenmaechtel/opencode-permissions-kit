@@ -33,9 +33,7 @@ check_fail() {
     fi
 }
 
-WORK=$(mktemp -d)
-# widen to the bare HOSTS_WORK receiver (#283; arms were already complete)
-trap 'rm -rf "${WORK:-}" "${HOSTS_WORK:-}"' EXIT INT TERM
+WORK=$(work_new)
 
 echo ""
 echo "Windows hosts bridge Tests (ddev-hosts)"
@@ -234,7 +232,7 @@ check "ddev-hosts.sh is a sourced lib (git 100644, not executed by path)" \
 # A leading dash must be rejected BEFORE it reaches `ddev hostname` as a
 # flag; a clean hostname still goes through. ddev is PATH-stubbed with a
 # recorder.
-HOSTS_WORK=$(mktemp -d)
+HOSTS_WORK=$(work_new)
 HOSTS_STUB="$HOSTS_WORK/bin"
 mkdir -p "$HOSTS_STUB"
 printf '#!/bin/sh\necho "ddev $*" >> "$DDEV_CALLS"\n' >"$HOSTS_STUB/ddev"

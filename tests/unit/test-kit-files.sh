@@ -125,8 +125,7 @@ fi
 # (never the repo files) and verify the checks above would trip, reusing
 # the SAME extraction helpers — not a re-implementation.
 
-WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT INT TERM
+WORK="$(work_new)"
 
 # Shared mutation for 4a/4c: update.sh without opencode-deny-all.jsonc in
 # KIT_FILES (a file install.sh both fetches and cp-deploys).

@@ -20,8 +20,7 @@ DOCTOR="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/doctor.s
 # (and check/assert_eq where present) live in lib/harness.sh now.
 . "$SCRIPT_DIR/lib/harness.sh"
 
-WORK="$(mktemp -d)"
-trap 'rm -rf "${WORK:-}"' EXIT INT TERM
+WORK="$(work_new)"
 
 PROCFIX="$WORK/proc"
 CONF="$WORK/install.conf"
@@ -489,7 +488,7 @@ fi
 # helper leaves a stale $WORK/opk.json behind, and this pin asserts a
 # chain with NO opk.json at all (env assumption: none at /tmp or /)
 rm -f "${PROJ:?}/sub/opk.json"
-WALKNONE="$(mktemp -d)"
+WALKNONE="$(work_new)"
 mkdir -p "$WALKNONE/inner"
 rc_doctor_in "no hit anywhere -> rc 2" 2 "$WALKNONE/inner"
 grep_last_out "root stays the invocation dir" grep -qF "project root   $WALKNONE/inner"

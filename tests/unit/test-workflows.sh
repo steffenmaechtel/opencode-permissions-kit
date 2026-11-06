@@ -27,13 +27,9 @@ WF_DDEV_E2E="$REPO/.github/workflows/test-e2e-ddev.yml"
 WF_ADVISORY="$REPO/.github/workflows/advisory-watch.yml"
 WF_PAGES="$REPO/.github/workflows/pages.yml"
 
-TMP_REQ="$(mktemp)"
-TMP_755="$(mktemp)"
-TMP_RUNS="$(mktemp)"
-# widen to the late _FAKEWF/TMP_FAKE receivers (#283) — created far
-# below inside the command-position pin; unset-safe until then. Arms on
-# this physical line: the trap-coverage guard reads line-based.
-trap 'rm -f "${TMP_REQ:-}" "${TMP_755:-}" "${TMP_RUNS:-}" "${_FAKEWF:-}" "${TMP_FAKE:-}"' EXIT INT TERM
+TMP_REQ="$(work_new_file)"
+TMP_755="$(work_new_file)"
+TMP_RUNS="$(work_new_file)"
 
 # --- 1. exec bits in the git index ---------------------------------------------
 
@@ -165,8 +161,8 @@ fi
 
 # Behavioral pin of the command-position rule itself (0.0.42e C2): an
 # argument-position .sh on a run: line must NOT count as executed.
-_FAKEWF="$(mktemp)"
-TMP_FAKE="$(mktemp)"
+_FAKEWF="$(work_new_file)"
+TMP_FAKE="$(work_new_file)"
 printf '%s\n' \
     '      - name: one' \
     '        run: ./tests/unit/test-a.sh ./tests/unit/test-arg-only.sh' \
