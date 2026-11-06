@@ -245,6 +245,17 @@ review host):
   stay unguarded by design: fixture setup uses them heavily, they are
   not deletion, and a degenerate target fails on permissions for the
   non-root suite user. (RM-0003)
+- Scratch receivers in harness-sourcing suites register with the
+  **work registry** (`WORK="$(work_new)"`,
+  `F="$(work_new_file)"`, `work_register "$P"`,
+  `work_register_var NAME` — issue #395): the central EXIT INT TERM
+  trap in `tests/unit/lib/harness.sh` collects them on exit, abort and
+  signal, ending the #283 leak class structurally. A converted suite
+  carries **no trap statement of its own** — its local trap would
+  replace the harness trap and silently disarm the registry; the
+  sandbox floor flags that mix. Suites not yet converted keep their
+  local trap unchanged until their conversion wave.
+  (RM-0137)
 - Code extracted from shipped scripts and eval'd or run by a test
   executes under a **controlled PATH**, never the inherited host PATH:
   any `command -v` inside the extracted block must not see tools that

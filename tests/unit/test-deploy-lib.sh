@@ -26,6 +26,13 @@ LIB="$REPO/files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 check() {
     _d="$1"
     shift
+    # F6 parity with the harness form (round A B6): an empty command
+    # fails loud instead of vacuously passing through the redirection-
+    # only null command.
+    if [ "$#" -eq 0 ]; then
+        fail "$_d (check: no command given)"
+        return
+    fi
     if "$@" >/dev/null 2>&1; then pass "$_d"; else fail "$_d"; fi
 }
 
@@ -33,8 +40,7 @@ mode_is() {
     [ "$(stat -c %a "$1")" = "$2" ]
 }
 
-WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT INT TERM
+WORK="$(work_new)"
 LIBD="$WORK/libdir"
 
 # --- 1. happy path ----------------------------------------------------------
