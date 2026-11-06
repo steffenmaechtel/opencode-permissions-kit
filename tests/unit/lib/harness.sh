@@ -141,12 +141,24 @@ suite_done() {
 # 1 BEFORE anything exists to leak; a failed registry append removes the
 # receiver and returns 1; any later abort fires the EXIT trap, which
 # iterates whatever is registered by then. Suite rc is preserved: the
-# cleanup ends in `return 0`, the pending exit status stands.
+# cleanup is errexit-safe (a receiver it cannot remove is reported on
+# stderr and skipped, never fatal) and ends in `return 0`, so the
+# pending exit status stands (round A A2 -- under set -e a bare failing
+# rm in the trap used to flip the rc AND leak the registry file).
+#
+# TMPDIR reassignment (round A A6): the registry path freezes at SOURCE
+# time -- harmless, appends and cleanup agree on the frozen path. But a
+# suite that reassigns TMPDIR after sourcing (the git-config /
+# mkcert-reuse / wsl-exposure shape) must make the NEW TMPDIR's scratch
+# a work_new/work_register receiver if its old trap covered it: the
+# registry does not auto-adopt it. The reverse shape (TMPDIR set before
+# sourcing) embeds the registry inside that scratch -- do not rm it
+# mid-suite.
 #
 # The registry never re-arms itself. A suite that keeps its own trap
 # statement after a work_* call silently disarms the central cleanup
 # (its trap replaces ours) -- the sandbox floor flags exactly that mix
-# (test-sandbox-policy.sh, check 4). Converted suites carry no trap line
+# (test-sandbox-policy.sh, check 4b). Converted suites carry no trap line
 # of their own; unconverted suites keep theirs (they never register, so
 # nothing leaks through the lazy file).
 _WORK_REG="${TMPDIR:-/tmp}/opk-work-reg.$$"
@@ -155,9 +167,30 @@ _work_cleanup() {
     [ -f "$_WORK_REG" ] || return 0
     while IFS= read -r _we; do
         case "$_we" in
-            '$'*) eval "_we=\${${_we#\$}:-}" ;;
+            '$'*)
+                # Round A A1 hardening: a malformed $-line (stale
+                # registry, corruption) must SKIP with a warning, never
+                # abort the loop -- eval is a special builtin; a syntax
+                # error in it used to kill the cleanup mid-loop in dash
+                # (even without set -e), leaking every later receiver.
+                _we2="${_we#\$}"
+                case "$_we2" in
+                    '' | *[!A-Za-z0-9_]*)
+                        echo "work registry: skipping malformed entry [$_we]" >&2
+                        continue
+                        ;;
+                esac
+                eval "_we=\${$_we2:-}"
+                ;;
         esac
-        [ -n "$_we" ] && rm -rf -- "$_we"
+        # Round A A2: errexit-safe AND fail-loud -- a receiver that
+        # cannot be removed is reported and skipped; a bare failing rm
+        # here used to flip the suite rc under set -e and leak the
+        # registry file.
+        if [ -n "$_we" ]; then
+            rm -rf -- "$_we" 2>/dev/null ||
+                echo "work registry: could not remove [$_we]" >&2
+        fi
     done <"$_WORK_REG"
     rm -f -- "$_WORK_REG"
     return 0
@@ -165,29 +198,43 @@ _work_cleanup() {
 trap _work_cleanup EXIT INT TERM
 
 _work_emit() {
-    # $1 = the freshly created receiver: register it, print it. On a
-    # failed append the receiver is removed again -- no unregistered
-    # scratch may survive a work_new call.
-    printf '%s\n' "$1" >>"$_WORK_REG" 2>/dev/null || {
-        echo "work_new: registry append failed ($_WORK_REG)" >&2
-        rm -rf -- "$1"
+    # $1 = caller name (the error message prefix), $2 = the freshly
+    # created receiver: register it, print it. On a failed append the
+    # receiver is removed again -- no unregistered scratch may survive
+    # a work_new call.
+    printf '%s\n' "$2" >>"$_WORK_REG" 2>/dev/null || {
+        echo "$1: registry append failed ($_WORK_REG)" >&2
+        rm -rf -- "$2"
         return 1
     }
-    printf '%s\n' "$1"
+    printf '%s\n' "$2"
 }
 
 work_new() {
+    local _wn
     _wn="$(mktemp -d "$@")" || return 1
-    _work_emit "$_wn"
+    _work_emit work_new "$_wn"
 }
 
 work_new_file() {
+    local _wn
     _wn="$(mktemp "$@")" || return 1
-    _work_emit "$_wn"
+    _work_emit work_new_file "$_wn"
 }
 
 work_register() {
+    local _wr
     for _wr in "$@"; do
+        # Round A A1/A3: paths only -- a "$"-prefixed argument is the
+        # work_register_var contract (or a quoting slip); letting it
+        # through put an eval target in the registry (late-bound
+        # deletion) or a syntax-error bomb for the cleanup.
+        case "$_wr" in
+            '$'*)
+                echo "work_register takes paths, not \$names: [$_wr] (use work_register_var NAME)" >&2
+                return 1
+                ;;
+        esac
         printf '%s\n' "$_wr" >>"$_WORK_REG" 2>/dev/null || {
             echo "work_register: registry append failed ($_WORK_REG)" >&2
             return 1
@@ -197,6 +244,7 @@ work_register() {
 }
 
 work_register_var() {
+    local _wv
     for _wv in "$@"; do
         case "$_wv" in
             '' | *[!A-Za-z0-9_]*)

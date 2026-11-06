@@ -58,8 +58,10 @@ bad() {
 # form: the receiver list does not fit one line and the floor reads the
 # arms off the trap's physical line.
 _meta_cleanup() {
-    rm -rf "${_lc_iso:-}" "${_lc_cell:-}" "${_sig_iso:-}" \
-        "${_sig_scratch:-}" "${_af_out:-}" "${_af_cell:-}" "${_sig_out:-}"
+    rm -rf "${_lc_iso:-}" "${_lc_cell:-}" "${_sgi_iso:-}" \
+        "${_sgi_scratch:-}" "${_afc_out:-}" "${_afc_cell:-}" \
+        "${_a1h_out:-}" "${_a1h_cell:-}" "${_a1h_a:-}" "${_a1h_b:-}"
+    rm -f "${_sgi_out:-}"
 }
 trap _meta_cleanup EXIT INT TERM
 
@@ -125,6 +127,15 @@ if arm_plain | grep -qF '[0;32mPASS[0m  one'; then
     ok "PASS row bytes: color codes, word, two spaces, message"
 else
     bad "PASS row bytes: color codes, word, two spaces, message"
+fi
+# Raw-ESC pin (round A B7): arm_plain strips ESC before matching, so a
+# harness regression losing the ESC byte (colors without \033) stays
+# byte-identical to the strippers -- this arm greps the RAW bytes.
+_esc="$(printf '\033')"
+if printf '%s' "$_arm_out" | grep -qF "${_esc}[0;32mPASS"; then
+    ok "PASS row emits the raw ESC byte before the color code (B7)"
+else
+    bad "PASS row emits the raw ESC byte before the color code (B7)"
 fi
 
 # --- 2. red path: fail counting + rc 1 + no green line ------------------------
@@ -214,10 +225,15 @@ fi
 # -- the parent then observes the receiver PATH is gone and the child's
 # rc. Sabotage discrimination (committed tree, then restore + re-run):
 #   - delete `trap _work_cleanup EXIT INT TERM` from the harness -> the
-#     recv_gone pins and the leak cell go red (receivers stay, control
-#     arm proves the cell was discriminating all along)
-#   - delete the `>>"$_WORK_REG"` append from _work_emit -> recv_gone
-#     pins go red while the ISDIR/ISFILE shape pins stay green
+#     recv_gone pins, the leak cell and the signal cell go red
+#     (receivers stay; the gone control arms prove the cells were
+#     discriminating all along)
+#   - delete the `>>"$_WORK_REG"` append from _work_emit -> the FIVE
+#     _work_emit-routed recv_gone arms go red while the ISDIR/ISFILE
+#     shape pins stay green; the work_register/work_register_var arms
+#     stay green TOO -- their appends are their own inline sites
+#     (round A B2: the red set is 5 of 7 arms; those two sites are
+#     discriminated by the _af_case pins below, not by this sabotage)
 arm 'W="$(work_new)"; echo "RECV=$W"; test -d "$W" && echo ISDIR; suite_done demo'
 rc_is 0 "work_new suite exits green"
 has ISDIR "work_new creates a directory receiver"
@@ -244,6 +260,52 @@ has "not a variable name" "the rejection names the bad operand"
 arm 'W="$(work_new)"; echo "RECV=$W"; fail boom; suite_done demo'
 rc_is 1 "red suite with a registered receiver still exits 1"
 recv_gone "red exit: cleanup ran AND the rc stayed 1 (rc preserved)"
+
+# --- 8b. A1/A3: work_register takes paths, never $-arguments -------------------
+# Round A A1/A3: a "$"-prefixed argument is the work_register_var
+# contract or a quoting slip -- unvalidated it put an eval target (or a
+# syntax-error bomb) into the registry. Rejected at the gate now.
+arm 'set -e; work_register '\''$(echo NOPE)'\''; pass unreachable'
+rc_is 1 "work_register rejects a \$-prefixed non-name loud (A1)"
+has "not \$names" "the rejection names the contract and the operand (A1)"
+arm 'set -e; work_register '\''$WORK2'\''; pass unreachable'
+rc_is 1 "the quoting-slip shape '\$WORK2' is rejected too (A3: no late-bound targets)"
+
+# A1 hardening: a malformed $-line IN the registry (stale file, PID
+# recycle -- work_register rejects them, corruption still reaches the
+# file) must SKIP with a warning: later receivers stay collected, the
+# registry file is removed, rc preserved. The cell seeds the registry
+# directly (good / poison / good) before its exit runs the trap.
+_a1h_out="$(mktemp -d)"
+_a1h_a="$(mktemp -d)"
+_a1h_b="$(mktemp -d)"
+_a1h_cell="$(mktemp)"
+cat >"$_a1h_cell" <<'A1H'
+#!/bin/sh
+. "$1"
+printf '%s\n' "$2" '$(echo POISON)' "$3" >>"${TMPDIR:-/tmp}/opk-work-reg.$$"
+exit 0
+A1H
+_a1h_rc=0
+_a1h_err="$(TMPDIR="$_a1h_out" sh "$_a1h_cell" "$HARNESS" "$_a1h_a" "$_a1h_b" 2>&1 >/dev/null)" ||
+    _a1h_rc=$?
+_a1h_left="$(find "$_a1h_out" -mindepth 1 | wc -l | tr -d ' ')"
+if [ "$_a1h_rc" = 0 ] && [ "$_a1h_left" = 0 ] &&
+    printf '%s' "$_a1h_err" | grep -qF 'skipping malformed entry'; then
+    ok "malformed registry line skips: later receivers collected, rc 0 (A1 hardening)"
+else
+    bad "malformed registry line must skip loudly and collect the rest (rc=$_a1h_rc left=$_a1h_left err=$(printf '%s' "$_a1h_err" | head -c 80))"
+fi
+
+# --- 8c. A2: errexit-safe cleanup keeps the suite rc ---------------------------
+# A set -e suite with an unremovable registered receiver: the cleanup
+# reports and skips it (loud), collects the rest, and the pending rc 0
+# stands. The unremovable path is a read-only proc file -- rm fails on
+# permissions, harmlessly, every run.
+arm 'set -e; work_register /proc/version; W="$(work_new)"; echo "RECV=$W"; suite_done demo'
+rc_is 0 "set -e suite with an unremovable receiver keeps rc 0 (A2)"
+has "could not remove [/proc/version]" "the unremovable receiver is reported loud, skipped (A2)"
+recv_gone "the removable receiver is still collected (A2)"
 
 # Leak-shaped pin (acceptance of #395): the #283 form executing the
 # failure path -- isolated TMPDIR, receiver created, set -e abort inside
@@ -288,51 +350,90 @@ fi
 # via a session-group kill (the house cell pattern, test-sandbox-policy
 # section 5) with a work_new receiver. The elapsed guard (<10 s) proves
 # the kill landed -- a missed kill would green through the EXIT arm
-# after the sleep (0.0.46a F2 vacuity class).
-_sig_iso="$(mktemp -d)"
-_sig_scratch="$(mktemp -d)"
-_sig_cell="$_sig_scratch/cell.sh"
-_sig_out="$(mktemp)"
-printf '#!/bin/sh\n. "$1"\nW1="$(work_new)"\necho "RECV=$W1"\nsleep 30\n' \
-    >"$_sig_cell"
-_sig_start=$(date +%s)
-TMPDIR="$_sig_iso" setsid sh "$_sig_cell" "$HARNESS" >"$_sig_out" 2>&1 &
-_sig_pid=$!
-sleep 1
-kill -TERM "-$_sig_pid" 2>/dev/null || :
-wait "$_sig_pid" 2>/dev/null || :
-_sig_left="$(find "$_sig_iso" -mindepth 1 | wc -l | tr -d ' ')"
-_sig_el=$(($(date +%s) - _sig_start))
-rm -rf -- "$_sig_iso"
-rm -rf -- "$_sig_scratch"
-rm -f -- "$_sig_out"
+# after the sleep (0.0.46a F2 vacuity class). Round A B2/B3: the cell
+# also verifies the child actually REGISTERED a receiver (the RECV=
+# line -- an early-dying child used to green it vacuously) and carries
+# its own disarmed control arm that must leak.
+_sgi_cell() {
+    # $1 = armed|gone -- sets _sig_left, _sig_el, _sig_recv
+    _sgi_iso="$(mktemp -d)"
+    _sgi_scratch="$(mktemp -d)"
+    _sgi_script="$_sgi_scratch/cell.sh"
+    _sgi_out="$(mktemp)"
+    printf '#!/bin/sh\n. "$1"\nif [ "$2" = gone ]; then trap - EXIT INT TERM; fi\nW1="$(work_new)"\necho "RECV=$W1"\nsleep 30\n' \
+        >"$_sgi_script"
+    _sgi_start=$(date +%s)
+    TMPDIR="$_sgi_iso" setsid sh "$_sgi_script" "$HARNESS" "$1" \
+        >"$_sgi_out" 2>&1 &
+    _sgi_pid=$!
+    sleep 1
+    kill -TERM "-$_sgi_pid" 2>/dev/null || :
+    wait "$_sgi_pid" 2>/dev/null || :
+    _sig_left="$(find "$_sgi_iso" -mindepth 1 | wc -l | tr -d ' ')"
+    _sig_el=$(($(date +%s) - _sgi_start))
+    _sig_recv="$(sed -n 's/^RECV=//p' "$_sgi_out" | tail -n 1)"
+    rm -rf -- "$_sgi_iso"
+    rm -rf -- "$_sgi_scratch"
+    rm -f -- "$_sgi_out"
+}
+_sgi_cell armed
+if [ -n "$_sig_recv" ]; then
+    ok "signal cell: the child registered a receiver before the TERM (B3)"
+else
+    bad "signal cell: no RECV= line -- the child never registered (B3 vacuity)"
+fi
 if [ "$_sig_left" = 0 ] && [ "$_sig_el" -lt 10 ]; then
     ok "signal window: TERM lands, registry collects (zero leftovers, ${_sig_el}s)"
 else
     bad "signal window: TERM must collect within the window (left=$_sig_left elapsed=${_sig_el}s)"
 fi
+_sgi_cell gone
+if [ "$_sig_left" -ge 1 ] && [ "$_sig_el" -lt 10 ]; then
+    ok "signal control arm: disarmed registry leaks under TERM (B2, pin discriminates)"
+else
+    bad "signal control arm must leak within the kill window (left=$_sig_left elapsed=${_sig_el}s)"
+fi
 
 # Append-failure arm (L1: every fail-loud spot gets a pin that executes
-# the failure path): the registry path blocked by a directory while
-# mktemp still works. work_new must fail loud (rc 1, stderr names the
-# registry) AND remove the created receiver again -- no unregistered
-# scratch may survive a failed registration. The _work_emit message
-# covers all three append sites (work_new, work_register, var) -- the
-# mechanism is one, the pin drives it.
-_af_out="$(mktemp -d)"
-_af_cell="$(mktemp)"
-printf '#!/bin/sh\n. "$1"\nmkdir "${TMPDIR:-/tmp}/opk-work-reg.$$"\nset -e\nW="$(work_new)"\necho unreachable\n' \
-    >"$_af_cell"
-_af_rc=0
-TMPDIR="$_af_out" sh "$_af_cell" "$HARNESS" >/dev/null 2>&1 || _af_rc=$?
-_af_left="$(find "$_af_out" -mindepth 1 ! -name 'opk-work-reg.*' | wc -l | tr -d ' ')"
-rm -rf -- "$_af_out"
-rm -f -- "$_af_cell"
-if [ "$_af_rc" = 1 ] && [ "$_af_left" = 0 ]; then
-    ok "append failure: loud rc 1, receiver removed (no unregistered scratch)"
-else
-    bad "append failure must be loud rc 1 with the receiver removed (rc=$_af_rc left=$_af_left)"
-fi
+# the failure path). Round A B1: THREE separate append implementations
+# exist (work_new/work_new_file via _work_emit, work_register and
+# work_register_var inline) -- each site is pinned by its own blocked-
+# registry case, asserting rc 1 AND the site's stderr message (round A
+# B4: the message half must be observable, not discarded).
+_af_case() {
+    # $1 = the work_* call (child code), $2 = expected stderr token,
+    # $3 = site label. The registry path is blocked by a directory
+    # while mktemp still works. Asserts rc 1, the site's stderr message
+    # (B4: observable, not discarded) and zero unregistered scratch.
+    _afc_out="$(mktemp -d)"
+    _afc_cell="$(mktemp)"
+    printf '#!/bin/sh\n. "$1"\nmkdir "${TMPDIR:-/tmp}/opk-work-reg.$$"\nset -e\n%s\necho unreachable\n' "$1" \
+        >"$_afc_cell"
+    _afc_rc=0
+    _afc_err="$(TMPDIR="$_afc_out" sh "$_afc_cell" "$HARNESS" 2>&1 >/dev/null)" ||
+        _afc_rc=$?
+    _afc_left="$(find "$_afc_out" -mindepth 1 ! -name 'opk-work-reg.*' | wc -l | tr -d ' ')"
+    if [ "$_afc_rc" = 1 ] && [ "$_afc_left" = 0 ] &&
+        printf '%s' "$_afc_err" | grep -qF "$2"; then
+        ok "append failure ($3): rc 1 + message + no unregistered scratch"
+    else
+        bad "append failure ($3): must exit 1 naming [$2] with zero leftovers (rc=$_afc_rc left=$_afc_left err=$(printf '%s' "$_afc_err" | head -c 80))"
+    fi
+    rm -rf -- "$_afc_out"
+    rm -f -- "$_afc_cell"
+}
+_af_case 'W="$(work_new)"' 'work_new: registry append failed' 'work_new'
+_af_case 'F="$(work_new_file)"' 'work_new_file: registry append failed' 'work_new_file'
+_af_case 'work_register /tmp/opk-af-nonexistent' 'work_register: registry append failed' 'work_register'
+_af_case 'work_register_var V' 'work_register_var: registry append failed' 'work_register_var'
+# mktemp-failure path (round A B1): a dead TMPDIR fails work_new loud
+# before anything exists to leak -- mktemp's own error surfaces.
+# (TMPDIR must be exported BEFORE the call: a prefix assignment applies
+# after word expansion, and an unexported var never reaches mktemp.)
+arm 'set -e; TMPDIR="/opk-dead-af"; export TMPDIR; W="$(work_new)"; echo unreachable'
+rc_is 1 "work_new fails loud when mktemp fails (dead TMPDIR)"
+has "failed to create" "mktemp's own error surfaces (no silent empty path)"
+lacks unreachable "the abort happened at the failed mktemp"
 
 # --- summary gate (independent on purpose -- see header) ------------------------
 echo ""

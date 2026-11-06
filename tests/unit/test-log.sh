@@ -116,7 +116,6 @@ if [ -f "$WORK2/log/kit.log" ] && [ ! -f "$WORK2/log/kit.log.1" ]; then
 else
     fail "no rotation below the size threshold"
 fi
-rm -rf "$WORK2"
 
 # --- 4. best-effort: unwritable location never breaks the caller ----------------
 

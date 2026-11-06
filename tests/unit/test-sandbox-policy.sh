@@ -352,7 +352,8 @@ fi
 # trap statement carries all three arms. Whether the trap's action LIST
 # every receiver (variable-level completeness) cannot be grepped — that
 # stays the review's job, pinned behaviorally by section 5's mechanism
-# cells. Receiver detection: a live assignment whose value starts with
+# cells. (Check 4b, further below: work_* call + local trap in one
+# suite = mix — the local trap disarms the harness work registry, #395.) Receiver detection: a live assignment whose value starts with
 # an UNESCAPED $(mktemp (comment lines skipped), an optional `command `
 # prefix included ($(command mktemp …)); heredoc-embedded child
 # scripts carry \$ ( — escaped, excluded by design: child scripts own
@@ -383,10 +384,20 @@ trap_scan() {
                 # quotes kept -- a real suite calls work_* bare or inside
                 # "$( )"; single quotes carry child-code strings
                 # (meta-suite arm() lines) that run in children, where a
-                # trap statement of the parent file is irrelevant
+                # trap statement of the parent file is irrelevant. An
+                # escaped \$ ( is the documented child-script shape of
+                # the receiver check (round A C1) and is placeholder-
+                # mangled to break the \$\( adjacency -- outside quotes
+                # and inside dq alike (the dq "W="\$(...)" variant is the
+                # same child-code shape).
                 _ins = 0; _ind = 0; _out = ""
                 for (_i = 1; _i <= length(s); _i++) {
                     _ch = substr(s, _i, 1)
+                    if (!_ins && _ch == "\\" && substr(s, _i + 1, 1) == "$") {
+                        _out = _out "#"
+                        _i++
+                        continue
+                    }
                     if (!_ins && !_ind && _ch == "\\") {
                         _out = _out _ch
                         _i++
@@ -404,13 +415,28 @@ trap_scan() {
             /^[[:space:]]*#/ { next }
             /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*="?[$][(](command[[:space:]]+)?mktemp/ { recv++ }
             # work_* CALL detection (#395 check 4b): a call shape, not
-            # bare word presence -- `\$(name`, command position at line
-            # start, or after ; && ||. Description strings of pin labels
-            # ("the work_new receiver collected") carry the word without
-            # a call shape and must not flag. A function definition
-            # (`work_new() {`) is followed by "(" and matches no branch;
-            # lib/harness.sh defines but never calls. Scanned on the
-            # sq-blanked, comment-cut line (workline).
+            # bare word presence -- `$(name`, command position at line
+            # start, or after ; && ||. An ESCAPED \$(name) does NOT
+            # count (round A C1): it is the documented child-script
+            # shape of the receiver check -- child scripts own their
+            # cleanup -- and is placeholder-mangled in workline.
+            # strings of pin labels ("the work_new receiver collected")
+            # carry the word without a call shape and must not flag. A
+            # function definition (`work_new() {`) is followed by "("
+            # and matches no branch; lib/harness.sh defines but never
+            # calls. Scanned on the sq-blanked, comment-cut line
+            # (workline).
+            # Known latent shape gaps, documented not scanned (no live
+            # instance; line-based scanning deliberately avoids a
+            # parser -- the rationale of sibling check 4): dq strings
+            # carrying call-shape TEXT ("done; work_new" in a label
+            # counts as a call; the sq blanking protects arm()-style
+            # child-code strings only), work tokens on CONTINUATION
+            # lines of multi-line sq strings (per-line quote state
+            # resets), and the call shapes `V=1 work_new` (assignment
+            # prefix), keyword position (`if work_new; then`), single-
+            # pipe stage (`| work_new`) and `$( name )` with an inner
+            # space.
             {
                 _wl = workline($0)
                 if (_wl ~ "(\\$\\(|^[[:space:]]*|;[[:space:]]*|&&[[:space:]]*|\\|\\|[[:space:]]*)(" wnames ")([[:space:]]|\\))") workcall++
@@ -579,6 +605,12 @@ printf '#!/bin/sh\n# probe: a trailing comment naming work_new must not count as
     >"$PROBE_DIR/unit/test-probe-work-cmt.sh"
 printf '#!/bin/sh\n# probe: the function definition form is not a call\nwork_new() { :; }\n' \
     >"$PROBE_DIR/unit/test-probe-work-def.sh"
+# escaped heredoc/dq child code must not count as the suite's call
+# (round A C1): both the receiver check's documented \$ ( shape and its
+# dq variant, alongside a local trap -- the pre-C1 scanner flagged this
+# mix spuriously.
+printf '#!/bin/sh\n# probe: escaped child code is not the parent call (C1)\n_h = \\$(work_new)\nW="\\$(work_new_file)"\ntrap "rm -rf \\"$H\\" \\"$W\\"" EXIT INT TERM\n' \
+    >"$PROBE_DIR/unit/test-probe-work-esc.sh"
 : >"$VIOL"
 trap_scan "$PROBE_DIR/unit" >"$VIOL" || true
 if grep -q 'test-probe-trap-mix.sh|mixtrap' "$VIOL"; then
@@ -586,11 +618,11 @@ if grep -q 'test-probe-trap-mix.sh|mixtrap' "$VIOL"; then
 else
     fail "self-probe: work_new + local trap must be caught (check 4b)"
 fi
-if grep -qE 'test-probe-(work-only|work-cmt|work-def)\.sh\|' "$VIOL"; then
-    fail "self-probe: work-only, comment-only and definition forms must pass clean"
-    grep -E 'test-probe-(work-only|work-cmt|work-def)' "$VIOL" || true
+if grep -qE 'test-probe-(work-only|work-cmt|work-def|work-esc)\.sh\|' "$VIOL"; then
+    fail "self-probe: work-only, comment-only, definition and escaped-child forms must pass clean"
+    grep -E 'test-probe-(work-only|work-cmt|work-def|work-esc)' "$VIOL" || true
 else
-    pass "self-probe: work-only, comment-only and definition forms pass clean"
+    pass "self-probe: work-only, comment-only, definition and escaped-child forms pass clean"
 fi
 # scan-target assert must fail loudly on a vanished directory (#287 a S3)
 _ts_probe=0
