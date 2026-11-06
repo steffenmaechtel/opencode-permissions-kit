@@ -115,7 +115,7 @@ fi
 # --- 2+3. editorconfig equivalence + discrimination (scratch probe) -------------
 _scratch="$(work_new)"
 if [ ! -d "$_scratch" ]; then
-    echo "  error  scratch setup failed (mktemp) -- aborting (D4 guard)"
+    echo "  error  scratch setup failed (work_new) -- aborting (D4 guard)"
     exit 1
 fi
 
@@ -290,7 +290,7 @@ OKSTUB
         fail "empty SHFMT_BIN_DIR passed or failed too late (rc=$_efb_rc curl-ran=$([ -e "$_isf/curl.ran" ] && echo yes))"
     fi
 else
-    fail "scratch setup failed (mktemp) -- install-shfmt pins not run (D4 guard)"
+    fail "scratch setup failed (work_new) -- install-shfmt pins not run (D4 guard)"
 fi
 
 echo ""
