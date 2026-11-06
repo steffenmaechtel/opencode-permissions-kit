@@ -332,13 +332,15 @@ fi
 # DDEV_VERSION in install.conf is an install-time stamp; status.sh must
 # report the LIVE binary version instead (the stale stamp showed 1.25.3
 # while the terminal's `ddev --version` answered 1.25.4). Extract the
-# probe block and run it with a fake ddev shim ahead on PATH — command -v
-# resolves the shim first, so the host's own ddev cannot interfere.
-DDEV_PROBE="$(sed -n '/# Live ddev version/,/# Windows hosts readiness/p' "$SCORE" | sed '$d')"
-if [ -n "$DDEV_PROBE" ]; then
-    pass "ddev version probe block extractable from status.sh"
+# whole _st_ddev_version function and run it with a fake ddev shim ahead
+# on PATH — command -v resolves the shim first, so the host's own ddev
+# cannot interfere. (#402 a c1: the fragment must be a balanced unit —
+# the #221 a W8 sh -n discipline is pinned here too, not just assumed.)
+DDEV_PROBE="$(sed -n '/^_st_ddev_version() {/,/^}$/p' "$SCORE")"
+if [ -n "$DDEV_PROBE" ] && printf '%s\n' "$DDEV_PROBE" | sh -n; then
+    pass "ddev version probe function extractable from sh/status-core.sh (sh -n clean)"
 else
-    fail "ddev version probe block extractable from status.sh"
+    fail "ddev version probe function extractable from sh/status-core.sh (sh -n clean)"
     echo "  ${RED}$failures test(s) failed.${NC}"
     exit 1
 fi
@@ -353,6 +355,7 @@ probe_out=$(
         . "$UI_LIB"
         DDEV_VERSION="1.25.3"
         eval "$DDEV_PROBE"
+        _st_ddev_version
         exit 0
     ) 2>&1
 ) || true
@@ -374,6 +377,7 @@ probe_low=$(
         . "$UI_LIB"
         DDEV_VERSION="1.24.2"
         eval "$DDEV_PROBE"
+        _st_ddev_version
         exit 0
     ) 2>&1
 ) || true
@@ -421,6 +425,7 @@ probe_helper=$(
         OPENCODE_USER="opencode"
         DDEV_VERSION="1.25.3"
         eval "$DDEV_PROBE"
+        _st_ddev_version
         exit 0
     ) 2>&1
 ) || true
@@ -1969,6 +1974,10 @@ _m165_run() {
         ui_kv_ok() { echo "OK|$1|$2"; }
         ui_kv_warn() { echo "WARN|$1|$2"; }
         ui_detail() { echo "DETAIL|$1"; }
+        # Self-sufficient harness (#402 a c2): the hoisted _st_dbdump_gap
+        # definition comes from the lib itself, not from an unrelated
+        # earlier leg's top-level sourcing — same pattern as _h165_run.
+        eval "$SCAN_HELPERS"
         eval "$_m165"
         exit 0
     ) 2>&1

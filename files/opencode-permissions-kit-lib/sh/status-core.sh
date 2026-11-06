@@ -796,6 +796,7 @@ _st_ddev_basic() {
     esac
 }
 _st_ddev_share_scan() {
+    # Group-write gaps in .ddev trees (issue #94's edge case, issue #149
     # finding 2): ddev's hardcoded 0755/0644 modes cap the ACL mask below
     # g+w, and runs from AGENT sessions get none of the ddev() hook's
     # automatic heals — the developer then fails `git pull` on .ddev/ content

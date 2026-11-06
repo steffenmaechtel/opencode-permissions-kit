@@ -953,7 +953,7 @@ rm -rf "$VN"
 # dispositions in round b's comment instead.
 E2ELIB="$SCRIPT_DIR/../e2e/lib.sh"
 check "fix a M1: status tier-1 probe runs ddev from / — no caller cwd" \
-    sh -c 'grep -qF "(cd / && \"\$_st_bin\" --version)" "$1" && ! grep -qF "[ -n \"\$_st_bin\" ] && _st_ver=" "$2"' _ "$SCORE" "$STATUS"
+    sh -c 'grep -qF "(cd / && \"\$_st_bin\" --version)" "$1" && ! grep -qF "[ -n \"\$_st_bin\" ] && _st_ver=" "$2" && ! grep -qF "[ -n \"\$_st_bin\" ] && _st_ver=" "$3"' _ "$SCORE" "$STATUS" "$SCORE"
 # e2e_cleanup body, comment-stripped once (#387 a a1): the presence arm
 # and the NR anchors below must not ride comment lines — the body
 # carries a ~10-line comment block around the dump gate, one comment
