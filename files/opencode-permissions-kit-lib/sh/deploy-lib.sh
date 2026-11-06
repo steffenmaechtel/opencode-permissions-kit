@@ -138,6 +138,9 @@ opencode-permissions-kit-lib/sh/ui.sh 755
 # update-check.sh: kit update probes (issue #358), sourced by the
 # wrapper (daily banner note) and status.sh (live Core row)
 opencode-permissions-kit-lib/sh/update-check.sh 644
+# update-core.sh: the update run's phase functions (issue #346), sourced
+# checkout-first by management/update.sh
+opencode-permissions-kit-lib/sh/update-core.sh 644
 opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh 644
 # tui/ mode display (internal/records/_archive/design/plan-ui-tui-opencode.md)
 opencode-permissions-kit-lib/tui/kit-mode-2x.tsx 644

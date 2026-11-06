@@ -18,7 +18,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LIB="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/advisories.sh"
 WRAPPER="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
 STATUS="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/status.sh"
-SCORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core.sh"
+STATUS_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core.sh"
 # Shared harness (issue #394): pass/fail, colors, counters
 # (and check/assert_eq where present) live in lib/harness.sh now.
 . "$SCRIPT_DIR/lib/harness.sh"
@@ -268,9 +268,9 @@ if grep -q 'timeout 5 /usr/bin/sudo -n -u opencode' "$WRAPPER" && grep -q 'bin/o
 else
     fail "wrapper: the --version probe is timeout-bounded (wedged 2.x service, issue #80)"
 fi
-if grep -q 'ui_section "Security advisories"' "$SCORE" &&
-    grep -q 'https://api.github.com/repos/anomalyco/opencode/security-advisories' "$SCORE" &&
-    grep -q 'opk upgrade-opencode' "$SCORE"; then
+if grep -q 'ui_section "Security advisories"' "$STATUS_CORE" &&
+    grep -q 'https://api.github.com/repos/anomalyco/opencode/security-advisories' "$STATUS_CORE" &&
+    grep -q 'opk upgrade-opencode' "$STATUS_CORE"; then
     pass "status.sh: advisory section, upstream live check, upgrade hint"
 else
     fail "status.sh: advisory section, upstream live check, upgrade hint"

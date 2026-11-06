@@ -23,6 +23,7 @@ TEMPLATE="$FILES/opencode-permissions-kit-lib/templates/opencode.jsonc"
 SUDOERS="$FILES/opencode-permissions-kit-lib/templates/sudoers.template"
 INSTALL="$FILES/install.sh"
 UPDATE="$FILES/opencode-permissions-kit-lib/management/update.sh"
+UPDATE_CORE="$FILES/opencode-permissions-kit-lib/sh/update-core.sh"
 CONFIG="$FILES/opencode-permissions-kit-lib/management/config.sh"
 DEPLOYLIB="$FILES/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 KIT="$FILES/opencode-permissions-kit-lib/bin/opk"
@@ -35,7 +36,7 @@ HANDOVER="$FILES/opencode-permissions-kit-lib/sh/ddev-handover.sh"
 OPK_INSTALL_CONF="/nonexistent-opk-test-install.conf"
 export OPK_INSTALL_CONF
 STATUS="$FILES/opencode-permissions-kit-lib/management/status.sh"
-SCORE="$FILES/opencode-permissions-kit-lib/sh/status-core.sh"
+STATUS_CORE="$FILES/opencode-permissions-kit-lib/sh/status-core.sh"
 MAKEFILE="$SCRIPT_DIR/../../Makefile"
 TEST_CI="$SCRIPT_DIR/../../.github/workflows/test-unit.yml"
 
@@ -574,13 +575,13 @@ check "update.sh KIT_FILES includes both new files" \
 check "update.sh KIT_FILES includes the handover helper" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-handover.sh' \"\$1\"" _ "$UPDATE"
 check "update.sh deploys the function file (lib_deploy manifest)" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh 644' \"\$2\" && grep -q 'lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"' \"\$1\"" _ "$UPDATE" "$DEPLOYLIB"
+    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh 644' \"\$2\" && grep -q 'lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"' \"\$1\"" _ "$UPDATE_CORE" "$DEPLOYLIB"
 check "update.sh deploys the helper (mode 755, lib_deploy manifest)" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/bin/ddev-as-opencode 755' \"\$2\" && grep -q 'lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"' \"\$1\"" _ "$UPDATE" "$DEPLOYLIB"
+    sh -c "grep -q 'opencode-permissions-kit-lib/bin/ddev-as-opencode 755' \"\$2\" && grep -q 'lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"' \"\$1\"" _ "$UPDATE_CORE" "$DEPLOYLIB"
 check "update.sh heals the rc-file hook idempotently" \
-    sh -c "grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' \"\$1\"" _ "$UPDATE_CORE"
 check "update.sh runs the ddev handover unconditionally" \
-    sh -c "grep -q 'ddev_handover_root' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -q 'ddev_handover_root' \"\$1\"" _ "$UPDATE_CORE"
 
 # --- 7. handover helper + call sites ---------------------------------------------
 check "handover helper searches .ddev at any depth" \
@@ -900,17 +901,17 @@ check "reshare detect: unknown user yields no findings (find -user error path; l
 check "reshare detect: missing dir is a clean no-need" \
     sh -c ". \"\$1\" && ! ddev_reshare_needed \"\$2/does-not-exist\" \"\$3\"" _ "$HANDOVER" "$RN" "$RN_U"
 check "reshare detect: status.sh wires ddev_reshare_needed per project root" \
-    sh -c "grep -q 'ddev_reshare_needed' \"\$1\" && grep -qF 'ui_kv_warn \"ddev share\"' \"\$1\"" _ "$SCORE"
+    sh -c "grep -q 'ddev_reshare_needed' \"\$1\" && grep -qF 'ui_kv_warn \"ddev share\"' \"\$1\"" _ "$STATUS_CORE"
 check "reshare detect: status.sh prints the opk ensure-shared one-command fix (issue #159)" \
-    sh -c "grep -qF 'opk ensure-shared \\\"\$_st_d\\\"' \"\$1\"" _ "$SCORE"
+    sh -c "grep -qF 'opk ensure-shared \\\"\$_st_d\\\"' \"\$1\"" _ "$STATUS_CORE"
 check "reshare detect: status.sh fix line is the short form only (no raw helper call)" \
-    sh -c "! grep -q -- '--opk-ensure-shared' \"\$1\" && ! grep -q -- '--opk-ensure-shared' \"\$2\"" _ "$STATUS" "$SCORE"
+    sh -c "! grep -q -- '--opk-ensure-shared' \"\$1\" && ! grep -q -- '--opk-ensure-shared' \"\$2\"" _ "$STATUS" "$STATUS_CORE"
 check "reshare detect: status.sh resolves the lib checkout-first (0.0.46a F4)" \
-    sh -c "grep -qF '_st_dhl=\"\$(cd \"\$(dirname \"\$0\")\" && pwd)/../sh/ddev-handover.sh\"' \"\$1\" && grep -qF '[ -f \"\$_st_dhl\" ] || _st_dhl=\"\$LIBDIR/sh/ddev-handover.sh\"' \"\$1\"" _ "$SCORE"
+    sh -c "grep -qF '_st_dhl=\"\$(cd \"\$(dirname \"\$0\")\" && pwd)/../sh/ddev-handover.sh\"' \"\$1\" && grep -qF '[ -f \"\$_st_dhl\" ] || _st_dhl=\"\$LIBDIR/sh/ddev-handover.sh\"' \"\$1\"" _ "$STATUS_CORE"
 check "reshare detect: status fix names 'any ddev command' — every invocation heals (0.0.46a F7 wording inverted by issue #279)" \
-    sh -c "grep -q 'any ddev command in this project' \"\$1\" && ! grep -q 'tree-creating ddev command (config/get/start/restart' \"\$1\" && ! grep -q 'tree-creating ddev command (config/get/start/restart' \"\$2\"" _ "$SCORE" "$STATUS"
+    sh -c "grep -q 'any ddev command in this project' \"\$1\" && ! grep -q 'tree-creating ddev command (config/get/start/restart' \"\$1\" && ! grep -q 'tree-creating ddev command (config/get/start/restart' \"\$2\"" _ "$STATUS_CORE" "$STATUS"
 check "reshare detect: warn line names the general cause, not only agent runs (issue #279)" \
-    sh -c "grep -q 'group-write missing (a ddev run without the following heal)' \"\$1\" && ! grep -q 'agent-side ddev run' \"\$1\" && ! grep -q 'agent-side ddev run' \"\$2\"" _ "$SCORE" "$STATUS"
+    sh -c "grep -q 'group-write missing (a ddev run without the following heal)' \"\$1\" && ! grep -q 'agent-side ddev run' \"\$1\" && ! grep -q 'agent-side ddev run' \"\$2\"" _ "$STATUS_CORE" "$STATUS"
 rm -rf "$RN"
 
 # --- 7d-4. version-probe neutrality (issue #279) ----------------------------------
@@ -953,7 +954,7 @@ rm -rf "$VN"
 # dispositions in round b's comment instead.
 E2ELIB="$SCRIPT_DIR/../e2e/lib.sh"
 check "fix a M1: status tier-1 probe runs ddev from / — no caller cwd" \
-    sh -c 'grep -qF "(cd / && \"\$_st_bin\" --version)" "$1" && ! grep -qF "[ -n \"\$_st_bin\" ] && _st_ver=" "$2" && ! grep -qF "[ -n \"\$_st_bin\" ] && _st_ver=" "$3"' _ "$SCORE" "$STATUS" "$SCORE"
+    sh -c 'grep -qF "(cd / && \"\$_st_bin\" --version)" "$1" && ! grep -qF "[ -n \"\$_st_bin\" ] && _st_ver=" "$2" && ! grep -qF "[ -n \"\$_st_bin\" ] && _st_ver=" "$3"' _ "$STATUS_CORE" "$STATUS" "$STATUS_CORE"
 # e2e_cleanup body, comment-stripped once (#387 a a1): the presence arm
 # and the NR anchors below must not ride comment lines — the body
 # carries a ~10-line comment block around the dump gate, one comment
@@ -1000,7 +1001,7 @@ check "fix b M3: both inline import invocations hop through a neutral cwd (impor
 check "fix b M1: install.sh root probe from / (consistency)" \
     sh -c 'grep -qF "(cd / && \"\$DDEV_BIN\" version)" "$1" && ! grep -qF "\"\$DDEV_BIN\" version 2>/dev/null" "$1"' _ "$INSTALL"
 check "fix b M1: update.sh root fallback probe from / (consistency)" \
-    sh -c 'grep -qF "(cd / && \"\$_ddev_bin\" --version)" "$1" && ! grep -qF "\"\$_ddev_bin\" --version 2>/dev/null" "$1"' _ "$UPDATE"
+    sh -c 'grep -qF "(cd / && \"\$_ddev_bin\" --version)" "$1" && ! grep -qF "\"\$_ddev_bin\" --version 2>/dev/null" "$1" && ! grep -qF "\"\$_ddev_bin\" --version 2>/dev/null" "$2"' _ "$UPDATE_CORE" "$UPDATE"
 check "fix b M4/S3: dump gate sees the exit status, not only counted failures" \
     sh -c "printf '%s\n' \"\$1\" | grep -qF '_ecc_rc=\$?' && printf '%s\n' \"\$1\" | grep -qF '\"\$_ecc_rc\" -ne 0'" _ "$_ecl_str"
 check "fix b M4: dump fires before the keep branches (red --debug runs get evidence)" \
@@ -1553,13 +1554,13 @@ unset OPK_HANDOVER_STAMP_DIR
 # update.sh keeps exactly one project-root loop and one handover call
 # per root; comment-strip riders (#261) guard the counts.
 check "update.sh: plain-update loop gates the skip on REFRESH + stamp_valid" \
-    sh -c "grep -qF '[ \"\$REFRESH\" != true ]' \"\$1\" && grep -qF 'ddev_handover_stamp_valid \"\$root\" \"\$OPENCODE_USER\" \"\$NEW_OPENCODE_GROUP\" \"\$DEFAULT_USER\"; then' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -qF '[ \"\$REFRESH\" != true ]' \"\$1\" && grep -qF 'ddev_handover_stamp_valid \"\$root\" \"\$OPENCODE_USER\" \"\$NEW_OPENCODE_GROUP\" \"\$DEFAULT_USER\"; then' \"\$1\"" _ "$UPDATE_CORE"
 check "update.sh: stamps the root after the handover" \
-    sh -c "grep -qF 'ddev_handover_stamp_write \"\$root\" \"\$OPENCODE_USER\" \"\$NEW_OPENCODE_GROUP\"' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -qF 'ddev_handover_stamp_write \"\$root\" \"\$OPENCODE_USER\" \"\$NEW_OPENCODE_GROUP\"' \"\$1\"" _ "$UPDATE_CORE"
 check "update.sh: the scanning detail is printed only for roots actually scanned" \
-    sh -c "grep -qF '_ho_announced=false' \"\$1\" && grep -qF 'if [ \"\$_ho_announced\" = false ]' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -qF '_ho_announced=false' \"\$1\" && grep -qF 'if [ \"\$_ho_announced\" = false ]' \"\$1\"" _ "$UPDATE_CORE"
 check "update.sh: skip message names both force paths" \
-    sh -c "grep -q 'opk update --refresh' \"\$1\" && grep -q 'config handover' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -q 'opk update --refresh' \"\$1\" && grep -q 'config handover' \"\$1\"" _ "$UPDATE_CORE"
 # pr-00381 a1/a2/a7 + b1/b2: the file-global presence/order pins were
 # comment-blind and position-free — hoisting the arm out of the loop,
 # dropping its REFRESH wrapper or commenting it out all stayed green.
@@ -1572,7 +1573,7 @@ check "update.sh: skip message names both force paths" \
 # is loud in EVERY placement (c1): anywhere it reds the loops==1 pin,
 # and inside the range it additionally shortens this capture, which
 # reds the in-body counts.
-_upd_loop="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE" | awk '/while IFS= read -r root; do/,/done <"\$PROJECTS_CONF"/')"
+_upd_loop="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE_CORE" | awk '/while IFS= read -r root; do/,/done <"\$PROJECTS_CONF"/')"
 _upd_gate_n="$(printf '%s\n' "$_upd_loop" | grep -c 'if \[ "\$REFRESH" = true \]; then' || true)"
 _upd_arm_n="$(printf '%s\n' "$_upd_loop" | grep -c 'fs_baseline_root "\$root"' || true)"
 _upd_stmp_n="$(printf '%s\n' "$_upd_loop" | grep -c 'ddev_handover_stamp_write "\$root"' || true)"
@@ -1583,18 +1584,18 @@ _upd_ho_ln="$(printf '%s\n' "$_upd_loop" | grep -n 'ddev_handover_root "\$root"'
 _upd_stamp_ln="$(printf '%s\n' "$_upd_loop" | grep -n 'ddev_handover_stamp_write "\$root"' | head -1 | cut -d: -f1)"
 check "update.sh: in-loop order arm < handover < stamp (${_upd_arm_ln}<${_upd_ho_ln}<${_upd_stamp_ln} — pr-00381 a7)" \
     sh -c '[ -n "$1" ] && [ -n "$2" ] && [ -n "$3" ] && [ "$1" -lt "$2" ] && [ "$2" -lt "$3" ]' _ "$_upd_arm_ln" "$_upd_ho_ln" "$_upd_stamp_ln"
-_upd_loops_n="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE" | grep -c 'done <"$PROJECTS_CONF"' || true)"
+_upd_loops_n="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE_CORE" | grep -c 'done <"$PROJECTS_CONF"' || true)"
 check "update.sh: exactly one project-root loop (loops: $_upd_loops_n, need 1 — issue #219)" \
     [ "$_upd_loops_n" -eq 1 ]
-_upd_ho_n="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE" | grep -c 'ddev_handover_root "$root"' || true)"
+_upd_ho_n="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE_CORE" | grep -c 'ddev_handover_root "$root"' || true)"
 check "update.sh: handover call per root exactly once (sites: $_upd_ho_n, need 1 — issue #219)" \
     [ "$_upd_ho_n" -eq 1 ]
 check "update.sh: refresh success line kept verbatim (issue #219 move)" \
-    grep -qF 'ui_success "group baseline refreshed (chgrp + setgid + g+rw + default ACLs)"' "$UPDATE"
+    grep -qF 'ui_success "group baseline refreshed (chgrp + setgid + g+rw + default ACLs)"' "$UPDATE_CORE"
 check "update.sh: refresh section header kept (issue #219 move)" \
-    grep -qF 'ui_section "Refreshing group baseline"' "$UPDATE"
+    grep -qF 'ui_section "Refreshing group baseline"' "$UPDATE_CORE"
 check "update.sh: routine skip hint kept verbatim (issue #219 move)" \
-    grep -qF 'skipped group-baseline refresh (use --refresh to re-apply chgrp/setgid/default ACLs)' "$UPDATE"
+    grep -qF 'skipped group-baseline refresh (use --refresh to re-apply chgrp/setgid/default ACLs)' "$UPDATE_CORE"
 check "install.sh: stamps after the install-time handover" \
     sh -c "grep -qF 'ddev_handover_stamp_write \"\$root\" \"\$OPENCODE_USER\" \"\$OPENCODE_GROUP\"' \"\$1\"" _ "$INSTALL"
 # Comment-strip riders (#261, the #244 g W1 class): commented-out lines
@@ -1605,7 +1606,7 @@ check "config.sh: refresh + projects add + handover re-stamp (stamp sites: $_sta
 check "handover.sh: stamp dir defaults to /etc/opencode-permissions-kit/handover" \
     sh -c "grep -qF 'OPK_HANDOVER_STAMP_DIR:-/etc/opencode-permissions-kit/handover' \"\$1\"" _ "$HANDOVER"
 check "handover.sh: stamp stubs fail open (valid=1) when the lib is missing" \
-    sh -c "grep -qF 'ddev_handover_stamp_valid() { return 1; }' \"\$1\" && grep -qF 'ddev_handover_stamp_write() { :; }' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -qF 'ddev_handover_stamp_valid() { return 1; }' \"\$1\" && grep -qF 'ddev_handover_stamp_write() { :; }' \"\$1\"" _ "$UPDATE_CORE"
 
 # wiring: config.sh / install.sh / status.sh / hook / kit CLI
 check "config.sh dispatches ddev-settings" \
@@ -1626,7 +1627,7 @@ _dsetq_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -c 'ddev settings mana
 check "install.sh asks the ddev-settings question (standard + advanced; question sites: $_dsetq_n, need >=2)" \
     [ "$_dsetq_n" -ge 2 ]
 check "status.sh reports the ddev settings mode" \
-    sh -c "grep -q 'ddev settings' \"\$1\"" _ "$SCORE"
+    sh -c "grep -q 'ddev settings' \"\$1\"" _ "$STATUS_CORE"
 check "hook hint mentions the dev-owned effect" \
     sh -c "grep -q 'disable_settings_management:' \"\$1\"" _ "$FUNC"
 check "kit CLI usage documents ddev-settings" \
@@ -1634,14 +1635,14 @@ check "kit CLI usage documents ddev-settings" \
 check "install.sh passes DEFAULT_USER to the handover" \
     sh -c "grep -qF 'ddev_handover_root \"\$root\" \"\$OPENCODE_USER\" \"\$OPENCODE_GROUP\" \"\$DEFAULT_USER\"' \"\$1\"" _ "$INSTALL"
 check "update.sh passes DEFAULT_USER to the handover" \
-    sh -c "grep -qF 'ddev_handover_root \"\$root\" \"\$OPENCODE_USER\" \"\$NEW_OPENCODE_GROUP\" \"\$DEFAULT_USER\"' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -qF 'ddev_handover_root \"\$root\" \"\$OPENCODE_USER\" \"\$NEW_OPENCODE_GROUP\" \"\$DEFAULT_USER\"' \"\$1\"" _ "$UPDATE_CORE"
 check "config.sh passes DEFAULT_USER to the handover" \
     sh -c "grep -qF 'ddev_handover_root \"\$p\" \"\$OPENCODE_USER\" \"\$OPENCODE_GROUP\" \"\$DEFAULT_USER\"' \"\$1\"" _ "$CONFIG"
 rm -rf "$HWORK"
 
 # --- 8. status.sh reporting ----------------------------------------------------
 check "status.sh reports ddev-as-opencode state" \
-    sh -c "grep -q 'ddev-as-opencode' \"\$1\"" _ "$SCORE"
+    sh -c "grep -q 'ddev-as-opencode' \"\$1\"" _ "$STATUS_CORE"
 
 # --- 8b. config.sh ui.sh fallback (0.0.45c C9) ----------------------------------
 # The body calls ui_have/ui_atten (projects list) and ui_confirm/ui_menu/

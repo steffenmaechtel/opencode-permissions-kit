@@ -18,7 +18,7 @@ REPO="$SCRIPT_DIR/../.."
 LIB="$REPO/files/opencode-permissions-kit-lib/sh/update-check.sh"
 WRAPPER="$REPO/files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
 STATUS="$REPO/files/opencode-permissions-kit-lib/management/status.sh"
-SCORE="$REPO/files/opencode-permissions-kit-lib/sh/status-core.sh"
+STATUS_CORE="$REPO/files/opencode-permissions-kit-lib/sh/status-core.sh"
 INSTALL="$REPO/files/install.sh"
 UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
 DEPLOYLIB="$REPO/files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
@@ -504,19 +504,19 @@ grep -q '\[ "\$HEADLESS" != true \] && \[ -f /usr/local/lib/opencode-permissions
     fail "wrapper: interactive guard missing"
 
 echo "-- wiring: status.sh Core row --"
-grep -q 'ui_kv_warn "kit update" "new kit' "$SCORE" &&
+grep -q 'ui_kv_warn "kit update" "new kit' "$STATUS_CORE" &&
     pass "status: available update renders a counted warn row" ||
     fail "status: counted warn row missing"
-grep -q 'ui_kv "kit update" "unknown — live check unavailable (offline or blocked)"' "$SCORE" &&
+grep -q 'ui_kv "kit update" "unknown — live check unavailable (offline or blocked)"' "$STATUS_CORE" &&
     pass "status: offline renders an uncounted unknown row" ||
     fail "status: uncounted unknown row missing"
-grep -q 'ui_kv "kit update" "pinned to' "$SCORE" &&
+grep -q 'ui_kv "kit update" "pinned to' "$STATUS_CORE" &&
     pass "status: tag pin renders a neutral row" ||
     fail "status: tag-pin row missing"
-grep -q 'ui_kv "kit update" "checks disabled (OPK_UPDATE_CHECK=0)"' "$SCORE" &&
+grep -q 'ui_kv "kit update" "checks disabled (OPK_UPDATE_CHECK=0)"' "$STATUS_CORE" &&
     pass "status: opt-out renders a disabled row" ||
     fail "status: disabled row missing"
-grep -q 'ui_kv_warn "kit update" "not checked — kit file sh/update-check.sh missing' "$SCORE" &&
+grep -q 'ui_kv_warn "kit update" "not checked — kit file sh/update-check.sh missing' "$STATUS_CORE" &&
     pass "status: missing lib renders a counted broken-kit warn" ||
     fail "status: missing-lib warn missing"
 
@@ -540,7 +540,7 @@ fixture_channel master 0.0.59
     KIT_CHANNEL=master
     OPK_UPDATE_CHECK=1
     export KIT_UPDATE_HOST="$KIT_HOST" OPK_UPDATE_CHECK
-    eval "$(awk '/^ *# Kit update row \(issue #358\)/{f=1} f && /^ *if id "\$OPENCODE_USER" >/{exit} f' "$SCORE")"
+    eval "$(awk '/^ *# Kit update row \(issue #358\)/{f=1} f && /^ *if id "\$OPENCODE_USER" >/{exit} f' "$STATUS_CORE")"
     printf 'warn=%s ok=%s\n' "${UI_ROWS_WARN:-0}" "${UI_ROWS_OK:-0}"
 ) >"$WORK/m2/out" 2>"$WORK/m2/err" || true
 grep -q 'warn=1 ok=0' "$WORK/m2/out" &&
@@ -557,7 +557,7 @@ fixture_channel master 0.0.58
     KIT_CHANNEL=master
     OPK_UPDATE_CHECK=1
     export KIT_UPDATE_HOST="$KIT_HOST" OPK_UPDATE_CHECK
-    eval "$(awk '/^ *# Kit update row \(issue #358\)/{f=1} f && /^ *if id "\$OPENCODE_USER" >/{exit} f' "$SCORE")"
+    eval "$(awk '/^ *# Kit update row \(issue #358\)/{f=1} f && /^ *if id "\$OPENCODE_USER" >/{exit} f' "$STATUS_CORE")"
     printf 'warn=%s ok=%s\n' "${UI_ROWS_WARN:-0}" "${UI_ROWS_OK:-0}"
 ) >"$WORK/m2/out2" 2>>"$WORK/m2/err" || true
 grep -q 'warn=0 ok=1' "$WORK/m2/out2" &&

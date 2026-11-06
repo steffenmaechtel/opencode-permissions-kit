@@ -52,9 +52,9 @@ cd "$REPO_ROOT" || exit 1
 # Deliberate no-space joins, one entry per line: path-suffix | seam text.
 # A reason line starts with '#' and sits above its entry.
 ALLOW="
-# update.sh mount-option list: uid=(...),gid=(...) -- the comma separates
-# options; no prose space
-management/update.sh|'),gid=
+# update-core.sh mount-option list: uid=(...),gid=(...) -- the comma separates
+# options; no prose space (moved from management/update.sh, #346 wave 2)
+sh/update-core.sh|'),gid=
 "
 
 TMP="$(mktemp)"

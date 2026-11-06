@@ -27,6 +27,7 @@ TUIJSON="$TUIDIR/tui.json"
 TUIDANGER="$TUIDIR/tui-danger.json"
 INSTALL="$REPO/files/install.sh"
 UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
+UPDATE_CORE="$REPO/files/opencode-permissions-kit-lib/sh/update-core.sh"
 DEPLOYLIB="$REPO/files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 UNINSTALL="$REPO/files/opencode-permissions-kit-lib/management/uninstall.sh"
 # Shared harness (issue #394): pass/fail, colors, counters live in
@@ -128,11 +129,11 @@ check "install.sh keeps user-managed tui.json (skip branch)" \
 check "update.sh KIT_FILES includes the tui payload" \
     grep -q 'opencode-permissions-kit-lib/tui/kit-mode.tsx' "$UPDATE"
 check "update.sh re-deploys the plugin to LIBDIR/tui (lib_deploy manifest)" \
-    sh -c 'grep -qF "opencode-permissions-kit-lib/tui/kit-mode.tsx 644" "$2" && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE" "$DEPLOYLIB"
+    sh -c 'grep -qF "opencode-permissions-kit-lib/tui/kit-mode.tsx 644" "$2" && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE_CORE" "$DEPLOYLIB"
 check "update.sh refreshes the opencode-user tui.json (marker policy)" \
-    grep -q 'grep -q .\"_opencode_permissions_kit\". \"\$OC_TUI_CONF\"' "$UPDATE"
+    grep -q 'grep -q .\"_opencode_permissions_kit\". \"\$OC_TUI_CONF\"' "$UPDATE_CORE"
 check "update.sh refreshes the default-user danger theme" \
-    grep -q 'opencode-danger.theme.json" "$DEFAULT_THEME_DIR' "$UPDATE"
+    grep -q 'opencode-danger.theme.json" "$DEFAULT_THEME_DIR' "$UPDATE_CORE"
 
 # --- uninstall.sh hints -------------------------------------------------------
 check "uninstall.sh documents the tui.json leftovers" \
@@ -182,8 +183,8 @@ check "install.sh unregisters inert cli.json path entries (2x cleanup, via sh/tu
 check "update.sh fetch list includes the 2x plugin" \
     grep -q 'opencode-permissions-kit-lib/tui/kit-mode-2x.tsx' "$UPDATE"
 check "update.sh re-registers the 2x plugin dir (major-gated, sync function)" \
-    sh -c 'grep -qF "tui_plugin_sync_user \"\$_str_major\"" "$1" && grep -q "sync_tui_registration \"\$_oc_major\"" "$1" && grep -qF "sh/tui-plugin.sh" "$1"' _ "$UPDATE" &&
-    grep -q 'sync_tui_registration "$_maj_after"' "$UPDATE"
+    sh -c 'grep -qF "tui_plugin_sync_user \"\$_str_major\"" "$1" && grep -q "sync_tui_registration \"\$_oc_major\"" "$1" && grep -qF "sh/tui-plugin.sh" "$2"' _ "$UPDATE_CORE" "$UPDATE" &&
+    grep -q 'sync_tui_registration "$_maj_after"' "$UPDATE_CORE"
 check "uninstall.sh removes the 2x plugin dir and cli.json entries" \
     grep -q 'plugins/opencode-permissions-kit' "$UNINSTALL" && grep -q 'kit-mode-2x.tsx' "$UNINSTALL"
 

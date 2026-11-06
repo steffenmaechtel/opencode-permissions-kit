@@ -25,6 +25,7 @@ REPO="$(cd "$SCRIPT_DIR/../.." && pwd)"
 STAGEDWRITE="$REPO/files/opencode-permissions-kit-lib/sh/staged-write.sh"
 HANDOVER="$REPO/files/opencode-permissions-kit-lib/sh/ddev-handover.sh"
 UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
+UPDATE_CORE="$REPO/files/opencode-permissions-kit-lib/sh/update-core.sh"
 CONFIG="$REPO/files/opencode-permissions-kit-lib/management/config.sh"
 INSTALL="$REPO/files/install.sh"
 DEPLOYLIB="$REPO/files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
@@ -406,7 +407,7 @@ check "0.0.44b W16/V10: sudoers replace is stage+mv (atomic, not O_TRUNC cp)" \
 check "0.0.44b W16/V10: wsl.conf replace is stage+mv via _bb_install_conf" \
     sh -c 'grep -qF "_bb_install_conf" "$1" && grep -qF "mv -f \"\$_bb_stage\" \"\$_bb_conf\"" "$1"' _ "$WSL_LIB"
 check "0.0.39h F4/F6: update.sh install.conf rewrite is narrowed + atomic (temp + mv)" \
-    sh -c 'grep -qF "_ic_keep=\$(grep -v -e '"'"'^VERSION='"'"' -e '"'"'^OPENCODE_GROUP='"'"' -e '"'"'^KIT_CHANNEL='"'"'" "$1" && grep -qF "-e '"'"'^DDEV_VERSION='"'"' \"\$INSTALL_CONF\" 2>/dev/null) || _ic_rc=\$?" "$1" && grep -qF "_tmp_track \"\$_INSTALL_CONF_TMP\"" "$1" && grep -qF "mv -f \"\$_INSTALL_CONF_TMP\" \"\$CONFDIR/install.conf\"" "$1"' _ "$UPDATE"
+    sh -c 'grep -qF "_ic_keep=\$(grep -v -e '"'"'^VERSION='"'"' -e '"'"'^OPENCODE_GROUP='"'"' -e '"'"'^KIT_CHANNEL='"'"'" "$1" && grep -qF "-e '"'"'^DDEV_VERSION='"'"' \"\$INSTALL_CONF\" 2>/dev/null) || _ic_rc=\$?" "$1" && grep -qF "_tmp_track \"\$_INSTALL_CONF_TMP\"" "$1" && grep -qF "mv -f \"\$_INSTALL_CONF_TMP\" \"\$CONFDIR/install.conf\"" "$1"' _ "$UPDATE_CORE"
 check "0.0.39h F4/F6: config.sh conf rewrites are narrowed + atomic (class sweep)" \
     sh -c 'grep -qF "_ucb_keep=\$(grep -v" "$1" && grep -qF "mv -f \"\$_ucb_tmp\" \"\$INSTALL_CONF\"" "$1" && grep -qF "mv -f \"\$_udd_tmp\" \"\$INSTALL_CONF\"" "$1"' _ "$CONFIG"
 
@@ -468,11 +469,11 @@ check "wiring: update.sh KIT_FILES carries staged-write.sh" \
     grep -qF 'opencode-permissions-kit-lib/sh/staged-write.sh \' "$UPDATE"
 check "wiring: update.sh deploys staged-write.sh (lib_deploy manifest)" \
     sh -c 'grep -qF "opencode-permissions-kit-lib/sh/staged-write.sh 644" "$2" \
-        && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE" "$DEPLOYLIB"
+        && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE_CORE" "$DEPLOYLIB"
 check "wiring: config.sh sources staged-write.sh" \
     grep -qF 'for cand in "$SCRIPT_DIR/../sh/staged-write.sh" "$LIBDIR/sh/staged-write.sh"' "$CONFIG"
 check "wiring: update.sh tui.json write goes through staged_write" \
-    grep -qF 'staged_write 664 "$OPENCODE_USER:$NEW_OPENCODE_GROUP" "$LIBDIR/tui/tui.json"' "$UPDATE"
+    grep -qF 'staged_write 664 "$OPENCODE_USER:$NEW_OPENCODE_GROUP" "$LIBDIR/tui/tui.json"' "$UPDATE_CORE"
 # Comment-strip riders (#261, the #244 g W1 class) on the range counts:
 # commented-out lines stop counting; full-line comments only (#244 h W6
 # residual). Guarded counts (#260): the || true sits INSIDE the
@@ -561,7 +562,7 @@ check "gates: update.sh sources staged-write.sh early + walker fallback" \
     sh -c 'grep -q "command -v agent_home_sane >/dev/null 2>&1 \|\| agent_home_sane() { return 0; }" "$1"' _ "$UPDATE"
 check "gates: update.sh sync_tui_registration + tui.json chain gates" \
     sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$OC_TUI_DIR\"" "$1" \
-        && grep -qF "sh/tui-plugin.sh" "$1" && grep -qF "agent_home_sane \"\$_tp_oc_user\" \"\$_tp_user_dir\"" "$3"' _ "$UPDATE" "$CONFIG" "$TUIPLUGIN"
+        && grep -qF "sh/tui-plugin.sh" "$2" && grep -qF "agent_home_sane \"\$_tp_oc_user\" \"\$_tp_user_dir\"" "$3"' _ "$UPDATE_CORE" "$UPDATE" "$TUIPLUGIN"
 check "gates: config.sh git_config_apply chain gate" \
     sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$(dirname \"\$target\")\"" "$1"' _ "$CONFIG"
 check "gates: uninstall.sh plugin-removal chain gate" \

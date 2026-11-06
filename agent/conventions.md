@@ -186,6 +186,22 @@ examples from counting; for a NEW pin whose literal spans a wrap, join
 continuations before stripping — otherwise do not copy the idiom, and
 do not refactor the site into the canonical shape.
 
+## Unit-suite path variables (entry scripts and their phase libs)
+
+Suites that reference a management entry script together with its
+sourced phase lib (the #346 waves: `status.sh`/`status-core.sh`,
+`update.sh`/`update-core.sh`, later `install.sh` and `uninstall.sh`)
+name the two path variables after the entry script:
+`STATUS`/`STATUS_CORE`, `UPDATE`/`UPDATE_CORE` — later
+`INSTALL`/`INSTALL_CORE`, `UNINSTALL`/`UNINSTALL_CORE`. No bare `CORE`
+and no per-suite abbreviations (`SCORE`, `UCORE`): suites grow second
+and third lib references over time, and a grep for one lib's pins must
+find every referencing suite under one variable name. (The shipped
+resolver variables follow the same shape — `UPDATE_CORE` in
+management/update.sh, `STATUS_CORE` in management/status.sh.) A suite
+whose own subject IS the lib keeps the plain `LIB` idiom
+(test-status-core.sh, test-update-core.sh).
+
 ## Pin-cost budget (unit suites)
 
 A pin whose fixture would exceed ~30 lines for a LOW/INFO-severity

@@ -23,8 +23,9 @@ MIG="$FILES/opencode-permissions-kit-lib/sh/ddev-migrate.sh"
 BIN_MIG="$FILES/opencode-permissions-kit-lib/bin/ddev-migrate"
 INSTALL="$FILES/install.sh"
 UPDATE="$FILES/opencode-permissions-kit-lib/management/update.sh"
+UPDATE_CORE="$FILES/opencode-permissions-kit-lib/sh/update-core.sh"
 STATUS="$FILES/opencode-permissions-kit-lib/management/status.sh"
-SCORE="$FILES/opencode-permissions-kit-lib/sh/status-core.sh"
+STATUS_CORE="$FILES/opencode-permissions-kit-lib/sh/status-core.sh"
 DEPLOYLIB="$FILES/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 MAKEFILE="$SCRIPT_DIR/../../Makefile"
 TEST_CI="$SCRIPT_DIR/../../.github/workflows/test-unit.yml"
@@ -629,11 +630,11 @@ check "install.sh deploys ddev-migrate.sh to the library (lib_deploy manifest)" 
 check "update.sh KIT_FILES includes ddev-migrate.sh" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh' \"\$1\"" _ "$UPDATE"
 check "update.sh deploys ddev-migrate.sh (lib_deploy manifest)" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh 644' \"\$2\" && grep -q 'opencode-permissions-kit-lib/bin/ddev-migrate 755' \"\$2\" && grep -q 'lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"' \"\$1\"" _ "$UPDATE" "$DEPLOYLIB"
+    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh 644' \"\$2\" && grep -q 'opencode-permissions-kit-lib/bin/ddev-migrate 755' \"\$2\" && grep -q 'lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"' \"\$1\"" _ "$UPDATE_CORE" "$DEPLOYLIB"
 check "status.sh reports dumps waiting for import" \
-    sh -c "grep -q 'db dumps' \"\$1\" && grep -q 'bin/ddev-migrate import' \"\$1\"" _ "$SCORE"
+    sh -c "grep -q 'db dumps' \"\$1\" && grep -q 'bin/ddev-migrate import' \"\$1\"" _ "$STATUS_CORE"
 check "status.sh import detection knows the ddev >= 1.23 project_list.yaml" \
-    sh -c "grep -q 'project_list.yaml' \"\$1\" && grep -q 'approot:' \"\$1\"" _ "$SCORE"
+    sh -c "grep -q 'project_list.yaml' \"\$1\" && grep -q 'approot:' \"\$1\"" _ "$STATUS_CORE"
 
 # --- 8. Makefile + CI wiring --------------------------------------------------------
 
@@ -828,7 +829,7 @@ _mig_gap_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -c '_ddev_mig_gap_wa
 check "install.sh warns on skip branches when the registry outgrew the manifest (warn sites: $_mig_gap_n, need >=3)" \
     sh -c "grep -q '_ddev_mig_gap_warn' \"\$1\" && [ \"\$2\" -ge 3 ]" _ "$INSTALL" "$_mig_gap_n"
 check "status.sh reports INCOMPLETE dumps vs the dev registry" \
-    sh -c "grep -q 'INCOMPLETE — registry lists' \"\$1\" && grep -q 'ddev-migrate registry' \"\$1\"" _ "$SCORE"
+    sh -c "grep -q 'INCOMPLETE — registry lists' \"\$1\" && grep -q 'ddev-migrate registry' \"\$1\"" _ "$STATUS_CORE"
 check "bin dispatcher has the registry subcommand" \
     sh -c "grep -q 'registry)' \"\$1\"" _ "$BIN_MIG"
 
