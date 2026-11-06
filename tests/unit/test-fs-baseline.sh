@@ -19,6 +19,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LIB="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/fs-baseline.sh"
 INSTALL="$SCRIPT_DIR/../../files/install.sh"
 UPDATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh"
+UPDATE_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/update-core.sh"
 CONFIG="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh"
 MAKEFILE="$SCRIPT_DIR/../../Makefile"
 TEST_CI="$SCRIPT_DIR/../../.github/workflows/test-unit.yml"
@@ -116,7 +117,8 @@ OUT3="$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2-nope" "$3"' _ "$LIB" "$
 assert_eq "missing root: no output, no error" "" "$OUT3"
 
 # --- 6. wiring: all three callers use the helper -------------------------------------
-for f in "$INSTALL" "$UPDATE" "$CONFIG"; do
+# update.sh calls fs_baseline_root from its phase lib since #346 wave 2.
+for f in "$INSTALL" "$UPDATE_CORE" "$CONFIG"; do
     if grep -q 'fs_baseline_root' "$f"; then
         pass "$(basename "$f") runs the baseline through fs_baseline_root"
     else
@@ -129,7 +131,7 @@ grep -q 'opencode-permissions-kit-lib/sh/fs-baseline.sh' "$INSTALL" &&
 grep -q 'opencode-permissions-kit-lib/sh/fs-baseline.sh' "$UPDATE" &&
     pass "update.sh KIT_FILES includes fs-baseline.sh" ||
     fail "update.sh KIT_FILES includes fs-baseline.sh"
-grep -q 'large trees: this can take a while' "$UPDATE" &&
+grep -q 'large trees: this can take a while' "$UPDATE_CORE" &&
     pass "update.sh hints before the ddev handover scan (issue #14)" ||
     fail "update.sh hints before the ddev handover scan (issue #14)"
 grep -q 'large trees: this can take minutes' "$INSTALL" &&
@@ -939,7 +941,7 @@ fi
         'ddev_handover_stamp_valid() { return 1; }' \
         'REFRESH=true' 'OPENCODE_USER=toc' 'NEW_OPENCODE_GROUP=tg' 'DEFAULT_USER=tdv' \
         '_ho_skip=0' '_ho_announced=false'
-    sed -n '/while IFS= read -r root; do/,/done <"\$PROJECTS_CONF"/p' "$UPDATE" |
+    sed -n '/while IFS= read -r root; do/,/done <"\$PROJECTS_CONF"/p' "$UPDATE_CORE" |
         sed 's|done <"$PROJECTS_CONF"|done|'
 } >"$S245/run-update-loop.sh"
 S245U_OUT=$(sh "$S245/run-update-loop.sh" <"$S245/conf" 2>&1)

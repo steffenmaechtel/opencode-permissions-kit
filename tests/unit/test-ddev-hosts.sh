@@ -15,9 +15,10 @@ FUNC="$FILES/opencode-permissions-kit-lib/sh/ddev-terminal.sh"
 KIT="$FILES/opencode-permissions-kit-lib/bin/opk"
 INSTALL="$FILES/install.sh"
 UPDATE="$FILES/opencode-permissions-kit-lib/management/update.sh"
+UPDATE_CORE="$FILES/opencode-permissions-kit-lib/sh/update-core.sh"
 DEPLOYLIB="$FILES/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 STATUS="$FILES/opencode-permissions-kit-lib/management/status.sh"
-SCORE="$FILES/opencode-permissions-kit-lib/sh/status-core.sh"
+STATUS_CORE="$FILES/opencode-permissions-kit-lib/sh/status-core.sh"
 MAKEFILE="$SCRIPT_DIR/../../Makefile"
 
 # Shared harness (issue #394 adoption): pass/fail, colors, counters
@@ -206,15 +207,15 @@ check "install.sh deploys ddev-hosts.sh (lib_deploy manifest)" \
 check "update.sh KIT_FILES includes ddev-hosts.sh" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh' \"\$1\"" _ "$UPDATE"
 check "update.sh deploys ddev-hosts.sh (lib_deploy manifest)" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh 644' \"\$2\" && grep -q 'lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"' \"\$1\"" _ "$UPDATE" "$DEPLOYLIB"
+    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh 644' \"\$2\" && grep -q 'lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"' \"\$1\"" _ "$UPDATE_CORE" "$DEPLOYLIB"
 check "status.sh reports missing Windows hostnames" \
-    sh -c "grep -q 'hosts (win)' \"\$1\"" _ "$SCORE"
+    sh -c "grep -q 'hosts (win)' \"\$1\"" _ "$STATUS_CORE"
 check "status.sh scan prunes vendor dirs (issue #21)" \
-    sh -c "grep -qF -e '-name vendor' \"\$1\"" _ "$SCORE"
+    sh -c "grep -qF -e '-name vendor' \"\$1\"" _ "$STATUS_CORE"
 check "status.sh scan prunes node_modules dirs (issue #21)" \
-    sh -c "grep -qF -e '-name node_modules' \"\$1\"" _ "$SCORE"
+    sh -c "grep -qF -e '-name node_modules' \"\$1\"" _ "$STATUS_CORE"
 check "status.sh prints one add command per hostname (issue #21)" \
-    sh -c "grep -qF 'ddev-hosts-add \$_st_h' \"\$1\"" _ "$SCORE"
+    sh -c "grep -qF 'ddev-hosts-add \$_st_h' \"\$1\"" _ "$STATUS_CORE"
 check "hook hint prints one add command per hostname (issue #21)" \
     sh -c "grep -qF 'ddev-hosts-add \$_opk_h' \"\$1\"" _ "$FUNC"
 check "kit CLI usage documents the hostname mode (issue #21)" \

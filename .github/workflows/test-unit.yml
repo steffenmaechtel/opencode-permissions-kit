@@ -132,6 +132,8 @@ jobs:
         run: ./tests/unit/test-doctor.sh
       - name: Run update flags tests
         run: ./tests/unit/test-update-flags.sh
+      - name: Run update phase-lib tests (issue #346)
+        run: ./tests/unit/test-update-core.sh
       - name: Run release script tests
         run: ./tests/unit/test-release.sh
       - name: Run fs-baseline progress tests

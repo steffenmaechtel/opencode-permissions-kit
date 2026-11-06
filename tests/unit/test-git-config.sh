@@ -111,6 +111,7 @@ fi
 #   c) a re-install silently ignored the choice (config never re-rendered).
 INSTALL="$SCRIPT_DIR/../../files/install.sh"
 UPDATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh"
+UPDATE_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/update-core.sh"
 
 # issue #116: sudo keeps the invoking user's CWD — a `git config --global`
 # as the opencode user from an unreadable developer home (mode 750) dies
@@ -124,8 +125,10 @@ UPDATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.s
 # scoped to the safe.directory calls (the --list backups must not
 # satisfy the threshold); `|| true` keeps set -e from aborting the suite
 # on a zero count instead of failing the check.
+# #346 wave 2: update.sh's safe.directory block lives in
+# sh/update-core.sh — the counts read the lib.
 _opk_install_j=$(sed -e ':a' -e '/\\$/N; s/\\\n/ /; ta' "$INSTALL" | grep -v '^[[:space:]]*#' || true)
-_opk_update_j=$(sed -e ':a' -e '/\\$/N; s/\\\n/ /; ta' "$UPDATE" | grep -v '^[[:space:]]*#' || true)
+_opk_update_j=$(sed -e ':a' -e '/\\$/N; s/\\\n/ /; ta' "$UPDATE_CORE" | grep -v '^[[:space:]]*#' || true)
 _git_sd_install=$(printf '%s\n' "$_opk_install_j" | grep -c 'git -C / config --global --get-all safe.directory\|git -C / config --global --add safe.directory' || true)
 _git_sd_update=$(printf '%s\n' "$_opk_update_j" | grep -c 'git -C / config --global --get-all safe.directory\|git -C / config --global --add safe.directory' || true)
 if [ "$_git_sd_install" -ge 2 ] && [ "$_git_sd_update" -ge 2 ]; then
@@ -134,7 +137,8 @@ else
     fail "issue #116: safe.directory git calls are CWD-safe (git -C /): install=$_git_sd_install update=$_git_sd_update"
 fi
 if ! printf '%s\n' "$_opk_install_j" | grep -qE '(sudo -u "[^"]+"|sudo -u [A-Za-z_$]+) (-H )?git config --global' &&
-    ! printf '%s\n' "$_opk_update_j" | grep -qE '(sudo -u "[^"]+"|sudo -u [A-Za-z_$]+) (-H )?git config --global'; then
+    ! printf '%s\n' "$_opk_update_j" | grep -qE '(sudo -u "[^"]+"|sudo -u [A-Za-z_$]+) (-H )?git config --global' &&
+    ! grep -qE '(sudo -u "[^"]+"|sudo -u [A-Za-z_$]+) (-H )?git config --global' "$UPDATE"; then
     pass "issue #116: no bare (CWD-inheriting) git config --global calls remain"
 else
     fail "issue #116: bare git config --global call remains (CWD-inheriting)"
@@ -151,7 +155,7 @@ fi
 # preventing anything.
 GITCHECK="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/git-check.sh"
 STATUS="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/status.sh"
-SCORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core.sh"
+STATUS_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core.sh"
 DEPLOYLIB="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 
 # Behavioral: source the helper with stubbed ui/log helpers and drive
@@ -244,7 +248,7 @@ else
     fail "issue #118: update.sh git-check wiring missing"
 fi
 if grep -q 'sh/git-check.sh' "$STATUS" &&
-    grep -q '^[[:space:]]*git_status_row$' "$SCORE"; then
+    grep -q '^[[:space:]]*git_status_row$' "$STATUS_CORE"; then
     pass "issue #118: status.sh sources + calls git_status_row (Core row)"
 else
     fail "issue #118: status.sh git-check wiring missing"
@@ -318,10 +322,10 @@ if grep -qF "$_gc_on" "$CONFIG" &&
     grep -qF "$_gc_off" "$CONFIG" &&
     [ "$_gc_on_n" -ge 2 ] &&
     [ "$_gc_off_n" -ge 3 ] &&
-    grep -qF "$_gc_prot" "$SCORE" &&
-    grep -qF "$_gc_allow" "$SCORE" &&
+    grep -qF "$_gc_prot" "$STATUS_CORE" &&
+    grep -qF "$_gc_allow" "$STATUS_CORE" &&
     grep -qF "$_gc_mark" "$CONFIG" &&
-    grep -qF "$_gc_mark" "$SCORE" &&
+    grep -qF "$_gc_mark" "$STATUS_CORE" &&
     ! grep -qF '"ON  (' "$CONFIG" &&
     ! grep -qF '"OFF  (' "$CONFIG"; then
     pass "issue #205: git-config rows read ON/OFF + protected/access allowed"

@@ -667,7 +667,8 @@ fi
 PATH="$_op"
 unset _op
 # wiring: update.sh and status.sh route their guards through the helper
-grep -qF 'xdg_open_real_exists' "$REPO/files/opencode-permissions-kit-lib/management/update.sh" &&
+# (update's guard lives in sh/update-core.sh since #346 wave 2)
+grep -qF 'xdg_open_real_exists' "$REPO/files/opencode-permissions-kit-lib/sh/update-core.sh" &&
     pass "update.sh never-shadow guard uses the shared probe" ||
     fail "update.sh never-shadow guard uses the shared probe (0.0.42d S1/C1)"
 grep -qF 'xdg_open_real_exists' "$REPO/files/opencode-permissions-kit-lib/sh/status-core.sh" &&

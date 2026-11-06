@@ -19,6 +19,7 @@ WARN="$REPO/files/opencode-permissions-kit-lib/sh/shell-warn.sh"
 WRAPPER="$REPO/files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
 INSTALL="$REPO/files/install.sh"
 UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
+UPDATE_CORE="$REPO/files/opencode-permissions-kit-lib/sh/update-core.sh"
 SECUREBIN="$REPO/files/opencode-permissions-kit-lib/sh/secure-binary.sh"
 DEPLOYLIB="$REPO/files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 UMASK="$REPO/files/etc/umask.sh"
@@ -180,32 +181,37 @@ check "update.sh fetches shell-warn.sh" \
     grep -Fq 'opencode-permissions-kit-lib/sh/shell-warn.sh' "$UPDATE"
 check "update.sh deploys shell-warn.sh to LIBDIR (lib_deploy manifest)" \
     sh -c 'grep -qF "opencode-permissions-kit-lib/sh/shell-warn.sh 755" "$2" \
-        && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE" "$DEPLOYLIB"
+        && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE_CORE" "$DEPLOYLIB"
 # #211 b W4: update twins of the advisories/ui mode pins above.
 check "update.sh deploys advisories.sh to LIBDIR (lib_deploy manifest, 755)" \
     sh -c 'grep -qF "opencode-permissions-kit-lib/sh/advisories.sh 755" "$2"' _ "$UPDATE" "$DEPLOYLIB"
 check "update.sh deploys ui.sh to LIBDIR (lib_deploy manifest, 755)" \
     sh -c 'grep -qF "opencode-permissions-kit-lib/sh/ui.sh 755" "$2"' _ "$UPDATE" "$DEPLOYLIB"
 check "update.sh hooks shell-warn.sh into rc files" \
-    grep -Fq 'opencode-permissions-kit/sh/shell-warn.sh' "$UPDATE"
+    grep -Fq 'opencode-permissions-kit/sh/shell-warn.sh' "$UPDATE_CORE"
 # 0.0.49b C1 (update twin of the install pins above): the umask
 # re-deploy routes through the atomic file helper, never an in-place
 # sudo cp over the sourced profile. 0.0.49c F2/F3: mode-carrying
 # deploy pin + call-site count, twin-for-twin with the install pins.
+# The call site and literals moved to sh/update-core.sh with the
+# re-deploy sections (#346 wave 2); the missing-lib fallback stub and
+# the sh/secure-binary.sh sourcing reference stay in update.sh.
 check "update.sh defines the atomic-file fallback for a missing lib (0.0.49b C1)" \
     sh -c 'grep -A1 -F "copy_file_atomic() {" "$1" | grep -Fq "echo \"error: copy_file_atomic unavailable"' _ "$UPDATE"
 check "update.sh re-deploys the umask profile through the atomic file helper at mode 644 (0.0.49b C1, 0.0.49c F2)" \
     sh -c 'grep -Fq "copy_file_atomic \"\$FILES_ROOT/etc/umask.sh\"" "$1" \
-        && grep -Fq "opencode-permissions-kit-umask.sh 644" "$1"' _ "$UPDATE"
-_cfa_u_n="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE" | grep -cF 'copy_file_atomic "' || true)"
+        && grep -Fq "opencode-permissions-kit-umask.sh 644" "$1"' _ "$UPDATE_CORE"
+_cfa_u_n="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE_CORE" | grep -cF 'copy_file_atomic "' || true)"
 check "update.sh routes exactly one deploy through copy_file_atomic (0.0.49c F3; deploy sites: $_cfa_u_n of 1)" \
     [ "$_cfa_u_n" -eq 1 ]
 check "update.sh no longer sudo-cps the umask profile in place (0.0.49b C1)" \
-    sh -c '! grep -Fq "sudo cp \"\$FILES_ROOT/etc/umask.sh\" /etc/profile.d" "$1"' _ "$UPDATE"
+    sh -c '! grep -Fq "sudo cp \"\$FILES_ROOT/etc/umask.sh\" /etc/profile.d" "$1" \
+        && ! grep -Fq "sudo cp \"\$FILES_ROOT/etc/umask.sh\" /etc/profile.d" "$2"' _ "$UPDATE" "$UPDATE_CORE"
 check "update.sh re-asserts binary 750 (shared helper)" \
-    sh -c 'grep -Fq "secure_binary \"\$SYSTEM_BIN\" \"\$BINARY_GROUP\"" "$1" && grep -Fq "chmod 750 \"\$_sb_bin\"" "$2" && grep -Fq "sh/secure-binary.sh" "$1"' _ "$UPDATE" "$SECUREBIN"
+    sh -c 'grep -Fq "secure_binary \"\$SYSTEM_BIN\" \"\$BINARY_GROUP\"" "$1" && grep -Fq "chmod 750 \"\$_sb_bin\"" "$2" && grep -Fq "sh/secure-binary.sh" "$3"' _ "$UPDATE_CORE" "$SECUREBIN" "$UPDATE"
 check "update.sh never uses world-executable binary mode" \
-    sh -c '! grep -Fq "chmod 755 \"\$SYSTEM_BIN\"" "$1"' _ "$UPDATE"
+    sh -c '! grep -Fq "chmod 755 \"\$SYSTEM_BIN\"" "$1" \
+        && ! grep -Fq "chmod 755 \"\$SYSTEM_BIN\"" "$2"' _ "$UPDATE" "$UPDATE_CORE"
 
 echo ""
 echo "-- CI wiring (issue #123: exec bits live in the git index) --"

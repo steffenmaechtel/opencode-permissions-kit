@@ -18,7 +18,7 @@ STATUS="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/status.s
 # pins whose literal moved follow it there; behavioral pins keep running
 # status.sh end to end (the movement is output-pure, so their
 # expectations are unchanged).
-SCORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core.sh"
+STATUS_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core.sh"
 # Shared harness (issue #394): pass/fail, colors, counters
 # (and check/assert_eq where present) live in lib/harness.sh now.
 . "$SCRIPT_DIR/lib/harness.sh"
@@ -42,9 +42,9 @@ _trap_cleanup() {
 trap _trap_cleanup EXIT INT TERM
 
 # --- 0. dev-owned mode line (internal/records/ddev-dev-owned-projects.md) -------------
-if grep -q 'ui_kv "ddev settings"' "$SCORE" &&
-    grep -q 'dev-owned — kit writes disable_settings_management' "$SCORE" &&
-    grep -qF 'DDEV_DEV_OWNED=' "$SCORE"; then
+if grep -q 'ui_kv "ddev settings"' "$STATUS_CORE" &&
+    grep -q 'dev-owned — kit writes disable_settings_management' "$STATUS_CORE" &&
+    grep -qF 'DDEV_DEV_OWNED=' "$STATUS_CORE"; then
     pass "status.sh reports the ddev settings mode (stamp-driven)"
 else
     fail "status.sh reports the ddev settings mode (stamp-driven)"
@@ -55,9 +55,9 @@ fi
 # #199 a W3: a missing or outdated helper renders the counted warn row at
 # the call site (section g2 pins it); the old fail-soft contract
 # ("a missing helper just drops the row") is retired.
-if grep -q 'git_status_row' "$SCORE" &&
+if grep -q 'git_status_row' "$STATUS_CORE" &&
     grep -q 'sh/git-check.sh' "$STATUS" &&
-    grep -q 'command -v git_status_row' "$SCORE"; then
+    grep -q 'command -v git_status_row' "$STATUS_CORE"; then
     pass "status.sh reports the host git via the shared git-check helper"
 else
     fail "status.sh reports the host git via the shared git-check helper"
@@ -73,9 +73,9 @@ fi
 # #346 wave-1 move the sections live in sh/status-core.sh — the pin
 # covers BOTH files (a main-only check would be vacuous).
 if ! grep -qE 'ui_(ask|menu|confirm)[[:space:]]' "$STATUS" &&
-    ! grep -qE 'ui_(ask|menu|confirm)[[:space:]]' "$SCORE" &&
+    ! grep -qE 'ui_(ask|menu|confirm)[[:space:]]' "$STATUS_CORE" &&
     ! {
-        cat "$STATUS" "$SCORE" |
+        cat "$STATUS" "$STATUS_CORE" |
             grep -E '^[[:space:]]*[^#[:space:]]' |
             grep -qE '(^|[[:space:];&|(])(chown|chmod|mv)[[:space:]]'
     }; then
@@ -99,7 +99,7 @@ fi
 # variables (the #346 wave-1 replacement for the old sed extraction of
 # the case block — a sourcing pin, the log.sh pattern).
 
-if sh -c '. "$1" && command -v status_section_backend >/dev/null' _ "$SCORE" 2>/dev/null; then
+if sh -c '. "$1" && command -v status_section_backend >/dev/null' _ "$STATUS_CORE" 2>/dev/null; then
     pass "status_section_backend sourceable from sh/status-core.sh"
 else
     fail "status_section_backend sourceable from sh/status-core.sh"
@@ -115,7 +115,7 @@ UI_LIB="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/ui.sh"
 # issue-210 pins exercise both helpers directly. Since the #346 wave-1
 # move the helpers are top-level definitions in the section lib — the
 # old sed extraction became a plain sourcing include.
-SCAN_HELPERS=". \"$SCORE\""
+SCAN_HELPERS=". \"$STATUS_CORE\""
 
 run_case() {
     (
@@ -133,7 +133,7 @@ run_case() {
         set -u
         set +e
         . "$UI_LIB"
-        . "$SCORE"
+        . "$STATUS_CORE"
         CONTAINER_BACKEND="$1"
         OPENCODE_DOCKER_HOST="${2:-}"
         OPENCODE_PODMAN_SOCKET="${3:-}"
@@ -216,9 +216,9 @@ chmod 755 "$WORK/locked-runtime" 2>/dev/null || true
 # --- 1b. root-equivalent access audit (issue #37) --------------------------------
 # The audit ships two pure helpers (stat math only); they are extracted and
 # unit-tested directly, plus static assertions on the section wiring.
-if grep -q 'ui_section "Root-equivalent access' "$SCORE" &&
-    grep -q 'ROOT_EQUIV_SOCKS' "$SCORE" &&
-    grep -q '/mnt/wsl' "$SCORE"; then
+if grep -q 'ui_section "Root-equivalent access' "$STATUS_CORE" &&
+    grep -q 'ROOT_EQUIV_SOCKS' "$STATUS_CORE" &&
+    grep -q '/mnt/wsl' "$STATUS_CORE"; then
     pass "status.sh carries the root-equivalent access section (issue #37)"
 else
     fail "status.sh carries the root-equivalent access section (issue #37)"
@@ -228,7 +228,7 @@ fi
     . "$UI_LIB"
     # Helpers are top-level definitions in the section lib since the
     # #346 wave-1 move — sourcing replaces the old sed extraction.
-    . "$SCORE"
+    . "$STATUS_CORE"
 
     # groups: word match, no substring false positives (adm vs admin)
     _out=$(status_groups_hits "opencode www-data" "docker sudo admin adm wheel")
@@ -273,7 +273,7 @@ done
 # an installed host (the e2e grep hits an earlier line and passes anyway).
 # || true on the captures: the subshell deliberately runs under set -u and
 # its exit status must not kill this script (same pattern as run_case).
-AUDIT_SECTION="$(sed -n '/^# === Root-equivalent access audit/,/^# === Sensitive-file leak scan/p' "$SCORE" | sed '$d')"
+AUDIT_SECTION="$(sed -n '/^# === Root-equivalent access audit/,/^# === Sensitive-file leak scan/p' "$STATUS_CORE" | sed '$d')"
 [ -n "$AUDIT_SECTION" ] || {
     echo "  ${RED}audit section not extractable${NC}"
     exit 1
@@ -336,7 +336,7 @@ fi
 # on PATH — command -v resolves the shim first, so the host's own ddev
 # cannot interfere. (#402 a c1: the fragment must be a balanced unit —
 # the #221 a W8 sh -n discipline is pinned here too, not just assumed.)
-DDEV_PROBE="$(sed -n '/^_st_ddev_version() {/,/^}$/p' "$SCORE")"
+DDEV_PROBE="$(sed -n '/^_st_ddev_version() {/,/^}$/p' "$STATUS_CORE")"
 if [ -n "$DDEV_PROBE" ] && printf '%s\n' "$DDEV_PROBE" | sh -n; then
     pass "ddev version probe function extractable from sh/status-core.sh (sh -n clean)"
 else
@@ -390,7 +390,7 @@ fi
 # fallback: no binary answers -> the stamp, annotated (static assert: the
 # standard locations /usr/local/bin/ddev and /usr/bin/ddev exist on real
 # hosts and cannot be shadowed in-process)
-if grep -q 'recorded at install time' "$SCORE"; then
+if grep -q 'recorded at install time' "$STATUS_CORE"; then
     pass "ddev version: stamp fallback annotated when no binary answers"
 else
     fail "ddev version: stamp fallback annotated when no binary answers"
@@ -437,7 +437,7 @@ else
 fi
 
 # the helper tier must never prompt for a password inside a status output
-if grep -q 'sudo -n -u' "$SCORE"; then
+if grep -q 'sudo -n -u' "$STATUS_CORE"; then
     pass "ddev version: helper probe uses sudo -n (no password prompt)"
 else
     fail "ddev version: helper probe uses sudo -n (no password prompt)"
@@ -452,7 +452,7 @@ channel_out=$(
         set +e
         . "$UI_LIB"
         KIT_CHANNEL="stable"
-        eval "$(sed -n '/# Channel stamp (issue #38)/,/^[[:space:]]*fi$/p' "$SCORE")"
+        eval "$(sed -n '/# Channel stamp (issue #38)/,/^[[:space:]]*fi$/p' "$STATUS_CORE")"
         exit 0
     ) 2>&1
 ) || true
@@ -468,7 +468,7 @@ channel_out=$(
         set +e
         . "$UI_LIB"
         unset KIT_CHANNEL
-        eval "$(sed -n '/# Channel stamp (issue #38)/,/^[[:space:]]*fi$/p' "$SCORE")"
+        eval "$(sed -n '/# Channel stamp (issue #38)/,/^[[:space:]]*fi$/p' "$STATUS_CORE")"
         exit 0
     ) 2>&1
 ) || true
@@ -482,12 +482,12 @@ fi
 # --- 1f. management footer uses the opk shorthand (issue #62) ---------------------
 # The footer is the hint users copy-paste; it must print the short CLI
 # commands, not the library paths behind them.
-if grep -qF 'ui_detail "sudo opk config' "$SCORE" &&
-    grep -qF 'ui_detail "sudo opk update' "$SCORE" &&
-    grep -qF 'ui_detail "opk uninstall' "$SCORE" &&
-    ! grep -q 'management/config\.sh.*change settings' "$STATUS" "$SCORE" &&
-    ! grep -q 'management/update\.sh.*re-deploy' "$STATUS" "$SCORE" &&
-    ! grep -q 'management/uninstall\.sh.*remove the kit' "$STATUS" "$SCORE"; then
+if grep -qF 'ui_detail "sudo opk config' "$STATUS_CORE" &&
+    grep -qF 'ui_detail "sudo opk update' "$STATUS_CORE" &&
+    grep -qF 'ui_detail "opk uninstall' "$STATUS_CORE" &&
+    ! grep -q 'management/config\.sh.*change settings' "$STATUS" "$STATUS_CORE" &&
+    ! grep -q 'management/update\.sh.*re-deploy' "$STATUS" "$STATUS_CORE" &&
+    ! grep -q 'management/uninstall\.sh.*remove the kit' "$STATUS" "$STATUS_CORE"; then
     pass "management footer prints opk shorthand, not library paths (issue #62)"
 else
     fail "management footer prints opk shorthand, not library paths (issue #62)"
@@ -514,7 +514,7 @@ fi
 # proj, t is the first blocker; after a traverse-only ACL on t and W the
 # chain is clean.
 # helpers are top-level definitions in the section lib (#346 wave 1)
-. "$SCORE"
+. "$STATUS_CORE"
 OPENCODE_GROUP="$(id -gn)"
 W3=$(mktemp -d)
 mkdir -p "$W3/t/w/proj"
@@ -538,7 +538,7 @@ rm -rf "$W3"
 # appended a second 0 and the captured "0<newline>0" broke the "Projects"
 # header across lines. The shipped counting block is extracted and run
 # with a stubbed ui_section against an empty and a missing projects.conf.
-sed -n '/_st_pc=/,/ui_section "Projects/p' "$SCORE" >"$WORK/pc-block.sh"
+sed -n '/_st_pc=/,/ui_section "Projects/p' "$STATUS_CORE" >"$WORK/pc-block.sh"
 if [ -s "$WORK/pc-block.sh" ] && grep -q 'ui_section "Projects' "$WORK/pc-block.sh"; then
     pass "the projects-count block is extractable from status.sh"
 else
@@ -579,29 +579,29 @@ fi
 # timeout envelope the wrapper got in 0.0.43a F3. A wedged 2.x service can
 # make even --version hang (issue #80); opk status, the diagnostic for
 # exactly that state, must never hang on it.
-if awk '/ADV_VER=\$\(/,/head -1 \|\| true/' "$SCORE" | grep -q 'timeout 10'; then
+if awk '/ADV_VER=\$\(/,/head -1 \|\| true/' "$STATUS_CORE" | grep -q 'timeout 10'; then
     pass "advisory probe is timeout-bounded (0.0.43b W3)"
 else
     fail "advisory probe is timeout-bounded (0.0.43b W3)"
 fi
-if grep -qF 'BOUNDED pattern as the wrapper' "$SCORE"; then
+if grep -qF 'BOUNDED pattern as the wrapper' "$STATUS_CORE"; then
     pass "the probe comment states the bounded parity truthfully"
 else
     fail "the probe comment states the bounded parity truthfully"
 fi
 
 # --- 0.0.44b W12b/W15/W16: unscannable render, line-wise roots, null coercion -----------
-if grep -qF 'scan_unscannable=true' "$SCORE" && grep -qF 'agent config unscannable' "$SCORE"; then
+if grep -qF 'scan_unscannable=true' "$STATUS_CORE" && grep -qF 'agent config unscannable' "$STATUS_CORE"; then
     pass "status.sh renders unscannable (never false-green) for parser rc != 0 (W12b)"
 else
     fail "status.sh renders unscannable (never false-green) for parser rc != 0 (W12b)"
 fi
-if grep -qF 'str(entry.get("ghsa_id") or "")' "$SCORE"; then
+if grep -qF 'str(entry.get("ghsa_id") or "")' "$STATUS_CORE"; then
     pass "status.sh coerces a null ghsa_id (the F7 class twin, V19)"
 else
     fail "status.sh coerces a null ghsa_id (the F7 class twin, V19)"
 fi
-_gap_fn=$(sed -n '/^_st_dbdump_gap() {/,/^}$/p' "$SCORE")
+_gap_fn=$(sed -n '/^_st_dbdump_gap() {/,/^}$/p' "$STATUS_CORE")
 if [ -n "$_gap_fn" ]; then
     pass "status.sh: gap function extractable (W15)"
     _gap_work=$(mktemp -d)
@@ -649,8 +649,8 @@ fi
 # a structural runas disjunct. Verbatim pins on both, behavioral replay
 # of the REAL extracted pattern against representative listings incl. a
 # TRANSLATED header.
-_sudo_grep="$(grep -F "LC_ALL=C sudo -n -l -U " "$SCORE" | head -1 | sed 's/^ *//')"
-_sra_pat="$(grep -F "_sra_pat=" "$SCORE" | head -1 | sed -e 's/^ *//' -e "s/^_sra_pat=//" -e "s/^'//" -e "s/'\$//")"
+_sudo_grep="$(grep -F "LC_ALL=C sudo -n -l -U " "$STATUS_CORE" | head -1 | sed 's/^ *//')"
+_sra_pat="$(grep -F "_sra_pat=" "$STATUS_CORE" | head -1 | sed -e 's/^ *//' -e "s/^_sra_pat=//" -e "s/^'//" -e "s/'\$//")"
 if printf '%s\n' "$_sudo_grep" | grep -q 'grep -Eq'; then
     pass "sudo-rules audit probes with LC_ALL=C (S3+W3, verbatim pin)"
 else
@@ -705,17 +705,17 @@ fi
 # advice when OpenChamber is present but unpinned, shadow note when only
 # self-installed binaries exist without OpenChamber (0.0.47a F4). Static
 # pins below; the verdict matrix itself runs functionally further down.
-if grep -q 'secured via policy pin' "$SCORE" &&
-    grep -q 'BYPASSED' "$SCORE" &&
-    grep -q "sudo opk openchamber-secure" "$SCORE"; then
+if grep -q 'secured via policy pin' "$STATUS_CORE" &&
+    grep -q 'BYPASSED' "$STATUS_CORE" &&
+    grep -q "sudo opk openchamber-secure" "$STATUS_CORE"; then
     pass "status shows the OpenChamber state (secured/bypassed/advice)"
 else
     fail "status lost the OpenChamber state line"
 fi
 # detection reuses the wrapper's semantics: a pin on the kit wrapper itself
 # is not a bypass, an empty pin counts as unset
-if grep -q '_oc_secured=true' "$SCORE" &&
-    grep -qF '[ "$_oc_pin" = "/usr/local/bin/opencode" ]' "$SCORE"; then
+if grep -q '_oc_secured=true' "$STATUS_CORE" &&
+    grep -qF '[ "$_oc_pin" = "/usr/local/bin/opencode" ]' "$STATUS_CORE"; then
     pass "status pin detection matches the wrapper semantics"
 else
     fail "status pin detection diverges from the wrapper"
@@ -725,8 +725,8 @@ fi
 # Literals updated for #211 a F9: the default chain deepened to
 # ${USER:-} so set -u survives both-unset (cron env) — same getent
 # resolution, same fallback shape, one level deeper.
-if grep -q 'getent passwd "${DEFAULT_USER:-${USER:-}}"' "$SCORE" &&
-    grep -qF '_oc_home="${_oc_home:-/home/${DEFAULT_USER:-${USER:-}}}"' "$SCORE"; then
+if grep -q 'getent passwd "${DEFAULT_USER:-${USER:-}}"' "$STATUS_CORE" &&
+    grep -qF '_oc_home="${_oc_home:-/home/${DEFAULT_USER:-${USER:-}}}"' "$STATUS_CORE"; then
     pass "openchamber verdicts resolve the home via getent (0.0.47b W2)"
 else
     fail "openchamber home resolution regressed to /home hardcode (0.0.47b W2)"
@@ -741,7 +741,7 @@ fi
 # Environment-dependent (0.0.46a F2 class): needs getent + root's home
 # at /root — true on every Linux host the suite runs on; without getent,
 # status.sh itself degrades to the fallback everywhere.
-OCV_HOME_SRC="$(awk '/^[[:space:]]*_oc_policy=/{_ocv=1} _ocv{ if ($0 ~ /^[[:space:]]*f="\/home/) exit; print }' "$SCORE" |
+OCV_HOME_SRC="$(awk '/^[[:space:]]*_oc_policy=/{_ocv=1} _ocv{ if ($0 ~ /^[[:space:]]*f="\/home/) exit; print }' "$STATUS_CORE" |
     grep '^[[:space:]]*_oc_home=' || true)"
 if [ -n "$OCV_HOME_SRC" ]; then
     pass "openchamber home-resolution lines extractable (0.0.47c C1)"
@@ -811,7 +811,7 @@ fi
 # Extract from `_oc_policy=` up to (excluding) the `f="/home/...` line that
 # follows the block — the block contains col-0 `fi` lines of its inner ifs,
 # so a sed range on `^fi$` would stop early.
-OCV_BLOCK="$(awk '/^[[:space:]]*_oc_policy=/{_ocv=1} _ocv{ if ($0 ~ /^[[:space:]]*f="\/home/) exit; print }' "$SCORE" |
+OCV_BLOCK="$(awk '/^[[:space:]]*_oc_policy=/{_ocv=1} _ocv{ if ($0 ~ /^[[:space:]]*f="\/home/) exit; print }' "$STATUS_CORE" |
     sed -e "s|/etc/openchamber/policy.json|$OCV_POLICY|g" \
         -e "s|/usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode|$OCV_WRAPPER|g" \
         -e "s|/usr/local/bin/opencode|$OCV_KITBIN|g" \
@@ -958,10 +958,10 @@ OCV_BLOCK=$_282_saved_block
 # .git/config wording: "protected"/"access allowed" instead of ON/OFF;
 # OFF deliberately NEUTRAL (a conscious config choice is a hint, not a
 # warning — maintainer decision on the ticket).
-if grep -qF 'ui_kv_ok ".git/config" "protected (soft-only — agent tools blocked)"' "$SCORE" &&
-    grep -qF 'ui_kv ".git/config" "access allowed (agent tools may edit git config)"' "$SCORE" &&
-    ! grep -qF '"ON (soft-only' "$STATUS" "$SCORE" &&
-    ! grep -qF 'ui_kv ".git/config" "OFF"' "$STATUS" "$SCORE"; then
+if grep -qF 'ui_kv_ok ".git/config" "protected (soft-only — agent tools blocked)"' "$STATUS_CORE" &&
+    grep -qF 'ui_kv ".git/config" "access allowed (agent tools may edit git config)"' "$STATUS_CORE" &&
+    ! grep -qF '"ON (soft-only' "$STATUS" "$STATUS_CORE" &&
+    ! grep -qF 'ui_kv ".git/config" "OFF"' "$STATUS" "$STATUS_CORE"; then
     pass ".git/config row reads protected / access allowed (issue #158)"
 else
     fail ".git/config row wording regressed to ON/OFF"
@@ -970,8 +970,8 @@ fi
 # Sweep invariant: status.sh carries NO raw color-argument ui_kv rows
 # anymore — every verdict row goes through the semantic helpers, so the
 # summary cannot miss one (class sweep of the 62 sites, 0.0.46a F2 style).
-if ! grep -qE '"\$UI_(GREEN|YELLOW|RED)"' "$STATUS" "$SCORE" &&
-    grep -q 'ui_kv_ok ' "$SCORE" && grep -q 'ui_kv_bad ' "$SCORE"; then
+if ! grep -qE '"\$UI_(GREEN|YELLOW|RED)"' "$STATUS" "$STATUS_CORE" &&
+    grep -q 'ui_kv_ok ' "$STATUS_CORE" && grep -q 'ui_kv_bad ' "$STATUS_CORE"; then
     pass "status.sh: all colored rows use semantic helpers (countable)"
 else
     fail "status.sh: raw colored ui_kv row survived the sweep"
@@ -986,9 +986,9 @@ fi
 # Severity tallies only see MAIN-shell rows: the three scanning loops
 # feed from temp files via redirect, never from a `cmd | while` pipe
 # (counter bumps inside a pipe subshell die there). Shape pins per site.
-if grep -qF 'done <"$_st_share_list"' "$SCORE" &&
-    grep -qF 'done <"$_st_hosts_list"' "$SCORE" &&
-    grep -qF '_st_dbdump_gap "$DEFAULT_USER" <"$_st_gap_roots"' "$SCORE"; then
+if grep -qF 'done <"$_st_share_list"' "$STATUS_CORE" &&
+    grep -qF 'done <"$_st_hosts_list"' "$STATUS_CORE" &&
+    grep -qF '_st_dbdump_gap "$DEFAULT_USER" <"$_st_gap_roots"' "$STATUS_CORE"; then
     pass "scan loops run in the main shell (redirect, not pipe)"
 else
     fail "a scan loop prints its findings from a pipe subshell again"
@@ -997,8 +997,8 @@ fi
 # One-line mode must be exactly one line: no raw echo/printf leaks past
 # UI_SILENT (the hosts-scan add-lines and the leak-scan hit list are the
 # two raw-print sites; both are guarded/converted).
-if grep -qF 'ui_detail "add: opk ddev-hosts-add' "$SCORE" &&
-    ! grep -qF 'echo "     add' "$STATUS" "$SCORE"; then
+if grep -qF 'ui_detail "add: opk ddev-hosts-add' "$STATUS_CORE" &&
+    ! grep -qF 'echo "     add' "$STATUS" "$STATUS_CORE"; then
     pass "--short: raw-print sites converted/guarded (one-line discipline)"
 else
     fail "a raw print site can leak past UI_SILENT"
@@ -1134,9 +1134,9 @@ fi
 # /dev/null fallback silently killed the tally and its cleanup rm -f'd
 # the device node when root ran it). A control run with a working mktemp
 # proves the harness exercises the real block (find flows, cleanup runs).
-W2_BLOCK_SHARE="$(sed -n '/_st_share_list=\$(mktemp)/,/^ *rm -f "\$_st_share_list"$/p' "$SCORE")"
-W2_BLOCK_HOSTS="$(sed -n '/_st_hosts_list=\$(mktemp)/,/^ *rm -f "\$_st_hosts_list"$/p' "$SCORE")"
-W2_BLOCK_GAP="$(sed -n '/_st_gap_roots=\$(mktemp)/,/^ *fi$/p' "$SCORE")"
+W2_BLOCK_SHARE="$(sed -n '/_st_share_list=\$(mktemp)/,/^ *rm -f "\$_st_share_list"$/p' "$STATUS_CORE")"
+W2_BLOCK_HOSTS="$(sed -n '/_st_hosts_list=\$(mktemp)/,/^ *rm -f "\$_st_hosts_list"$/p' "$STATUS_CORE")"
+W2_BLOCK_GAP="$(sed -n '/_st_gap_roots=\$(mktemp)/,/^ *fi$/p' "$STATUS_CORE")"
 if [ -n "$W2_BLOCK_SHARE" ] && [ -n "$W2_BLOCK_HOSTS" ] && [ -n "$W2_BLOCK_GAP" ]; then
     pass "W2 scan blocks extractable from status.sh"
 else
@@ -1304,14 +1304,14 @@ fi
 # Comment-strip rider (#261, the #244 g W1 class) on the socket-twin
 # count: commented-out rows stop counting; full-line comments only
 # (#244 h W6 residual).
-_sock_n="$(sed 's/^[[:space:]]*#.*$//' "$SCORE" |
+_sock_n="$(sed 's/^[[:space:]]*#.*$//' "$STATUS_CORE" |
     grep -cF 'ui_kv "socket" "unknown — needs root to check' || true)"
-if grep -qF 'ui_kv "opencode version" "unknown — probe failed' "$SCORE" &&
+if grep -qF 'ui_kv "opencode version" "unknown — probe failed' "$STATUS_CORE" &&
     [ "$_sock_n" = "2" ] &&
-    grep -qF 'ui_kv "mkcert CA" "unknown — needs root to check' "$SCORE" &&
-    grep -qF 'ui_kv "mkcert CA" "missing (optional' "$SCORE" &&
-    ! grep -qE 'ui_kv_warn "[^"]*" "unknown — (needs root|probe failed)' "$STATUS" "$SCORE" &&
-    ! grep -qF 'ui_kv_warn "mkcert CA" "missing (optional' "$STATUS" "$SCORE"; then
+    grep -qF 'ui_kv "mkcert CA" "unknown — needs root to check' "$STATUS_CORE" &&
+    grep -qF 'ui_kv "mkcert CA" "missing (optional' "$STATUS_CORE" &&
+    ! grep -qE 'ui_kv_warn "[^"]*" "unknown — (needs root|probe failed)' "$STATUS" "$STATUS_CORE" &&
+    ! grep -qF 'ui_kv_warn "mkcert CA" "missing (optional' "$STATUS" "$STATUS_CORE"; then
     pass "W3: unknown/optional rows are uncounted (plain ui_kv, both socket twins)"
 else
     fail "W3: an unknown/optional row still counts (or the conversion drifted; socket-twin rows: $_sock_n of 2)"
@@ -1334,8 +1334,8 @@ w4_run() {
         eval "$1"
     )
 }
-W4_BLOCK_HITLIST="$(sed -n '/# Hit list prints in full mode only/,/^ *fi$/p' "$SCORE")"
-W4_BLOCK_MGMT="$(sed -n '/^    if \[ "\$STATUS_SHORT" = false \]; then$/,/^    fi$/p' "$SCORE")"
+W4_BLOCK_HITLIST="$(sed -n '/# Hit list prints in full mode only/,/^ *fi$/p' "$STATUS_CORE")"
+W4_BLOCK_MGMT="$(sed -n '/^    if \[ "\$STATUS_SHORT" = false \]; then$/,/^    fi$/p' "$STATUS_CORE")"
 if [ -n "$W4_BLOCK_HITLIST" ] && [ -n "$W4_BLOCK_MGMT" ]; then
     pass "W4 guard blocks extractable from status.sh"
 else
@@ -1375,7 +1375,7 @@ fi
 # $LIBDIR/bin/opencode gone, the gate warns (counted) and never reaches
 # the probe; with a working binary, the probe path runs and no warn
 # fires. Behavioral: the extracted gate block against fixture LIBDIRs.
-W48C_BLOCK_ADV="$(sed -n '/^        ADV_VER=""$/,/^        fi$/p' "$SCORE")"
+W48C_BLOCK_ADV="$(sed -n '/^        ADV_VER=""$/,/^        fi$/p' "$STATUS_CORE")"
 if printf '%s' "$W48C_BLOCK_ADV" | grep -q 'ui_kv_warn "opencode binary"' &&
     printf '%s' "$W48C_BLOCK_ADV" | grep -q 'elif command -v sudo'; then
     pass "C1 gate block extractable (warn + elif shape)"
@@ -1436,11 +1436,11 @@ fi
 # third fixture: a present-but-failing binary is no longer one class —
 # the direct classifier splits it into corrupt (rc != 0, counted warn)
 # vs. privilege-gap (sudo refused, binary healthy, uncounted row).
-W48D_BLOCK_RENDER="$(sed -n '/^        if \[ -n "\$ADV_VER" \]; then$/,/^        fi$/p' "$SCORE")"
+W48D_BLOCK_RENDER="$(sed -n '/^        if \[ -n "\$ADV_VER" \]; then$/,/^        fi$/p' "$STATUS_CORE")"
 # Issue #201: the capture block is a third extracted region — the
 # harness below evals gate + capture + render; a construct placed
 # outside all three would be untested here and drift silently.
-W201_BLOCK_CAPTURE="$(sed -n '/^        ADV_DIRECT_OUT=""$/,/^        fi$/p' "$SCORE")"
+W201_BLOCK_CAPTURE="$(sed -n '/^        ADV_DIRECT_OUT=""$/,/^        fi$/p' "$STATUS_CORE")"
 if printf '%s' "$W48D_BLOCK_RENDER" | grep -qF 'elif [ -n "${ADV_DIRECT_RC:-}" ]' &&
     printf '%s' "$W48D_BLOCK_RENDER" | grep -qF 'ui_kv "opencode version" "unknown — probe failed'; then
     pass "D1 render block extractable (elif-gated unknown row)"
@@ -1460,7 +1460,7 @@ fi
 # Issue #201: the dead-end advice lives ONLY in the #166 cell now —
 # exactly one literal (a second occurrence would mean a healthy-direct
 # or unparsable cell advising sudo again).
-_sudo_n="$(sed 's/^[[:space:]]*#.*$//' "$SCORE" | grep -cF 'unknown — probe failed (run: sudo opk status)' ||
+_sudo_n="$(sed 's/^[[:space:]]*#.*$//' "$STATUS_CORE" | grep -cF 'unknown — probe failed (run: sudo opk status)' ||
     true)"
 if [ "$_sudo_n" = "1" ]; then
     pass "#201: the sudo-opk-status advice is #166-cell only (one literal)"
@@ -1483,7 +1483,7 @@ fi
 # per arm, and unknown — so neither the comparator direction nor a
 # boundary constant can drift silently (#209 a W1, b W1).
 ADV_SRC="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/advisories.sh"
-W201_BLOCK_BRIDGE="$(sed -n '/^            _st_bridge_unneeded=0$/,/^            fi$/p' "$SCORE")"
+W201_BLOCK_BRIDGE="$(sed -n '/^            _st_bridge_unneeded=0$/,/^            fi$/p' "$STATUS_CORE")"
 if [ -f "$ADV_SRC" ] && [ -n "$W201_BLOCK_BRIDGE" ]; then
     w201_bridge() {
         (
@@ -1726,7 +1726,7 @@ fi
 # could never heal. A uid-0 developer is reported as the install defect
 # it is. Arms run the extracted block with stubbed id/getent and a fake
 # LIBDIR; all homes live under $WORK.
-_hk_block="$(sed -n '/# ddev() hook row (issue #192)/,/^    fi$/p' "$SCORE")"
+_hk_block="$(sed -n '/# ddev() hook row (issue #192)/,/^    fi$/p' "$STATUS_CORE")"
 if [ -n "$_hk_block" ]; then
     pass "ddev() hook row block extractable from status.sh (issue #192)"
     mkdir -p "$WORK/libkit/sh"
@@ -1839,7 +1839,7 @@ fi
 # way production observes it).
 
 # a) advisories: negated-guard fallback, complete block
-_a165="$(sed -n '/^    if \[ ! -f "\$LIBDIR\/sh\/advisories.sh" \]; then$/,/^    fi$/p' "$SCORE")"
+_a165="$(sed -n '/^    if \[ ! -f "\$LIBDIR\/sh\/advisories.sh" \]; then$/,/^    fi$/p' "$STATUS_CORE")"
 if printf '%s' "$_a165" | grep -qF 'if [ ! -f "$LIBDIR/sh/advisories.sh" ]' &&
     printf '%s' "$_a165" | grep -qF 'ui_kv_warn "advisories database" "missing — security checks skipped (fix: sudo opk update)"'; then
     pass "#165: advisories fallback block extractable (negated guard + counted row)"
@@ -1873,7 +1873,7 @@ if [ -z "$_a165_out" ]; then
 else
     fail "#165: present advisories lib must not fire the fallback (got: $_a165_out)"
 fi
-_a165_head="$(sed -n '/^[[:space:]]*if \[ -f "\$LIBDIR\/sh\/advisories.sh" \]; then$/,/ui_section "Security advisories"/p' "$SCORE")"
+_a165_head="$(sed -n '/^[[:space:]]*if \[ -f "\$LIBDIR\/sh\/advisories.sh" \]; then$/,/ui_section "Security advisories"/p' "$STATUS_CORE")"
 if [ -n "$_a165_head" ]; then
     _a165_out=$(
         (
@@ -1894,7 +1894,7 @@ else
 fi
 
 # b) ddev-terminal: compound guard + elif — complete block
-_t165="$(sed -n '/^[[:space:]]*if \[ -n "\$DEFAULT_USER" \] && \[ -f "\$LIBDIR\/sh\/ddev-terminal.sh" \]; then$/,/^    fi$/p' "$SCORE")"
+_t165="$(sed -n '/^[[:space:]]*if \[ -n "\$DEFAULT_USER" \] && \[ -f "\$LIBDIR\/sh\/ddev-terminal.sh" \]; then$/,/^    fi$/p' "$STATUS_CORE")"
 if printf '%s' "$_t165" | grep -qF 'elif [ -n "$DEFAULT_USER" ]; then' &&
     printf '%s' "$_t165" | grep -qF 'ui_kv_warn "ddev() hook" "not checked — kit file sh/ddev-terminal.sh missing (fix: sudo opk update)"'; then
     pass "#165: ddev-terminal block extractable (compound guard + elif row)"
@@ -1952,7 +1952,7 @@ if [ -n "$_t165" ]; then
 fi
 
 # c) ddev-migrate: compound guard + elif — complete block
-_m165="$(sed -n '/^[[:space:]]*if \[ -n "\$DEFAULT_USER" \] && \[ -f "\$LIBDIR\/sh\/ddev-migrate.sh" \]; then$/,/^    fi$/p' "$SCORE")"
+_m165="$(sed -n '/^[[:space:]]*if \[ -n "\$DEFAULT_USER" \] && \[ -f "\$LIBDIR\/sh\/ddev-migrate.sh" \]; then$/,/^    fi$/p' "$STATUS_CORE")"
 if printf '%s' "$_m165" | grep -qF 'ui_kv_warn "db dumps" "not checked — kit file sh/ddev-migrate.sh missing (fix: sudo opk update)"'; then
     pass "#165: ddev-migrate block extractable (elif row present)"
 else
@@ -2010,7 +2010,7 @@ if [ -n "$_m165" ]; then
 fi
 
 # d) ddev-hosts: readiness flag split + lib guard + elif
-_h165pre="$(sed -n '/# Readiness split (issue #165):/,/^    fi$/p' "$SCORE")"
+_h165pre="$(sed -n '/# Readiness split (issue #165):/,/^    fi$/p' "$STATUS_CORE")"
 if printf '%s' "$_h165pre" | grep -qF '[ -d /mnt/c ]' &&
     printf '%s' "$_h165pre" | grep -qF '[ -f /mnt/c/Windows/System32/drivers/etc/hosts ]' &&
     printf '%s' "$_h165pre" | grep -qF '[ -n "${DEFAULT_USER:-}" ]' &&
@@ -2019,7 +2019,7 @@ if printf '%s' "$_h165pre" | grep -qF '[ -d /mnt/c ]' &&
 else
     fail "#165: hosts readiness block not extractable (anchor drift?)"
 fi
-_h165="$(sed -n '/^[[:space:]]*if \[ "\$_st_hosts_ready" = true \] && \[ -f "\$LIBDIR\/sh\/ddev-hosts.sh" \]; then$/,/^    fi$/p' "$SCORE")"
+_h165="$(sed -n '/^[[:space:]]*if \[ "\$_st_hosts_ready" = true \] && \[ -f "\$LIBDIR\/sh\/ddev-hosts.sh" \]; then$/,/^    fi$/p' "$STATUS_CORE")"
 if printf '%s' "$_h165" | grep -qF 'ui_kv_warn "hosts (win)" "not checked — kit file sh/ddev-hosts.sh missing (fix: sudo opk update)"'; then
     pass "#165: hosts guard block extractable (flag + lib + elif row)"
 else
@@ -2080,7 +2080,7 @@ fi
 # to = or dropping the || echo 1 sentinel turns arms red. The full
 # chain is additionally executed once (any host): it must yield a
 # boolean, never an error.
-_h165r_cond="$(sed -n 's/^        \[ -n "${DEFAULT_USER:-}" \] && \(.*\); then$/\1/p' "$SCORE")"
+_h165r_cond="$(sed -n 's/^        \[ -n "${DEFAULT_USER:-}" \] && \(.*\); then$/\1/p' "$STATUS_CORE")"
 if [ -n "$_h165r_cond" ] &&
     printf '%s' "$_h165r_cond" | grep -qF '[ "$(id -u)" != "$(id -u "$OPENCODE_USER" 2>/dev/null || echo 1)" ]'; then
     pass "#165: readiness uid condition extractable from the real chain line"
@@ -2157,7 +2157,7 @@ esac
 # counted row, agent-uid runs stay row-free, and a present lib runs the
 # real scan (control). The harness runs from tests/, so the checkout-first
 # candidate never exists and the deployed LIBDIR fixture decides.
-_s165="$(sed -n '/^    _st_dhl=/,/^    fi$/p' "$SCORE")"
+_s165="$(sed -n '/^    _st_dhl=/,/^    fi$/p' "$STATUS_CORE")"
 if printf '%s' "$_s165" | grep -qF 'ui_kv_warn "ddev share" "not checked — kit file sh/ddev-handover.sh missing (fix: sudo opk update)"'; then
     pass "#165: ddev-handover block extractable (elif row present)"
 else
@@ -2226,7 +2226,7 @@ fi
 # silently when neither resolution candidate delivers git_status_row —
 # counted warn row at the call site; control with the helper defined
 # renders its row and stays row-free.
-_g165="$(sed -n '/^[[:space:]]*if command -v git_status_row >\/dev\/null 2>&1; then$/,/^    fi$/p' "$SCORE")"
+_g165="$(sed -n '/^[[:space:]]*if command -v git_status_row >\/dev\/null 2>&1; then$/,/^    fi$/p' "$STATUS_CORE")"
 if printf '%s' "$_g165" | grep -qF 'ui_kv_warn "git" "not checked — kit file sh/git-check.sh missing or outdated (fix: sudo opk update)"'; then
     pass "#165: git-floor fallback block extractable (helper check + counted row)"
 else
@@ -2328,7 +2328,7 @@ kit file sh/ddev-migrate.sh missing
 kit file sh/ddev-terminal.sh missing
 kit file sh/git-check.sh missing
 kit file sh/update-check.sh missing'
-_k165_got="$(grep -o 'kit file sh/[a-z0-9-]*\.sh missing' "$SCORE" | LC_ALL=C sort -u)"
+_k165_got="$(grep -o 'kit file sh/[a-z0-9-]*\.sh missing' "$STATUS_CORE" | LC_ALL=C sort -u)"
 if [ "$_k165_got" = "$_k165_want" ]; then
     pass "#165: missing-lib rows are exactly the six broken-kit sites (bridge/log keep their design)"
 else
@@ -2338,7 +2338,7 @@ fi
 # id-probe sentinel value (#196 a T2): `|| echo 1` must yield exactly "1"
 # for an unresolvable developer — `|| true` (empty uid) keeps every branch
 # pin above green while silently re-arming the uid-0 defect row for ghosts.
-_st_line="$(grep '^ *_st_dev_uid=' "$SCORE" | head -1)"
+_st_line="$(grep '^ *_st_dev_uid=' "$STATUS_CORE" | head -1)"
 if [ -n "$_st_line" ]; then
     _rc=0
     _out=$(
@@ -2366,7 +2366,7 @@ fi
 # W3 rule names. Extract the real three-arm block and drive it: the
 # unknown arm must render as a plain (uncounted) row; a REAL finding
 # (new advisories) must still count as a warn.
-_f8_block="$(sed -n '/^            if \[ -n "\$ADV_NEW" \]; then$/,/^            fi$/p' "$SCORE")"
+_f8_block="$(sed -n '/^            if \[ -n "\$ADV_NEW" \]; then$/,/^            fi$/p' "$STATUS_CORE")"
 if [ -n "$_f8_block" ]; then
     pass "upstream verdict block extractable from status.sh (#211 a F8)"
     _f8_run() {
@@ -2404,7 +2404,7 @@ fi
 # all. Extract the real probe lines and run them with both unset:
 # rc must be 0 and the degraded /home/ fallback stands. Hermetic —
 # the host's install.conf never runs (0.0.46a F2 class).
-_f9_lines="$(sed -n '/^    _oc_home=\$(getent passwd/,+1p' "$SCORE")"
+_f9_lines="$(sed -n '/^    _oc_home=\$(getent passwd/,+1p' "$STATUS_CORE")"
 if [ -n "$_f9_lines" ]; then
     pass "_oc_home probe lines extractable from status.sh (#211 a F9)"
     _f9_rc=0
@@ -2426,7 +2426,7 @@ fi
 # verdict: a failed /proc read printed ui_kv_bad "(? > 80)" (false
 # alarm), a failed stat printed ui_kv_ok "restricted (mode ?)" (false
 # green). Extract both real blocks, drive them with failing probes.
-_f25_ports="$(sed -n '/^    port_start=\$(cat \/proc\/sys\/net\/ipv4\/ip_unprivileged_port_start/,/^    fi$/p' "$SCORE")"
+_f25_ports="$(sed -n '/^    port_start=\$(cat \/proc\/sys\/net\/ipv4\/ip_unprivileged_port_start/,/^    fi$/p' "$STATUS_CORE")"
 if [ -n "$_f25_ports" ]; then
     F25P=$(mktemp -d)
     mkdir -p "$F25P/bin"
@@ -2453,7 +2453,7 @@ else
     echo "  ${RED}FAIL${NC}  F25 ports block extractable"
     failures=$((failures + 1))
 fi
-_f25_mnt="$(sed -n '/^        mnt_mode=\$(stat -c %a \/mnt\/c/,/^        fi$/p' "$SCORE")"
+_f25_mnt="$(sed -n '/^        mnt_mode=\$(stat -c %a \/mnt\/c/,/^        fi$/p' "$STATUS_CORE")"
 if [ -n "$_f25_mnt" ]; then
     F25=$(mktemp -d)
     mkdir -p "$F25/bin"
@@ -2499,15 +2499,15 @@ fi
 # find (parity, not a new fail-soft spot).
 # Since the #346 wave-1 move the helpers are top-level definitions in the
 # section lib — the structural checks read the lib file directly.
-if grep -q '^_st_progress_tee() {' "$SCORE" &&
-    grep -q '^_st_ddev_scan() {' "$SCORE"; then
+if grep -q '^_st_progress_tee() {' "$STATUS_CORE" &&
+    grep -q '^_st_ddev_scan() {' "$STATUS_CORE"; then
     pass "#210: scan helpers present in sh/status-core.sh"
 else
     fail "#210: scan helpers not found in the section lib (anchor drift?)"
 fi
-if grep -qF '_st_ddev_scan "ddev share: scanning $_st_root" "$_st_root" "$_st_share_list"' "$SCORE" &&
-    grep -qF '_st_ddev_scan "win hosts: scanning $_st_root" "$_st_root" "$_st_hosts_list"' "$SCORE" &&
-    ! grep -qE 'find "\$_st_root" .* -name \.ddev' "$STATUS" "$SCORE"; then
+if grep -qF '_st_ddev_scan "ddev share: scanning $_st_root" "$_st_root" "$_st_share_list"' "$STATUS_CORE" &&
+    grep -qF '_st_ddev_scan "win hosts: scanning $_st_root" "$_st_root" "$_st_hosts_list"' "$STATUS_CORE" &&
+    ! grep -qE 'find "\$_st_root" .* -name \.ddev' "$STATUS" "$STATUS_CORE"; then
     pass "#210: both scan sites run through the shared helper (emitter sweep)"
 else
     fail "#210: a scan site bypasses _st_ddev_scan (sweep incomplete)"
@@ -2637,17 +2637,17 @@ fi
 #     feed, scan parser) while every EXPECTED failure stays silent —
 #     the empty/warn output contracts are untouched. Line-shape pins
 #     first (re-adding a stderr discard goes red), behavior after.
-if grep -qF "import sys, threading, time' >/dev/null 2>&1" "$STATUS" "$SCORE"; then
+if grep -qF "import sys, threading, time' >/dev/null 2>&1" "$STATUS" "$STATUS_CORE"; then
     fail "#244 c S3: probe must not discard interpreter stderr (2>&1 found)"
 else
     pass "#244 c S3: probe no longer discards interpreter stderr"
 fi
-if grep -qF 'or ""))'"'"' 2>/dev/null); then' "$STATUS" "$SCORE"; then
+if grep -qF 'or ""))'"'"' 2>/dev/null); then' "$STATUS" "$STATUS_CORE"; then
     fail "#244 c S3: advisory parse must not discard interpreter stderr"
 else
     pass "#244 c S3: advisory parse no longer discards interpreter stderr"
 fi
-if grep -qF 'python3 "$PARSER" "$SCAN_CFG" 2>/dev/null' "$STATUS" "$SCORE"; then
+if grep -qF 'python3 "$PARSER" "$SCAN_CFG" 2>/dev/null' "$STATUS" "$STATUS_CORE"; then
     fail "#244 c S3: leak-scan parser must not discard its diagnostic stderr"
 else
     pass "#244 c S3: leak-scan parser no longer discards its diagnostic stderr"
@@ -2679,7 +2679,7 @@ fi
 # Advisory behavior — the shipped program, extracted, keeps its
 # contract: garbage in -> rc 1, SILENT (the except path is the
 # expected failure; the passthrough must not add noise to it).
-C244ADVPGM="$(sed -n "/if ADV_IDS=\$(printf/,/); then\$/p" "$SCORE" |
+C244ADVPGM="$(sed -n "/if ADV_IDS=\$(printf/,/); then\$/p" "$STATUS_CORE" |
     sed "1s/^.*python3 -c '//" | sed "\$s/'[[:space:]]*); then\$//")"
 if printf 'not json' | python3 -c "$C244ADVPGM" >/dev/null 2>"$WORK/t244c-adv.err"; then
     fail "#244 c S3: advisory program must reject an unparseable feed (rc 1)"
@@ -2690,7 +2690,7 @@ else
 fi
 # Leak-scan parser behavior: a broken config surfaces the parser's own
 # clean error line (not a traceback) — that is what now passes through.
-C244PARSER="$(dirname "$SCORE")/../py/jsonc-parser.py"
+C244PARSER="$(dirname "$STATUS_CORE")/../py/jsonc-parser.py"
 printf 'not json at all\n' >"$WORK/t244c-bad.jsonc"
 C244PRC=0
 python3 "$C244PARSER" "$WORK/t244c-bad.jsonc" >/dev/null 2>"$WORK/t244c-par.err" || C244PRC=$?
@@ -2816,10 +2816,10 @@ fi
 # 8) (#221 a W8) integrity beyond presence: the sourced lib must PARSE
 #    (sh -n) and carry the tee's full body — an early col-0 brace in the
 #    lib leaves def ticker/draw behind; unterminated quoting fails sh -n.
-if sh -n "$SCORE" 2>/dev/null &&
-    grep -q 'def draw' "$SCORE" &&
-    grep -q 'def ticker' "$SCORE" &&
-    grep -q 'read1' "$SCORE"; then
+if sh -n "$STATUS_CORE" 2>/dev/null &&
+    grep -q 'def draw' "$STATUS_CORE" &&
+    grep -q 'def ticker' "$STATUS_CORE" &&
+    grep -q 'read1' "$STATUS_CORE"; then
     pass "#221: section lib parses and carries the full tee body"
 else
     fail "#221: sh/status-core.sh truncated or unparsable"
@@ -2930,7 +2930,7 @@ fi
 # dict envelope exits 1 SILENT (the old shape raised a raw traceback on
 # cron stderr); a list with null and scalar entries yields exactly the
 # real ids.
-ADVPY="$(sed -n "/python3 -c 'import json,sys$/,/'); then\$/p" "$SCORE" | sed -e "1s/^.*python3 -c '//" -e "\$s/'); then\$//")"
+ADVPY="$(sed -n "/python3 -c 'import json,sys$/,/'); then\$/p" "$STATUS_CORE" | sed -e "1s/^.*python3 -c '//" -e "\$s/'); then\$//")"
 if [ -n "$ADVPY" ] && printf '%s' "$ADVPY" | grep -q 'isinstance(feed, list)'; then
     pass "advisory feed parser extractable + shape gate present (pr-00263 a F11)"
 else
@@ -2957,7 +2957,7 @@ fi
 # a plain uncounted row (no kvwarn), broken kit and unscannable config
 # stay counted warns. Controlled PATH per the 0.0.46a F2 class: only the
 # block's few externals are visible.
-_lk_block="$(sed -n '/^[[:space:]]*if \[ -f "\$SCAN_CFG" \] && \[ -x "\$PARSER" \]/,/^    fi$/p' "$SCORE")"
+_lk_block="$(sed -n '/^[[:space:]]*if \[ -f "\$SCAN_CFG" \] && \[ -x "\$PARSER" \]/,/^    fi$/p' "$STATUS_CORE")"
 if [ -n "$_lk_block" ] && printf '%s' "$_lk_block" | grep -q 'agent config unscannable'; then
     pass "leak-scan outer block extractable from status.sh (issue #217)"
     _lk_work=$(mktemp -d)
@@ -3028,7 +3028,7 @@ fi
 # so the block's own /home/$OPENCODE_USER interpolation lands inside this
 # suite's mktemp scratch: the real code path runs unmodified and the
 # sandbox floor (no /home writes) holds.
-_cfg_block="$(sed -n '/^    _occonf=""$/,/^    fi$/p' "$SCORE")"
+_cfg_block="$(sed -n '/^    _occonf=""$/,/^    fi$/p' "$STATUS_CORE")"
 if [ -n "$_cfg_block" ] && printf '%s' "$_cfg_block" | grep -q 'is not a regular file'; then
     pass "Config row block extractable from status.sh (issue #382)"
     _cfg_work=$(mktemp -d)

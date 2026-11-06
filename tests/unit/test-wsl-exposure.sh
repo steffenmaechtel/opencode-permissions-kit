@@ -15,9 +15,10 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 STATUS="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/status.sh"
-SCORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core.sh"
+STATUS_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core.sh"
 INSTALL="$SCRIPT_DIR/../../files/install.sh"
 UPDATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh"
+UPDATE_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/update-core.sh"
 DEPLOYLIB="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 WRAPPER="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
 OPK="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opk"
@@ -38,21 +39,21 @@ check "update.sh passes sh -n" sh -n "$UPDATE"
 
 # --- warning wiring -------------------------------------------------------------
 check "status.sh gates the section on /mnt/c existing" \
-    sh -c "grep -qF '[ -d /mnt/c ]' \"\$1\"" _ "$SCORE"
+    sh -c "grep -qF '[ -d /mnt/c ]' \"\$1\"" _ "$STATUS_CORE"
 check "status.sh checks the world-readable (other) bit of the mount mode" \
-    sh -c "grep -q '0004' \"\$1\"" _ "$SCORE"
+    sh -c "grep -q '0004' \"\$1\"" _ "$STATUS_CORE"
 check "status.sh prints a world-readable warning" \
-    sh -c "grep -q 'world-readable' \"\$1\"" _ "$SCORE"
+    sh -c "grep -q 'world-readable' \"\$1\"" _ "$STATUS_CORE"
 check "status.sh names the asset at risk (Windows profile)" \
-    sh -c "grep -q 'Windows profile' \"\$1\"" _ "$SCORE"
+    sh -c "grep -q 'Windows profile' \"\$1\"" _ "$STATUS_CORE"
 check "status.sh shows the wsl.conf automount fix" \
-    sh -c "grep -qF '[automount]' \"\$1\" && grep -q 'uid=1000,gid=1000,dmask=027,fmask=037' \"\$1\"" _ "$SCORE"
+    sh -c "grep -qF '[automount]' \"\$1\" && grep -q 'uid=1000,gid=1000,dmask=027,fmask=037' \"\$1\"" _ "$STATUS_CORE"
 check "status.sh mentions 'wsl --shutdown'" \
-    sh -c "grep -q 'wsl --shutdown' \"\$1\"" _ "$SCORE"
+    sh -c "grep -q 'wsl --shutdown' \"\$1\"" _ "$STATUS_CORE"
 check "status.sh stays silent when the mount is restricted" \
-    sh -c "grep -qF 'restricted' \"\$1\"" _ "$SCORE"
+    sh -c "grep -qF 'restricted' \"\$1\"" _ "$STATUS_CORE"
 check "status.sh detects a configured-but-pending fix (wsl --shutdown)" \
-    sh -c "grep -q 'pending' \"\$1\" && grep -q \"options *=.*dmask\" \"\$1\"" _ "$SCORE"
+    sh -c "grep -q 'pending' \"\$1\" && grep -q \"options *=.*dmask\" \"\$1\"" _ "$STATUS_CORE"
 
 # --- install.sh report-only restriction (consent policy) ------------------------
 # The kit never writes /etc/wsl.conf (internal/records/wsl-conf-consent.md):
@@ -101,15 +102,16 @@ check "wrapper stays silent when the mount is restricted (other bit off)" \
 check "wrapper skips the bridge warning for open@11 versions (1.18.33 / 2.0.18)" \
     sh -c "grep -qF 'advisories_version_cmp' \"\$1\" && grep -qF '1.18.33' \"\$1\" && grep -qF '2.0.18' \"\$1\"" _ "$WRAPPER"
 
-# --- update.sh report-only hint -------------------------------------------------
+# --- update.sh report-only hint (the section lives in sh/update-core.sh,
+# #346 wave 2) ------------------------------------------------------------------
 check "update.sh warns about the world-readable /mnt/c (no prompt)" \
-    sh -c "grep -qF 'ui_warn \"/mnt/c is world-readable' \"\$1\" && ! sed -n '/restriction configured but still pending/,/kit never edits \\/etc\\/wsl.conf/p' \"\$1\" | grep -Eq 'ui_confirm|ui_ask|ui_menu'" _ "$UPDATE"
+    sh -c "grep -qF 'ui_warn \"/mnt/c is world-readable' \"\$1\" && ! sed -n '/restriction configured but still pending/,/kit never edits \\/etc\\/wsl.conf/p' \"\$1\" | grep -Eq 'ui_confirm|ui_ask|ui_menu'" _ "$UPDATE_CORE"
 check "update.sh prints the recommended wsl.conf options" \
-    sh -c "grep -qF '[automount]' \"\$1\" && grep -q 'dmask=027' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -qF '[automount]' \"\$1\" && grep -q 'dmask=027' \"\$1\"" _ "$UPDATE_CORE"
 check "update.sh reminds about a configured-but-pending restriction" \
-    sh -c "grep -q \"pending 'wsl --shutdown'\" \"\$1\"" _ "$UPDATE"
+    sh -c "grep -q \"pending 'wsl --shutdown'\" \"\$1\"" _ "$UPDATE_CORE"
 check "update.sh never writes /etc/wsl.conf (carrier left to the user)" \
-    sh -c "! grep -q 'browser_bridge_write_conf' \"\$1\" && grep -q 'opk wsl-add-opencode-1-fix' \"\$1\"" _ "$UPDATE"
+    sh -c "! grep -q 'browser_bridge_write_conf' \"\$1\" && ! grep -q 'browser_bridge_write_conf' \"\$2\" && grep -q 'opk wsl-add-opencode-1-fix' \"\$1\"" _ "$UPDATE_CORE" "$UPDATE"
 
 # --- the explicit-consent command (opk wsl-add-opencode-1-fix) -------------------
 check "opk implements the wsl-add-opencode-1-fix subcommand" \
@@ -119,9 +121,9 @@ check "opk wsl-add-opencode-1-fix elevates via sudo and runs write_conf" \
 check "opk wsl-add-opencode-1-fix is the ONLY shipped entry point calling write_conf" \
     sh -c "! grep -rl 'browser_bridge_write_conf' \"\$1\" 2>/dev/null | grep -v 'sh/wsl-browser-bridge.sh$' | grep -v 'bin/opk$' | grep -q ." _ "$SCRIPT_DIR/../../files"
 check "status.sh points at the opt-in bridge command" \
-    sh -c "grep -q 'opk wsl-add-opencode-1-fix' \"\$1\"" _ "$SCORE"
+    sh -c "grep -q 'opk wsl-add-opencode-1-fix' \"\$1\"" _ "$STATUS_CORE"
 check "status.sh skips the bridge warning for open@11 versions (1.18.33 / 2.0.18)" \
-    sh -c "grep -qF 'advisories_version_cmp' \"\$1\" && grep -qF '1.18.33' \"\$1\" && grep -qF '2.0.18' \"\$1\" && grep -qF 'not needed' \"\$1\"" _ "$SCORE"
+    sh -c "grep -qF 'advisories_version_cmp' \"\$1\" && grep -qF '1.18.33' \"\$1\" && grep -qF '2.0.18' \"\$1\" && grep -qF 'not needed' \"\$1\"" _ "$STATUS_CORE"
 
 # --- xdg-open fallback shim (opencode 1.18.33+ / 2.0.18+ login fix) ---------------
 check "lib manifest deploys bin/xdg-open 755" \
@@ -129,13 +131,13 @@ check "lib manifest deploys bin/xdg-open 755" \
 check "install.sh deploys the xdg-open shim (guarded, never shadows a real one)" \
     sh -c "grep -q 'opencode-permissions-kit-lib/bin/xdg-open' \"\$1\" && grep -qF 'ln -s \"\$LIBDIR/bin/xdg-open\" /usr/local/bin/xdg-open' \"\$1\"" _ "$INSTALL"
 check "update.sh refreshes and heals the xdg-open shim (stands back for a real one)" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/bin/xdg-open' \"\$1\" && grep -qF 'xdg_open_real_exists' \"\$1\" && ! grep -qF '/usr/bin/xdg-open' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -q 'opencode-permissions-kit-lib/bin/xdg-open' \"\$2\" && grep -qF 'xdg_open_real_exists' \"\$1\" && ! grep -qF '/usr/bin/xdg-open' \"\$1\" && ! grep -qF '/usr/bin/xdg-open' \"\$2\"" _ "$UPDATE_CORE" "$UPDATE"
 check "status.sh reports the xdg-open fallback state" \
-    sh -c "grep -qF 'xdg-open fallback' \"\$1\"" _ "$SCORE"
+    sh -c "grep -qF 'xdg-open fallback' \"\$1\"" _ "$STATUS_CORE"
 check "status.sh never-shadow verdict uses the shared PATH probe (0.0.42d S1)" \
-    sh -c "grep -qF 'xdg_open_real_exists' \"\$1\"" _ "$SCORE"
+    sh -c "grep -qF 'xdg_open_real_exists' \"\$1\"" _ "$STATUS_CORE"
 check "status.sh flags a dangling kit shim instead of green (0.0.42d C2)" \
-    sh -c "grep -qF 'shim symlink dangles' \"\$1\"" _ "$SCORE"
+    sh -c "grep -qF 'shim symlink dangles' \"\$1\"" _ "$STATUS_CORE"
 
 # --- uninstall consent (internal/records/wsl-conf-consent.md) --------------------------
 UNINSTALL="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/uninstall.sh"
@@ -148,7 +150,7 @@ check "uninstall.sh prints the manual line range when declined" \
     sh -c "grep -q 'browser bridge -- begin\\\$' \"\$1\" && grep -q 'left untouched' \"\$1\"" _ "$UNINSTALL"
 check "install.sh and update.sh deploy bin/browser-bridge into the library (lib_deploy manifest)" \
     sh -c "grep -q 'opencode-permissions-kit-lib/bin/browser-bridge 755' \"\$3\" \
-        && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\" && grep -q 'lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"' \"\$2\"" _ "$INSTALL" "$UPDATE" "$DEPLOYLIB"
+        && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\" && grep -q 'lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"' \"\$2\"" _ "$INSTALL" "$UPDATE_CORE" "$DEPLOYLIB"
 
 # --- mode-mask arithmetic (the exact check status.sh performs) -----------------
 mode_allows_other() {

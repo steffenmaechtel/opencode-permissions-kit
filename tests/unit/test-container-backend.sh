@@ -24,7 +24,8 @@ INSTALL="$REPO/files/install.sh"
 UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
 DEPLOYLIB="$REPO/files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 STATUS="$REPO/files/opencode-permissions-kit-lib/management/status.sh"
-SCORE="$REPO/files/opencode-permissions-kit-lib/sh/status-core.sh"
+STATUS_CORE="$REPO/files/opencode-permissions-kit-lib/sh/status-core.sh"
+UPDATE_CORE="$REPO/files/opencode-permissions-kit-lib/sh/update-core.sh"
 CONFIG="$REPO/files/opencode-permissions-kit-lib/management/config.sh"
 UNINSTALL="$REPO/files/opencode-permissions-kit-lib/management/uninstall.sh"
 SUDOERS="$REPO/files/opencode-permissions-kit-lib/templates/sudoers.template"
@@ -218,28 +219,28 @@ check "update.sh KIT_FILES includes socket-check.sh" \
     grep -Fq 'opencode-permissions-kit-lib/bin/socket-check' "$UPDATE"
 check "update.sh deploys socket-check.sh to LIBDIR/bin (lib_deploy manifest)" \
     sh -c 'grep -qF "opencode-permissions-kit-lib/bin/socket-check 755" "$2" \
-        && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE" "$DEPLOYLIB"
+        && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE_CORE" "$DEPLOYLIB"
 check "update.sh KIT_FILES includes setup-container-backend" \
     grep -Fq 'opencode-permissions-kit-lib/bin/setup-container-backend' "$UPDATE"
 check "update.sh deploys setup-container-backend to LIBDIR (lib_deploy manifest)" \
     sh -c 'grep -qF "opencode-permissions-kit-lib/bin/setup-container-backend 755" "$2" \
-        && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE" "$DEPLOYLIB"
+        && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE_CORE" "$DEPLOYLIB"
 check "update.sh KIT_FILES has NO migrate-denies.sh (legacy cleanup)" \
     sh -c "! sed -n 's/^KIT_FILES=\"\\(.*\\)\"$/\\1/p' \"\$1\" | grep -q migrate-denies" _ "$UPDATE"
 check "update.sh stamps no HARD_DENY_REMOVED key anymore" \
-    grep_absent -Fq 'HARD_DENY_REMOVED=1' "$UPDATE"
+    sh -c '! grep -Fq "HARD_DENY_REMOVED=1" "$1" && ! grep -Fq "HARD_DENY_REMOVED=1" "$2"' _ "$UPDATE" "$UPDATE_CORE"
 check "update.sh KIT_FILES has NO protect-projects.sh" \
-    grep_absent -Fq 'protect-projects.sh' "$UPDATE"
+    sh -c '! grep -Fq "protect-projects.sh" "$1" && ! grep -Fq "protect-projects.sh" "$2"' _ "$UPDATE" "$UPDATE_CORE"
 check "update.sh KIT_FILES has NO ddev-transaction.sh" \
-    grep_absent -Fq 'ddev-transaction.sh' "$UPDATE"
+    sh -c '! grep -Fq "ddev-transaction.sh" "$1" && ! grep -Fq "ddev-transaction.sh" "$2"' _ "$UPDATE" "$UPDATE_CORE"
 check "update.sh KIT_FILES has NO ddev shim" \
-    grep_absent -Eq 'opencode-permissions-kit-lib/bin/ddev([[:space:]]|$)' "$UPDATE"
+    sh -c '! grep -Eq "opencode-permissions-kit-lib/bin/ddev([[:space:]]|$)" "$1" && ! grep -Eq "opencode-permissions-kit-lib/bin/ddev([[:space:]]|$)" "$2"' _ "$UPDATE" "$UPDATE_CORE"
 check "update.sh KIT_FILES has NO git hooks" \
-    grep_absent -Fq 'hooks/post-' "$UPDATE"
+    sh -c '! grep -Fq "hooks/post-" "$1" && ! grep -Fq "hooks/post-" "$2"' _ "$UPDATE" "$UPDATE_CORE"
 check "update.sh re-stamps OPENCODE_GROUP to the opencode usergroup" \
-    grep -Fq 'echo "OPENCODE_GROUP=$NEW_OPENCODE_GROUP"' "$UPDATE"
+    grep -Fq 'echo "OPENCODE_GROUP=$NEW_OPENCODE_GROUP"' "$UPDATE_CORE"
 check "update.sh strips no legacy keys on re-stamp (cleanup done)" \
-    grep_absent -Fq "e '^WWW_GROUP='" "$UPDATE"
+    sh -c '! grep -Fq "e '"'"'^WWW_GROUP='"'"'" "$1" && ! grep -Fq "e '"'"'^WWW_GROUP='"'"'" "$2"' _ "$UPDATE" "$UPDATE_CORE"
 check "update.sh comment documents the re-base" \
     grep -Fq 'OPENCODE_GROUP re-base' "$UPDATE"
 
@@ -274,13 +275,13 @@ check "config.sh menu has a container backend entry" \
 echo ""
 echo "-- status.sh wiring (section rows live in sh/status-core.sh, #346 wave 1) --"
 check "status.sh reports the backend name" \
-    grep -Fq 'backend:' "$SCORE"
+    grep -Fq 'backend:' "$STATUS_CORE"
 check "status.sh handles rootless backends" \
-    grep -Fq 'docker-rootless|podman-rootless' "$SCORE"
+    grep -Fq 'docker-rootless|podman-rootless' "$STATUS_CORE"
 check "status.sh reports socket reachability" \
-    grep -Fq 'NOT reachable' "$SCORE"
+    grep -Fq 'NOT reachable' "$STATUS_CORE"
 check "status.sh has no migration-stamp section (legacy cleanup)" \
-    sh -c '! grep -Fq "HARD_DENY_REMOVED" "$1" && ! grep -Fq "HARD_DENY_REMOVED" "$2"' _ "$STATUS" "$SCORE"
+    sh -c '! grep -Fq "HARD_DENY_REMOVED" "$1" && ! grep -Fq "HARD_DENY_REMOVED" "$2"' _ "$STATUS" "$STATUS_CORE"
 
 echo ""
 echo "-- CI wiring (issue #123: exec bits live in the git index) --"
