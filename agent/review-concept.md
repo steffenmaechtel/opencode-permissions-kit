@@ -312,17 +312,23 @@ works.
   session curates directly, disclosed in the comment's provenance.
   (RM-0126)
 - Verification: every curated finding is re-verified against the
-  code — and the verification is SIZED: at ≤ 5 curated findings, all
-  LOW/INFO, the main session verifies inline (no verifier
-  subagents); above that, or at any MED/HIGH finding, exactly ONE
-  fresh strong-tier verifier batch runs (verdict files per batch) —
-  a hard gate: skipping an owed batch is a process deviation only a
+  code — and the verification is SIZED BY SEVERITY, not count: a
+  LOW/INFO-only round verifies main-inline at ANY finding count (no
+  verifier subagents); at any MED/HIGH finding, exactly ONE fresh
+  strong-tier verifier batch runs (verdict files per batch) — a hard
+  gate: skipping an owed batch is a process deviation only a
   maintainer disclosure can carry, never a time-pressure call. The
-  main session audits the verdicts — re-deriving every MED/HIGH
-  itself, spot-checking LOW/INFO; refuted findings are retracted with
-  the refuting evidence named. Subagent freshness replaces session
-  rotation as the bias-reduction mechanism: the author's loaded
-  context never verifies its own claims. (RM-0127)
+  old count arm ("≤ 5 curated findings") was dropped 2026-11-07 on
+  the numbers: six batches over > 5-finding LOW/INFO rounds produced
+  at most one retraction, main-inline rounds retract LOW/INFO ghosts
+  too, and the next round's fresh re-review nets the rest
+  ([reviews-meta 2026-11-07](../internal/reviews-meta/2026-11-07/)).
+  The main session audits the verdicts — re-deriving every MED/HIGH
+  itself, spot-checking LOW/INFO (on a LOW/INFO-only round that audit
+  IS the verification — all of them); refuted findings are retracted
+  with the refuting evidence named. Subagent freshness replaces
+  session rotation as the bias-reduction mechanism: the author's
+  loaded context never verifies its own claims. (RM-0127)
 
 ## Reviewer freshness
 

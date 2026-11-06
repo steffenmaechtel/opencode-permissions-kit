@@ -96,8 +96,9 @@ both in the loop status BEFORE the fan-out launches:
 - **tier low** — shipped ≤ ~50 lines or message-only,
   non-shipped standard, EVERY fix-wave re-review: exactly ONE
   fast-tier subagent (~5 min, greps + targeted reads);
-  verification per the sizing gate (section 6): ≤ 5 findings all
-  LOW/INFO → main audit alone; else exactly one verifier batch.
+  verification per the sizing gate (section 6): LOW/INFO-only →
+  main audit alone (any count); any MED/HIGH → exactly one verifier
+  batch.
   Solo means one subagent, never main-solo.
 - **tier none** — comments/docs only: no review round owed; closure
   via the diff-shape proof.
@@ -182,12 +183,12 @@ finding escalates scope.
 
 ## 6. Verification
 
-- Sizing is a HARD GATE (review-concept, "Curation and
-  verification"): at ≤ 5 curated findings, all LOW/INFO, the main
-  session verifies inline (no verifier subagents); above that, or at
-  any MED/HIGH, exactly ONE fresh strong-tier verifier batch runs —
-  skipping an owed batch needs maintainer disclosure, never a
-  time-pressure call.
+- Sizing is a HARD GATE, severity-driven (review-concept, "Curation
+  and verification"): a LOW/INFO-only round verifies main-inline at
+  ANY finding count (no verifier subagents); at any MED/HIGH,
+  exactly ONE fresh strong-tier verifier batch runs — skipping an
+  owed batch needs maintainer disclosure, never a time-pressure
+  call.
 - The verifier deliverable: verdict files — every curated finding
   re-derived against the code, verdict CONFIRMED / REFUTED /
   UNVERIFIED with file:line evidence.
