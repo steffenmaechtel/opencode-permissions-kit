@@ -22,6 +22,8 @@ FILES="$SCRIPT_DIR/../../files"
 MIG="$FILES/opencode-permissions-kit-lib/sh/ddev-migrate.sh"
 BIN_MIG="$FILES/opencode-permissions-kit-lib/bin/ddev-migrate"
 INSTALL="$FILES/install.sh"
+# Phase literals (export wave, stamps, handover ordering) live in install-core.sh since #346 wave 3.
+INSTALL_CORE="$FILES/opencode-permissions-kit-lib/sh/install-core.sh"
 UPDATE="$FILES/opencode-permissions-kit-lib/management/update.sh"
 UPDATE_CORE="$FILES/opencode-permissions-kit-lib/sh/update-core.sh"
 STATUS="$FILES/opencode-permissions-kit-lib/management/status.sh"
@@ -450,7 +452,7 @@ check "export accounting reads the stage copy, not the dump-dir manifest (C2/F4)
 check "finalize keeps the manifest root-owned for the resume seed (F2)" \
     sh -c "grep -q 'chown \"root:' \"\$1\"" _ "$MIG"
 check "install.sh prints the FAIL list from the function state, never a re-grep (F1)" \
-    sh -c "grep -q 'DD_MIG_FAILLIST' \"\$1\" && ! grep -q \"grep -c '^OK|' \\\"\\\$DD_MIG_DUMP_DIR/manifest.conf\\\"\" \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q 'DD_MIG_FAILLIST' \"\$1\" && ! grep -q \"grep -c '^OK|' \\\"\\\$DD_MIG_DUMP_DIR/manifest.conf\\\"\" \"\$1\"" _ "$INSTALL_CORE"
 check "export return state starts EMPTY — counters signal completion (E1)" \
     sh -c "grep -A3 -F 'DD_MIG_DUMP_DIR=\"\"' \"\$1\" | tr -s '[:space:]' ' ' | grep -qF 'DD_MIG_DUMP_DIR=\"\" DD_MIG_OK=\"\" DD_MIG_FAIL=\"\" DD_MIG_FAILLIST=\"\"' " _ "$MIG"
 
@@ -574,27 +576,27 @@ check "install.sh runs the export in Step 4b (before the Step 5 handover)" \
     sh -c 's=$(sed "s/^[[:space:]]*#.*\$//" "$1");
         export_ln=$(printf "%s\n" "$s" | grep -n "ddev_migrate_export \"" | head -1 | cut -d: -f1);
         hand_ln=$(printf "%s\n" "$s" | grep -n "ddev_handover_root \"" | head -1 | cut -d: -f1);
-        [ -n "$export_ln" ] && [ -n "$hand_ln" ] && [ "$export_ln" -lt "$hand_ln" ]' _ "$INSTALL"
+        [ -n "$export_ln" ] && [ -n "$hand_ln" ] && [ "$export_ln" -lt "$hand_ln" ]' _ "$INSTALL_CORE"
 check "install.sh stamps DDEV_EXPORTED=1 after a successful export" \
-    sh -c "grep -q 'DDEV_EXPORTED=1' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q 'DDEV_EXPORTED=1' \"\$1\"" _ "$INSTALL_CORE"
 check "install.sh gates the DDEV_EXPORTED stamp on zero failures" \
-    sh -c "grep -qF '[ \"\$DD_MIG_FAIL\" -eq 0 ]' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -qF '[ \"\$DD_MIG_FAIL\" -eq 0 ]' \"\$1\"" _ "$INSTALL_CORE"
 # 0.0.44d F1: the counts now come from the export function's return
 # state (set from the authoritative stage copy BEFORE the finalize hands
 # the tree to the agent). A re-grep of the dump-dir manifest here would
 # read an agent-owned file as root — the old pin demanded exactly that.
 check "install.sh uses the propagated DD_MIG_* counts, never a manifest re-grep (F1)" \
-    sh -c "grep -qF '[ -n \"\${DD_MIG_OK:-}\${DD_MIG_FAIL:-}\" ]' \"\$1\" && ! grep -qF 'grep -c \"^OK|\"' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -qF '[ -n \"\${DD_MIG_OK:-}\${DD_MIG_FAIL:-}\" ]' \"\$1\" && ! grep -qF 'grep -c \"^OK|\"' \"\$1\"" _ "$INSTALL_CORE"
 check "install.sh lists failed projects before continuing" \
-    sh -c "grep -q 'could NOT be exported' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q 'could NOT be exported' \"\$1\"" _ "$INSTALL_CORE"
 check "install.sh asks before continuing with failed exports (default: abort)" \
-    sh -c "grep -q 'ui_confirm \"Continue the install anyway?' \"\$1\" && grep -q '\"n\"' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q 'ui_confirm \"Continue the install anyway?' \"\$1\" && grep -q '\"n\"' \"\$1\"" _ "$INSTALL_CORE"
 check "install.sh aborts BEFORE the handover when the user declines" \
-    sh -c "grep -q 'the .ddev handover did NOT run' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q 'the .ddev handover did NOT run' \"\$1\"" _ "$INSTALL_CORE"
 check "install.sh keeps exporting the remaining projects on failure (non-fatal loop)" \
     sh -c "grep -qF 'continue' \"\$1\"" _ "$MIG"
 check "install.sh skips the export when already stamped" \
-    sh -c "grep -q 'DDEV_EXPORTED_PRE' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q 'DDEV_EXPORTED_PRE' \"\$1\"" _ "$INSTALL_CORE"
 
 # --- 6b. production-WSL findings (nb-laptop burn-in; workspace notes deleted) ----
 
@@ -603,11 +605,11 @@ check "install.sh skips the export when already stamped" \
 # (HOME rides DEV_HOME since 0.0.44a V14 — getent-resolved, /home/<name>
 # only the fallback.)
 check "install.sh probes the ddev version as the DEFAULT user too" \
-    sh -c "grep -q 'DDEV_BIN_DEV' \"\$1\" && grep -q 'sudo -u \"\$DEFAULT_USER\" env HOME=\"\$DEV_HOME\"' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q 'DDEV_BIN_DEV' \"\$1\" && grep -q 'sudo -u \"\$DEFAULT_USER\" env HOME=\"\$DEV_HOME\"' \"\$1\"" _ "$INSTALL_CORE"
 check "install.sh inventory distinguishes found-but-unreadable from missing" \
-    sh -c "grep -q 'version could not be read' \"\$1\" && grep -q 'not installed (optional' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q 'version could not be read' \"\$1\" && grep -q 'not installed (optional' \"\$1\"" _ "$INSTALL_CORE"
 check "migration detection is gated on the registry, not the binary" \
-    sh -c "grep -qF 'if [ -d \"\$DEV_HOME/.ddev\" ]; then' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -qF 'if [ -d \"\$DEV_HOME/.ddev\" ]; then' \"\$1\"" _ "$INSTALL_CORE"
 # _ddev_migrate_bin must consider per-user install paths (sudo -u does not
 # inherit the dev user's PATH).
 check "ddev resolution includes the user's private install paths" \
@@ -619,11 +621,11 @@ check "runtime db-less export failure is classified no-db-service" \
 check "install.sh shows the dumps + import hint in the summary" \
     sh -c "grep -q 'Ddev dumps' \"\$1\" && grep -q 'bin/ddev-migrate import' \"\$1\"" _ "$INSTALL"
 check "install.sh inventory counts the dev user's ddev projects" \
-    sh -c "grep -q 'ddev projects' \"\$1\" && grep -q 'ddev_migrate_registry' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q 'ddev projects' \"\$1\" && grep -q 'ddev_migrate_registry' \"\$1\"" _ "$INSTALL_CORE"
 check "install.sh plan mentions the database export when projects exist" \
-    sh -c "grep -q 'export ddev databases' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q 'export ddev databases' \"\$1\"" _ "$INSTALL_CORE"
 check "install.sh deploys ddev-migrate.sh to the library (lib_deploy manifest)" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh 644' \"\$2\" && grep -q 'opencode-permissions-kit-lib/bin/ddev-migrate 755' \"\$2\" && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\"" _ "$INSTALL" "$DEPLOYLIB"
+    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh 644' \"\$2\" && grep -q 'opencode-permissions-kit-lib/bin/ddev-migrate 755' \"\$2\" && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\"" _ "$INSTALL_CORE" "$DEPLOYLIB"
 
 # --- 7. update.sh / status.sh wiring ------------------------------------------------
 
@@ -693,7 +695,7 @@ assert_eq "rc=1 (not needed) never trips set -e in the caller pattern" "survived
 
 CONFIG_SH="$FILES/opencode-permissions-kit-lib/management/config.sh"
 check "install.sh wires the bind-mounts switch (backend + version gated)" \
-    sh -c "grep -q 'ddev_rootless_bindmounts \"\$OPENCODE_USER\"' \"\$1\" && grep -qF '[ -n \"\$DDEV_BIN\" ] && [ -n \"\$DDEV_VERSION\" ]' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q 'ddev_rootless_bindmounts \"\$OPENCODE_USER\"' \"\$1\" && grep -qF '[ -n \"\$DDEV_BIN\" ] && [ -n \"\$DDEV_VERSION\" ]' \"\$1\"" _ "$INSTALL_CORE"
 check "config.sh wires the bind-mounts switch on backend changes" \
     sh -c "grep -q 'ddev_rootless_bindmounts \"\$OPENCODE_USER\"' \"\$1\"" _ "$CONFIG_SH"
 
@@ -825,9 +827,9 @@ assert_eq "registry cmd: narrow root -> 1 export, 11 outside" "1 11" \
 # wiring: the outside warning + the install/status gap detectors exist
 check "export warns about registry projects outside the roots" \
     sh -c "grep -q 'OUTSIDE the given roots' \"\$1\"" _ "$MIG"
-_mig_gap_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -c '_ddev_mig_gap_warn' || true)"
+_mig_gap_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" | grep -c '_ddev_mig_gap_warn' || true)"
 check "install.sh warns on skip branches when the registry outgrew the manifest (warn sites: $_mig_gap_n, need >=3)" \
-    sh -c "grep -q '_ddev_mig_gap_warn' \"\$1\" && [ \"\$2\" -ge 3 ]" _ "$INSTALL" "$_mig_gap_n"
+    sh -c "grep -q '_ddev_mig_gap_warn' \"\$1\" && [ \"\$2\" -ge 3 ]" _ "$INSTALL_CORE" "$_mig_gap_n"
 check "status.sh reports INCOMPLETE dumps vs the dev registry" \
     sh -c "grep -q 'INCOMPLETE — registry lists' \"\$1\" && grep -q 'ddev-migrate registry' \"\$1\"" _ "$STATUS_CORE"
 check "bin dispatcher has the registry subcommand" \

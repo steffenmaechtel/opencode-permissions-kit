@@ -18,6 +18,7 @@ REPO="$SCRIPT_DIR/../.."
 WARN="$REPO/files/opencode-permissions-kit-lib/sh/shell-warn.sh"
 WRAPPER="$REPO/files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
 INSTALL="$REPO/files/install.sh"
+INSTALL_CORE="$REPO/files/opencode-permissions-kit-lib/sh/install-core.sh"
 UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
 UPDATE_CORE="$REPO/files/opencode-permissions-kit-lib/sh/update-core.sh"
 SECUREBIN="$REPO/files/opencode-permissions-kit-lib/sh/secure-binary.sh"
@@ -97,7 +98,7 @@ check "install.sh fetches shell-warn.sh" \
     grep -Fq 'opencode-permissions-kit-lib/sh/shell-warn.sh' "$INSTALL"
 check "install.sh deploys shell-warn.sh to LIBDIR (lib_deploy manifest)" \
     sh -c 'grep -qF "opencode-permissions-kit-lib/sh/shell-warn.sh 755" "$2" \
-        && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL" "$DEPLOYLIB"
+        && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL_CORE" "$DEPLOYLIB"
 # #211 b W4: the 755-sourced-lib invariant needs a pin per lib —
 # shell-warn.sh was the only one here (log.sh via test-deploy-lib);
 # advisories.sh and ui.sh had no mode pin anywhere.
@@ -105,8 +106,10 @@ check "install.sh deploys advisories.sh to LIBDIR (lib_deploy manifest, 755)" \
     sh -c 'grep -qF "opencode-permissions-kit-lib/sh/advisories.sh 755" "$2"' _ "$INSTALL" "$DEPLOYLIB"
 check "install.sh deploys ui.sh to LIBDIR (lib_deploy manifest, 755)" \
     sh -c 'grep -qF "opencode-permissions-kit-lib/sh/ui.sh 755" "$2"' _ "$INSTALL" "$DEPLOYLIB"
+# The rc-hook emissions live in do_deploy_phase — install-core.sh since
+# #346 wave 3 (the fetch-list pins above stay on the entry).
 check "install.sh hooks shell-warn.sh into rc files" \
-    grep -Fq 'opencode-permissions-kit/sh/shell-warn.sh' "$INSTALL"
+    grep -Fq 'opencode-permissions-kit/sh/shell-warn.sh' "$INSTALL_CORE"
 # #331 b b-1: install.sh's hook emissions have no functional unit
 # renderer (root/sudo deploy phase; e2e covers them with substring
 # greps only). Pin the exact wrap construct on the JOINED source --
@@ -120,13 +123,15 @@ check "install.sh hooks shell-warn.sh into rc files" \
 # script must not travel through argv (the 128 KiB single-argument
 # limit makes the whole check E2BIG, a fail-loud trap).
 check "install.sh shell-warn wrap byte-exact on joined source (splice-seam pin)" \
-    sh -c "sed -e ':a' -e '/\\\\$/N; s/\\\\\\n//; ta' \"\$1\" | grep -qF '\"[ -f /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh ] && . \"\"/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh  # opencode permissions kit\"\" (wrapper bypass warning)\"'" _ "$INSTALL"
+    sh -c "sed -e ':a' -e '/\\\\$/N; s/\\\\\\n//; ta' \"\$1\" | grep -qF '\"[ -f /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh ] && . \"\"/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh  # opencode permissions kit\"\" (wrapper bypass warning)\"'" _ "$INSTALL_CORE"
 check "install.sh ddev wrap byte-exact on joined source (splice-seam pin)" \
-    sh -c "sed -e ':a' -e '/\\\\$/N; s/\\\\\\n//; ta' \"\$1\" | grep -qF '\"[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . \"\"/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh  # opencode permissions kit\"\" (ddev always runs as opencode)\"'" _ "$INSTALL"
+    sh -c "sed -e ':a' -e '/\\\\$/N; s/\\\\\\n//; ta' \"\$1\" | grep -qF '\"[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . \"\"/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh  # opencode permissions kit\"\" (ddev always runs as opencode)\"'" _ "$INSTALL_CORE"
 check "install.sh restricts binary to root:group 750 (shared helper)" \
-    sh -c 'grep -Fq "chmod 750 \"\$_sb_bin\"" "$2" && grep -Fq "secure_binary \"\$SYSTEM_BIN\" \"\$BINARY_GROUP\"" "$1"' _ "$INSTALL" "$SECUREBIN"
+    sh -c 'grep -Fq "chmod 750 \"\$_sb_bin\"" "$2" && grep -Fq "secure_binary \"\$SYSTEM_BIN\" \"\$BINARY_GROUP\"" "$1"' _ "$INSTALL_CORE" "$SECUREBIN"
+# absence pin covers BOTH hosts since #346 wave 3 (the phases live in
+# the lib; the entry keeps the definitions and fallbacks)
 check "install.sh never uses world-executable binary mode" \
-    sh -c '! grep -Fq "chmod 755 \"\$SYSTEM_BIN\"" "$1"' _ "$INSTALL"
+    sh -c '! grep -Fq "chmod 755 \"\$SYSTEM_BIN\"" "$1" && ! grep -Fq "chmod 755 \"\$SYSTEM_BIN\"" "$3"' _ "$INSTALL" "$SECUREBIN" "$INSTALL_CORE"
 # Issue #163: install.sh's four binary deploys (found-binary menu x2,
 # official-installer x2) must go through the shared atomic helper — a
 # plain in-place cp killed mid-write leaves a truncated binary with
@@ -140,14 +145,18 @@ check "install.sh defines the atomic-copy fallback for a missing lib (#163)" \
     sh -c 'grep -A1 -F "copy_binary_atomic() {" "$1" | grep -Fq "echo \"error: copy_binary_atomic unavailable"' _ "$INSTALL"
 # Comment-strip rider (#261, the #244 g W1 class): commented-out call
 # sites must not count. Full-line comments only (#244 h W6 residual):
-# a trailing comment after a live line still counts.
-_cbina_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -cF 'copy_binary_atomic "' || true)"
+# a trailing comment after a live line still counts. The four call
+# sites live in do_deploy_phase — install-core.sh since #346 wave 3.
+_cbina_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" | grep -cF 'copy_binary_atomic "' || true)"
 check "install.sh deploys the binary through the atomic helper at exactly four call sites (#163, 0.0.49a W6; call sites: $_cbina_n of 4)" \
     [ "$_cbina_n" -eq 4 ]
 check "install.sh no longer sudo-cps directly onto SYSTEM_BIN (#163)" \
     sh -c '! grep -Fq "sudo cp \"\$loc\" \"\$SYSTEM_BIN\"" "$1" \
         && ! grep -Fq "sudo cp \"/root/.opencode/bin/opencode\" \"\$SYSTEM_BIN\"" "$1" \
-        && ! grep -Fq "sudo cp \"\$DEV_HOME/.opencode/bin/opencode\" \"\$SYSTEM_BIN\"" "$1"' _ "$INSTALL"
+        && ! grep -Fq "sudo cp \"\$DEV_HOME/.opencode/bin/opencode\" \"\$SYSTEM_BIN\"" "$1" \
+        && ! grep -Fq "sudo cp \"\$loc\" \"\$SYSTEM_BIN\"" "$2" \
+        && ! grep -Fq "sudo cp \"/root/.opencode/bin/opencode\" \"\$SYSTEM_BIN\"" "$2" \
+        && ! grep -Fq "sudo cp \"\$DEV_HOME/.opencode/bin/opencode\" \"\$SYSTEM_BIN\"" "$2"' _ "$INSTALL" "$INSTALL_CORE"
 # 0.0.49b C1: the umask profile deploys through the mode-atomic file
 # helper too — a cp killed mid-write over /etc/profile.d/ leaves a
 # truncated profile with intact mode bits, sourced at every login
@@ -163,17 +172,18 @@ check "install.sh defines the atomic-file fallback for a missing lib (0.0.49b C1
     sh -c 'grep -A1 -F "copy_file_atomic() {" "$1" | grep -Fq "echo \"error: copy_file_atomic unavailable"' _ "$INSTALL"
 check "install.sh deploys the umask profile through the atomic file helper at mode 644 (0.0.49b C1, 0.0.49c F2)" \
     sh -c 'grep -Fq "copy_file_atomic \"\$SCRIPT_DIR/etc/umask.sh\"" "$1" \
-        && grep -Fq "opencode-permissions-kit-umask.sh 644" "$1"' _ "$INSTALL"
+        && grep -Fq "opencode-permissions-kit-umask.sh 644" "$1"' _ "$INSTALL_CORE"
 # 0.0.49c F3: W6's count-pin shape for the new helper — the pattern
 # carries the opening quote, so it counts CALL SITES only (the
 # command -v wiring line and the fallback definition don't match);
 # -eq, not -ge: a second copy_file_atomic deploy must be a conscious
 # pin update, not a silent pass.
-_cfa_i_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -cF 'copy_file_atomic "' || true)"
+_cfa_i_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" | grep -cF 'copy_file_atomic "' || true)"
 check "install.sh routes exactly one deploy through copy_file_atomic (0.0.49c F3; deploy sites: $_cfa_i_n of 1)" \
     [ "$_cfa_i_n" -eq 1 ]
 check "install.sh no longer sudo-cps the umask profile in place (0.0.49b C1)" \
-    sh -c '! grep -Fq "sudo cp \"\$SCRIPT_DIR/etc/umask.sh\" /etc/profile.d" "$1"' _ "$INSTALL"
+    sh -c '! grep -Fq "sudo cp \"\$SCRIPT_DIR/etc/umask.sh\" /etc/profile.d" "$1" \
+        && ! grep -Fq "sudo cp \"\$SCRIPT_DIR/etc/umask.sh\" /etc/profile.d" "$2"' _ "$INSTALL" "$INSTALL_CORE"
 
 echo ""
 echo "-- update.sh wiring --"

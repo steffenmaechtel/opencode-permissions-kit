@@ -17,6 +17,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 STATUS="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/status.sh"
 STATUS_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core.sh"
 INSTALL="$SCRIPT_DIR/../../files/install.sh"
+INSTALL_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/install-core.sh" # phase lib since #346 wave 3
 UPDATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh"
 UPDATE_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/update-core.sh"
 DEPLOYLIB="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
@@ -61,25 +62,27 @@ check "status.sh detects a configured-but-pending fix (wsl --shutdown)" \
 check "install.sh gates the exposure info on /mnt/c existing" \
     sh -c "grep -qF '[ -d /mnt/c ]' \"\$1\"" _ "$INSTALL"
 check "install.sh warns about the exposure" \
-    sh -c "grep -qF 'ui_warn \"/mnt/c is world-readable' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -qF 'ui_warn \"/mnt/c is world-readable' \"\$1\"" _ "$INSTALL_CORE"
+# absence pins cover BOTH files since #346 wave 3 (the exposure section
+# lives in do_plan_phase, the lib)
 check "install.sh never writes /etc/wsl.conf (no tee/append)" \
-    sh -c "! grep -q 'tee -a /etc/wsl.conf' \"\$1\"" _ "$INSTALL"
+    sh -c "! grep -q 'tee -a /etc/wsl.conf' \"\$1\" && ! grep -q 'tee -a /etc/wsl.conf' \"\$2\"" _ "$INSTALL" "$INSTALL_CORE"
 check "install.sh no longer prompts for the restriction (explicit consent)" \
-    sh -c "! grep -q 'Restrict /mnt/c to your user' \"\$1\"" _ "$INSTALL"
+    sh -c "! grep -q 'Restrict /mnt/c to your user' \"\$1\" && ! grep -q 'Restrict /mnt/c to your user' \"\$2\"" _ "$INSTALL" "$INSTALL_CORE"
 check "install.sh prints the [automount] snippet with dmask/fmask" \
-    sh -c "grep -qF '[automount]' \"\$1\" && grep -q 'dmask=027,fmask=037' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -qF '[automount]' \"\$1\" && grep -q 'dmask=027,fmask=037' \"\$1\"" _ "$INSTALL_CORE"
 check "install.sh resolves uid/gid for the snippet from the default user" \
-    sh -c "grep -qF 'id -u \"\$DEFAULT_USER\"' \"\$1\" && grep -qF 'id -g \"\$DEFAULT_USER\"' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -qF 'id -u \"\$DEFAULT_USER\"' \"\$1\" && grep -qF 'id -g \"\$DEFAULT_USER\"' \"\$1\"" _ "$INSTALL_CORE"
 check "install.sh leaves a pre-existing [automount] section untouched" \
-    sh -c "grep -q 'already has an \[automount\]' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q 'already has an \[automount\]' \"\$1\"" _ "$INSTALL_CORE"
 check "install.sh names the activation step (wsl --shutdown)" \
     sh -c "grep -q 'wsl --shutdown' \"\$1\"" _ "$INSTALL"
 check "install.sh skips silently when the mount is already restricted" \
-    sh -c "grep -qF '/mnt/c already restricted' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -qF '/mnt/c already restricted' \"\$1\"" _ "$INSTALL_CORE"
 check "install.sh warns again in the final summary while /mnt/c is exposed" \
     sh -c "grep -q 'still world-readable' \"\$1\" && grep -q 'warn on every start' \"\$1\"" _ "$INSTALL"
 check "install.sh points WSL users at the opt-in bridge command" \
-    sh -c "grep -q 'opk wsl-add-opencode-1-fix' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q 'opk wsl-add-opencode-1-fix' \"\$1\"" _ "$INSTALL_CORE"
 
 # --- wrapper startup warning ------------------------------------------------------
 check "wrapper passes sh -n" sh -n "$WRAPPER"
@@ -128,8 +131,10 @@ check "status.sh skips the bridge warning for open@11 versions (1.18.33 / 2.0.18
 # --- xdg-open fallback shim (opencode 1.18.33+ / 2.0.18+ login fix) ---------------
 check "lib manifest deploys bin/xdg-open 755" \
     sh -c "grep -q 'opencode-permissions-kit-lib/bin/xdg-open 755' \"\$1\"" _ "$DEPLOYLIB"
+# split legs (#346 wave 3): the path literal is the fetch-list entry
+# (stays in install.sh), the guarded ln sits in do_deploy_phase (the lib)
 check "install.sh deploys the xdg-open shim (guarded, never shadows a real one)" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/bin/xdg-open' \"\$1\" && grep -qF 'ln -s \"\$LIBDIR/bin/xdg-open\" /usr/local/bin/xdg-open' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q 'opencode-permissions-kit-lib/bin/xdg-open' \"\$1\" && grep -qF 'ln -s \"\$LIBDIR/bin/xdg-open\" /usr/local/bin/xdg-open' \"\$2\"" _ "$INSTALL" "$INSTALL_CORE"
 check "update.sh refreshes and heals the xdg-open shim (stands back for a real one)" \
     sh -c "grep -q 'opencode-permissions-kit-lib/bin/xdg-open' \"\$2\" && grep -qF 'xdg_open_real_exists' \"\$1\" && ! grep -qF '/usr/bin/xdg-open' \"\$1\" && ! grep -qF '/usr/bin/xdg-open' \"\$2\"" _ "$UPDATE_CORE" "$UPDATE"
 check "status.sh reports the xdg-open fallback state" \
@@ -150,7 +155,7 @@ check "uninstall.sh prints the manual line range when declined" \
     sh -c "grep -q 'browser bridge -- begin\\\$' \"\$1\" && grep -q 'left untouched' \"\$1\"" _ "$UNINSTALL"
 check "install.sh and update.sh deploy bin/browser-bridge into the library (lib_deploy manifest)" \
     sh -c "grep -q 'opencode-permissions-kit-lib/bin/browser-bridge 755' \"\$3\" \
-        && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\" && grep -q 'lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"' \"\$2\"" _ "$INSTALL" "$UPDATE_CORE" "$DEPLOYLIB"
+        && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\" && grep -q 'lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"' \"\$2\"" _ "$INSTALL_CORE" "$UPDATE_CORE" "$DEPLOYLIB"
 
 # --- mode-mask arithmetic (the exact check status.sh performs) -----------------
 mode_allows_other() {

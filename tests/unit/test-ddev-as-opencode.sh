@@ -22,6 +22,7 @@ FUNC="$FILES/opencode-permissions-kit-lib/sh/ddev-terminal.sh"
 TEMPLATE="$FILES/opencode-permissions-kit-lib/templates/opencode.jsonc"
 SUDOERS="$FILES/opencode-permissions-kit-lib/templates/sudoers.template"
 INSTALL="$FILES/install.sh"
+INSTALL_CORE="$FILES/opencode-permissions-kit-lib/sh/install-core.sh"
 UPDATE="$FILES/opencode-permissions-kit-lib/management/update.sh"
 UPDATE_CORE="$FILES/opencode-permissions-kit-lib/sh/update-core.sh"
 CONFIG="$FILES/opencode-permissions-kit-lib/management/config.sh"
@@ -551,21 +552,24 @@ check "template still parses cleanly with the new rules" \
     python3 "$FILES/opencode-permissions-kit-lib/py/jsonc-parser.py" "$TEMPLATE"
 
 # --- 5. install.sh wiring ------------------------------------------------------
+# Phase-internal literals (lib_deploy call, rc hooks, probes, stamps,
+# handover calls) live in install-core.sh since #346 wave 3; fetch-list
+# and parse_args pins stay on the entry.
 check "install.sh fetches both new files (fetch_kit list)" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh' \"\$1\" && grep -q 'opencode-permissions-kit-lib/bin/ddev-as-opencode' \"\$1\"" _ "$INSTALL"
 check "install.sh deploys the function file (lib_deploy manifest)" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh 644' \"\$2\" && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\"" _ "$INSTALL" "$DEPLOYLIB"
+    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh 644' \"\$2\" && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\"" _ "$INSTALL_CORE" "$DEPLOYLIB"
 check "install.sh deploys the helper (mode 755, lib_deploy manifest)" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/bin/ddev-as-opencode 755' \"\$2\" && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\"" _ "$INSTALL" "$DEPLOYLIB"
+    sh -c "grep -q 'opencode-permissions-kit-lib/bin/ddev-as-opencode 755' \"\$2\" && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\"" _ "$INSTALL_CORE" "$DEPLOYLIB"
 check "install.sh hooks the function into the developer rc files" \
-    sh -c "grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' \"\$1\"" _ "$INSTALL_CORE"
 # The hook line is splice-wrapped in the canonical dq form (#300 tier 1,
 # #255 stage 0a idiom): frag2's opening quote sits at EOL, so both pinned
 # literals are raw-matched per line -- the guard prefix with its quote
 # boundary on the head line, the sourced path + kit marker on the
 # continuation line.
 check "install.sh hooks use the [ -f ] uninstall-safe guard" \
-    sh -c "grep -qF '\"[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . \"' \"\$1\" && grep -qF '/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh  # opencode permissions kit' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -qF '\"[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . \"' \"\$1\" && grep -qF '/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh  # opencode permissions kit' \"\$1\"" _ "$INSTALL_CORE"
 check "install.sh hands over ddev paths in the filesystem step" \
     sh -c "grep -q 'ddev_handover_root' \"\$1\"" _ "$INSTALL"
 
@@ -973,7 +977,7 @@ _eds_str="$(awk '/^_e2e_dump_strip\(\)/,/^}/' "$E2ELIB" | sed 's/^[[:space:]]*#.
 check "fix a S3: symlinks stripped from the dump (docker cp preserves them)" \
     sh -c "printf '%s\n' \"\$1\" | grep -q -- '-type l -delete'" _ "$_eds_str"
 check "fix a Q3: install.sh probes the ddev version subcommand from /" \
-    sh -c 'grep -q "env HOME=\"\$DEV_HOME\" sh -c .cd / && exec" "$1" && ! grep -q "\"\$DDEV_BIN_DEV\" version" "$1"' _ "$INSTALL"
+    sh -c 'grep -q "env HOME=\"\$DEV_HOME\" sh -c .cd / && exec" "$1" && ! grep -q "\"\$DDEV_BIN_DEV\" version" "$1"' _ "$INSTALL_CORE"
 check "fix a M3: config.sh probes the ddev version from /" \
     sh -c 'grep -qF "(cd / && \"\$_cand_bin\" version)" "$1" && ! grep -qF "\"\$_cand_bin\" version 2>/dev/null" "$1"' _ "$CONFIG"
 check "fix a M4: opk usage tells the generalized story, not 'agent-side'" \
@@ -999,7 +1003,7 @@ _m3i_n="$(sed 's/^[[:space:]]*#.*$//' "$MIGRATESH" | grep -c 'cd / && exec.*migr
 check "fix b M3: both inline import invocations hop through a neutral cwd (import sites: $_m3i_n of 2)" \
     [ "$_m3i_n" = 2 ]
 check "fix b M1: install.sh root probe from / (consistency)" \
-    sh -c 'grep -qF "(cd / && \"\$DDEV_BIN\" version)" "$1" && ! grep -qF "\"\$DDEV_BIN\" version 2>/dev/null" "$1"' _ "$INSTALL"
+    sh -c 'grep -qF "(cd / && \"\$DDEV_BIN\" version)" "$1" && ! grep -qF "\"\$DDEV_BIN\" version 2>/dev/null" "$1"' _ "$INSTALL_CORE"
 check "fix b M1: update.sh root fallback probe from / (consistency)" \
     sh -c 'grep -qF "(cd / && \"\$_ddev_bin\" --version)" "$1" && ! grep -qF "\"\$_ddev_bin\" --version 2>/dev/null" "$1" && ! grep -qF "\"\$_ddev_bin\" --version 2>/dev/null" "$2"' _ "$UPDATE_CORE" "$UPDATE"
 check "fix b M4/S3: dump gate sees the exit status, not only counted failures" \
@@ -1597,7 +1601,7 @@ check "update.sh: refresh section header kept (issue #219 move)" \
 check "update.sh: routine skip hint kept verbatim (issue #219 move)" \
     grep -qF 'skipped group-baseline refresh (use --refresh to re-apply chgrp/setgid/default ACLs)' "$UPDATE_CORE"
 check "install.sh: stamps after the install-time handover" \
-    sh -c "grep -qF 'ddev_handover_stamp_write \"\$root\" \"\$OPENCODE_USER\" \"\$OPENCODE_GROUP\"' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -qF 'ddev_handover_stamp_write \"\$root\" \"\$OPENCODE_USER\" \"\$OPENCODE_GROUP\"' \"\$1\"" _ "$INSTALL_CORE"
 # Comment-strip riders (#261, the #244 g W1 class): commented-out lines
 # stop counting; full-line comments only (#244 h W6 residual).
 _stampw_n="$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" | grep -c "ddev_handover_stamp_write" || true)"
@@ -1622,8 +1626,8 @@ check "install.sh parses --ddev-settings" \
 check "install.sh defaults to dev-owned (DDEV_DEV_OWNED=true)" \
     sh -c "grep -qF 'DDEV_DEV_OWNED=true' \"\$1\"" _ "$INSTALL"
 check "install.sh stamps DDEV_DEV_OWNED into install.conf" \
-    sh -c "grep -qF 'DDEV_DEV_OWNED=\$DDEV_DEV_OWNED' \"\$1\"" _ "$INSTALL"
-_dsetq_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -c 'ddev settings management? (dev-owned projects)' || true)"
+    sh -c "grep -qF 'DDEV_DEV_OWNED=\$DDEV_DEV_OWNED' \"\$1\"" _ "$INSTALL_CORE"
+_dsetq_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" | grep -c 'ddev settings management? (dev-owned projects)' || true)"
 check "install.sh asks the ddev-settings question (standard + advanced; question sites: $_dsetq_n, need >=2)" \
     [ "$_dsetq_n" -ge 2 ]
 check "status.sh reports the ddev settings mode" \
@@ -1633,7 +1637,7 @@ check "hook hint mentions the dev-owned effect" \
 check "kit CLI usage documents ddev-settings" \
     sh -c "grep -q 'ddev-settings on|off|status' \"\$1\"" _ "$KIT"
 check "install.sh passes DEFAULT_USER to the handover" \
-    sh -c "grep -qF 'ddev_handover_root \"\$root\" \"\$OPENCODE_USER\" \"\$OPENCODE_GROUP\" \"\$DEFAULT_USER\"' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -qF 'ddev_handover_root \"\$root\" \"\$OPENCODE_USER\" \"\$OPENCODE_GROUP\" \"\$DEFAULT_USER\"' \"\$1\"" _ "$INSTALL_CORE"
 check "update.sh passes DEFAULT_USER to the handover" \
     sh -c "grep -qF 'ddev_handover_root \"\$root\" \"\$OPENCODE_USER\" \"\$NEW_OPENCODE_GROUP\" \"\$DEFAULT_USER\"' \"\$1\"" _ "$UPDATE_CORE"
 check "config.sh passes DEFAULT_USER to the handover" \

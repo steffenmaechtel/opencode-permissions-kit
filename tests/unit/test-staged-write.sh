@@ -28,6 +28,7 @@ UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
 UPDATE_CORE="$REPO/files/opencode-permissions-kit-lib/sh/update-core.sh"
 CONFIG="$REPO/files/opencode-permissions-kit-lib/management/config.sh"
 INSTALL="$REPO/files/install.sh"
+INSTALL_CORE="$REPO/files/opencode-permissions-kit-lib/sh/install-core.sh" # phase lib since #346 wave 3
 DEPLOYLIB="$REPO/files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 TUIPLUGIN="$REPO/files/opencode-permissions-kit-lib/sh/tui-plugin.sh"
 
@@ -459,12 +460,12 @@ check "ensure_local_file: no empty file deployed" test ! -e "$WORK/fr/empty.txt"
 # --- 5. wiring (C5 + the shipped lists) --------------------------------------------
 
 check "C5: install.conf stamp written via temp + mv" \
-    sh -c 'grep -qF "_INSTALL_CONF_TMP=" "$1" && grep -qF "mv -f \"\$_INSTALL_CONF_TMP\"" "$1"' _ "$INSTALL"
+    sh -c 'grep -qF "_INSTALL_CONF_TMP=" "$1" && grep -qF "mv -f \"\$_INSTALL_CONF_TMP\"" "$1"' _ "$INSTALL_CORE"
 check "wiring: install.sh fetch list carries staged-write.sh" \
     grep -qF 'opencode-permissions-kit-lib/sh/staged-write.sh \' "$INSTALL"
 check "wiring: install.sh deploys staged-write.sh (lib_deploy manifest)" \
     sh -c 'grep -qF "opencode-permissions-kit-lib/sh/staged-write.sh 644" "$2" \
-        && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL" "$DEPLOYLIB"
+        && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL_CORE" "$DEPLOYLIB"
 check "wiring: update.sh KIT_FILES carries staged-write.sh" \
     grep -qF 'opencode-permissions-kit-lib/sh/staged-write.sh \' "$UPDATE"
 check "wiring: update.sh deploys staged-write.sh (lib_deploy manifest)" \
@@ -482,9 +483,11 @@ check "wiring: update.sh tui.json write goes through staged_write" \
 # (#285: the ! grep -q absence legs below stay RAW on purpose -- a
 # commented forbidden construct SHOULD keep tripping; the absence
 # carve-out in conventions.md "Source-counting pins".)
-_iac_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -c '_oc_install_agent_config' || true)"
+# #346 wave 3: the render sites moved to install-core.sh; the sed -i
+# absence stays RAW on both files (#285 idiom below).
+_iac_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" | grep -c '_oc_install_agent_config' || true)"
 check "wiring: install.sh config writes go through staged_write (0.0.39h F8: offline-rendered, ONE write per branch; render sites: $_iac_n, need 4-9)" \
-    sh -c '[ "$2" -ge 4 ] && [ "$2" -le 9 ] && ! grep -q "sed -i .*opencode\.jsonc" "$1"' _ "$INSTALL" "$_iac_n"
+    sh -c '[ "$2" -ge 4 ] && [ "$2" -le 9 ] && ! grep -q "sed -i .*opencode\.jsonc" "$1" && ! grep -q "sed -i .*opencode\.jsonc" "$3"' _ "$INSTALL_CORE" "$_iac_n" "$INSTALL"
 _gca_n="$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" | grep -c 'staged_write 664' || true)"
 check "wiring: config.sh git_config_apply renders offline, ONE staged_write (0.0.39h F8; staged_write sites: $_gca_n of 2)" \
     sh -c 'grep -qF "_gca_tmp" "$1" && [ "$2" = 2 ] && ! grep -qF "sed -i '"'"'s|" "$1"' _ "$CONFIG" "$_gca_n"
@@ -522,29 +525,29 @@ check "walker: the home itself passes" \
 # --- 7. wiring: the 0.0.39h gates ----------------------------------------------
 UNINSTALL="$REPO/files/opencode-permissions-kit-lib/management/uninstall.sh"
 check "gates: install.sh ~/.ddev operand gate" \
-    sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"/home/\$OPENCODE_USER/.ddev\"" "$1"' _ "$INSTALL"
-_ahg_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -c 'agent_home_sane "$OPENCODE_USER" /home/opencode/' || true)"
+    sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"/home/\$OPENCODE_USER/.ddev\"" "$1"' _ "$INSTALL_CORE"
+_ahg_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" | grep -c 'agent_home_sane "$OPENCODE_USER" /home/opencode/' || true)"
 check "gates: install.sh Step 8 operand gates (.config/.config/opencode/.agents; gate sites: $_ahg_n, need 3-9)" \
-    sh -c '[ "$2" -ge 3 ] && [ "$2" -le 9 ]' _ "$INSTALL" "$_ahg_n"
+    sh -c '[ "$2" -ge 3 ] && [ "$2" -le 9 ]' _ "$INSTALL_CORE" "$_ahg_n"
 # 0.0.39i F1: the combined top-level mkdir is gone — every Step 8 mkdir
 # runs INSIDE its operand gate (three per-operand mkdirs), so no root
 # mkdir passes through a linked parent.
-_mk8_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -c 'sudo mkdir -p /home/opencode/' || true)"
+_mk8_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" | grep -c 'sudo mkdir -p /home/opencode/' || true)"
 check "gates: install.sh Step 8 mkdir sits inside the operand gates (0.0.39i F1; mkdir sites: $_mk8_n, need 3-9)" \
     sh -c '! grep -qF "mkdir -p /home/opencode/.config/opencode /home/opencode/.agents" "$1" \
-        && [ "$2" -ge 3 ] && [ "$2" -le 9 ]' _ "$INSTALL" "$_mk8_n"
+        && [ "$2" -ge 3 ] && [ "$2" -le 9 ]' _ "$INSTALL_CORE" "$_mk8_n"
 # 0.0.39j F1: every Step 8 operand carries its own chown — gate 2's mkdir
 # runs after gate 1's chown -R, so without its own chown the fresh-install
 # leaf ends root-owned.
 check "gates: install.sh Step 8 chowns every operand it creates (0.0.39j F1)" \
-    sh -c 'grep -qF "sudo chown -R \"\$OPENCODE_USER:\$OPENCODE_GROUP\" /home/opencode/.config/opencode" "$1"' _ "$INSTALL"
+    sh -c 'grep -qF "sudo chown -R \"\$OPENCODE_USER:\$OPENCODE_GROUP\" /home/opencode/.config/opencode" "$1"' _ "$INSTALL_CORE"
 check "gates: install.sh agents-migration operand gate" \
-    sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$_opk_dst\"" "$1"' _ "$INSTALL"
+    sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$_opk_dst\"" "$1"' _ "$INSTALL_CORE"
 # 0.0.45e W1: the migration chmod walks run before the chown hand-over
 # (walk while the copied-in tree is still dev-owned; chown-first is the
 # scan-then-act window on re-installs over a live agent) — static line
 # order inside _opk_migrate_one (defined indented inside Step 8a).
-_mig_blk="$(sed -n '/^    _opk_migrate_one() {/,/^    }$/p' "$INSTALL" | sed 's/^[[:space:]]*#.*$//')"
+_mig_blk="$(sed -n '/^    _opk_migrate_one() {/,/^    }$/p' "$INSTALL_CORE" | sed 's/^[[:space:]]*#.*$//')"
 _mig_chmod="$(printf '%s\n' "$_mig_blk" | grep -nF 'find "$_opk_dst" -type d -exec chmod g+rwxs' | cut -d: -f1)"
 _mig_chown="$(printf '%s\n' "$_mig_blk" | grep -nF 'chown -R "$OPENCODE_USER:$OPENCODE_GROUP" "$_opk_dst"' | cut -d: -f1)"
 if [ -n "$_mig_chmod" ] && [ -n "$_mig_chown" ] && [ "$_mig_chmod" -lt "$_mig_chown" ]; then
@@ -553,11 +556,13 @@ else
     fail "gates: install.sh agents migration order violated (W1: chmod=$_mig_chmod chown=$_mig_chown)"
 fi
 check "gates: install.sh mkcert chain gate" \
-    sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$caroot\"" "$1"' _ "$INSTALL"
+    sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$caroot\"" "$1"' _ "$INSTALL_CORE"
+# split legs (#346 wave 3): the chain gates live in do_deploy_phase
+# (install-core.sh), the kit_source stays in the entry's bootstrap.
 check "gates: install.sh agent-config + tui + plugin chain gates" \
     sh -c 'grep -q "agent_home_sane \"\$OPENCODE_USER\" /home/opencode/.config/opencode" "$1" \
         && grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$OC_TUI_DIR\"" "$1" \
-        && grep -qF "kit_source \"\$SCRIPT_DIR/opencode-permissions-kit-lib/sh/tui-plugin.sh\"" "$1"' _ "$INSTALL"
+        && grep -qF "kit_source \"\$SCRIPT_DIR/opencode-permissions-kit-lib/sh/tui-plugin.sh\"" "$2"' _ "$INSTALL_CORE" "$INSTALL"
 check "gates: update.sh sources staged-write.sh early + walker fallback" \
     sh -c 'grep -q "command -v agent_home_sane >/dev/null 2>&1 \|\| agent_home_sane() { return 0; }" "$1"' _ "$UPDATE"
 check "gates: update.sh sync_tui_registration + tui.json chain gates" \

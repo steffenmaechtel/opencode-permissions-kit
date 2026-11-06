@@ -17,6 +17,13 @@
 # Static extraction of parse_args() from install.sh, then table-driven
 # checks. No root required.
 #
+# The three phase functions live in sh/install-core.sh since #346 wave 3
+# — pins whose literal moved are retargeted to $INSTALL_CORE, absence
+# pins cover BOTH files (the wave-2 sweep idiom), and the four fragment
+# block-extractions (V15 guards, W6/W14 loops, V1 normalize case) are
+# GONE: their fragments are lib functions now, pinned by sourcing in
+# tests/unit/test-install-core.sh (the #396 payoff).
+#
 # Unit tests for the python3 health gate (#244 a W1/S1, b Q1/Q2/S2):
 #   - extracted _py3_health_probe functional matrix: healthy passes,
 #     absent and broken-shim abort loud (two distinct error classes),
@@ -31,6 +38,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 INSTALL="$SCRIPT_DIR/../../files/install.sh"
+INSTALL_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/install-core.sh"
 # Shared harness (issue #394): pass/fail, colors, counters
 # (and check/assert_eq where present) live in lib/harness.sh now.
 . "$SCRIPT_DIR/lib/harness.sh"
@@ -194,34 +202,12 @@ parse_args --projects /var/www/vhosts --migrate-agents copy
     pass "--migrate-agents works after --projects" ||
     fail "--migrate-agents works after --projects"
 
-# Word forms normalize to the menu letters (0.0.44a V1): the migration
-# semantics compare `[ "$_opk_ag" = m ]` — an untranslated word form made
-# `--migrate-agents move` silently degrade to a copy. The normalization
-# case is extracted from install.sh and executed against every accepted
-# input form.
-_install_sh="$SCRIPT_DIR/../../files/install.sh"
-_extracted_case=$(sed -n '/^        # normalize-agents-forms (0.0.44a V1)/,/^        esac$/p' "$_install_sh")
-[ -n "$_extracted_case" ] &&
-    pass "install.sh: agents-form normalization extractable (V1)" ||
-    fail "install.sh: agents-form normalization extractable (V1)"
-for _pair in "m:m" "move:m" "c:c" "copy:c" "s:s" "skip:s"; do
-    _in=${_pair%%:*}
-    _want=${_pair##*:}
-    _opk_ag="$_in"
-    eval "$(printf '%s\n' "$_extracted_case" | sed -n '/^        case/,$p')"
-    [ "$_opk_ag" = "$_want" ] &&
-        pass "agents form '$_in' normalizes to '$_want' (V1)" ||
-        fail "agents form '$_in' normalizes to '$_want' (V1, got '$_opk_ag')"
-done
-# and it runs BEFORE the dispatch that fires the migration loop.
-# Comment-stripped + live anchor (#385): the old pin grepped the
-# COMMENT naming 'normalize-agents-forms' (install.sh:2461) — a live
-# instance of the #384 b b1 class; the normalization ARM is the anchor.
-_norm_ln=$(sed 's/^[[:space:]]*#.*$//' "$_install_sh" | grep -nF 'm | move) _opk_ag=m ;;' | head -1 | cut -d: -f1)
-_disp_ln=$(sed 's/^[[:space:]]*#.*$//' "$_install_sh" | grep -n 'm | move | c | copy)' | head -1 | cut -d: -f1)
-[ -n "$_norm_ln" ] && [ -n "$_disp_ln" ] && [ "$_norm_ln" -lt "$_disp_ln" ] &&
-    pass "normalization precedes the migration dispatch (V1)" ||
-    fail "normalization precedes the migration dispatch (V1)"
+# Word forms normalize to the menu letters (0.0.44a V1): the
+# normalization case and its before-the-dispatch order are FUNCTION pins
+# since #346 wave 3 — the case moved into install_core's
+# install_agents_form_normalize, sourced and called with stubs in
+# tests/unit/test-install-core.sh (the #396 payoff: no more
+# indentation-anchored block extraction here).
 
 # Developer-side paths ride DEV_HOME, getent-resolved (0.0.44a V14): the
 # installer used to hardcode /home/$DEFAULT_USER in ~14 provisioning
@@ -232,11 +218,15 @@ _disp_ln=$(sed 's/^[[:space:]]*#.*$//' "$_install_sh" | grep -n 'm | move | c | 
 # shape `[ -d "/home/$DEFAULT_USER" ]` back in green. The initializer
 # line itself is the one sanctioned slash-less site — positively pinned
 # by the first grep and subtracted from the negative sweep.
-_v14i_bad="$(grep -e '/home/\$DEFAULT_USER' -e '/home/\${DEFAULT_USER' "$_install_sh" 2>/dev/null |
+# #346 wave 3: the initializer + getent live in install-core.sh (the
+# plan phase moved); usage sites must stay absent from BOTH files (the
+# wave-2 both-files sweep idiom).
+_v14i_bad="$(cat "$INSTALL" "$INSTALL_CORE" |
+    grep -e '/home/\$DEFAULT_USER' -e '/home/\${DEFAULT_USER' 2>/dev/null |
     grep -v '^[[:space:]]*#' |
     grep -v '^[[:space:]]*DEV_HOME="/home/\$DEFAULT_USER"$' || true)"
-if grep -q 'DEV_HOME="/home/\$DEFAULT_USER"' "$_install_sh" &&
-    grep -q 'getent passwd "\$DEFAULT_USER"' "$_install_sh" &&
+if grep -q 'DEV_HOME="/home/\$DEFAULT_USER"' "$INSTALL_CORE" &&
+    grep -q 'getent passwd "\$DEFAULT_USER"' "$INSTALL_CORE" &&
     [ -z "$_v14i_bad" ]; then
     pass "install.sh: DEV_HOME via getent, no hardcoded /home/\$DEFAULT_USER left (V14)"
 else
@@ -285,124 +275,14 @@ $_v14_core"
     fi
 done
 
-# V15: the reuse guard aborts on a deviating home or primary group
-# (maintainer decision B) instead of provisioning a shadow home. The two
-# checks are extracted and executed against shims.
-_h_guard=$(sed -n '/^        # reuse-guard-home (0.0.44a V15/,/^        fi$/p' "$_install_sh")
-_g_guard=$(sed -n '/^        # reuse-guard-group (0.0.44a V15/,/^        fi$/p' "$_install_sh")
-[ -n "$_h_guard" ] &&
-    pass "install.sh: reuse home-guard extractable (V15)" ||
-    fail "install.sh: reuse home-guard extractable (V15)"
-[ -n "$_g_guard" ] &&
-    pass "install.sh: reuse group-guard extractable (V15)" ||
-    fail "install.sh: reuse group-guard extractable (V15)"
-if [ -n "$_h_guard" ] && [ -n "$_g_guard" ]; then
-    OPENCODE_USER="octest"
-    ui_error() { :; }
-    ui_info() { :; }
-    log() { :; }
-    # deviating home -> rc 1 (|| captures the rc: this suite runs set -e)
-    _gr_rc=0
-    (
-        getent() { [ "$2" = "octest" ] && printf 'x:x:1000:1000::/srv/octest:/bin/sh\n'; }
-        eval "$_h_guard"
-    ) || _gr_rc=$?
-    [ "$_gr_rc" -eq 1 ] &&
-        pass "reuse guard: deviating home aborts (V15)" ||
-        fail "reuse guard: deviating home aborts (V15, rc $_gr_rc)"
-    # matching home -> rc 0
-    _gr_rc=0
-    (
-        getent() { [ "$2" = "octest" ] && printf 'x:x:1000:1000::/home/octest:/bin/sh\n'; }
-        eval "$_h_guard"
-    ) || _gr_rc=$?
-    [ "$_gr_rc" -eq 0 ] &&
-        pass "reuse guard: matching home passes (V15)" ||
-        fail "reuse guard: matching home passes (V15, rc $_gr_rc)"
-    # deviating primary group -> rc 1
-    _gr_rc=0
-    (
-        id() { [ "$1" = "-gn" ] && printf 'users\n'; }
-        eval "$_g_guard"
-    ) || _gr_rc=$?
-    [ "$_gr_rc" -eq 1 ] &&
-        pass "reuse guard: foreign primary group aborts (V15)" ||
-        fail "reuse guard: foreign primary group aborts (V15, rc $_gr_rc)"
-    # own primary group -> rc 0
-    _gr_rc=0
-    (
-        id() { [ "$1" = "-gn" ] && printf 'octest\n'; }
-        eval "$_g_guard"
-    ) || _gr_rc=$?
-    [ "$_gr_rc" -eq 0 ] &&
-        pass "reuse guard: own primary group passes (V15)" ||
-        fail "reuse guard: own primary group passes (V15, rc $_gr_rc)"
-fi
-
-# --- 0.0.44b W6/W14: EOF bails in BOTH Step-2 loops -----------------------------------
-# The 0.0.44a V6 fix closed the outer selection loop only; the custom-
-# path sub-loop still spun forever on a dead stdin (the class rule the
-# wave itself added, applied to itself). Both empty-read guards are
-# extracted and executed against an _ui_read stub that always yields
-# the empty string.
-_loop_w=$(sed -n '/^                    while \[ -z "\$_custom" \]; do$/,/^                    done$/p' "$_install_sh")
-[ -n "$_loop_w" ] &&
-    pass "install.sh: custom-path loop extractable (W6)" ||
-    fail "install.sh: custom-path loop extractable (W6)"
-if [ -n "$_loop_w" ]; then
-    _w6_rc=0
-    (
-        _ui_read() {
-            # hang breaker (0.0.44c C5): on a W6 revert the pre-fix loop
-            # spins on empty reads — force-exit 124 after 9 so the pin
-            # FAILS with a name instead of hanging the suite
-            _ui_n=$((_ui_n + 1))
-            [ "$_ui_n" -gt 9 ] && exit 124
-            eval "$1="
-        }
-        _ui_n=0
-        project_path_sane() { return 0; }
-        ui_error() { :; }
-        ui_info() { :; }
-        _PP_NORM="/var/tmp/x"
-        _custom=""
-        custom=""
-        _custom_empty=0
-        eval "$_loop_w"
-    ) || _w6_rc=$?
-    [ "$_w6_rc" -eq 1 ] &&
-        pass "custom-path loop aborts on 5 empty reads instead of spinning (W6)" ||
-        fail "custom-path loop aborts on 5 empty reads instead of spinning (W6, rc $_w6_rc)"
-fi
-_outer_bail=$(sed -n '/^            if \[ -z "\$selection" \]; then$/,/^            fi$/p' "$_install_sh")
-[ -n "$_outer_bail" ] &&
-    pass "install.sh: outer empty-read guard extractable (W14)" ||
-    fail "install.sh: outer empty-read guard extractable (W14)"
-if [ -n "$_outer_bail" ]; then
-    _w14_rc=0
-    (
-        ui_error() { :; }
-        _sel_empty=0
-        _n=0
-        while [ "$_n" -lt 5 ]; do
-            selection=""
-            eval "$_outer_bail"
-            [ "$_sel_empty" -gt 0 ] && [ "$_n" -eq 4 ] && exit 1 # not reached: exit comes first
-            _n=$((_n + 1))
-        done
-        exit 0
-    ) || _w14_rc=$?
-    [ "$_w14_rc" -eq 1 ] &&
-        pass "outer selection guard exits on the 5th empty read (W14)" ||
-        fail "outer selection guard exits on the 5th empty read (W14, rc $_w14_rc)"
-fi
-# and --yes takes the documented skip: the SKIP_PROMPTS elif sits before
-# the interactive prompt block (order pin; comment-stripped operands, #385)
-_skip_ln=$(sed 's/^[[:space:]]*#.*$//' "$_install_sh" | grep -n 'elif \[ "\$SKIP_PROMPTS" = true \]; then' | head -1 | cut -d: -f1)
-_prompt_ln=$(sed 's/^[[:space:]]*#.*$//' "$_install_sh" | grep -n 'ui_section "Project roots"' | head -1 | cut -d: -f1)
-[ -n "$_skip_ln" ] && [ -n "$_prompt_ln" ] && [ "$_skip_ln" -lt "$_prompt_ln" ] &&
-    pass "--yes skip branch precedes the interactive prompt (W14)" ||
-    fail "--yes skip branch precedes the interactive prompt (W14)"
+# V15 (reuse guards) and 0.0.44b W6/W14 (EOF bails in both Step-2
+# loops) are FUNCTION pins since #346 wave 3: the guards and the whole
+# Step-2 selection block moved into install-core's
+# install_reuse_home_guard / install_reuse_group_guard /
+# install_project_roots_select, sourced and called against getent/id and
+# _ui_read stubs in tests/unit/test-install-core.sh (the #396 payoff).
+# The --yes-skip-before-prompt order pin moved with them (both literals
+# live in do_plan_phase / its selection helper now).
 
 # The regression this file exists for: flags AFTER --projects used to be
 # silently dropped (the old loop `break`ed out of the parser).
@@ -451,10 +331,13 @@ expect_rc 0 "plain --projects value passes parse_args" --yes --projects /var/www
 # install.sh stamps the actually-used ref as KIT_CHANNEL into install.conf
 # and reports it in the final summary. Since 0.0.39g C5 the stamp is
 # written to a temp file beside it and renamed onto the canonical path —
-# assert the full atomic shape (heredoc tee into the temp + mv).
-if grep -qF "KIT_CHANNEL=\$KIT_BRANCH" "$INSTALL" &&
-    grep -qF 'tee "$_INSTALL_CONF_TMP"' "$INSTALL" &&
-    grep -qF 'mv -f "$_INSTALL_CONF_TMP" /etc/opencode-permissions-kit/install.conf' "$INSTALL" &&
+# assert the full atomic shape (heredoc tee into the temp + mv). The
+# stamp writes live in install-core.sh since #346 wave 3 (the plan
+# phase moved); the ui_kv summary row stays in the entry's tail — each
+# leg greps the file that owns the literal (the wave-2 split-pin idiom).
+if grep -qF "KIT_CHANNEL=\$KIT_BRANCH" "$INSTALL_CORE" &&
+    grep -qF 'tee "$_INSTALL_CONF_TMP"' "$INSTALL_CORE" &&
+    grep -qF 'mv -f "$_INSTALL_CONF_TMP" /etc/opencode-permissions-kit/install.conf' "$INSTALL_CORE" &&
     grep -qF 'ui_kv "Channel"' "$INSTALL"; then
     pass "install.sh stamps KIT_CHANNEL and reports the channel"
 else
@@ -656,8 +539,10 @@ parse_args --yes
 [ "$FORCE_UNSUPPORTED_DISTRO" = false ] &&
     pass "force flag defaults to false" ||
     fail "force flag defaults to false"
-if grep -qF 'sed -n '"'"'s/^ID=//p'"'"' /etc/os-release' "$INSTALL" &&
-    grep -qF 'sed -n '"'"'s/^VERSION_ID=//p'"'"' /etc/os-release' "$INSTALL"; then
+# The reads sit in do_plan_phase (install-core.sh since #346 wave 3);
+# the _distro_gate FUNCTION below stays in install.sh.
+if grep -qF 'sed -n '"'"'s/^ID=//p'"'"' /etc/os-release' "$INSTALL_CORE" &&
+    grep -qF 'sed -n '"'"'s/^VERSION_ID=//p'"'"' /etc/os-release' "$INSTALL_CORE"; then
     pass "gate reads ID/VERSION_ID from /etc/os-release (sed, not sourced)"
 else
     fail "gate reads ID/VERSION_ID from /etc/os-release (sed, not sourced)"
@@ -725,20 +610,9 @@ if [ -n "$(sed -n '/^_distro_gate() {/,/^}/p' "$INSTALL")" ]; then
 else
     fail "_distro_gate extractable from install.sh"
 fi
-_dg_call_ln=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -n '^    _distro_gate ' | head -1 | cut -d: -f1)
-_dg_menu_ln=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -n 'ui_menu "How do you want to install?"' | head -1 | cut -d: -f1)
-[ -n "$_dg_call_ln" ] && [ -n "$_dg_menu_ln" ] && [ "$_dg_call_ln" -lt "$_dg_menu_ln" ] &&
-    pass "distro gate runs before the first interactive menu (order pin)" ||
-    fail "distro gate runs before the first interactive menu (gate=$_dg_call_ln menu=$_dg_menu_ln)"
-# Wiring pin (0.0.45a C1): the order pin only proves A call line exists —
-# a rewired call (e.g. _distro_gate "unknown" "24.04") neuters the gate
-# while every other pin stays green. The verbatim line pins that
-# do_plan_phase passes the parsed os-release values into the gate.
-if grep -qF '_distro_gate "${_dg_id:-unknown}" "$_dg_ver"' "$INSTALL"; then
-    pass "do_plan_phase wires the parsed os-release values into the gate (verbatim call pin)"
-else
-    fail "do_plan_phase wires the parsed os-release values into the gate (verbatim call pin)"
-fi
+# The order pin (gate before the first menu) and the verbatim wiring
+# pins moved to tests/unit/test-install-core.sh with the phase bodies
+# (#346 wave 3) — the literals live in do_plan_phase / install-core.sh.
 # Behavioral read pins (0.0.45a S1/C2): the REAL read lines, extracted,
 # path-swapped onto fixtures and executed under bash with install.sh's
 # own set -eu/pipefail idiom — a missing os-release must survive and
@@ -746,8 +620,8 @@ fi
 # and errexit aborts rc 2 with zero output — invisible under dash, which
 # is why the pins pin bash explicitly), single-quoted and CRLF values
 # must normalize.
-_dg_line_id="$(grep -F "_dg_id=\$(sed -n 's/^ID=//p' /etc/os-release" "$INSTALL" | head -1 | sed 's/^ *//')"
-_dg_line_ver="$(grep -F "_dg_ver=\$(sed -n 's/^VERSION_ID=//p' /etc/os-release" "$INSTALL" | head -1 | sed 's/^ *//')"
+_dg_line_id="$(grep -F "_dg_id=\$(sed -n 's/^ID=//p' /etc/os-release" "$INSTALL_CORE" | head -1 | sed 's/^ *//')"
+_dg_line_ver="$(grep -F "_dg_ver=\$(sed -n 's/^VERSION_ID=//p' /etc/os-release" "$INSTALL_CORE" | head -1 | sed 's/^ *//')"
 _dg_w="$(mktemp -d)"
 printf 'ID="ubuntu"\nVERSION_ID=%s\n' "'24.04'" >"$_dg_w/quoted"
 printf 'ID=ubuntu\r\nVERSION_ID=24.04\r\n' >"$_dg_w/crlf"
@@ -805,8 +679,8 @@ rm -rf "$_dg_w"
 _pb_w="$(mktemp -d)"
 printf '#!/bin/sh\nsleep 3\n' >"$_pb_w/hang"
 chmod +x "$_pb_w/hang"
-_pb_pf="$(grep -F '_pf_oc_ver=$(timeout 10 "$_pf_oc_bin" --version' "$INSTALL" | head -1 | sed 's/^ *//' | sed 's/timeout 10/timeout 1/')"
-_pb_st="$(grep -F '_stamp_ver=$(timeout 10 "$SYSTEM_BIN" --version' "$INSTALL" | head -1 | sed 's/^ *//' | sed 's/timeout 10/timeout 1/')"
+_pb_pf="$(grep -F '_pf_oc_ver=$(timeout 10 "$_pf_oc_bin" --version' "$INSTALL_CORE" | head -1 | sed 's/^ *//' | sed 's/timeout 10/timeout 1/')"
+_pb_st="$(grep -F '_stamp_ver=$(timeout 10 "$SYSTEM_BIN" --version' "$INSTALL_CORE" | head -1 | sed 's/^ *//' | sed 's/timeout 10/timeout 1/')"
 if command -v bash >/dev/null 2>&1 && command -v timeout >/dev/null 2>&1 &&
     [ -n "$_pb_pf" ] && [ -n "$_pb_st" ]; then
     _pb_rc=0
@@ -937,44 +811,34 @@ if [ -n "$_rug_fn" ]; then
 else
     fail "_root_user_gate extractable from install.sh"
 fi
-# Wiring + order (0.0.45a C1 discipline): the gate call must sit after
-# the charset case (same validation cluster) and before the distro gate
-# and the first menu — a root shell is unrepairable, so it refuses first.
-if grep -qF '_root_user_gate "$DEFAULT_USER"' "$INSTALL"; then
-    pass "do_plan_phase wires DEFAULT_USER into _root_user_gate (verbatim call pin)"
-else
-    fail "do_plan_phase wires DEFAULT_USER into _root_user_gate (verbatim call pin)"
-fi
-_rug_call_ln=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -n '^    _root_user_gate ' | head -1 | cut -d: -f1)
-_rug_charset_ln=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -n "Invalid user name" | head -1 | cut -d: -f1)
-_rug_distro_ln=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -n '^    _distro_gate ' | head -1 | cut -d: -f1)
-if [ -n "$_rug_call_ln" ] && [ -n "$_rug_charset_ln" ] && [ -n "$_rug_distro_ln" ] &&
-    [ "$_rug_charset_ln" -lt "$_rug_call_ln" ] && [ "$_rug_call_ln" -lt "$_rug_distro_ln" ]; then
-    pass "root gate runs after the charset gate, before the distro gate (order pin)"
-else
-    fail "root gate runs after the charset gate, before the distro gate (charset=$_rug_charset_ln gate=$_rug_call_ln distro=$_rug_distro_ln)"
-fi
+# Wiring + order (0.0.45a C1 discipline) moved to
+# tests/unit/test-install-core.sh with the phase bodies (#346 wave 3):
+# the call lines and the charset/distro cluster sit in do_plan_phase.
 
 # --- bootstrap installer channel (issue #197): the optional fallback
 # install (opencode missing) streams the official V2 installer — fresh
 # machines get the current 2.x through the npm registry. The v1 URL
 # must not come back (it resolves GitHub 1.x); the v2 installer keeps
 # the ~/.opencode/bin layout, so the pickup paths are version-agnostic.
+# The channel section lives in do_deploy_phase (install-core.sh since
+# #346 wave 3) — the count reads the lib, the v1 absence covers BOTH
+# files (a re-added URL in either host would resolve 1.x).
 # Comment lines stripped before the count (#244 g W1 class sweep, the
 # _p3old rider): a commented-out URL must not count as a surviving
 # call site — the two-step false-green the f-W4 sweep left bounded.
 # Full-line comments only (#244 h W6): a trailing comment after a
 # live line would still count — the same residual _p3old carries.
-_v2hits=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -c 'https://opencode.ai/v2/install' || true)
+_v2hits=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" | grep -c 'https://opencode.ai/v2/install' || true)
 if [ "$_v2hits" -ge 2 ]; then
     pass "bootstrap streams the v2 installer (prompt + curl, $_v2hits sites)"
 else
     fail "bootstrap v2 installer URL missing (expected prompt + curl, found $_v2hits)"
 fi
-if grep -qF 'https://opencode.ai/install' "$INSTALL"; then
+if grep -qF 'https://opencode.ai/install' "$INSTALL" ||
+    grep -qF 'https://opencode.ai/install' "$INSTALL_CORE"; then
     fail "bootstrap still references the v1 installer URL (resolves 1.x)"
 else
-    pass "no v1 installer URL left in install.sh"
+    pass "no v1 installer URL left in install.sh or install-core.sh"
 fi
 
 # --- python3 health gate (#244 a W1/S1, b Q1/Q2/S2) ------------------------------------
@@ -1066,10 +930,12 @@ if [ -n "$(sed -n '/^_py3_health_probe() {/,/^}/p' "$INSTALL")" ]; then
     rm -rf "$_py3w"
     # Wiring pin: the matrix proves the function works — the verbatim
     # call line proves the pre-flight runs it (a dropped call leaves
-    # every matrix pin green). The presence-check count pins that the
-    # old inline gate is GONE from the main flow: exactly one
-    # occurrence survives, the one inside the function itself.
-    if grep -qF '    _py3_health_probe' "$INSTALL"; then
+    # every matrix pin green; the call site lives in install-core.sh's
+    # do_plan_phase since #346 wave 3). The presence-check count pins
+    # that the old inline gate is GONE from the entry's main flow:
+    # exactly one occurrence survives, the one inside the function
+    # itself (which stays in install.sh).
+    if grep -qF '    _py3_health_probe' "$INSTALL_CORE"; then
         pass "pre-flight wires the health gate (verbatim call pin)"
     else
         fail "pre-flight wires the health gate (verbatim call pin)"
@@ -1275,10 +1141,13 @@ fi
 # the site wirings are anchored statically (exact call count + announce
 # anchors); e2e drives install success paths, not failure arms.
 # pr-00263 e W2: drive a production-shaped label — the real call site
-# (install.sh:723) interpolates the invoking user (DEFAULT_USER from
-# SUDO_USER/whoami, :630), never an empty string.
+# (do_plan_phase) interpolates the invoking user (DEFAULT_USER from
+# SUDO_USER/whoami), never an empty string. The recorder definition and
+# every wiring site live in install-core.sh since #346 wave 3; the
+# closing summary row (INCOMPLETE) stays in the entry's tail — each leg
+# greps the file that owns the literal.
 DEFAULT_USER=opencode
-_BKDEF="$(sed -n '/^    _BK_FAIL=""$/,/^    }$/p' "$INSTALL")"
+_BKDEF="$(sed -n '/^    _BK_FAIL=""$/,/^    }$/p' "$INSTALL_CORE")"
 if [ -n "$_BKDEF" ] && (
     eval "$_BKDEF"
     _bk_fail "gitconfig-$DEFAULT_USER"
@@ -1292,22 +1161,22 @@ fi
 # Comment-strip riders (#261, the #244 g W1 class — sweep finds beyond
 # the issue list): commented-out failure-recorder sites stop counting;
 # full-line comments only (#244 h W6 residual).
-_bk_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -c '_bk_fail' || true)"
+_bk_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" | grep -c '_bk_fail' || true)"
 [ "$_bk_n" = 10 ] &&
     grep -qF 'INCOMPLETE: $_BK_FAIL' "$INSTALL" &&
     pass "backup failures record loudly + degrade the summary row (pr-00263 a F6 + d W1/W2)" ||
     fail "backup failure silence survived somewhere (pr-00263 a F6 + d W1/W2; _bk_fail sites: $_bk_n of 10)"
-_cba_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" |
+_cba_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" |
     grep -cF 'config backup FAILED — see Backup summary' || true)"
 [ "$_cba_n" = 2 ] &&
-    grep -qF 'binary backup FAILED — see Backup summary' "$INSTALL" &&
+    grep -qF 'binary backup FAILED — see Backup summary' "$INSTALL_CORE" &&
     pass "the three swept backup sites degrade their announce on failure (pr-00263 d W1/W2)" ||
     fail "a backup announce still lies on failure (pr-00263 d W1/W2; config-announce sites: $_cba_n of 2)"
-_acl_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -cF 'no ACL recovery material' || true)"
+_acl_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" | grep -cF 'no ACL recovery material' || true)"
 [ "$_acl_n" = 2 ] &&
     pass "both getfacl backups announce failure instead of success (pr-00263 a F8)" ||
     fail "a getfacl success line still lies (pr-00263 a F8; no-ACL sites: $_acl_n of 2)"
-grep -qF 'the official opencode installer failed' "$INSTALL" &&
+grep -qF 'the official opencode installer failed' "$INSTALL_CORE" &&
     pass "official-installer pipe has the kit error wrapper (pr-00263 a F19)" ||
     fail "official-installer failure still bare (pr-00263 a F19)"
 

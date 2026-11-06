@@ -15,6 +15,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 UNINSTALL="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/uninstall.sh"
 INSTALL="$SCRIPT_DIR/../../files/install.sh"
+INSTALL_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/install-core.sh" # install phase lib since #346 wave 3
 # Shared harness (issue #394): pass/fail, colors, counters
 # (and check/assert_eq where present) live in lib/harness.sh now.
 . "$SCRIPT_DIR/lib/harness.sh"
@@ -1180,10 +1181,11 @@ fi
 # positive legs strip comments first (the source-counting rider).
 if sed 's/^[[:space:]]*#.*$//' "$UNINSTALL" |
     grep -qF '/var/backups/opencode-permissions-kit/install-' &&
-    sed 's/^[[:space:]]*#.*$//' "$INSTALL" |
+    sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" |
     grep -qF 'BACKUP_DIR="$_bk_root/install-' &&
     ! grep -qF '/tmp/opencode-install-backup' "$UNINSTALL" &&
-    ! grep -qF '/tmp/opencode-install-backup' "$INSTALL"; then
+    ! grep -qF '/tmp/opencode-install-backup' "$INSTALL" &&
+    ! grep -qF '/tmp/opencode-install-backup' "$INSTALL_CORE"; then
     pass "backup paths use the durable /var/backups root"
 else
     fail "backup paths use the durable /var/backups root"

@@ -15,6 +15,7 @@ set -u
 
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 INSTALL="$REPO/files/install.sh"
+INSTALL_CORE="$REPO/files/opencode-permissions-kit-lib/sh/install-core.sh"
 UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
 # Shared harness (issue #394): pass/fail, colors, counters
 # (and check/assert_eq where present) live in lib/harness.sh now.
@@ -100,7 +101,11 @@ norm_files_path() {
 }
 
 deploy_missing=""
-for script in "$INSTALL" "$UPDATE"; do
+# install-core.sh joined the scan with #346 wave 3: the deploy cp sites
+# moved into the phase lib, but $SCRIPT_DIR still resolves to files/ at
+# run time (the lib is sourced, SCRIPT_DIR is install.sh's) — same
+# base as install.sh itself.
+for script in "$INSTALL" "$INSTALL_CORE" "$UPDATE"; do
     name="${script##*/}"
     base=""
     [ "$name" = "update.sh" ] && base=""
@@ -158,9 +163,10 @@ else
 fi
 
 # 4c. deploy coverage: section 3's logic must flag the cp'd file that the
-#     mutated KIT_FILES no longer lists.
+#     mutated KIT_FILES no longer lists. The cp sites live in
+#     install-core.sh since #346 wave 3.
 _deploy_missing=""
-targets=$(grep -oE 'cp "\$SCRIPT_DIR/[^"]+"' "$INSTALL" | sed -e 's|cp "\$SCRIPT_DIR/||' -e 's|"||')
+targets=$(grep -oE 'cp "\$SCRIPT_DIR/[^"]+"' "$INSTALL_CORE" | sed -e 's|cp "\$SCRIPT_DIR/||' -e 's|"||')
 for t in $targets; do
     case " $mutated_update_list " in
         *" $t "*) ;;

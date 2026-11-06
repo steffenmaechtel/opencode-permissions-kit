@@ -21,6 +21,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="$SCRIPT_DIR/../.."
 WRAPPER="$REPO/files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
 INSTALL="$REPO/files/install.sh"
+INSTALL_CORE="$REPO/files/opencode-permissions-kit-lib/sh/install-core.sh"
 UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
 DEPLOYLIB="$REPO/files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 STATUS="$REPO/files/opencode-permissions-kit-lib/management/status.sh"
@@ -185,33 +186,36 @@ check "podman-rootless socket branch uses sock_reachable" \
 
 echo ""
 echo "-- install.sh wiring --"
+# The install.conf stamp heredoc, the backend validation/arm texts and
+# the provisioning call sites live in the phase lib — install-core.sh
+# since #346 wave 3 (fetch-list pins stay on the entry).
 check "install.sh records CONTAINER_BACKEND in install.conf" \
-    grep -Fq 'CONTAINER_BACKEND=$CONTAINER_BACKEND' "$INSTALL"
+    grep -Fq 'CONTAINER_BACKEND=$CONTAINER_BACKEND' "$INSTALL_CORE"
 check "install.sh records OPENCODE_DOCKER_HOST in install.conf" \
-    grep -Fq 'OPENCODE_DOCKER_HOST=$OPENCODE_DOCKER_HOST' "$INSTALL"
+    grep -Fq 'OPENCODE_DOCKER_HOST=$OPENCODE_DOCKER_HOST' "$INSTALL_CORE"
 check "install.sh records OPENCODE_PODMAN_SOCKET in install.conf" \
-    grep -Fq 'OPENCODE_PODMAN_SOCKET=$OPENCODE_PODMAN_SOCKET' "$INSTALL"
+    grep -Fq 'OPENCODE_PODMAN_SOCKET=$OPENCODE_PODMAN_SOCKET' "$INSTALL_CORE"
 check "install.sh records DDEV_VERSION in install.conf" \
-    grep -Fq 'DDEV_VERSION=$DDEV_VERSION' "$INSTALL"
+    grep -Fq 'DDEV_VERSION=$DDEV_VERSION' "$INSTALL_CORE"
 check "install.sh preserves an existing backend on re-install" \
-    grep -Eq 'sed -n '"'"'s/\^CONTAINER_BACKEND=//p'"'"' /etc/opencode-permissions-kit/install.conf' "$INSTALL"
+    grep -Eq 'sed -n '"'"'s/\^CONTAINER_BACKEND=//p'"'"' /etc/opencode-permissions-kit/install.conf' "$INSTALL_CORE"
 check "install.sh validates --container-backend (rootless only)" \
-    grep -Fq 'docker-rootless | podman-rootless' "$INSTALL"
+    grep -Fq 'docker-rootless | podman-rootless' "$INSTALL_CORE"
 check "install.sh aborts on provisioning failure (no docker-group fallback)" \
-    grep -Fq 'Container backend provisioning failed' "$INSTALL"
+    grep -Fq 'Container backend provisioning failed' "$INSTALL_CORE"
 check "install.sh fetches socket-check.sh" \
     grep -Fq 'opencode-permissions-kit-lib/bin/socket-check' "$INSTALL"
 check "install.sh deploys socket-check.sh to LIBDIR/bin (lib_deploy manifest)" \
     sh -c 'grep -qF "opencode-permissions-kit-lib/bin/socket-check 755" "$2" \
-        && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL" "$DEPLOYLIB"
+        && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL_CORE" "$DEPLOYLIB"
 check "install.sh fetches setup-container-backend" \
     grep -Fq 'opencode-permissions-kit-lib/bin/setup-container-backend' "$INSTALL"
 check "install.sh deploys setup-container-backend to LIBDIR" \
-    grep -Fq '"$LIBDIR/bin/setup-container-backend"' "$INSTALL"
+    grep -Fq '"$LIBDIR/bin/setup-container-backend"' "$INSTALL_CORE"
 check "install.sh records OPENCODE_GROUP=opencode usergroup" \
-    grep -Fq 'OPENCODE_GROUP=$(id -gn "$OPENCODE_USER"' "$INSTALL"
+    grep -Fq 'OPENCODE_GROUP=$(id -gn "$OPENCODE_USER"' "$INSTALL_CORE"
 check "install.sh adds the developer to the opencode usergroup" \
-    grep -Fq 'usermod -aG "$OPENCODE_GROUP" "$DEFAULT_USER"' "$INSTALL"
+    grep -Fq 'usermod -aG "$OPENCODE_GROUP" "$DEFAULT_USER"' "$INSTALL_CORE"
 
 echo ""
 echo "-- update.sh wiring --"
@@ -253,7 +257,7 @@ check "status.sh has no WWW_GROUP fallback" \
 check "uninstall.sh has no WWW_GROUP fallback" \
     grep_absent -Fq 'OPENCODE_GROUP:-${WWW_GROUP:-opencode}' "$UNINSTALL"
 check "no remaining WWW_GROUP variable use in install.sh" \
-    grep_absent -Fq '$WWW_GROUP' "$INSTALL"
+    sh -c '! grep -Fq "\$WWW_GROUP" "$1" && ! grep -Fq "\$WWW_GROUP" "$2"' _ "$INSTALL" "$INSTALL_CORE"
 
 echo ""
 echo "-- config.sh wiring --"

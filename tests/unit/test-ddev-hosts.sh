@@ -14,6 +14,7 @@ HOSTS="$FILES/opencode-permissions-kit-lib/sh/ddev-hosts.sh"
 FUNC="$FILES/opencode-permissions-kit-lib/sh/ddev-terminal.sh"
 KIT="$FILES/opencode-permissions-kit-lib/bin/opk"
 INSTALL="$FILES/install.sh"
+INSTALL_CORE="$FILES/opencode-permissions-kit-lib/sh/install-core.sh"
 UPDATE="$FILES/opencode-permissions-kit-lib/management/update.sh"
 UPDATE_CORE="$FILES/opencode-permissions-kit-lib/sh/update-core.sh"
 DEPLOYLIB="$FILES/opencode-permissions-kit-lib/sh/deploy-lib.sh"
@@ -202,8 +203,9 @@ check "hook preserves ddev's exit code" \
 
 check "install.sh fetch list includes ddev-hosts.sh" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh' \"\$1\"" _ "$INSTALL"
+# lib_deploy call site: install-core.sh since #346 wave 3
 check "install.sh deploys ddev-hosts.sh (lib_deploy manifest)" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh 644' \"\$2\" && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\"" _ "$INSTALL" "$DEPLOYLIB"
+    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh 644' \"\$2\" && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\"" _ "$INSTALL_CORE" "$DEPLOYLIB"
 check "update.sh KIT_FILES includes ddev-hosts.sh" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh' \"\$1\"" _ "$UPDATE"
 check "update.sh deploys ddev-hosts.sh (lib_deploy manifest)" \

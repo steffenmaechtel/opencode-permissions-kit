@@ -18,6 +18,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LIB="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/fs-baseline.sh"
 INSTALL="$SCRIPT_DIR/../../files/install.sh"
+INSTALL_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/install-core.sh"
 UPDATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh"
 UPDATE_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/update-core.sh"
 CONFIG="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh"
@@ -134,7 +135,9 @@ grep -q 'opencode-permissions-kit-lib/sh/fs-baseline.sh' "$UPDATE" &&
 grep -q 'large trees: this can take a while' "$UPDATE_CORE" &&
     pass "update.sh hints before the ddev handover scan (issue #14)" ||
     fail "update.sh hints before the ddev handover scan (issue #14)"
-grep -q 'large trees: this can take minutes' "$INSTALL" &&
+# The hint line lives in do_plan_phase's getfacl backup (install-core.sh
+# since #346 wave 3).
+grep -q 'large trees: this can take minutes' "$INSTALL_CORE" &&
     pass "install.sh hints before the getfacl backup (issue #14)" ||
     fail "install.sh hints before the getfacl backup (issue #14)"
 
@@ -972,8 +975,8 @@ fi
 # review a X1); config.sh counts THREE (projects add, handover,
 # refresh). The ddev_handover_root belt (a X2) and status.sh's
 # symlink report (a X4) ride the same rider'd shape.
-S245I=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" |
-    grep -cF 'ui_warn "skip $root (symlink — register the target directory instead)"')
+S245I=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" |
+    grep -cF 'ui_warn "skip $root (symlink — register the target directory instead)"' || true)
 if [ "$S245I" -ge 2 ]; then
     pass "install.sh: BOTH \$PROJECTS_ROOTS loops carry the symlink skip arm (#245, a X1)"
 else
@@ -1050,7 +1053,7 @@ fi
             if (buf ~ /ddev_handover_root/) { printf "%s", buf; exit }
             inl = 0
         }
-    ' "$INSTALL"
+    ' "$INSTALL_CORE"
 } >"$S245/run-install-handover.sh"
 S245H_OUT=$(sh "$S245/run-install-handover.sh" 2>&1)
 if [ "$(printf '%s\n' "$S245H_OUT" | grep -c '^HO: ')" -eq 1 ] &&
