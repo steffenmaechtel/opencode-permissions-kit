@@ -581,8 +581,10 @@ if [ -s "$_f1_dir/stampblock" ]; then
 else
     fail "install-time stamp block extractable (F1)"
 fi
+# #407 a P2: the guarded stamp block lives in install-core.sh since
+# wave 3 — the absence covers BOTH files (the suite's own idiom).
 check "install-time stamp has no bare default-to-1 (F1)" \
-    sh -c "! grep -qE '^[[:space:]]+OPENCODE_MAJOR=1\$' \"\$1\"" _ "$INSTALL"
+    sh -c "! grep -qE '^[[:space:]]+OPENCODE_MAJOR=1\$' \"\$1\" && ! grep -qE '^[[:space:]]+OPENCODE_MAJOR=1\$' \"\$2\"" _ "$INSTALL" "$INSTALL_CORE"
 check "preflight probes the reused binary bounded (F1)" \
     sh -c "grep -qF 'timeout 10 \"\$_pf_oc_bin\" --version' \"\$1\"" _ "$INSTALL_CORE"
 check "preflight warns instead of aborting on an unresponsive binary (F1)" \

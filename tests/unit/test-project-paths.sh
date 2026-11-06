@@ -202,7 +202,7 @@ fi
 _q1i=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" |
     grep -cF 'is not a valid project root (system path, symlink, or malformed form)' || true)
 _q1c=$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" |
-    grep -cF 'is not a valid project root (system path, symlink, or malformed form)')
+    grep -cF 'is not a valid project root (system path, symlink, or malformed form)' || true)
 if [ "$_q1i" -eq 3 ] && [ "$_q1c" -eq 2 ]; then
     pass "caller refusal messages enumerate the real causes at all five sites (a Q1)"
 else

@@ -570,8 +570,11 @@ check "install.sh hooks the function into the developer rc files" \
 # continuation line.
 check "install.sh hooks use the [ -f ] uninstall-safe guard" \
     sh -c "grep -qF '\"[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . \"' \"\$1\" && grep -qF '/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh  # opencode permissions kit' \"\$1\"" _ "$INSTALL_CORE"
+# #407 a P1: bare-name pin retargeted to the lib — install.sh's only
+# remaining match was the bootstrap stub definer (vacuous pass, its
+# label lied); the real handover call lives in do_deploy_phase.
 check "install.sh hands over ddev paths in the filesystem step" \
-    sh -c "grep -q 'ddev_handover_root' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q 'ddev_handover_root' \"\$1\"" _ "$INSTALL_CORE"
 
 # --- 6. update.sh wiring -------------------------------------------------------
 check "update.sh KIT_FILES includes both new files" \

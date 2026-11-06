@@ -107,8 +107,9 @@ done
 # users exist locally must not decide the pin — 0.0.46a F2). Output is
 # observed the way a terminal sees it (ui_error -> stderr, merged).
 # deviating home -> rc 1, names the shadow-home risk + remediation
+# (#407 a P3: no env prefix — the stubs hardcode their answers)
 _rc=0
-_out=$(GETENT_HOME=/srv/octest ID_GROUP=octest sh -c '
+_out=$(sh -c '
     . "$1"
     OPENCODE_USER="octest"
     ui_error() { printf "ui_error: %s\n" "$*" >&2; }
@@ -298,12 +299,14 @@ fi
 # Wiring pins (0.0.45a C1 discipline): the verbatim call lines prove the
 # phase wires the parsed values/globals into the entry's gate helpers —
 # a rewired call neuters the gate while every matrix pin stays green.
-if grep -qF '_distro_gate "${_dg_id:-unknown}" "$_dg_ver"' "$LIB"; then
+# Comment-stripped streams (#407 a P4, the #385 discipline): a
+# commented-out call line must not satisfy a presence pin.
+if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF '_distro_gate "${_dg_id:-unknown}" "$_dg_ver"'; then
     pass "do_plan_phase wires the parsed os-release values into the gate (verbatim call pin)"
 else
     fail "do_plan_phase wires the parsed os-release values into the gate (verbatim call pin)"
 fi
-if grep -qF '_root_user_gate "$DEFAULT_USER"' "$LIB"; then
+if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF '_root_user_gate "$DEFAULT_USER"'; then
     pass "do_plan_phase wires DEFAULT_USER into _root_user_gate (verbatim call pin)"
 else
     fail "do_plan_phase wires DEFAULT_USER into _root_user_gate (verbatim call pin)"
@@ -320,8 +323,8 @@ else
 fi
 # the pre-flight wires the python3 health gate (verbatim call pin,
 # #244; the gate function itself stays in install.sh and is matrix-
-# pinned in test-install-args.sh)
-if grep -qF '    _py3_health_probe' "$LIB"; then
+# pinned in test-install-args.sh). Comment-stripped (#407 a P4).
+if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF '    _py3_health_probe'; then
     pass "pre-flight wires the health gate (verbatim call pin)"
 else
     fail "pre-flight wires the health gate (verbatim call pin)"

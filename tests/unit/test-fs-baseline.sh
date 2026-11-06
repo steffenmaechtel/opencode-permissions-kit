@@ -983,7 +983,7 @@ else
     fail "install.sh must gate both \$PROJECTS_ROOTS loops (found $S245I of 2) (#245, a X1)"
 fi
 S245C=$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" |
-    grep -cF 'ui_warn "skip $p (symlink — register the target directory instead)"')
+    grep -cF 'ui_warn "skip $p (symlink — register the target directory instead)"' || true)
 if [ "$S245C" -ge 3 ]; then
     pass "config.sh symlink skip arms wired at all three sites (add, handover, refresh) (#245)"
 else
