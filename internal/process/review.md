@@ -23,10 +23,15 @@ archived corpus of the repo-file era lives at tag `review-corpus`
   permission denial, and re-push follow-ups yourself). Loop closure
   (the merge) stays with you in every mode.
 - **The birth-PR is the case key.** In autonomous mode the agent
-  opens it on your prompt approval (body: `Closes #<issue>`
-  references); the PR timeline is the case's whole review record —
-  round comments, pushes, CI runs. No case folders are created,
-  nothing is committed under `internal/reviews/`.
+  opens it on your prompt approval. The PR body references the case
+  issue as `Closes #<issue>` only when the merge is meant to close
+  the issue; a PR delivering just a section of it (an intermediate
+  wave of a multi-wave issue) references `Ref #<issue>` instead —
+  GitHub auto-closes every issue a closing keyword names, so only
+  the final wave closes, earlier waves reference. The PR timeline
+  is the case's whole review record — round comments, pushes, CI
+  runs. No case folders are created, nothing is committed under
+  `internal/reviews/`.
 
 ## Commissioning the review tracks
 
@@ -124,8 +129,10 @@ where its review role ends.
 - The loop's closing summary only PROPOSES closure
   (`"state":"closing-proposed"` in its marker, stop-rule check cited,
   full disposition ledger visible). **Your final review + merge is
-  the closure confirmation** — merging also closes the issue
-  references in the PR body.
+  the closure confirmation** — merging also closes every issue the
+  PR body names with a closing keyword (`Closes`), while a `Ref`
+  reference keeps its issue open by design (see the birth-PR rule
+  above).
 - The release gate reads the markers: no release while an unmerged PR
   carries an unresolved `opk-review` marker (see
   [agent/review-concept.md](../../agent/review-concept.md), "Release
