@@ -121,9 +121,13 @@ assert_eq "missing root: no output, no error" "" "$OUT3"
 # update.sh calls fs_baseline_root from its phase lib since #346 wave 2,
 # install.sh likewise since wave 3 (#407 b B1: the $INSTALL leg matched
 # only the bootstrap stub definer — the real call lives in
-# install-core.sh, same class as round a's P1).
+# install-core.sh, same class as round a's P1). Call-form pattern
+# (#407 c C1/C2: the opening quote of the first argument matches CALL
+# SITES only — the lib's header comment and the entries' stub-definer
+# code lines (`fs_baseline_root() {`) must not keep a leg green after
+# the real call is deleted; proven by scratch deletion probe).
 for f in "$INSTALL_CORE" "$UPDATE_CORE" "$CONFIG"; do
-    if grep -q 'fs_baseline_root' "$f"; then
+    if grep -q 'fs_baseline_root "' "$f"; then
         pass "$(basename "$f") runs the baseline through fs_baseline_root"
     else
         fail "$(basename "$f") runs the baseline through fs_baseline_root"
