@@ -35,6 +35,7 @@ HANDOVER="$FILES/opencode-permissions-kit-lib/sh/ddev-handover.sh"
 OPK_INSTALL_CONF="/nonexistent-opk-test-install.conf"
 export OPK_INSTALL_CONF
 STATUS="$FILES/opencode-permissions-kit-lib/management/status.sh"
+SCORE="$FILES/opencode-permissions-kit-lib/sh/status-core.sh"
 MAKEFILE="$SCRIPT_DIR/../../Makefile"
 TEST_CI="$SCRIPT_DIR/../../.github/workflows/test-unit.yml"
 
@@ -899,17 +900,17 @@ check "reshare detect: unknown user yields no findings (find -user error path; l
 check "reshare detect: missing dir is a clean no-need" \
     sh -c ". \"\$1\" && ! ddev_reshare_needed \"\$2/does-not-exist\" \"\$3\"" _ "$HANDOVER" "$RN" "$RN_U"
 check "reshare detect: status.sh wires ddev_reshare_needed per project root" \
-    sh -c "grep -q 'ddev_reshare_needed' \"\$1\" && grep -qF 'ui_kv_warn \"ddev share\"' \"\$1\"" _ "$STATUS"
+    sh -c "grep -q 'ddev_reshare_needed' \"\$1\" && grep -qF 'ui_kv_warn \"ddev share\"' \"\$1\"" _ "$SCORE"
 check "reshare detect: status.sh prints the opk ensure-shared one-command fix (issue #159)" \
-    sh -c "grep -qF 'opk ensure-shared \\\"\$_st_d\\\"' \"\$1\"" _ "$STATUS"
+    sh -c "grep -qF 'opk ensure-shared \\\"\$_st_d\\\"' \"\$1\"" _ "$SCORE"
 check "reshare detect: status.sh fix line is the short form only (no raw helper call)" \
-    sh -c "! grep -q -- '--opk-ensure-shared' \"\$1\"" _ "$STATUS"
+    sh -c "! grep -q -- '--opk-ensure-shared' \"\$1\" && ! grep -q -- '--opk-ensure-shared' \"\$2\"" _ "$STATUS" "$SCORE"
 check "reshare detect: status.sh resolves the lib checkout-first (0.0.46a F4)" \
-    sh -c "grep -qF '_st_dhl=\"\$(cd \"\$(dirname \"\$0\")\" && pwd)/../sh/ddev-handover.sh\"' \"\$1\" && grep -qF '[ -f \"\$_st_dhl\" ] || _st_dhl=\"\$LIBDIR/sh/ddev-handover.sh\"' \"\$1\"" _ "$STATUS"
+    sh -c "grep -qF '_st_dhl=\"\$(cd \"\$(dirname \"\$0\")\" && pwd)/../sh/ddev-handover.sh\"' \"\$1\" && grep -qF '[ -f \"\$_st_dhl\" ] || _st_dhl=\"\$LIBDIR/sh/ddev-handover.sh\"' \"\$1\"" _ "$SCORE"
 check "reshare detect: status fix names 'any ddev command' — every invocation heals (0.0.46a F7 wording inverted by issue #279)" \
-    sh -c "grep -q 'any ddev command in this project' \"\$1\" && ! grep -q 'tree-creating ddev command (config/get/start/restart' \"\$1\"" _ "$STATUS"
+    sh -c "grep -q 'any ddev command in this project' \"\$1\" && ! grep -q 'tree-creating ddev command (config/get/start/restart' \"\$1\" && ! grep -q 'tree-creating ddev command (config/get/start/restart' \"\$2\"" _ "$SCORE" "$STATUS"
 check "reshare detect: warn line names the general cause, not only agent runs (issue #279)" \
-    sh -c "grep -q 'group-write missing (a ddev run without the following heal)' \"\$1\" && ! grep -q 'agent-side ddev run' \"\$1\"" _ "$STATUS"
+    sh -c "grep -q 'group-write missing (a ddev run without the following heal)' \"\$1\" && ! grep -q 'agent-side ddev run' \"\$1\" && ! grep -q 'agent-side ddev run' \"\$2\"" _ "$SCORE" "$STATUS"
 rm -rf "$RN"
 
 # --- 7d-4. version-probe neutrality (issue #279) ----------------------------------
@@ -952,7 +953,7 @@ rm -rf "$VN"
 # dispositions in round b's comment instead.
 E2ELIB="$SCRIPT_DIR/../e2e/lib.sh"
 check "fix a M1: status tier-1 probe runs ddev from / — no caller cwd" \
-    sh -c 'grep -qF "(cd / && \"\$_st_bin\" --version)" "$1" && ! grep -qF "[ -n \"\$_st_bin\" ] && _st_ver=" "$1"' _ "$STATUS"
+    sh -c 'grep -qF "(cd / && \"\$_st_bin\" --version)" "$1" && ! grep -qF "[ -n \"\$_st_bin\" ] && _st_ver=" "$2" && ! grep -qF "[ -n \"\$_st_bin\" ] && _st_ver=" "$3"' _ "$SCORE" "$STATUS" "$SCORE"
 # e2e_cleanup body, comment-stripped once (#387 a a1): the presence arm
 # and the NR anchors below must not ride comment lines — the body
 # carries a ~10-line comment block around the dump gate, one comment
@@ -1625,7 +1626,7 @@ _dsetq_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -c 'ddev settings mana
 check "install.sh asks the ddev-settings question (standard + advanced; question sites: $_dsetq_n, need >=2)" \
     [ "$_dsetq_n" -ge 2 ]
 check "status.sh reports the ddev settings mode" \
-    sh -c "grep -q 'ddev settings' \"\$1\"" _ "$STATUS"
+    sh -c "grep -q 'ddev settings' \"\$1\"" _ "$SCORE"
 check "hook hint mentions the dev-owned effect" \
     sh -c "grep -q 'disable_settings_management:' \"\$1\"" _ "$FUNC"
 check "kit CLI usage documents ddev-settings" \
@@ -1640,7 +1641,7 @@ rm -rf "$HWORK"
 
 # --- 8. status.sh reporting ----------------------------------------------------
 check "status.sh reports ddev-as-opencode state" \
-    sh -c "grep -q 'ddev-as-opencode' \"\$1\"" _ "$STATUS"
+    sh -c "grep -q 'ddev-as-opencode' \"\$1\"" _ "$SCORE"
 
 # --- 8b. config.sh ui.sh fallback (0.0.45c C9) ----------------------------------
 # The body calls ui_have/ui_atten (projects list) and ui_confirm/ui_menu/

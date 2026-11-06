@@ -24,6 +24,7 @@ INSTALL="$REPO/files/install.sh"
 UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
 DEPLOYLIB="$REPO/files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 STATUS="$REPO/files/opencode-permissions-kit-lib/management/status.sh"
+SCORE="$REPO/files/opencode-permissions-kit-lib/sh/status-core.sh"
 CONFIG="$REPO/files/opencode-permissions-kit-lib/management/config.sh"
 UNINSTALL="$REPO/files/opencode-permissions-kit-lib/management/uninstall.sh"
 SUDOERS="$REPO/files/opencode-permissions-kit-lib/templates/sudoers.template"
@@ -271,15 +272,15 @@ check "config.sh menu has a container backend entry" \
     grep -Fq 'Switch container backend' "$CONFIG"
 
 echo ""
-echo "-- status.sh wiring --"
+echo "-- status.sh wiring (section rows live in sh/status-core.sh, #346 wave 1) --"
 check "status.sh reports the backend name" \
-    grep -Fq 'backend:' "$STATUS"
+    grep -Fq 'backend:' "$SCORE"
 check "status.sh handles rootless backends" \
-    grep -Fq 'docker-rootless|podman-rootless' "$STATUS"
+    grep -Fq 'docker-rootless|podman-rootless' "$SCORE"
 check "status.sh reports socket reachability" \
-    grep -Fq 'NOT reachable' "$STATUS"
+    grep -Fq 'NOT reachable' "$SCORE"
 check "status.sh has no migration-stamp section (legacy cleanup)" \
-    grep_absent -Fq 'HARD_DENY_REMOVED' "$STATUS"
+    sh -c '! grep -Fq "HARD_DENY_REMOVED" "$1" && ! grep -Fq "HARD_DENY_REMOVED" "$2"' _ "$STATUS" "$SCORE"
 
 echo ""
 echo "-- CI wiring (issue #123: exec bits live in the git index) --"

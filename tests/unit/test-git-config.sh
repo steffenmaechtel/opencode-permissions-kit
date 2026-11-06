@@ -151,6 +151,7 @@ fi
 # preventing anything.
 GITCHECK="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/git-check.sh"
 STATUS="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/status.sh"
+SCORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core.sh"
 DEPLOYLIB="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 
 # Behavioral: source the helper with stubbed ui/log helpers and drive
@@ -243,7 +244,7 @@ else
     fail "issue #118: update.sh git-check wiring missing"
 fi
 if grep -q 'sh/git-check.sh' "$STATUS" &&
-    grep -q '^[[:space:]]*git_status_row$' "$STATUS"; then
+    grep -q '^[[:space:]]*git_status_row$' "$SCORE"; then
     pass "issue #118: status.sh sources + calls git_status_row (Core row)"
 else
     fail "issue #118: status.sh git-check wiring missing"
@@ -317,10 +318,10 @@ if grep -qF "$_gc_on" "$CONFIG" &&
     grep -qF "$_gc_off" "$CONFIG" &&
     [ "$_gc_on_n" -ge 2 ] &&
     [ "$_gc_off_n" -ge 3 ] &&
-    grep -qF "$_gc_prot" "$STATUS" &&
-    grep -qF "$_gc_allow" "$STATUS" &&
+    grep -qF "$_gc_prot" "$SCORE" &&
+    grep -qF "$_gc_allow" "$SCORE" &&
     grep -qF "$_gc_mark" "$CONFIG" &&
-    grep -qF "$_gc_mark" "$STATUS" &&
+    grep -qF "$_gc_mark" "$SCORE" &&
     ! grep -qF '"ON  (' "$CONFIG" &&
     ! grep -qF '"OFF  (' "$CONFIG"; then
     pass "issue #205: git-config rows read ON/OFF + protected/access allowed"

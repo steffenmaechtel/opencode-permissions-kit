@@ -15,6 +15,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 STATUS="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/status.sh"
+SCORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core.sh"
 INSTALL="$SCRIPT_DIR/../../files/install.sh"
 UPDATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh"
 DEPLOYLIB="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
@@ -37,21 +38,21 @@ check "update.sh passes sh -n" sh -n "$UPDATE"
 
 # --- warning wiring -------------------------------------------------------------
 check "status.sh gates the section on /mnt/c existing" \
-    sh -c "grep -qF '[ -d /mnt/c ]' \"\$1\"" _ "$STATUS"
+    sh -c "grep -qF '[ -d /mnt/c ]' \"\$1\"" _ "$SCORE"
 check "status.sh checks the world-readable (other) bit of the mount mode" \
-    sh -c "grep -q '0004' \"\$1\"" _ "$STATUS"
+    sh -c "grep -q '0004' \"\$1\"" _ "$SCORE"
 check "status.sh prints a world-readable warning" \
-    sh -c "grep -q 'world-readable' \"\$1\"" _ "$STATUS"
+    sh -c "grep -q 'world-readable' \"\$1\"" _ "$SCORE"
 check "status.sh names the asset at risk (Windows profile)" \
-    sh -c "grep -q 'Windows profile' \"\$1\"" _ "$STATUS"
+    sh -c "grep -q 'Windows profile' \"\$1\"" _ "$SCORE"
 check "status.sh shows the wsl.conf automount fix" \
-    sh -c "grep -qF '[automount]' \"\$1\" && grep -q 'uid=1000,gid=1000,dmask=027,fmask=037' \"\$1\"" _ "$STATUS"
+    sh -c "grep -qF '[automount]' \"\$1\" && grep -q 'uid=1000,gid=1000,dmask=027,fmask=037' \"\$1\"" _ "$SCORE"
 check "status.sh mentions 'wsl --shutdown'" \
-    sh -c "grep -q 'wsl --shutdown' \"\$1\"" _ "$STATUS"
+    sh -c "grep -q 'wsl --shutdown' \"\$1\"" _ "$SCORE"
 check "status.sh stays silent when the mount is restricted" \
-    sh -c "grep -qF 'restricted' \"\$1\"" _ "$STATUS"
+    sh -c "grep -qF 'restricted' \"\$1\"" _ "$SCORE"
 check "status.sh detects a configured-but-pending fix (wsl --shutdown)" \
-    sh -c "grep -q 'pending' \"\$1\" && grep -q \"options *=.*dmask\" \"\$1\"" _ "$STATUS"
+    sh -c "grep -q 'pending' \"\$1\" && grep -q \"options *=.*dmask\" \"\$1\"" _ "$SCORE"
 
 # --- install.sh report-only restriction (consent policy) ------------------------
 # The kit never writes /etc/wsl.conf (internal/records/wsl-conf-consent.md):
@@ -118,9 +119,9 @@ check "opk wsl-add-opencode-1-fix elevates via sudo and runs write_conf" \
 check "opk wsl-add-opencode-1-fix is the ONLY shipped entry point calling write_conf" \
     sh -c "! grep -rl 'browser_bridge_write_conf' \"\$1\" 2>/dev/null | grep -v 'sh/wsl-browser-bridge.sh$' | grep -v 'bin/opk$' | grep -q ." _ "$SCRIPT_DIR/../../files"
 check "status.sh points at the opt-in bridge command" \
-    sh -c "grep -q 'opk wsl-add-opencode-1-fix' \"\$1\"" _ "$STATUS"
+    sh -c "grep -q 'opk wsl-add-opencode-1-fix' \"\$1\"" _ "$SCORE"
 check "status.sh skips the bridge warning for open@11 versions (1.18.33 / 2.0.18)" \
-    sh -c "grep -qF 'advisories_version_cmp' \"\$1\" && grep -qF '1.18.33' \"\$1\" && grep -qF '2.0.18' \"\$1\" && grep -qF 'not needed' \"\$1\"" _ "$STATUS"
+    sh -c "grep -qF 'advisories_version_cmp' \"\$1\" && grep -qF '1.18.33' \"\$1\" && grep -qF '2.0.18' \"\$1\" && grep -qF 'not needed' \"\$1\"" _ "$SCORE"
 
 # --- xdg-open fallback shim (opencode 1.18.33+ / 2.0.18+ login fix) ---------------
 check "lib manifest deploys bin/xdg-open 755" \
@@ -130,11 +131,11 @@ check "install.sh deploys the xdg-open shim (guarded, never shadows a real one)"
 check "update.sh refreshes and heals the xdg-open shim (stands back for a real one)" \
     sh -c "grep -q 'opencode-permissions-kit-lib/bin/xdg-open' \"\$1\" && grep -qF 'xdg_open_real_exists' \"\$1\" && ! grep -qF '/usr/bin/xdg-open' \"\$1\"" _ "$UPDATE"
 check "status.sh reports the xdg-open fallback state" \
-    sh -c "grep -qF 'xdg-open fallback' \"\$1\"" _ "$STATUS"
+    sh -c "grep -qF 'xdg-open fallback' \"\$1\"" _ "$SCORE"
 check "status.sh never-shadow verdict uses the shared PATH probe (0.0.42d S1)" \
-    sh -c "grep -qF 'xdg_open_real_exists' \"\$1\"" _ "$STATUS"
+    sh -c "grep -qF 'xdg_open_real_exists' \"\$1\"" _ "$SCORE"
 check "status.sh flags a dangling kit shim instead of green (0.0.42d C2)" \
-    sh -c "grep -qF 'shim symlink dangles' \"\$1\"" _ "$STATUS"
+    sh -c "grep -qF 'shim symlink dangles' \"\$1\"" _ "$SCORE"
 
 # --- uninstall consent (internal/records/wsl-conf-consent.md) --------------------------
 UNINSTALL="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/uninstall.sh"

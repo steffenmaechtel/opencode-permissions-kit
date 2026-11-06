@@ -126,6 +126,8 @@ jobs:
         run: ./tests/unit/test-uninstall.sh
       - name: Run status tests
         run: ./tests/unit/test-status.sh
+      - name: Run status section-lib tests (issue #346)
+        run: ./tests/unit/test-status-core.sh
       - name: Run doctor tests (issue #313)
         run: ./tests/unit/test-doctor.sh
       - name: Run update flags tests

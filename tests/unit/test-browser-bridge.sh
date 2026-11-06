@@ -670,7 +670,7 @@ unset _op
 grep -qF 'xdg_open_real_exists' "$REPO/files/opencode-permissions-kit-lib/management/update.sh" &&
     pass "update.sh never-shadow guard uses the shared probe" ||
     fail "update.sh never-shadow guard uses the shared probe (0.0.42d S1/C1)"
-grep -qF 'xdg_open_real_exists' "$REPO/files/opencode-permissions-kit-lib/management/status.sh" &&
+grep -qF 'xdg_open_real_exists' "$REPO/files/opencode-permissions-kit-lib/sh/status-core.sh" &&
     pass "status.sh never-shadow verdict uses the shared probe" ||
     fail "status.sh never-shadow verdict uses the shared probe (0.0.42d S1/C1)"
 

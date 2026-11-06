@@ -19,6 +19,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 INSTALL="$SCRIPT_DIR/../../files/install.sh"
 UPDATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh"
 STATUS="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/status.sh"
+SCORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core.sh"
 
 # Shared harness (issue #394 adoption): pass/fail, colors, counters
 # and the summary gate live in lib/harness.sh now.
@@ -61,15 +62,15 @@ check "install.sh: Windows scan comes before the Linux fallback" \
 check "update.sh has no CA provisioning left (legacy cleanup)" \
     sh -c "! grep -qF '/mnt/c/Users/*/AppData/Local/mkcert' \"\$1\"" _ "$UPDATE"
 
-# --- status.sh mismatch warning ----------------------------------------------
+# --- status.sh mismatch warning (rows live in sh/status-core.sh, #346 wave 1) --
 check "status.sh compares CA fingerprints" \
-    sh -c "grep -q 'fingerprint -sha256' \"\$1\"" _ "$STATUS"
+    sh -c "grep -q 'fingerprint -sha256' \"\$1\"" _ "$SCORE"
 check "status.sh prints a MISMATCH warning" \
-    sh -c "grep -q 'MISMATCH' \"\$1\"" _ "$STATUS"
+    sh -c "grep -q 'MISMATCH' \"\$1\"" _ "$SCORE"
 check "status.sh points at the Windows CA source" \
-    sh -c "grep -qF '/mnt/c/Users/*/AppData/Local/mkcert/rootCA.pem' \"\$1\"" _ "$STATUS"
+    sh -c "grep -qF '/mnt/c/Users/*/AppData/Local/mkcert/rootCA.pem' \"\$1\"" _ "$SCORE"
 check "status.sh names the fix (clear traefik certs + restart)" \
-    sh -c "grep -q 'traefik/certs' \"\$1\" && grep -q 'ddev restart' \"\$1\"" _ "$STATUS"
+    sh -c "grep -q 'traefik/certs' \"\$1\" && grep -q 'ddev restart' \"\$1\"" _ "$SCORE"
 
 # --- functional: glob + label extraction --------------------------------------
 # Simulate the install.sh scan logic against a fake profile tree (the same

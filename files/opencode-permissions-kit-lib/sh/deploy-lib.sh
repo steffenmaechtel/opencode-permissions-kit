@@ -129,6 +129,9 @@ opencode-permissions-kit-lib/sh/render-agent-config.sh 644
 opencode-permissions-kit-lib/sh/secure-binary.sh 644
 opencode-permissions-kit-lib/sh/shell-warn.sh 755
 opencode-permissions-kit-lib/sh/staged-write.sh 644
+# status-core.sh: the status report's section functions (issue #346),
+# sourced checkout-first by management/status.sh
+opencode-permissions-kit-lib/sh/status-core.sh 644
 opencode-permissions-kit-lib/sh/sudoers-deploy.sh 644
 opencode-permissions-kit-lib/sh/tui-plugin.sh 644
 opencode-permissions-kit-lib/sh/ui.sh 755

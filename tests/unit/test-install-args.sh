@@ -255,16 +255,30 @@ fi
 # the getent-failure fallback (`|| var="/home/$DEFAULT_USER"`), and the
 # braced self-default fallback (`var="${var:-/home/${DEFAULT_USER:-$USER}}"`
 # — status.sh's openchamber home, positively pinned by the 0.0.47c C1 rows).
+# status.sh's home usages live in its section lib since the #346 wave-1
+# decomposition — both files are checked (getent in either, hardcoded
+# usage sites in neither).
+_v14_core="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core.sh"
 for _v14_sib in status update uninstall; do
     _v14_sh="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/$_v14_sib.sh"
-    _v14_bad="$(grep -e '/home/\$DEFAULT_USER' -e '/home/\${DEFAULT_USER' "$_v14_sh" 2>/dev/null |
+    _v14_files="$_v14_sh"
+    [ "$_v14_sib" = status ] && _v14_files="$_v14_sh
+$_v14_core"
+    _v14_bad="$(printf '%s\n' "$_v14_files" | while IFS= read -r _v14_f; do
+        grep -e '/home/\$DEFAULT_USER' -e '/home/\${DEFAULT_USER' "$_v14_f" 2>/dev/null ||
+            true
+    done |
         grep -v '^[[:space:]]*#' |
         grep -v '|| [[:alnum:]_]\{1,\}="/home/\$DEFAULT_USER"$' |
         grep -v '[[:alnum:]_]\{1,\}="\${[[:alnum:]_]\{1,\}:-/home/\${DEFAULT_USER:-\$USER}}"$' |
         grep -v '[[:alnum:]_]\{1,\}="\${[[:alnum:]_]\{1,\}:-/home/\${DEFAULT_USER:-\${USER:-}}}"$' || true)"
     # (the last allow-arm: the F9-deepened fallback #211 a F9 — set -u
     # survives both-unset; same self-default shape, one level deeper)
-    if grep -q 'getent passwd "\$DEFAULT_USER"' "$_v14_sh" && [ -z "$_v14_bad" ]; then
+    _v14_getent=0
+    for _v14_f in $_v14_files; do
+        grep -q 'getent passwd "\$DEFAULT_USER"' "$_v14_f" 2>/dev/null && _v14_getent=1
+    done
+    if [ "$_v14_getent" = 1 ] && [ -z "$_v14_bad" ]; then
         pass "$_v14_sib.sh: developer home via getent, no hardcoded usage site (V14 sibling)"
     else
         fail "$_v14_sib.sh: developer home via getent, no hardcoded usage site (V14 sibling: ${_v14_bad:-no getent})"
