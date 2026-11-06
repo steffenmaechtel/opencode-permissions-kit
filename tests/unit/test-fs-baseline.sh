@@ -1019,7 +1019,7 @@ if [ "$S245X2_RC" -ne 0 ] &&
 else
     fail "ddev_handover_root belt must refuse every dodge spelling (X2=$S245X2_RC X3=$S245X3_RC X4=$S245X4_RC X5=$S245X5_RC) (#245)"
 fi
-if sed 's/^[[:space:]]*#.*$//' "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/status.sh" |
+if sed 's/^[[:space:]]*#.*$//' "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core.sh" |
     grep -qF 'ui_atten "$root" "symlinked root — register the target directory instead"'; then
     pass "status.sh reports symlinked roots instead of the dead-end refresh advice (#245, a X4)"
 else

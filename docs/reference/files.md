@@ -147,6 +147,7 @@ The deployed library mirrors the repository layout
 | `/usr/local/lib/opencode-permissions-kit/sh/path-sane.sh` | Shared helper: project-root policy gate |
 | `/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh` | Shared helper: bypass warnings |
 | `/usr/local/lib/opencode-permissions-kit/sh/staged-write.sh` | Shared helper: symlink-safe privileged writes |
+| `/usr/local/lib/opencode-permissions-kit/sh/status-core.sh` | Shared helper: the status report's section functions |
 | `/usr/local/lib/opencode-permissions-kit/sh/sudoers-deploy.sh` | Shared helper: the sudoers pipeline |
 | `/usr/local/lib/opencode-permissions-kit/sh/secure-binary.sh` | Shared helper: binary hardening |
 | `/usr/local/lib/opencode-permissions-kit/sh/deploy-lib.sh` | Shared helper: library deployment manifest |

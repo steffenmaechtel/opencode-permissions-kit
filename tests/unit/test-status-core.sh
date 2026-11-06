@@ -1,0 +1,211 @@
+#!/bin/sh
+# Unit tests for sh/status-core.sh (issue #346, wave 1): the status
+# report's section functions, sourced from the lib the way status.sh
+# sources them — the log.sh pin pattern (source the lib, call the
+# function, stub the environment). The full-script behavioral matrix
+# stays in test-status.sh (it runs status.sh end to end); this suite
+# pins what only the DECOMPOSED shape can pin:
+#   - sourcing purity: definitions only, zero top-level side effects
+#   - every section entry point + helper is defined by sourcing
+#   - the Management section's --short gating, at function level
+#   - the Core section's missing-lib fallback row (git-check absent)
+#   - the Leak scan section's three verdict legs against a scratch
+#     LIBDIR (hit list, unscannable config, no config)
+#   - the Advisories section's missing-binary gate and healthy-binary
+#     verdict against a scratch LIBDIR with the real shipped database
+# Run: sh tests/unit/test-status-core.sh
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+LIB="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core.sh"
+UI_LIB="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/ui.sh"
+REPO_FILES="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib"
+
+# Shared harness (issue #394): pass/fail, colors, counters + the work
+# registry (issue #395) — no trap of our own, the harness owns cleanup.
+. "$SCRIPT_DIR/lib/harness.sh"
+WORK="$(work_new)"
+
+# Controlled PATH (the 0.0.46a F2 environment-dependence class; the
+# rule lives in agent/conventions.md, "Test sandbox (unit suites)"):
+# a scratch bin with stubs for the probes whose HOST state would leak
+# into rows. Everything else the sections touch (stat on scratch paths,
+# getent for absent users) is deterministic on its own.
+STUB="$WORK/bin"
+mkdir -p "$STUB"
+# readlink: the Wrapper row would answer with this host's real
+# /usr/local/bin/opencode target on kit-managed hosts, "missing" on CI.
+printf '#!/bin/sh\nexit 1\n' >"$STUB/readlink"
+chmod +x "$STUB/readlink"
+
+# --- 1. sourcing purity: definitions only, zero side effects ----------------------
+# The lib's core contract (#346): sourcing defines functions and nothing
+# else — no ui.sh needed, no probes, no output. A top-level probe or
+# print sneaking in shows up here as output or a non-zero rc.
+_purity_out=$(PATH="$STUB:$PATH" sh -c '. "$1"' _ "$LIB" 2>&1) || _purity_rc=$?
+if [ "${_purity_rc:-0}" = 0 ] && [ -z "$_purity_out" ]; then
+    pass "sourcing status-core.sh runs nothing, prints nothing"
+else
+    fail "sourcing status-core.sh must be side-effect free (rc=${_purity_rc:-0} out=$_purity_out)"
+fi
+
+# --- 2. every section entry point + helper is defined by sourcing -----------------
+_defs="status_section_core status_section_advisories status_section_projects
+status_section_backend status_section_ddev status_section_wsl2
+status_section_root_equiv status_section_leak_scan status_section_management
+_st_progress_tee _st_ddev_scan _st_ancestor_grants_x _st_root_blocker
+_st_dbdump_gap _st_ddev_basic _st_ddev_share_scan _st_ddev_router_ports
+_st_ddev_mkcert_ca _st_ddev_db_dumps _st_ddev_version _st_ddev_win_hosts
+status_groups_hits status_sock_agent_reachable"
+_missing=""
+for _fn in $_defs; do
+    sh -c '. "$1" && command -v "$2" >/dev/null' _ "$LIB" "$_fn" 2>/dev/null ||
+        _missing="$_missing $_fn"
+done
+if [ -z "$_missing" ]; then
+    pass "all 23 section/helper functions defined by sourcing"
+else
+    fail "functions missing after sourcing:$_missing"
+fi
+
+# --- 3. Management section: --short gating at function level ----------------------
+# W4's contract (one verdict line means one line): the hints block is
+# the section's whole body — false prints it, true prints nothing.
+_mgmt_run() {
+    (
+        PATH="$STUB:$PATH"
+        export PATH NO_COLOR=1
+        . "$UI_LIB"
+        . "$LIB"
+        STATUS_SHORT="$1"
+        status_section_management
+    ) 2>&1
+}
+_out=$(_mgmt_run false || true)
+if printf '%s' "$_out" | grep -q 'Management (run in a terminal)' &&
+    printf '%s' "$_out" | grep -q 'sudo opk config'; then
+    pass "management section prints the hints in full mode"
+else
+    fail "management section full mode broken (out=$_out)"
+fi
+_out=$(_mgmt_run true || true)
+if [ -z "$(printf '%s' "$_out" | grep -v '^ *$')" ]; then
+    pass "management section prints nothing under --short"
+else
+    fail "management section leaks into --short (out=$_out)"
+fi
+
+# --- 4. Core section: missing-lib fallback rows at function level -----------------
+# The #165/#199 a W3 contract at FUNCTION level: without git_status_row
+# defined (neither checkout nor deployed lib delivered it) and without
+# sh/update-check.sh at the resolved lib path, BOTH rows must render as
+# counted warns naming the broken kit — never a silent drop.
+# OPK_UPDATE_CHECK=0 is deliberately set AND ignored: the missing-lib
+# arm fires first. Only UNCONDITIONAL rows are asserted — the
+# OpenChamber verdict reads this host's real /etc/openchamber state, so
+# its row (and with it the counter totals) is environment-dependent on
+# kit-managed hosts vs CI (the 0.0.46a F2 class; the row itself is
+# pinned host-independently in test-status.sh's verdict matrix).
+_core_run() {
+    (
+        PATH="$STUB:$PATH"
+        export PATH NO_COLOR=1
+        . "$UI_LIB"
+        . "$LIB"
+        VERSION=0.0.0
+        KIT_CHANNEL=master
+        DEFAULT_USER=""
+        OPENCODE_USER=opencode-no-such-user-424242
+        OPENCODE_GROUP=opencode
+        LIBDIR="$WORK/no-lib"
+        OPK_UPDATE_CHECK=0
+        export OPK_UPDATE_CHECK
+        status_section_core
+    ) 2>&1
+}
+_out=$(_core_run || true)
+if printf '%s' "$_out" | grep -q 'kit update.*not checked — kit file sh/update-check.sh missing' &&
+    printf '%s' "$_out" | grep -q 'git.*not checked — kit file sh/git-check.sh missing or outdated'; then
+    pass "core: missing kit libs render their broken-kit warn rows"
+else
+    fail "core: missing-lib fallback rows broken (out=$(printf '%s' "$_out" | head -4))"
+fi
+
+# --- 5. Leak scan section: the no-config leg at function level -------------------
+# The section derives SCAN_CFG from OPENCODE_USER's home itself (pure
+# movement — no env seam was added), so only the no-config leg runs
+# sandboxed (an absent home config). The hit-list, --short and
+# unscannable legs stay pinned by test-status.sh's block-level harness
+# (#217/#379), which drives the section's scan block with a controlled
+# SCAN_CFG.
+LK="$WORK/lk"
+mkdir -p "$LK"
+_lk_run() {
+    (
+        PATH="$STUB:$PATH"
+        export PATH NO_COLOR=1
+        . "$UI_LIB"
+        . "$LIB"
+        LIBDIR="$LK" # no sh/log.sh: the noop log stays, the sandbox holds
+        OPENCODE_USER=opencode-no-such-user-424242
+        STATUS_SHORT=false
+        status_section_leak_scan
+    ) 2>&1
+}
+_out=$(_lk_run || true)
+if printf '%s' "$_out" | grep -q 'unknown — no agent config to scan'; then
+    pass "leak scan: absent config renders the uncounted unknown (#217)"
+else
+    fail "leak scan: absent-config leg broken (out=$(printf '%s' "$_out" | head -4))"
+fi
+
+# --- 6. Advisories section: missing-binary gate + healthy verdict ------------------
+# Scratch LIBDIR with the REAL shipped advisory database and a stub
+# opencode binary. Controlled PATH (agent/conventions.md, "Test sandbox
+# (unit suites)" — the controlled-PATH rule): a scratch bin with
+# symlinks to the section's few externals — stat, grep, sed, head — and
+# deliberately NO sudo, NO timeout, NO curl (every network / privilege
+# probe degrades deterministically instead of hitting the host's tools).
+# 9.9.9 is beyond every shipped range -> ok row.
+ADV="$WORK/adv"
+mkdir -p "$ADV/sh" "$ADV/bin" "$WORK/advbin"
+for _t in stat grep sed head; do
+    ln -s "$(command -v "$_t")" "$WORK/advbin/$_t"
+done
+cp "$REPO_FILES/sh/advisories.sh" "$ADV/sh/"
+printf '#!/bin/sh\necho "opencode version 9.9.9"\n' >"$ADV/bin/opencode"
+chmod 755 "$ADV/bin/opencode"
+_adv_run() {
+    (
+        PATH="$WORK/advbin" # only the section's externals: no sudo/timeout/curl
+        export PATH NO_COLOR=1
+        . "$UI_LIB"
+        . "$LIB"
+        LIBDIR="$ADV"
+        VERSION=0.0.0
+        OPENCODE_USER=opencode-no-such-user-424242
+        status_section_advisories
+        printf 'COUNTS warn=%s bad=%s ok=%s\n' \
+            "${UI_ROWS_WARN:-0}" "${UI_ROWS_BAD:-0}" "${UI_ROWS_OK:-0}"
+    ) 2>&1
+}
+_out=$(_adv_run || true)
+if printf '%s' "$_out" | grep -q 'opencode 9.9.9' &&
+    printf '%s' "$_out" | grep -q 'no known advisory affects this install' &&
+    printf '%s' "$_out" | grep -q 'COUNTS warn=0 bad=0 ok='; then
+    pass "advisories: healthy binary renders the no-advisory ok row"
+else
+    fail "advisories: healthy-binary leg broken (out=$(printf '%s' "$_out" | head -5))"
+fi
+# missing binary: the C1/#166 gate — counted warn, upgrade-opencode fix
+rm -f "${ADV:?}/bin/opencode"
+_out=$(_adv_run || true)
+if printf '%s' "$_out" | grep -q 'missing or not executable — advisory check skipped' &&
+    printf '%s' "$_out" | grep -q 'sudo opk upgrade-opencode' &&
+    printf '%s' "$_out" | grep -q 'COUNTS warn=1'; then
+    pass "advisories: missing binary counts the broken-kit warn (C1/#166)"
+else
+    fail "advisories: missing-binary gate broken (out=$(printf '%s' "$_out" | head -5))"
+fi
+
+suite_done
