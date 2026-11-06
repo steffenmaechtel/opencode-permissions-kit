@@ -573,8 +573,11 @@ check "install.sh hooks use the [ -f ] uninstall-safe guard" \
 # #407 a P1: bare-name pin retargeted to the lib — install.sh's only
 # remaining match was the bootstrap stub definer (vacuous pass, its
 # label lied); the real handover call lives in do_deploy_phase.
+# Call-form pattern since #407 d D1 (same sweep as C1/C2): the opening
+# quote matches CALL SITES only — stub definers, echo error arms and
+# comments cannot keep a leg green after the real call is deleted.
 check "install.sh hands over ddev paths in the filesystem step" \
-    sh -c "grep -q 'ddev_handover_root' \"\$1\"" _ "$INSTALL_CORE"
+    sh -c "grep -q 'ddev_handover_root \"' \"\$1\"" _ "$INSTALL_CORE"
 
 # --- 6. update.sh wiring -------------------------------------------------------
 check "update.sh KIT_FILES includes both new files" \
@@ -588,7 +591,7 @@ check "update.sh deploys the helper (mode 755, lib_deploy manifest)" \
 check "update.sh heals the rc-file hook idempotently" \
     sh -c "grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' \"\$1\"" _ "$UPDATE_CORE"
 check "update.sh runs the ddev handover unconditionally" \
-    sh -c "grep -q 'ddev_handover_root' \"\$1\"" _ "$UPDATE_CORE"
+    sh -c "grep -q 'ddev_handover_root \"' \"\$1\"" _ "$UPDATE_CORE"
 
 # --- 7. handover helper + call sites ---------------------------------------------
 check "handover helper searches .ddev at any depth" \
@@ -604,7 +607,7 @@ check "handover helper maps drupal settings dirs (sites/default)" \
 check "handover helper skips unknown app types" \
     sh -c "grep -qF 'return 0' \"\$1\"" _ "$HANDOVER"
 check "config.sh projects add uses the handover helper" \
-    sh -c "grep -q 'ddev_handover_root' \"\$1\"" _ "$CONFIG"
+    sh -c "grep -q 'ddev_handover_root \"' \"\$1\"" _ "$CONFIG"
 
 # --- 7b. project-root handover (TYPO3 bootstrap, EPERM on fresh clones) ---------
 # ddev's settings-path fallback targets the APP ROOT while TYPO3 is not
