@@ -6,12 +6,12 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**137 metas · 134 active · 3 retired · 1 review-pending · next due 2026-11-14**
+**137 metas · 134 active · 3 retired · 0 review-pending · next due 2026-11-14**
 
 ## Actionable
 
 - **Review pending:** none
-- **Amended — pending:** RM-0127 (2026-11-07)
+- **Amended — pending:** none
 - **Overdue:** none
 
 ## AGENTS.md
@@ -147,7 +147,7 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0126](0/1/2/RM-0126.md) | Curation: a fast-tier | active | approved | 1m | 2026-11-28 |
-| [RM-0127](0/1/2/RM-0127.md) | Verification: every curated | active | **amended — pending** | 1m | 2026-11-28 |
+| [RM-0127](0/1/2/RM-0127.md) | Verification: every curated | active | approved | 1m | 2026-11-28 |
 
 ### Reviewer freshness
 
