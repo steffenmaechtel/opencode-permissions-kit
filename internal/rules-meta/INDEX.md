@@ -6,12 +6,12 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**138 metas · 135 active · 3 retired · 3 review-pending · next due 2026-11-14**
+**138 metas · 135 active · 3 retired · 0 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0138
-- **Amended — pending:** RM-0065 (2026-11-07), RM-0136 (2026-11-07)
+- **Review pending:** none
+- **Amended — pending:** none
 - **Overdue:** none
 
 ## AGENTS.md
@@ -110,14 +110,14 @@
 | [RM-0121](0/1/2/RM-0121.md) | Write-through: the loop never | active | approved | 1m | 2026-11-28 |
 | [RM-0122](0/1/2/RM-0122.md) | Scope brake (binding in | active | approved | 1m | 2026-11-28 |
 | [RM-0123](0/1/2/RM-0123.md) | Scope budget (autonomous commissions): the | active | approved | 1m | 2026-11-28 |
-| [RM-0138](0/1/3/RM-0138.md) | A fix-wave re-review is itself | active | **pending** | 1m | 2026-12-07 |
+| [RM-0138](0/1/3/RM-0138.md) | A fix-wave re-review is itself | active | approved | 1m | 2026-12-07 |
 
 ### The loop and the stop rule
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0064](0/0/6/RM-0064.md) | Stop when a round leaves | active | approved | 1m | 2026-11-19 |
-| [RM-0065](0/0/6/RM-0065.md) | Review-relevant is everything that has | active | **amended — pending** | 1m | 2026-11-19 |
+| [RM-0065](0/0/6/RM-0065.md) | Review-relevant is everything that has | active | approved | 1m | 2026-11-19 |
 | [RM-0066](0/0/6/RM-0066.md) | A round whose fixes stay | active | approved | 1m | 2026-11-19 |
 | [RM-0067](0/0/6/RM-0067.md) | Any round whose fixes touch | active | approved | 1m | 2026-11-19 |
 | [RM-0068](0/0/6/RM-0068.md) | If a chain has not converged | retired | approved | 1m | 2026-11-19 |
@@ -126,7 +126,7 @@
 | [RM-0115](0/1/1/RM-0115.md) | A round never declares the | active | approved | 1m | 2026-11-28 |
 | [RM-0118](0/1/1/RM-0118.md) | Closure is a recorded step | active | approved | 1m | 2026-11-28 |
 | [RM-0134](0/1/3/RM-0134.md) | On the non-shipped track, a | active | approved | 1m | 2026-11-30 |
-| [RM-0136](0/1/3/RM-0136.md) | Deferred work orders collected during | active | **amended — pending** | 1m | 2026-12-01 |
+| [RM-0136](0/1/3/RM-0136.md) | Deferred work orders collected during | active | approved | 1m | 2026-12-01 |
 
 ### Round typing and tiering
 
