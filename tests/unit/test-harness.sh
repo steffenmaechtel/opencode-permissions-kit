@@ -454,8 +454,10 @@ lacks unreachable "the abort happened at the failed mktemp"
 # onto the output, stderr in the combined stream). Sabotage arms (run
 # against a committed tree, then restore + re-run green):
 #   - delete extract_func from harness.sh -> every 9.x pin goes red
-#   - widen the anchors to `^[[:space:]]*` -> the decoy_only pin goes
-#     red (over-capture guard discriminates)
+#   - widen BOTH anchors to `^[[:space:]]*` -> the decoy_only pin (9.2)
+#     goes red (over-capture guard discriminates)
+#   - widen ONLY the end anchor -> the outer_host full-extent pin (9.8)
+#     goes red (truncation discriminates)
 _ef_fix="$(mktemp -d)"
 printf '%s\n' \
     'alpha_fn() {' \
@@ -476,6 +478,7 @@ printf '%s\n' \
     '    decoy_only() {' \
     '        echo indented-decoy' \
     '    }' \
+    '    HOST_REACHED=1' \
     '}' \
     >"$_ef_fix/subject.sh"
 
@@ -520,7 +523,25 @@ has "not a function name" "9.6 ... stderr names it too"
 
 arm "extract_func \"$_ef_fix/no-such-file\" alpha_fn"
 rc_is 1 "9.7 missing file: rc 1 (fail-loud, L1)"
-has "not a readable file" "9.7 ... stderr names the file"
+has "not a regular file" "9.7 ... stderr names the file"
+
+# 9.7b (a R7): a DIRECTORY operand pins the -f semantics deterministically
+# (the env-dependent unreadable-regular-file path stays unpinned by design —
+# under a root runner sed would succeed and the pin could not discriminate).
+arm "extract_func \"$_ef_fix\" alpha_fn"
+rc_is 1 "9.7b directory operand: rc 1 (caught by the regular-file check)"
+has "not a regular file" "9.7b ... same guard, same message"
+
+# 9.8 (a R8): the full-extent discriminator the truncating end-anchor
+# widening escaped — outer_host is the one fixture function whose body
+# carries an indented nested def with its own indented close. A widened
+# end anchor (`/^[[:space:]]*}/`) truncates right after the decoy's
+# `    }` and drops TARGET_REACHED — every earlier pin observes nothing.
+arm "extract_func \"$_ef_fix/subject.sh\" outer_host"
+rc_is 0 "9.8 outer_host: rc 0"
+has "outer_host() {" "9.8 ... finds the definition line"
+has "indented-decoy" "9.8 ... spans past the nested def's indented close"
+has "HOST_REACHED=1" "9.8 ... reaches the real body end (truncation discriminator)"
 
 # --- summary gate (independent on purpose -- see header) ------------------------
 echo ""

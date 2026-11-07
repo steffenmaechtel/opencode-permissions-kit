@@ -685,7 +685,12 @@ check "root-file type (codeigniter): same permanent root handover" \
 check "root-file types: flagged project gets the root back (handback)" \
     sh -c "printf 'type: symfony\ndisable_settings_management: true\n' > \"\$2/.ddev/config.yaml\" && . \"\$1\" && ddev_handover_project_back \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\" >/dev/null && test \"\$(stat -c %a \"\$2\")\" = 2775" _ "$HANDOVER" "$HWORK/proj"
 
-# hint coverage (static): the bootstrap hint names the new type classes
+# hint coverage (static): the bootstrap hint names the new type classes.
+# Boundary note (#416 a R6): the awk ranges below run inside sh -c
+# children, where the harness's extract_func is not defined — conversion
+# would need a parent-shell extraction passing bytes down; kept as the
+# documented child-shell residual class (same boundary as fs-baseline's
+# _s245_dhr), not an oversight of the extract_func wave.
 check "hint: covers maho/modx settings dirs (issue #149 finding 5)" \
     sh -c "awk '/^_opk_bootstrap_hint\(\)/,/^}/' \"\$1\" | grep -q 'maho | modx'" _ "$FUNC"
 check "hint: covers the root-file types (codeigniter/shopware6/symfony)" \
@@ -729,7 +734,7 @@ check "kit CLI usage documents the handover command" \
 # config.sh's install.conf default. CONTAINER_BACKEND feeds the case arm
 # via the environment, so no INSTALL_CONF fixture is needed.
 HRH=$(mktemp -d)
-awk '/^_handover_rootless_hint\(\)/,/^}/' "$CONFIG" >"$HRH/fn.sh"
+extract_func "$CONFIG" _handover_rootless_hint >"$HRH/fn.sh"
 _hrh() {
     CONTAINER_BACKEND="$1" OPENCODE_USER=opencode sh -c '
         ui_detail() { printf "%s\n" "$1"; }
@@ -971,15 +976,15 @@ check "fix a M1: status tier-1 probe runs ddev from / — no caller cwd" \
 # naming e2e_dump_container would anchor the pin and hide motion of
 # the live call. e2e_finish likewise (#387 b b1): the negative arm
 # must not false-FAIL on a prose mention of the dump in its comments.
-_ecl_str="$(awk '/^e2e_cleanup\(\)/,/^}/' "$E2ELIB" | sed 's/^[[:space:]]*#.*$//')"
-_efn_str="$(awk '/^e2e_finish\(\)/,/^}/' "$E2ELIB" | sed 's/^[[:space:]]*#.*$//')"
+_ecl_str="$(extract_func "$E2ELIB" e2e_cleanup | sed 's/^[[:space:]]*#.*$//')"
+_efn_str="$(extract_func "$E2ELIB" e2e_finish | sed 's/^[[:space:]]*#.*$//')"
 check "fix a M2: e2e dump hooked in e2e_cleanup (every exit path), not e2e_finish" \
     sh -c "test -n \"\$1\" && test -n \"\$2\" && printf '%s\n' \"\$1\" | grep -q e2e_dump_container && ! printf '%s\n' \"\$2\" | grep -q e2e_dump_container" _ "$_ecl_str" "$_efn_str"
 check "fix a M2: the dump precedes the cleanup rm (evidence before destruction)" \
     sh -c "printf '%s\n' \"\$1\" | awk '/e2e_dump_container/{if (d == 0) d = NR} /^[[:space:]]*docker rm -f/{if (r == 0) r = NR} END{exit !(d > 0 && r > 0 && d < r)}'" _ "$_ecl_str"
 # _e2e_dump_strip body, comment-stripped (#387 c c1 / d d1 — the whole
 # block greps stripped streams; the raw shape stays in the deferred family)
-_eds_str="$(awk '/^_e2e_dump_strip\(\)/,/^}/' "$E2ELIB" | sed 's/^[[:space:]]*#.*$//')"
+_eds_str="$(extract_func "$E2ELIB" _e2e_dump_strip | sed 's/^[[:space:]]*#.*$//')"
 check "fix a S3: symlinks stripped from the dump (docker cp preserves them)" \
     sh -c "printf '%s\n' \"\$1\" | grep -q -- '-type l -delete'" _ "$_eds_str"
 check "fix a Q3: install.sh probes the ddev version subcommand from /" \
@@ -1037,7 +1042,7 @@ else
     chmod 000 "$BS1/tmp/locked"
     ln -s /usr/bin/find "$BS1/bin/find"
     ln -s /usr/bin/echo "$BS1/bin/echo"
-    BS1_OUT=$(awk '/^_e2e_dump_strip\(\)/,/^}/' "$E2ELIB" >"$BS1/fn.sh" && cd "$BS1" && PATH="$BS1/bin:$PATH" sh -c '. ./fn.sh 2>/dev/null; _e2e_dump_strip "$1"' sh "$BS1/tmp" 2>/dev/null)
+    BS1_OUT=$(extract_func "$E2ELIB" _e2e_dump_strip >"$BS1/fn.sh" && cd "$BS1" && PATH="$BS1/bin:$PATH" sh -c '. ./fn.sh 2>/dev/null; _e2e_dump_strip "$1"' sh "$BS1/tmp" 2>/dev/null)
     # find -delete still removes the top-level links it can reach (order is
     # directory-dependent) — the honest survival assertion is the link INSIDE
     # the untraversable dir; re-chmod first so test -L can see it again.

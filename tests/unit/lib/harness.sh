@@ -26,11 +26,12 @@
 #                        output on failure
 #   extract_func <file> <name>
 #                        print a top-level `name() { … }` definition
-#                        block from <file> (issue #396 -- the shape 9
-#                        suites had rolled locally). Strict col-0
-#                        anchors: `/^name() {/` .. first `/^}/`; an
-#                        indented (nested) same-name definition is
-#                        invisible by design (over-capture guard).
+#                        block from <file> (issue #396 — consolidating
+#                        the nine suite-local extractor helpers). Strict
+#                        col-0 anchors: `/^name() {/` .. first `/^}/`;
+#                        an indented (nested) definition, same name or
+#                        not, is invisible by design (over-capture
+#                        guard).
 #                        Empty output when absent; rc 1 + stderr on a
 #                        bad name or missing file. Callers own the
 #                        emptiness probe, the eval, and post-pipelines
@@ -111,11 +112,12 @@ extract_func() {
     # (comment-strip rider, inner-range, normalize). Strict col-0
     # anchors are the contract: an shfmt'd `name() {` at column 0,
     # closed by the first `^}` -- for a top-level function that first
-    # col-0 close is its own closing brace. Indented (nested) same-name
-    # definitions are deliberately invisible: a name-keyed helper that
-    # tolerates indent recreates the over-capture anchor class (the
-    # fold-comment lesson on #396) -- sites needing indent tolerance
-    # keep a local extractor (boundary rule, test-project-paths).
+    # col-0 close is its own closing brace. Indented (nested)
+    # definitions, same name or not, are deliberately invisible: a
+    # name-keyed helper that tolerates indent recreates the
+    # over-capture anchor class (the fold-comment lesson on #396) --
+    # sites needing indent tolerance keep a local extractor (boundary
+    # rule, test-project-paths).
     case "$2" in
         '' | *[!A-Za-z0-9_]*)
             echo "extract_func: not a function name: [$2]" >&2
@@ -123,7 +125,7 @@ extract_func() {
             ;;
     esac
     if [ ! -f "$1" ]; then
-        echo "extract_func: not a readable file: [$1]" >&2
+        echo "extract_func: not a regular file: [$1]" >&2
         return 1
     fi
     sed -n "/^$2() {/,/^}/p" "$1"
