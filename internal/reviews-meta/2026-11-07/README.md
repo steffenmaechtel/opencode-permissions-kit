@@ -86,6 +86,13 @@ outputs in [data/](data/) (`rounds.jsonl`, `subagents.jsonl`,
 
 ## Applied change (this PR)
 
+> Superseded later the same day (maintainer chat review): RM-0127
+> now sizes by COUNT — ≤ 10 curated → main-inline; > 10 → one batch
+> of 2–3 parallel strong sessions. History and the #367 a
+> counter-datapoint: the rule meta. The run's numbers and the
+> extraction stay valid as measured; only the derived gate form
+> changed.
+
 The maintainer pre-approved changing the calibration **in this PR** if
 the numbers are clear. They are (headline 2): verification sizing
 becomes **severity-driven** — RM-0127
