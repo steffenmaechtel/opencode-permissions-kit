@@ -571,7 +571,8 @@ check "gates: update.sh sync_tui_registration + tui.json chain gates" \
 check "gates: config.sh git_config_apply chain gate" \
     sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$(dirname \"\$target\")\"" "$1"' _ "$CONFIG"
 check "gates: uninstall.sh plugin-removal chain gate" \
-    sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$_un_dir\"" "$1"' _ "$UNINSTALL"
+    sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$_un_dir\"" "$1"' _ \
+    "$REPO/files/opencode-permissions-kit-lib/sh/uninstall-core.sh"
 check "0.0.39h F3: staged-write.sh refuses a directory destination" \
     grep -qF 'destination '"'"'$_sw_dst'"'"' is a directory' "$STAGEDWRITE"
 

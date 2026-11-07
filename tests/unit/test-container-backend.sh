@@ -255,7 +255,8 @@ check "config.sh has no WWW_GROUP fallback" \
 check "status.sh has no WWW_GROUP fallback" \
     grep_absent -Fq 'OPENCODE_GROUP:-${WWW_GROUP:-opencode}' "$STATUS"
 check "uninstall.sh has no WWW_GROUP fallback" \
-    grep_absent -Fq 'OPENCODE_GROUP:-${WWW_GROUP:-opencode}' "$UNINSTALL"
+    sh -c '! grep -Fq "\$WWW_GROUP" "$1" && ! grep -Fq "\$WWW_GROUP" "$2"' _ \
+    "$UNINSTALL" "$REPO/files/opencode-permissions-kit-lib/sh/uninstall-core.sh"
 check "no remaining WWW_GROUP variable use in install.sh" \
     sh -c '! grep -Fq "\$WWW_GROUP" "$1" && ! grep -Fq "\$WWW_GROUP" "$2"' _ "$INSTALL" "$INSTALL_CORE"
 

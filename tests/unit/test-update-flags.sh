@@ -659,7 +659,7 @@ check "install twin probes at the same authority (issue #164)" \
 check "uninstall twin probes at the same authority (issue #164)" \
     sh -c "grep -qF 'sudo test -f /etc/openchamber/policy.json' \"\$1\" \
         && grep -qF 'sudo grep -q ' \"\$1\"" _ \
-    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/uninstall.sh"
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/uninstall-core.sh"
 
 # Behavioral (L1/L4): the extracted gate block runs verbatim against a
 # fixture /etc/openchamber, mode 000 — caller-blind, root-visible (the
