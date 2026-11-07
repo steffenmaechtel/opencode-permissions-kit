@@ -165,27 +165,31 @@ nothing to review.
 - Deferred work orders collected during the loop become issues through
   ONE bundled maintainer gate at loop end: after the last fix wave and
   BEFORE the closing summary, the loop owner duplicate-checks every
-  collected work order against the tracker (open list + search),
-  proposes the bundling (same-topic orders share one issue) with
-  title, the `from-review` label (provenance: the issue came from a
+  collected work order against the tracker — the open list AND a
+  search covering issue TITLES AND BODIES (`gh search issues` covers
+  both; #407's title-only search missed two live matches), proposes
+  the bundling (same-topic orders share one issue) with title, the
+  `from-review` label (provenance: the issue came from a
   review pass — urgency NEVER travels in it), the `prio:` label
   derived from the finding's severity
   (LOW→prio:low, MED→prio:med, HIGH→prio:high; no label without a
-  severity), and source pointers — and agrees EVERY work order with
-  the maintainer in ONE ask placed at the very END of its report,
-  prominent enough that a maintainer reading only the closing lines
-  cannot miss it: plain markdown set off by horizontal rules, caps
-  headline, the affected IDs — nothing after it (the skill carries
-  the canonical shape). The answer is free-form, decided per work
-  order or per proposed bundle ("A and B yes, C no") — never a single
-  rigid yes/no over the whole set: for every YES the agent files the issue
-  itself (`gh issue create` — the opencode permission prompt stays
-  the runtime gate), each issue body citing the birth-PR as its
-  source (GitHub cross-references the PR timeline automatically — no
-  manual pointer comment); every NO is recorded as deliberately not
-  done, and the closing summary lists the created issues alongside
-  the recorded declines. Either way the round comments' work-order
-  records remain the ledger. (RM-0136)
+  severity), and source pointers. The PROPOSAL lives on the PR
+  timeline (the closing summary's work-order section); the ASK is
+  posed to the maintainer in the SESSION CHAT — both modes: the gate
+  is a maintainer decision, and the chat is where the maintainer
+  answers (#407 buried the ask inside the comment body — retired).
+  The answer is free-form, decided per work order or per proposed
+  bundle ("A and B yes, C no") — never a single rigid yes/no over the
+  whole set. For every YES the agent either files a new issue itself
+  (`gh issue create` — the opencode permission prompt stays the
+  runtime gate), each issue body citing the birth-PR as its source
+  (GitHub cross-references the PR timeline automatically), or FOLDS
+  the work order into the matched existing issue with a pointer
+  comment carrying the finding and its evidence — folding is an equal
+  disposition next to creating, not a fallback. Every NO is recorded
+  as deliberately not done, and the closing summary lists the created
+  issues and folds alongside the recorded declines. Either way the
+  round comments' work-order records remain the ledger. (RM-0136)
 
 ## Round typing and tiering
 
