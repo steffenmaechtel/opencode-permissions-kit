@@ -6,12 +6,12 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**137 metas · 134 active · 3 retired · 2 review-pending · next due 2026-11-14**
+**137 metas · 134 active · 3 retired · 3 review-pending · next due 2026-11-14**
 
 ## Actionable
 
 - **Review pending:** none
-- **Amended — pending:** RM-0137 (2026-11-06), RM-0127 (2026-11-07)
+- **Amended — pending:** RM-0137 (2026-11-06), RM-0059 (2026-11-07), RM-0127 (2026-11-07)
 - **Overdue:** none
 
 ## AGENTS.md
@@ -104,7 +104,7 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0058](0/0/5/RM-0058.md) | Before the first review round | active | approved | 1m | 2026-11-28 |
-| [RM-0059](0/0/5/RM-0059.md) | The round comment is posted | active | approved | 1m | 2026-11-28 |
+| [RM-0059](0/0/5/RM-0059.md) | The round comment is posted | active | **amended — pending** | 1m | 2026-11-28 |
 | [RM-0119](0/1/1/RM-0119.md) | Lettering: one letter per | active | approved | 1m | 2026-11-28 |
 | [RM-0120](0/1/2/RM-0120.md) | The loop cap (default 6) | active | approved | 1m | 2026-11-28 |
 | [RM-0121](0/1/2/RM-0121.md) | Write-through: the loop never | active | approved | 1m | 2026-11-28 |

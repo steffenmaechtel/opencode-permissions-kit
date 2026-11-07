@@ -65,7 +65,9 @@ round b: review (comment) → fixes → … → closing summary → merge
   Findings must be inspectable on the PR timeline while nothing has
   been done about them yet, and a fix applied mid-verification would
   change the very tree the remaining findings are verified against.
-  (RM-0059)
+  The seam is MECHANICAL, not remembered: before the first fix commit
+  of a wave, the case scratch `posted.log` must contain the current
+  round's comment URL — no entry, no fix. (RM-0059)
 - Lettering: one letter per round, and the review and its fix wave
   SHARE it (round a's review is comment "Review a", its fixes are
   dispositioned in round a's wake). Letters run sequentially from a,

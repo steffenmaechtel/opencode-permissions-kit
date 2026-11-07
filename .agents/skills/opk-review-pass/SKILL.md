@@ -220,7 +220,11 @@ review-concept, "The round comment contract"):
    trimmed.
 5. Post to the PR timeline; append the comment URL to the case
    scratch `posted.log`. The comment posts BEFORE any fix starts —
-   the hard seam.
+   the hard seam. MECHANICAL FORM: before the first fix commit of
+   the wave, re-read `posted.log` and confirm it contains THIS
+   round's URL — no entry, no fix; post first. Long sessions lose
+   prose, not logs (#407: rounds b–e posted as a batch after the
+   fixes, disclosed as a deviation).
 6. Nothing here fixes anything: dispositions for THIS round's
    findings land in the NEXT round's comment (or the closing
    summary).
