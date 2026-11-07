@@ -1363,7 +1363,7 @@ fi
 # as paths, so no rewrite is needed and the failure arm pins verbatim; a
 # whole-function sourcing drive (un_user_remove with the same stubs) has
 # suite precedent but is recorded pin polish, not owed here. The W2 gate
-# pin below is the one that genuinely needs the sed scratch rewrite (its
+# pin above is the one that genuinely needs the sed scratch rewrite (its
 # sudo stub EXECs, so the readable-.agents fixture must live at a
 # rewritable path). Anchors: 12-space nesting inside un_user_remove.
 _f2_bak_block="$(sed -n '/^            for _un_ag_dirname in \.agents \.claude; do$/,/^            done$/p' "$LIB")"
