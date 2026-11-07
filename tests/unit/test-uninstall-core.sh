@@ -6,7 +6,8 @@
 # block-extraction pins test-uninstall.sh used to carry (project loop,
 # rc-observing runner, OPENCODE_USER gate, config-dirs section, prompt_yn,
 # group/user/audit-log blocks) became sourcing pins here. Two extraction
-# pins remain, deliberately (RM-0130 — the pins work; converting them is
+# pins remain, deliberately (review-concept.md, "Review focus: shipped
+# code first, pins at a floor" — the pins work; converting them is
 # recorded as pin polish, not owed here): the W2 agents-backup gate (its
 # success fixture needs a readable dir at the literal /home/<agent> path —
 # the sed scratch rewrite is the only hermetic shape for THAT leg) and the
@@ -1153,7 +1154,8 @@ fi
 # The silent noop stub + unconditional echo claimed a removal that never
 # ran when the helper was missing. Extract the real consent block and
 # drive both arms with a stubbed browser_bridge_remove + auto-yes prompt.
-# Retargeted extraction, deliberately kept (RM-0130): the obstacle is the
+# Retargeted extraction, deliberately kept (review-concept.md, "Review
+# focus: shipped code first, pins at a floor"): the obstacle is the
 # marker GUARD's hardcoded /etc/wsl.conf grep — a whole-section sourcing
 # drive would need a grep shadow to stay hermetic (feasible, but that
 # conversion is recorded pin polish, not owed here); the standalone block
@@ -1358,7 +1360,8 @@ else
 fi
 
 # --- agents-backup failure arm names the failing commands (#211 f W2) ----------
-# Retargeted extraction, deliberately kept (RM-0130): this driver stubs
+# Retargeted extraction, deliberately kept (review-concept.md, "Review
+# focus: shipped code first, pins at a floor"): this driver stubs
 # sudo (test/ls/mkdir/cp) — the /home/<agent> literals are never executed
 # as paths, so no rewrite is needed and the failure arm pins verbatim; a
 # whole-function sourcing drive (un_user_remove with the same stubs) has
