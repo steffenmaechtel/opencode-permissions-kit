@@ -210,8 +210,9 @@ nothing to review.
   `from-review` label (provenance: the issue came from a
   review pass — urgency NEVER travels in it), the `prio:` label
   derived from the finding's severity
-  (LOW→prio:low, MED→prio:med, HIGH→prio:high; no label without a
-  severity), and source pointers. The PROPOSAL lives on the PR
+  (INFO→prio:info, LOW→prio:low, MED→prio:med, HIGH→prio:high; no
+  label without a severity), and source pointers. The PROPOSAL lives
+  on the PR
   timeline (the closing summary's work-order section); the ASK is
   posed to the maintainer in the SESSION CHAT — both modes: the gate
   is a maintainer decision, and the chat is where the maintainer
