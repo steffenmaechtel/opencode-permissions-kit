@@ -59,7 +59,11 @@ outputs in [data/](data/) (`rounds.jsonl`, `subagents.jsonl`,
    Six strong sessions ≈ ~34 min agent time, ~0.33M input tokens. The
    severity arm is the opposite: **37 MED/HIGH rounds → 9 retractions**
    (24% of rounds) — that is where verification earns its cost, and
-   the one skipped MED batch (#329 b) was a real deviation.
+   the one skipped MED batch (#329 b) was a real deviation. A "≥ 3
+   MED/HIGH findings" arm was considered and rejected: the yield
+   spreads across count bands — 6 of 8 retraction rounds carried
+   only 1–2 MED/HIGH (1–2 band: 29 rounds → 7 retractions; ≥ 3 band:
+   8 rounds → 2) — so the batch stays owed at ANY MED/HIGH.
 
 3. **Cost shape of the three roles** (339 sessions, 12 days): reviewers
    dominate by design — 221 sessions (218 fast tier), median 8.0 min,

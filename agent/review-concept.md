@@ -318,12 +318,7 @@ works.
   strong-tier verifier batch runs (verdict files per batch) — a hard
   gate: skipping an owed batch is a process deviation only a
   maintainer disclosure can carry, never a time-pressure call. The
-  old count arm ("≤ 5 curated findings") was dropped 2026-11-07 on
-  the numbers: six batches over > 5-finding LOW/INFO rounds produced
-  at most one retraction, main-inline rounds retract LOW/INFO ghosts
-  too, and the next round's fresh re-review nets the rest
-  ([reviews-meta 2026-11-07](../internal/reviews-meta/2026-11-07/)).
-  The main session audits the verdicts — re-deriving every MED/HIGH
+  main session audits the verdicts — re-deriving every MED/HIGH
   itself, spot-checking LOW/INFO (on a LOW/INFO-only round that audit
   IS the verification — all of them); refuted findings are retracted
   with the refuting evidence named. Subagent freshness replaces
