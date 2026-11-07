@@ -336,7 +336,7 @@ fi
 # on PATH — command -v resolves the shim first, so the host's own ddev
 # cannot interfere. (#402 a c1: the fragment must be a balanced unit —
 # the #221 a W8 sh -n discipline is pinned here too, not just assumed.)
-DDEV_PROBE="$(sed -n '/^_st_ddev_version() {/,/^}$/p' "$STATUS_CORE")"
+DDEV_PROBE="$(extract_func "$STATUS_CORE" _st_ddev_version)"
 if [ -n "$DDEV_PROBE" ] && printf '%s\n' "$DDEV_PROBE" | sh -n; then
     pass "ddev version probe function extractable from sh/status-core.sh (sh -n clean)"
 else
@@ -601,7 +601,7 @@ if grep -qF 'str(entry.get("ghsa_id") or "")' "$STATUS_CORE"; then
 else
     fail "status.sh coerces a null ghsa_id (the F7 class twin, V19)"
 fi
-_gap_fn=$(sed -n '/^_st_dbdump_gap() {/,/^}$/p' "$STATUS_CORE")
+_gap_fn=$(extract_func "$STATUS_CORE" _st_dbdump_gap)
 if [ -n "$_gap_fn" ]; then
     pass "status.sh: gap function extractable (W15)"
     _gap_work=$(mktemp -d)

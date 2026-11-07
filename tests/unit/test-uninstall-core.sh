@@ -294,7 +294,7 @@ done
 # the single copy. Top-level anchored (the lib's definition, like
 # config.sh's former one, sits at indent 0).
 PATH_SANE_SH="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/path-sane.sh"
-WRITER_PATTERNS="$(sed -n '/^project_path_sane()/,/^}/p' "$PATH_SANE_SH" |
+WRITER_PATTERNS="$(extract_func "$PATH_SANE_SH" project_path_sane |
     grep -E '^[[:space:]]*/' | grep -vE '^[[:space:]]*/\*\)' |
     sed -e 's/\\$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/)$//' | tr '\n' '|')"
 _un_parity_tokens() {

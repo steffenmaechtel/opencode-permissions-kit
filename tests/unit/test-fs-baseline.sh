@@ -905,7 +905,7 @@ fi
         'fs_baseline_root() { echo "FSB: $1"; }' \
         'ddev_handover_root() { echo "HO: $1"; }' \
         'ddev_handover_stamp_write() { :; }'
-    sed -n '/^refresh() {/,/^}$/p' "$CONFIG"
+    extract_func "$CONFIG" refresh
     printf '%s\n' 'refresh'
 } >"$S245/run-refresh.sh"
 # conf order: real … malformed/link entries … real2 — real2 AFTER every

@@ -91,7 +91,7 @@ trap _trap_cleanup EXIT INT TERM
 # past; quoting style must not blind the guard (pinned below by the
 # planted-receiver probe pin).
 _opk_recv_check() {
-    _orc_list=$(awk '/^_trap_cleanup\(\)/,/^}/' "$1")
+    _orc_list=$(extract_func "$1" _trap_cleanup)
     _orc_rc=0
     for _orc_v in $(grep -oE '^[[:space:]]*[A-Za-z_0-9]+="?[[:space:]]*\$\(mktemp' "$1" | cut -d= -f1 | sort -u); do
         _orc_pat=$(printf '"${%s:-}"' "$_orc_v")

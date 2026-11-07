@@ -43,11 +43,7 @@ INSTALL_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/install-co
 # (and check/assert_eq where present) live in lib/harness.sh now.
 . "$SCRIPT_DIR/lib/harness.sh"
 
-extract_fn() {
-    sed -n '/^parse_args() {/,/^}/p' "$1"
-}
-
-if [ -n "$(extract_fn "$INSTALL")" ]; then
+if [ -n "$(extract_func "$INSTALL" parse_args)" ]; then
     pass "parse_args defined in install.sh"
 else
     fail "parse_args defined in install.sh"
@@ -55,7 +51,7 @@ else
     exit 1
 fi
 
-eval "$(extract_fn "$INSTALL")"
+eval "$(extract_func "$INSTALL" parse_args)"
 
 reset_globals() {
     SKIP_PROMPTS=false
@@ -405,7 +401,7 @@ case "$2" in
 esac
 FAKE
 chmod +x "$FKWORK/bin/curl"
-eval "$(sed -n '/^fetch_kit() {/,/^}/p' "$INSTALL")"
+eval "$(extract_func "$INSTALL" fetch_kit)"
 # fetch_kit registers its fetch temps via _tmp_track (the host script's
 # trap empties the registry; the isolated function only needs it defined).
 _tmp_track() { :; }
@@ -441,7 +437,7 @@ for _fkg_host in "$INSTALL" "$UPDATE"; do
     _fkg_w="$FKWORK/g-$_fkg_i"
     mkdir -p "$_fkg_w/a-bin" "$_fkg_w/b-bin"
     _fkg_name="$(basename "$_fkg_host")"
-    eval "$(sed -n '/^fetch_kit() {/,/^}/p' "$_fkg_host")"
+    eval "$(extract_func "$_fkg_host" fetch_kit)"
     _tmp_track() { :; }
 
     # shared: fake curl (never reached in green; sabotage must not hit
@@ -549,8 +545,8 @@ if grep -qF 'sed -n '"'"'s/^ID=//p'"'"' /etc/os-release' "$INSTALL_CORE" &&
 else
     fail "gate reads ID/VERSION_ID from /etc/os-release (sed, not sourced)"
 fi
-if [ -n "$(sed -n '/^_distro_gate() {/,/^}/p' "$INSTALL")" ]; then
-    eval "$(sed -n '/^_distro_gate() {/,/^}/p' "$INSTALL")"
+if [ -n "$(extract_func "$INSTALL" _distro_gate)" ]; then
+    eval "$(extract_func "$INSTALL" _distro_gate)"
     ui_error() { echo "error: $*"; }
     ui_info() { echo "info: $*"; }
     ui_detail() { echo "detail: $*"; }
@@ -766,7 +762,7 @@ fi
 # warning survived every opk update (update skipped the /home/root
 # phantom silently). _root_user_gate aborts before the first prompt; it
 # must fire on the NAME root and on ANY uid-0 developer, independently.
-_rug_fn="$(sed -n '/^_root_user_gate() {/,/^}/p' "$INSTALL")"
+_rug_fn="$(extract_func "$INSTALL" _root_user_gate)"
 if [ -n "$_rug_fn" ]; then
     pass "_root_user_gate extractable from install.sh"
     eval "$_rug_fn"
@@ -852,8 +848,8 @@ fi
 # 0.0.45a C1). Fix-wave-2 additions: the noisy-broken case (the gate
 # must surface the interpreter's own diagnostic, #244 b S2) and the
 # import-union drift pin (#244 b Q1).
-if [ -n "$(sed -n '/^_py3_health_probe() {/,/^}/p' "$INSTALL")" ]; then
-    eval "$(sed -n '/^_py3_health_probe() {/,/^}/p' "$INSTALL")"
+if [ -n "$(extract_func "$INSTALL" _py3_health_probe)" ]; then
+    eval "$(extract_func "$INSTALL" _py3_health_probe)"
     pass "_py3_health_probe defined in install.sh"
     _py3w="$(mktemp -d)"
     mkdir -p "$_py3w/empty" "$_py3w/shim" "$_py3w/noisy"

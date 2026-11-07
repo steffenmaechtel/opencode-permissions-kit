@@ -25,7 +25,10 @@ PATH_SANE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/path-sane.sh"
 extract_fn() {
     # print a project_path_sane() { ... } block from a script or lib —
     # indent-tolerant: the lib's real definition sits at indent 0, the
-    # callers' fail-closed stubs (issue #216) at +4
+    # callers' fail-closed stubs (issue #216) at +4. Deliberately NOT
+    # the harness extract_func (#396): that helper is col-0-strict by
+    # contract (over-capture guard); this suite needs the +4 stubs, so
+    # the local indent-tolerant shape stays (the #396 boundary case).
     sed -n '/^[[:space:]]*project_path_sane() {/,/^[[:space:]]*}/p' "$1" |
         sed 's/^[[:space:]]*//'
 }

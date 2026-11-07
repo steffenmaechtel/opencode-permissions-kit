@@ -35,7 +35,7 @@ extract_update_list() {
 
 # extract_install_list <install.sh> — the `for f in ... ; do` inside fetch_kit()
 extract_install_list() {
-    sed -n '/^fetch_kit() {/,/^}/p' "$1" |
+    extract_func "$1" fetch_kit |
         sed -n '/for f in /,/; do/p' |
         sed -e 's/^[[:space:]]*for f in //' -e 's/; do$//' | normalize
 }
@@ -226,7 +226,7 @@ fi
 # with curl error 23 at the first nested file (the tui/ regression — every
 # `opk update` from the library failed mid-fetch).
 fetch_body() {
-    sed -n '/^fetch_kit() {/,/^}/p' "$1"
+    extract_func "$1" fetch_kit
 }
 
 # unique subdirectory prefixes referenced by the (verified-identical) lists
@@ -285,7 +285,7 @@ FAKE
 chmod +x "$WORK/fakebin/curl"
 
 sed -n '/^KIT_FILES="/,/"$/p' "$UPDATE" >"$WORK/kitfiles.env"
-sed -n '/^fetch_kit() {/,/^}/p' "$UPDATE" >"$WORK/fetchkit.fn"
+extract_func "$UPDATE" fetch_kit >"$WORK/fetchkit.fn"
 # fetch_kit reports the tree via the _FK_DIR global (no stdout — a
 # command-substitution call would void the trap registrations); the inner
 # shell echoes it deliberately for this test.

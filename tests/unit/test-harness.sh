@@ -13,6 +13,11 @@
 #     and the green/red verdict lines
 #   - assert_eq pass arm + fail arm (expected/got text)
 #   - check pass arm + fail arm
+#   - extract_func (#396): the strict col-0 anchor contract (right
+#     block, full extent, indented-only defs invisible), the emptiness
+#     contract for absent names, rider composability on stdout, the
+#     probe+eval production idiom, and the two fail-loud guards
+#     (invalid name, missing file)
 #   - the mixed-tally integration: 3 pass + 2 fail -> both counts in
 #     one output, rc 1
 #   - the work registry (#395): work_new / work_new_file create AND
@@ -62,7 +67,8 @@ bad() {
 _meta_cleanup() {
     rm -rf "${_lc_iso:-}" "${_lc_cell:-}" "${_sgi_iso:-}" \
         "${_sgi_scratch:-}" "${_afc_out:-}" "${_afc_cell:-}" \
-        "${_a1h_out:-}" "${_a1h_cell:-}" "${_a1h_a:-}" "${_a1h_b:-}"
+        "${_a1h_out:-}" "${_a1h_cell:-}" "${_a1h_a:-}" "${_a1h_b:-}" \
+        "${_ef_fix:-}"
     rm -f "${_sgi_out:-}"
 }
 trap _meta_cleanup EXIT INT TERM
@@ -438,6 +444,83 @@ arm 'set -e; TMPDIR="/opk-dead-af"; export TMPDIR; W="$(work_new)"; echo unreach
 rc_is 1 "work_new fails loud when mktemp fails (dead TMPDIR)"
 has "failed to create" "mktemp's own error surfaces (no silent empty path)"
 lacks unreachable "the abort happened at the failed mktemp"
+
+# --- 9. extract_func (#396): the canonical function-extraction helper -----------
+# Consolidation target of the nine suite-local extractors (inventory on
+# #396): every converted suite relies on the strict-anchor contract --
+# col-0 `name() {` .. first `^}` -- so these pins prove exactly that
+# contract plus the two fail-loud guards, observed through the child
+# shell the way production observes it (command substitution, pipes
+# onto the output, stderr in the combined stream). Sabotage arms (run
+# against a committed tree, then restore + re-run green):
+#   - delete extract_func from harness.sh -> every 9.x pin goes red
+#   - widen the anchors to `^[[:space:]]*` -> the decoy_only pin goes
+#     red (over-capture guard discriminates)
+_ef_fix="$(mktemp -d)"
+printf '%s\n' \
+    'alpha_fn() {' \
+    '    # rider comment alpha' \
+    '    A="set"' \
+    '}' \
+    'target_fn() {' \
+    '    # rider comment target' \
+    '    inner="}"' \
+    '    case "$inner" in' \
+    '        *)' \
+    '            echo case-arm' \
+    '            ;;' \
+    '    esac' \
+    '    TARGET_REACHED=1' \
+    '}' \
+    'outer_host() {' \
+    '    decoy_only() {' \
+    '        echo indented-decoy' \
+    '    }' \
+    '}' \
+    >"$_ef_fix/subject.sh"
+
+arm "extract_func \"$_ef_fix/subject.sh\" target_fn"
+rc_is 0 "9.1 extract_func: known top-level function, rc 0"
+has "target_fn() {" "9.1 ... finds the definition line"
+has "TARGET_REACHED=1" "9.1 ... spans the whole body to its own closing brace"
+has 'inner="}"' "9.1 ... an indented brace line does not close the range"
+lacks "alpha_fn" "9.1 ... does not spill backwards into the previous def"
+lacks "indented-decoy" "9.1 ... does not spill forward into later defs"
+
+arm "extract_func \"$_ef_fix/subject.sh\" decoy_only"
+rc_is 0 "9.2 absent at col 0: rc 0, not an error"
+if [ -z "$_arm_out" ]; then
+    ok "9.2 ... an indented-only def is invisible (over-capture guard)"
+else
+    bad "9.2 ... an indented-only def must extract empty (got: $_arm_out)"
+fi
+
+arm "extract_func \"$_ef_fix/subject.sh\" missing_fn"
+rc_is 0 "9.3 unknown name: rc 0, not an error"
+if [ -z "$_arm_out" ]; then
+    ok "9.3 ... empty output (the caller's emptiness probe owns the verdict)"
+else
+    bad "9.3 ... unknown name must extract empty (got: $_arm_out)"
+fi
+
+arm "B=\$(extract_func \"$_ef_fix/subject.sh\" alpha_fn | sed 's/^[[:space:]]*#.*\$//'); printf '%s\n' \"\$B\""
+lacks "# rider comment" "9.4 the #385 comment-strip rider composes on stdout"
+has 'A="set"' "9.4 ... code lines survive the rider"
+
+arm "_b=\$(extract_func \"$_ef_fix/subject.sh\" alpha_fn); [ -n \"\$_b\" ] && eval \"\$_b\"; alpha_fn; echo \"A=\$A\""
+has "A=set" "9.5 the production idiom: emptiness probe + eval + call runs the block"
+
+arm "extract_func \"$_ef_fix/subject.sh\" 'bad name'"
+rc_is 1 "9.6 invalid name: rc 1 (fail-loud, L1)"
+has "not a function name" "9.6 ... stderr names the bad argument"
+
+arm "extract_func \"$_ef_fix/subject.sh\" ''"
+rc_is 1 "9.6 empty name: rc 1 (a dropped argument cannot probe silently)"
+has "not a function name" "9.6 ... stderr names it too"
+
+arm "extract_func \"$_ef_fix/no-such-file\" alpha_fn"
+rc_is 1 "9.7 missing file: rc 1 (fail-loud, L1)"
+has "not a readable file" "9.7 ... stderr names the file"
 
 # --- summary gate (independent on purpose -- see header) ------------------------
 echo ""
