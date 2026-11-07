@@ -148,17 +148,40 @@ _fsb_py_probe() {
 # logs stay grep-able). Script via -c, NOT a heredoc: `python3 -` with a
 # heredoc would consume stdin for the script itself and the tee would
 # read nothing. Gated by _fsb_py_probe above (#223): without a healthy
-# python3 the tee is a plain passthrough (cat) — the pass data never
-# depends on the progress display. Runs isolated (`-I`) like the probe:
-# PYTHON* env poison cannot shadow the tee's imports either (#244 a
-# S1). The -I scope is those env vars plus the user-site isolation
-# -s/-P buy; system site-packages stay processed — the residual named
-# at the probe above (#244 b S1, c S2).
+# python3 the tee is a plain passthrough (cat) that PROPAGATES cat's rc
+# (#265: a read error must fail the pass; only SIGPIPE — the consumer
+# EPIPE — maps to the documented 0). Runs isolated (`-I`) like the
+# probe: PYTHON* env poison cannot shadow the tee's imports either
+# (#244 a S1). The -I scope is those env vars plus the user-site
+# isolation -s/-P buy; system site-packages stay processed — the
+# residual named at the probe above (#244 b S1, c S2). The two output
+# streams carry DIFFERENT failure contracts (#265, pr-00263 c C1):
+# stdout is the data stream (a consumer EPIPE aborts it, exit 0 per
+# #244 a Q1), stderr is progress only (a write failure there — EPIPE
+# from a closed sink, ENOSPC from a full device — degrades the counter
+# and never touches the data stream).
 _fsb_count_tee() {
     _fsb_py_probe
     if [ "${_fsb_py_ok:-0}" != 1 ]; then
+        # rc contract (#265, pr-00263 b B2 — the cat arm's mask): the
+        # old unconditional `return 0` discarded cat's rc — a read
+        # error truncated the operand stream with every pipeline member
+        # green and _FSB_ERRORS stayed 0, while callers printed the
+        # success line this file's own contract forbids ("must not
+        # print over a baseline that did not fully apply"). Propagate:
+        # 0 stays 0, a read error fails the pass — in production
+        # pipefail fails the pipeline, in _fsb_pass the captured rc
+        # feeds _FSB_ERRORS. The ONE rc that must not fail is 141
+        # (128+SIGPIPE): the consumer closed early or died — the python
+        # arm's documented consumer-EPIPE 0 below (#244 a Q1); a
+        # consumer that DIED still fails the pass through its own rc in
+        # the pipeline, and pipefail reads that member, not this one.
         cat
-        return 0
+        _fsb_cat_rc=$?
+        if [ "$_fsb_cat_rc" -eq 141 ]; then
+            return 0
+        fi
+        return "$_fsb_cat_rc"
     fi
     python3 -I -c '
 import os, sys
@@ -166,6 +189,7 @@ label = sys.argv[1]
 counted = 0
 shown = 0
 aborted = False
+progress_dead = False
 try:
     while True:
         chunk = sys.stdin.buffer.read(1 << 20)
@@ -174,10 +198,27 @@ try:
         counted += chunk.count(b"\0")
         sys.stdout.buffer.write(chunk)
         sys.stdout.buffer.flush()
-        if counted - shown >= 2000:
+        if not progress_dead and counted - shown >= 2000:
             shown = counted
-            sys.stderr.write("\r    %-16s %d entries" % (label, counted))
-            sys.stderr.flush()
+            try:
+                sys.stderr.write("\r    %-16s %d entries" % (label, counted))
+                sys.stderr.flush()
+            except OSError:
+                # stderr-side failure only (#265, pr-00263 c C1): the
+                # PROGRESS sink died — EPIPE (BrokenPipeError is an
+                # OSError subclass; the reader of the sink closed) or
+                # e.g. ENOSPC (stderr at a full device) — never the
+                # data consumer. Degrade the progress display alone and
+                # keep the data stream alive. Falling through to the
+                # outer except here would dup2 stdout to devnull and
+                # drop every buffered byte after this chunk for a sink
+                # nobody reads (the false-green race: find already
+                # finished, buffered bytes lost, every rc 0).
+                progress_dead = True
+                # And the interpreter shutdown flush must not retry the
+                # dead sink either — it would exit 120 over a progress
+                # line (the stdout dup2 idiom below, stderr side).
+                os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stderr.fileno())
 except (BrokenPipeError, KeyboardInterrupt):
     # A dead consumer (xargs died first — the pr-00221 W2/W6 sweep
     # recorded this missing clause — or Ctrl-C hit the whole pipeline,
@@ -197,9 +238,16 @@ except (BrokenPipeError, KeyboardInterrupt):
     # production shape.
     aborted = True
     os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
-if counted and not aborted:
-    sys.stderr.write("\r    %-16s %d entries — done\n" % (label, counted))
-    sys.stderr.flush()
+if counted and not aborted and not progress_dead:
+    # progress_dead skips the line outright (the sink is known dead);
+    # the try is the race belt — the sink may die between the last
+    # progress write and here, with the data already flushed. The lost
+    # completion line is cosmetic (#265, pr-00263 c C1).
+    try:
+        sys.stderr.write("\r    %-16s %d entries — done\n" % (label, counted))
+        sys.stderr.flush()
+    except OSError:
+        pass
 ' "$1"
 }
 

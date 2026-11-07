@@ -330,5 +330,96 @@ else
     fail "pre-flight wires the health gate (verbatim call pin)"
 fi
 
+# --- 8. loud stubs (#250): a truncated lib must abort, never complete green ----------
+# install.sh's kit_source dies loud on a missing FILE; the stubs cover a
+# present-but-INCOMPLETE copy (partial fetch, mid-deploy). The old
+# silent `{ :; }` no-ops let the install complete green with the
+# baseline/handover/migration never applied (#250, the update-core #211
+# a F2 twins). Executed pins: the exact stub blocks are sed-extracted
+# from install.sh and driven in a child — rc 1 + the error line each.
+_stb_rc=0
+_stb_out="$(
+    sed -n '/^command -v fs_baseline_root/,/^}/p' "$INSTALL" >"$WORK/stub-fsb.sh"
+    sh -c '. "$1"; fs_baseline_root /nonexistent g u' _ "$WORK/stub-fsb.sh" 2>&1
+)" || _stb_rc=$?
+if [ "$_stb_rc" -eq 1 ] && printf '%s' "$_stb_out" | grep -qF 'error: fs_baseline_root unavailable'; then
+    pass "fs_baseline_root stub: loud, rc 1 — no silent no-op baseline (#250)"
+else
+    fail "fs_baseline_root stub must abort loud (rc=$_stb_rc out=$_stb_out) (#250)"
+fi
+_stb_rc=0
+_stb_out="$(
+    sed -n '/^command -v ddev_handover_root/,/^}/p' "$INSTALL" >"$WORK/stub-ho.sh"
+    sh -c '. "$1"; ddev_handover_root /nonexistent o g d' _ "$WORK/stub-ho.sh" 2>&1
+)" || _stb_rc=$?
+if [ "$_stb_rc" -eq 1 ] && printf '%s' "$_stb_out" | grep -qF 'error: ddev_handover_root unavailable'; then
+    pass "ddev_handover_root stub: loud, rc 1 — no silent no-op handover (#250 sweep)"
+else
+    fail "ddev_handover_root stub must abort loud (rc=$_stb_rc out=$_stb_out) (#250 sweep)"
+fi
+sed -n '/^command -v ddev_migrate_registry/,/^}/p' "$INSTALL" >"$WORK/stub-mig.sh"
+_stb_rc=0
+_stb_out="$(sh -c '. "$1"; ddev_migrate_registry /x; ddev_migrate_projects /x /y; ddev_migrate_done u' _ "$WORK/stub-mig.sh" 2>&1)" || _stb_rc=$?
+if [ "$_stb_rc" -eq 1 ] &&
+    printf '%s' "$_stb_out" | grep -qF 'error: ddev_migrate_registry unavailable' &&
+    printf '%s' "$_stb_out" | grep -qF 'error: ddev_migrate_projects unavailable'; then
+    pass "ddev_migrate stubs: the actions abort loud; the done probe fails safe rc 1 (#250 sweep)"
+else
+    fail "ddev_migrate stub contract broken (rc=$_stb_rc out=$_stb_out) (#250 sweep)"
+fi
+# The two DELIBERATE silent stubs, pinned as such (comment-stripped
+# presence, #407 a P4): the stamp writer is a rescan optimization (a
+# missing stamp costs the next update a scan, never a skipped action —
+# the update-core twin's documented contract), and the done probe's
+# rc 1 = "not migrated" keeps the flow on the migration path where the
+# loud action stubs catch a truncated lib anyway.
+if sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -qF 'ddev_handover_stamp_write() { :; }'; then
+    pass "stamp-write stub stays deliberately silent (documented exception)"
+else
+    fail "stamp-write stub must stay the documented silent exception"
+fi
+if sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -qF 'ddev_migrate_done() { return 1; }'; then
+    pass "done-probe stub stays deliberately fail-safe (documented exception)"
+else
+    fail "done-probe stub must stay the documented fail-safe exception"
+fi
+
+# --- 9. pairing guard (#413): a version-skewed entry/lib pairing dies loud -----------
+# kit_source dies loud on a missing FILE; the guard closes the
+# missing-FUNCTION twin (a truncated/incompletely-deployed core would
+# rc-127 the bare phase calls — a cryptic not-found abort). extract_func
+# pulls the guard from the entry; both directions in fresh children,
+# plus the completeness rider over the entry's own phase calls.
+_pg_src="$(extract_func "$INSTALL" install_pairing_guard)"
+_pg_full=$(sh -c 'eval "$1"; . "$2"; install_pairing_guard; echo "rc=$?"' _ "$_pg_src" "$LIB" 2>&1)
+_pg_tr_rc=0
+_pg_tr_out="$(sh -c 'eval "$1"; install_pairing_guard' _ "$_pg_src" 2>&1)" || _pg_tr_rc=$?
+if printf '%s' "$_pg_full" | grep -q 'rc=0'; then
+    pass "pairing guard: real lib passes (every phase defined) (#413)"
+else
+    fail "pairing guard must pass against the real lib (out=$_pg_full) (#413)"
+fi
+if [ "$_pg_tr_rc" -eq 1 ] &&
+    printf '%s' "$_pg_tr_out" | grep -qF "phase 'do_plan_phase' missing from install-core.sh" &&
+    printf '%s' "$_pg_tr_out" | grep -qF "version-skewed entry/lib pairing"; then
+    pass "pairing guard: truncated lib dies loud naming the first missing phase (#413)"
+else
+    fail "pairing guard must refuse a skewed pairing (rc=$_pg_tr_rc out=$_pg_tr_out) (#413)"
+fi
+if sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -qF 'install_pairing_guard || exit 1'; then
+    pass "install.sh wires the guard right after kit_source (#413)"
+else
+    fail "install.sh must call the guard after sourcing install-core.sh (#413)"
+fi
+_pg_missing=""
+for _fn in $(grep -oE '^do_[a-z_]+$' "$INSTALL" | sort -u); do
+    printf '%s\n' "$_pg_src" | grep -qF "$_fn" || _pg_missing="$_pg_missing $_fn"
+done
+if [ -z "$_pg_missing" ]; then
+    pass "pairing guard list covers every phase the entry calls (#413)"
+else
+    fail "phases called by install.sh but absent from the guard:$_pg_missing (#413)"
+fi
+
 echo ""
 suite_done

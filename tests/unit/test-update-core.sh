@@ -76,9 +76,10 @@ check "update.sh sources update-core.sh checkout-first" \
 check "update.sh errors loud on a missing lib (no silent phase drops)" \
     sh -c 'grep -qF "error: update-core.sh not found" "$1"' _ "$UPDATE"
 check "update.sh sequences the phases in run order" \
-    sh -c '_l1=$(grep -nF "    update_redeploy_library" "$1" | head -1 | cut -d: -f1)
-        _l2=$(grep -nF "update_binary_resecure" "$1" | head -1 | cut -d: -f1)
-        _l3=$(grep -nF "    update_finalize_tui_files" "$1" | head -1 | cut -d: -f1)
+    sh -c '_tail=$(sed -n "/# --- phases, in run order/,\$p" "$1")
+        _l1=$(printf "%s\n" "$_tail" | grep -nF "    update_redeploy_library" | head -1 | cut -d: -f1)
+        _l2=$(printf "%s\n" "$_tail" | grep -nF "update_binary_resecure" | head -1 | cut -d: -f1)
+        _l3=$(printf "%s\n" "$_tail" | grep -nF "    update_finalize_tui_files" | head -1 | cut -d: -f1)
         [ -n "$_l1" ] && [ -n "$_l2" ] && [ -n "$_l3" ] && [ "$_l1" -lt "$_l2" ] && [ "$_l2" -lt "$_l3" ]' _ "$UPDATE"
 
 # --- 4. library re-deploy section: executes from the lib -------------------------
@@ -289,6 +290,46 @@ else
     else
         fail "ddev stamp probe broken (out=$_dv_out)"
     fi
+fi
+
+# --- 16. pairing guard (#413): a version-skewed entry/lib pairing dies loud ----------
+# The resolver (section 3) dies loud on a missing FILE; the guard closes
+# the missing-FUNCTION twin — a core missing one renamed/newly-added
+# section would rc-127 the bare section calls (cryptic abort at best,
+# mid-update AFTER earlier sections ran). extract_func pulls the guard
+# from the ENTRY; both directions run in fresh children: the real lib
+# defines every section (rc 0), a truncated lib defining NOTHING fails
+# on the FIRST section with the diagnosis line. The completeness rider
+# derives the entry's own call list and requires every name inside the
+# guard body — a section call added to the entry without the guard list
+# cannot pass silently.
+_pg_src="$(extract_func "$UPDATE" update_pairing_guard)"
+_pg_full=$(sh -c 'eval "$1"; . "$2"; update_pairing_guard; echo "rc=$?"' _ "$_pg_src" "$LIB" 2>&1)
+_pg_tr_rc=0
+_pg_tr_out="$(sh -c 'eval "$1"; update_pairing_guard' _ "$_pg_src" 2>&1)" || _pg_tr_rc=$?
+if printf '%s' "$_pg_full" | grep -q 'rc=0'; then
+    pass "pairing guard: real lib passes (every section defined) (#413)"
+else
+    fail "pairing guard must pass against the real lib (out=$_pg_full) (#413)"
+fi
+if [ "$_pg_tr_rc" -eq 1 ] &&
+    printf '%s' "$_pg_tr_out" | grep -qF "section 'update_redeploy_library' missing from update-core.sh" &&
+    printf '%s' "$_pg_tr_out" | grep -qF "version-skewed entry/lib pairing"; then
+    pass "pairing guard: truncated lib dies loud naming the first missing section (#413)"
+else
+    fail "pairing guard must refuse a skewed pairing (rc=$_pg_tr_rc out=$_pg_tr_out) (#413)"
+fi
+check "update.sh wires the guard right after the resolver" \
+    sh -c 'grep -qF "update_pairing_guard || exit 1" "$1"' _ "$UPDATE"
+_pg_missing=""
+for _fn in $(grep -oE '^[[:space:]]*update_[a-z_]+[[:space:]]*$' "$UPDATE" |
+    awk '{gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print}' | sort -u); do
+    printf '%s\n' "$_pg_src" | grep -qF "$_fn" || _pg_missing="$_pg_missing $_fn"
+done
+if [ -z "$_pg_missing" ]; then
+    pass "pairing guard list covers every section the entry calls (#413)"
+else
+    fail "sections called by update.sh but absent from the guard:$_pg_missing (#413)"
 fi
 
 suite_done

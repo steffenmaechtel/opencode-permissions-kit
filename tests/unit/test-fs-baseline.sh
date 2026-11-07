@@ -912,10 +912,25 @@ fi
 # refused entry proves no mid-loop abort (the a S2 over-abort shape).
 # The b X1 arms ride along: `.` and `foo` (relative spellings the a-wave
 # form arms missed) and a spaced absolute path (writer whitespace arm).
-printf '%s\n/\n%s\n%s/\n%s/.\n%s//\n%s\n%s\n.\nfoo\n/var/www/foo bar\n%s\n' \
+# #247 arms at the tail: the classic system paths (/etc, /usr, /var and
+# the bare /home — the stripped-compare arm the writer's blocklist owes)
+# plus the agent home /home/toc (OPENCODE_USER=toc above; lexical, so
+# the nonexistent home still refuses). All four system entries EXIST on
+# every test host — the blocklist sits after [ -d ], a nonexistent
+# system path would be skipped silently by the existence gate before
+# the blocklist sees it (uninstall-core parity).
+printf '%s\n/\n%s\n%s/\n%s/.\n%s//\n%s\n%s\n.\nfoo\n/var/www/foo bar\n/etc\n/usr\n/var\n/home\n/home/toc\n/relocated/opencode\n' \
     "$S245/real" "$S245/link" "$S245/link" "$S245/link" "$S245/link" \
     "$S245/dangling" "$S245/real2" >"$S245/conf"
-S245R_OUT=$(PROJECTS_CONF="$S245/conf" OPENCODE_GROUP=tg OPENCODE_USER=toc DEFAULT_USER=tdv \
+# getent stub (L1 rider for the agent-home arm): toc's RELOCATED home —
+# pins the getent-hit direction (pr-00263 a F10 shape: the literal
+# /home/<user> compare alone would miss a moved agent home). Absent
+# stubs of getent fall through to the real binary, which has no toc.
+mkdir -p "$S245/bin"
+printf '#!/bin/sh\n[ "$1" = passwd ] && [ "$2" = toc ] && echo "toc:x:1:1::/relocated/opencode:/bin/sh" && exit 0\nexit 2\n' \
+    >"$S245/bin/getent"
+chmod +x "$S245/bin/getent"
+S245R_OUT=$(PATH="$S245/bin:$PATH" PROJECTS_CONF="$S245/conf" OPENCODE_GROUP=tg OPENCODE_USER=toc DEFAULT_USER=tdv \
     sh "$S245/run-refresh.sh" 2>&1)
 if [ "$(printf '%s\n' "$S245R_OUT" | grep -c '^FSB: ')" -eq 2 ] &&
     [ "$(printf '%s\n' "$S245R_OUT" | grep -c '^HO: ')" -eq 2 ] &&
@@ -929,10 +944,18 @@ if [ "$(printf '%s\n' "$S245R_OUT" | grep -c '^FSB: ')" -eq 2 ] &&
     [ "$(printf '%s\n' "$S245R_OUT" | grep -cF "ui_warn: skip $S245/link// (malformed")" -eq 1 ] &&
     [ "$(printf '%s\n' "$S245R_OUT" | grep -cF 'ui_warn: skip . (not an absolute project path)')" -eq 1 ] &&
     [ "$(printf '%s\n' "$S245R_OUT" | grep -cF 'ui_warn: skip foo (not an absolute project path)')" -eq 1 ] &&
-    [ "$(printf '%s\n' "$S245R_OUT" | grep -cF 'ui_warn: skip /var/www/foo bar (malformed')" -eq 1 ]; then
-    pass "config.sh refresh: real roots only, link/dangling/malformed/relative/spaced skipped loudly, no abort (#245, a S1/S2/S3, b X1)"
+    [ "$(printf '%s\n' "$S245R_OUT" | grep -cF 'ui_warn: skip /var/www/foo bar (malformed')" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245R_OUT" | grep -cF '(system path — never a project root)')" -eq 4 ] &&
+    [ "$(printf '%s\n' "$S245R_OUT" | grep -cF 'ui_warn: skip /etc (system path')" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245R_OUT" | grep -cF 'ui_warn: skip /home (system path')" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245R_OUT" | grep -cF '(agent home — never a project root)')" -eq 2 ] &&
+    [ "$(printf '%s\n' "$S245R_OUT" | grep -cF 'ui_warn: skip /home/toc (agent home')" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245R_OUT" | grep -cF 'ui_warn: skip /relocated/opencode (agent home')" -eq 1 ] &&
+    ! printf '%s\n' "$S245R_OUT" | grep -q '^FSB: /etc' &&
+    ! printf '%s\n' "$S245R_OUT" | grep -q '^FSB: /home$'; then
+    pass "config.sh refresh: real roots only, link/dangling/malformed/relative/spaced skipped loudly, system paths + agent home refused, no abort (#245, a S1/S2/S3, b X1; #247)"
 else
-    fail "config.sh refresh must skip link/dangling/malformed/relative roots without abort (out=$(printf '%s\n' "$S245R_OUT" | head -10)) (#245)"
+    fail "config.sh refresh must skip link/dangling/malformed/relative roots without abort (out=$(printf '%s\n' "$S245R_OUT" | head -10)) (#245/#247)"
 fi
 
 # 12c. the update.sh root loop (refresh + handover, the #247 raw-conf
@@ -954,7 +977,7 @@ fi
     sed -n '/while IFS= read -r root; do/,/done <"\$PROJECTS_CONF"/p' "$UPDATE_CORE" |
         sed 's|done <"$PROJECTS_CONF"|done|'
 } >"$S245/run-update-loop.sh"
-S245U_OUT=$(sh "$S245/run-update-loop.sh" <"$S245/conf" 2>&1)
+S245U_OUT=$(PATH="$S245/bin:$PATH" sh "$S245/run-update-loop.sh" <"$S245/conf" 2>&1)
 if [ "$(printf '%s\n' "$S245U_OUT" | grep -c '^FSB: ')" -eq 2 ] &&
     [ "$(printf '%s\n' "$S245U_OUT" | grep -c '^HO: ')" -eq 2 ] &&
     printf '%s\n' "$S245U_OUT" | grep -qF "FSB: $S245/real" &&
@@ -967,10 +990,18 @@ if [ "$(printf '%s\n' "$S245U_OUT" | grep -c '^FSB: ')" -eq 2 ] &&
     [ "$(printf '%s\n' "$S245U_OUT" | grep -cF "ui_warn: skip $S245/link// (malformed")" -eq 1 ] &&
     [ "$(printf '%s\n' "$S245U_OUT" | grep -cF 'ui_warn: skip . (not an absolute project path)')" -eq 1 ] &&
     [ "$(printf '%s\n' "$S245U_OUT" | grep -cF 'ui_warn: skip foo (not an absolute project path)')" -eq 1 ] &&
-    [ "$(printf '%s\n' "$S245U_OUT" | grep -cF 'ui_warn: skip /var/www/foo bar (malformed')" -eq 1 ]; then
-    pass "update.sh root loop: real roots only, link/dangling/malformed/relative/spaced skipped loudly, no abort (#245, a S1/S2/S3, b X1)"
+    [ "$(printf '%s\n' "$S245U_OUT" | grep -cF 'ui_warn: skip /var/www/foo bar (malformed')" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245U_OUT" | grep -cF '(system path — never a project root)')" -eq 4 ] &&
+    [ "$(printf '%s\n' "$S245U_OUT" | grep -cF 'ui_warn: skip /etc (system path')" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245U_OUT" | grep -cF 'ui_warn: skip /home (system path')" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245U_OUT" | grep -cF '(agent home — never a project root)')" -eq 2 ] &&
+    [ "$(printf '%s\n' "$S245U_OUT" | grep -cF 'ui_warn: skip /home/toc (agent home')" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245U_OUT" | grep -cF 'ui_warn: skip /relocated/opencode (agent home')" -eq 1 ] &&
+    ! printf '%s\n' "$S245U_OUT" | grep -q '^FSB: /etc' &&
+    ! printf '%s\n' "$S245U_OUT" | grep -q '^HO: /home$'; then
+    pass "update.sh root loop: real roots only, link/dangling/malformed/relative/spaced skipped loudly, system paths + agent home refused, no abort (#245, a S1/S2/S3, b X1; #247)"
 else
-    fail "update.sh root loop must skip link/dangling/malformed/relative roots without abort (out=$(printf '%s\n' "$S245U_OUT" | head -10)) (#245)"
+    fail "update.sh root loop must skip link/dangling/malformed/relative roots without abort (out=$(printf '%s\n' "$S245U_OUT" | head -10)) (#245/#247)"
 fi
 
 # 12d. belt arms behind the writer gate (scan->act rechecks, L5):
@@ -1077,6 +1108,82 @@ if [ "$(printf '%s\n' "$S245H_OUT" | grep -c '^HO: ')" -eq 1 ] &&
     pass "install.sh handover loop: no stamp/op for link or dangling root, loud skip (a X1/S3)"
 else
     fail "install.sh handover loop must refuse symlinked roots (out=$(printf '%s\n' "$S245H_OUT" | head -6)) (a X1)"
+fi
+
+# --- 13. #265: tee rc contracts — cat-arm mask + stream separation -----------------
+# pr-00263 b B2 (cat arm): the old unconditional `return 0` discarded
+# cat's rc — a read error truncated the operand stream green. The stub
+# cat pins the rc CONTRACT in both directions (7 = read error must
+# propagate; 141 = SIGPIPE must map to the documented consumer-EPIPE 0)
+# without needing a real mid-stream read error — the old mask answers 0
+# to both, the naive `return $?` answers 7/141: only this pair pins the
+# exact contract. _fsb_py_checked/_fsb_py_ok force the cat arm
+# deterministically (the probe is #223's subject, not this pin's).
+W65BIN="$WORK/issue265-bin"
+mkdir -p "$W65BIN"
+printf '#!/bin/sh\nexit 7\n' >"$W65BIN/cat"
+chmod +x "$W65BIN/cat"
+W65C7=0
+FS_SUDO="" PATH="$W65BIN:$PATH" sh -c '. "$1"; _fsb_py_checked=1; _fsb_py_ok=0; _fsb_count_tee e </dev/null' \
+    _ "$LIB" >/dev/null 2>&1 || W65C7=$?
+assert_eq "#265 cat arm: read-error rc propagates (7, not the masked 0)" "7" "$W65C7"
+printf '#!/bin/sh\nexit 141\n' >"$W65BIN/cat"
+W65C141=0
+FS_SUDO="" PATH="$W65BIN:$PATH" sh -c '. "$1"; _fsb_py_checked=1; _fsb_py_ok=0; _fsb_count_tee e </dev/null' \
+    _ "$LIB" >/dev/null 2>&1 || W65C141=$?
+assert_eq "#265 cat arm: SIGPIPE (141) maps to the consumer-EPIPE 0" "0" "$W65C141"
+# Real-cat rider under bash pipefail (the §11c pattern): a consumer
+# that exits at once ends REAL cat in SIGPIPE — the pipeline must stay
+# green (141 -> 0), or every large install/update/config pass would
+# fail through the tee. Skipped with a note where bash is absent.
+if command -v bash >/dev/null 2>&1; then
+    W65BIG="$WORK/issue265-big"
+    python3 -c 'import sys; sys.stdout.buffer.write(b"e\0" * 524288)' >"$W65BIG"
+    W65PF=0
+    FS_SUDO="" bash -c 'set -o pipefail; . "$1"; _fsb_py_checked=1; _fsb_py_ok=0; _fsb_count_tee pf <"$2" | sh -c "exit 0"' \
+        _ "$LIB" "$W65BIG" >/dev/null 2>&1 || W65PF=$?
+    assert_eq "#265 pipefail rider: real cat's SIGPIPE stays pipeline-green" "0" "$W65PF"
+    rm -rf "$W65BIG"
+else
+    echo "  note: bash absent — cat-arm pipefail rider skipped (#244 a Q1 shape)"
+fi
+# Python arm: an interpreter failure must not be masked either (the
+# stub dies rc 3 before touching the stream — the function's rc is
+# python's own; this pins that nothing regresses it to a silent 0).
+printf '#!/bin/sh\nexit 3\n' >"$W65BIN/python3"
+chmod +x "$W65BIN/python3"
+W65P3=0
+FS_SUDO="" PATH="$W65BIN:$PATH" sh -c '. "$1"; _fsb_py_checked=1; _fsb_py_ok=1; _fsb_count_tee e </dev/null' \
+    _ "$LIB" >/dev/null 2>&1 || W65P3=$?
+assert_eq "#265 python arm: interpreter failure propagates (3)" "3" "$W65P3"
+rm -rf "$W65BIN"
+
+# pr-00263 c C1 (stream separation): a DEAD PROGRESS SINK must degrade
+# the counter only, never the data stream. /dev/full makes the sink
+# fail deterministically on the first progress write (ENOSPC — OSError;
+# EPIPE from a closed fifo reader is the same except arm but carries an
+# unfixable open/close race in a unit harness, so the full device
+# carries the pin). Two 1 MiB chunks with the 2000-entry threshold
+# crossed inside chunk 1: the OLD single-except shape took the
+# consumer-death path here — dup2 stdout to devnull — and lost chunk 2+
+# with every rc 0 (the false-green race). rc 0 + byte-identical
+# passthrough discriminate; the done line is suppressed (progress_dead).
+if [ -w /dev/full ]; then
+    W65EP="$WORK/issue265-epipe"
+    mkdir -p "$W65EP"
+    python3 -c 'import sys; sys.stdout.buffer.write(b"x\0" * 2500 + b"z" * (1572864 - 5000))' >"$W65EP/in"
+    W65EP_RC=0
+    FS_SUDO="" sh -c '. "$1"; _fsb_py_checked=1; _fsb_py_ok=1; _fsb_count_tee full <"$2" >"$3" 2>/dev/full' \
+        _ "$LIB" "$W65EP/in" "$W65EP/out" >/dev/null 2>&1 || W65EP_RC=$?
+    assert_eq "#265 dead progress sink: tee survives, rc 0 (data stream unaffected)" "0" "$W65EP_RC"
+    if cmp -s "$W65EP/in" "$W65EP/out"; then
+        pass "#265 dead progress sink: data stream intact (both chunks flushed byte-identically)"
+    else
+        fail "#265 dead progress sink: data truncated ($(wc -c <"$W65EP/out") of $(wc -c <"$W65EP/in") bytes)"
+    fi
+    rm -rf "$W65EP"
+else
+    echo "  note: /dev/full unavailable — dead-sink pin skipped"
 fi
 
 # --- Summary ---------------------------------------------------------------------------

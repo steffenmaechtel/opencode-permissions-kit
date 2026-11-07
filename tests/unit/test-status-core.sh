@@ -208,4 +208,43 @@ else
     fail "advisories: missing-binary gate broken (out=$(printf '%s' "$_out" | head -5))"
 fi
 
+# --- 7. pairing guard (#413): a version-skewed entry/lib pairing dies loud -----------
+# status is deliberately fail-soft (set -u only) — an undefined section
+# call does NOT abort, the report silently loses the section while the
+# summary still prints. The guard refuses the skewed pairing before any
+# section renders. Both directions in fresh children + completeness
+# rider over the entry's own section calls.
+STATUS_ENTRY="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/status.sh"
+_pg_src="$(extract_func "$STATUS_ENTRY" status_pairing_guard)"
+_pg_full=$(sh -c 'eval "$1"; . "$2"; status_pairing_guard; echo "rc=$?"' _ "$_pg_src" "$LIB" 2>&1)
+_pg_tr_rc=0
+_pg_tr_out="$(sh -c 'eval "$1"; status_pairing_guard' _ "$_pg_src" 2>&1)" || _pg_tr_rc=$?
+if printf '%s' "$_pg_full" | grep -q 'rc=0'; then
+    pass "pairing guard: real lib passes (every section defined) (#413)"
+else
+    fail "pairing guard must pass against the real lib (out=$_pg_full) (#413)"
+fi
+if [ "$_pg_tr_rc" -eq 1 ] &&
+    printf '%s' "$_pg_tr_out" | grep -qF "section 'status_section_core' missing from status-core.sh" &&
+    printf '%s' "$_pg_tr_out" | grep -qF "version-skewed entry/lib pairing"; then
+    pass "pairing guard: truncated lib dies loud before any section renders (#413)"
+else
+    fail "pairing guard must refuse a skewed pairing (rc=$_pg_tr_rc out=$_pg_tr_out) (#413)"
+fi
+if sed 's/^[[:space:]]*#.*$//' "$STATUS_ENTRY" | grep -qF 'status_pairing_guard || exit 1'; then
+    pass "status.sh wires the guard right after the resolver (#413)"
+else
+    fail "status.sh must call the guard after sourcing status-core.sh (#413)"
+fi
+_pg_missing=""
+for _fn in $(grep -oE '^[[:space:]]*status_section_[a-z_0-9]+[[:space:]]*$' "$STATUS_ENTRY" |
+    awk '{gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print}' | sort -u); do
+    printf '%s\n' "$_pg_src" | grep -qF "$_fn" || _pg_missing="$_pg_missing $_fn"
+done
+if [ -z "$_pg_missing" ]; then
+    pass "pairing guard list covers every section the entry calls (#413)"
+else
+    fail "sections called by status.sh but absent from the guard:$_pg_missing (#413)"
+fi
+
 suite_done

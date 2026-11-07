@@ -1436,6 +1436,43 @@ else
     fail "sudoers section arms (pr-00263 a F3, fail-out: $_f3fail / ok-out: $_f3ok)"
 fi
 
+# --- pairing guard (#413, the finding's own entry): skewed pairing dies loud --------
+# uninstall is fail-soft (no set -e) — an undefined section call does
+# NOT abort: it rc-127s, the removal is silently skipped and the run
+# still prints "Uninstall complete." (the #413 mechanism verbatim).
+# Both directions in fresh children + completeness rider.
+_pg_src="$(extract_func "$UNINSTALL" un_pairing_guard)"
+_pg_full=$(sh -c 'eval "$1"; . "$2"; un_pairing_guard; echo "rc=$?"' _ "$_pg_src" "$LIB" 2>&1)
+_pg_tr_rc=0
+_pg_tr_out="$(sh -c 'eval "$1"; un_pairing_guard' _ "$_pg_src" 2>&1)" || _pg_tr_rc=$?
+if printf '%s' "$_pg_full" | grep -q 'rc=0'; then
+    pass "pairing guard: real lib passes (every section defined) (#413)"
+else
+    fail "pairing guard must pass against the real lib (out=$_pg_full) (#413)"
+fi
+if [ "$_pg_tr_rc" -eq 1 ] &&
+    printf '%s' "$_pg_tr_out" | grep -qF "section 'un_context_load' missing from uninstall-core.sh" &&
+    printf '%s' "$_pg_tr_out" | grep -qF "version-skewed entry/lib pairing"; then
+    pass "pairing guard: truncated lib dies loud before the first prompt (#413)"
+else
+    fail "pairing guard must refuse a skewed pairing (rc=$_pg_tr_rc out=$_pg_tr_out) (#413)"
+fi
+if sed 's/^[[:space:]]*#.*$//' "$UNINSTALL" | grep -qF 'un_pairing_guard || exit 1'; then
+    pass "uninstall.sh wires the guard right after the resolver (#413)"
+else
+    fail "uninstall.sh must call the guard after sourcing uninstall-core.sh (#413)"
+fi
+_pg_missing=""
+for _fn in $(grep -oE '^[[:space:]]*(un_[a-z_0-9]+|prompt_yn)[[:space:]]*$' "$UNINSTALL" |
+    awk '{gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print}' | sort -u); do
+    printf '%s\n' "$_pg_src" | grep -qF "$_fn" || _pg_missing="$_pg_missing $_fn"
+done
+if [ -z "$_pg_missing" ]; then
+    pass "pairing guard list covers every core call the entry makes (#413)"
+else
+    fail "core calls in uninstall.sh but absent from the guard:$_pg_missing (#413)"
+fi
+
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"
     exit 1

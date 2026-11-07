@@ -256,24 +256,53 @@ kit_source() {
 
 # Shared ddev handover helpers (.ddev + settings dirs -> opencode user).
 # install.sh always runs from a checkout or a fully fetched temp dir, so the
-# helper sits right next to log.sh.
+# helper sits right next to log.sh. Loud like the update-core twins (#211
+# a F2 sweep; issue #250 — the stub class sweep): kit_source above dies
+# loud only when the FILE is missing; a present-but-truncated copy (partial
+# fetch, mid-deploy) would leave the function undefined and the old silent
+# `{ :; }` no-op let the install complete green with the handover never
+# applied — fail loud, set -e stops the install instead of lying in the
+# summary. The stamp writer is the deliberate exception: the stamp is a
+# rescan optimization, a missing stamp only costs the next update a scan
+# (the update-core twin's documented contract), never a skipped action.
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-handover.sh"
-command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() { :; }
+command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() {
+    echo "error: ddev_handover_root unavailable (ddev-handover.sh incomplete) — the handover is not optional" >&2
+    return 1
+}
 command -v ddev_handover_stamp_write >/dev/null 2>&1 || ddev_handover_stamp_write() { :; }
 
 # Shared ddev database-migration helpers (dev-user registry -> SQL dumps,
-# issue #15). Same sourcing rules as ddev-handover.sh.
+# issue #15). Same sourcing rules as ddev-handover.sh; same stub contract
+# as above (#250 class sweep): the registry scan and the dump are actions
+# whose absence must not read as "nothing to migrate" green. The done
+# probe is the fail-safe exception: rc 1 = "not migrated" keeps the flow
+# on the migration path, where the loud action stubs catch a truncated
+# lib anyway.
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-migrate.sh"
 command -v ddev_migrate_registry >/dev/null 2>&1 || {
-    ddev_migrate_registry() { :; }
-    ddev_migrate_projects() { :; }
+    ddev_migrate_registry() {
+        echo "error: ddev_migrate_registry unavailable (ddev-migrate.sh incomplete) — aborting" >&2
+        return 1
+    }
+    ddev_migrate_projects() {
+        echo "error: ddev_migrate_projects unavailable (ddev-migrate.sh incomplete) — aborting" >&2
+        return 1
+    }
     ddev_migrate_done() { return 1; }
 }
 
 # Shared group-baseline helper with live progress (issue #14). Same
-# sourcing rules as ddev-handover.sh.
+# sourcing rules as ddev-handover.sh; same loud stub contract (#250,
+# the issue's own site): the baseline is a documented part of the
+# install, not an optional extra — a truncated fs-baseline.sh must
+# abort the install, never complete green with the group baseline
+# silently never applied.
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/fs-baseline.sh"
-command -v fs_baseline_root >/dev/null 2>&1 || fs_baseline_root() { :; }
+command -v fs_baseline_root >/dev/null 2>&1 || fs_baseline_root() {
+    echo "error: fs_baseline_root unavailable (fs-baseline.sh incomplete) — the group baseline is not optional" >&2
+    return 1
+}
 
 # Shared project-root policy gate (issue #216): bounds the group
 # baseline above — one implementation with config.sh (the old verbatim
@@ -707,6 +736,25 @@ _root_user_gate() {
 # incomplete checkout or broken fetch, and kit_source dies loud (the
 # #165 class: no silent phase drops).
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/install-core.sh"
+
+# Pairing guard (#413, PR #412 round a S2): kit_source dies loud on a
+# missing FILE; this closes the missing-FUNCTION twin. A version-skewed
+# entry/lib pairing (a core missing one renamed or newly-added phase —
+# an interrupted deploy, a manually mixed tree) makes the bare phase
+# calls below fail with rc 127; under set -e that aborts, but with a
+# cryptic "not found" and no named cause. The guard converts it into a
+# diagnosed abort BEFORE any phase runs, and pins the phase list the
+# entry expects — a phase added to the core without the entry calling
+# it is equally a wiring bug this list makes reviewable.
+install_pairing_guard() {
+    for _ipg in do_plan_phase do_ddev_phase do_deploy_phase; do
+        command -v "$_ipg" >/dev/null 2>&1 || {
+            echo "error: phase '$_ipg' missing from install-core.sh — version-skewed entry/lib pairing, aborting" >&2
+            return 1
+        }
+    done
+}
+install_pairing_guard || exit 1
 
 # === Main ===
 # The install as a linear phase list; everything above is bootstrap,
