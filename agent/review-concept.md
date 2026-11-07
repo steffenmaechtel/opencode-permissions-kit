@@ -318,18 +318,25 @@ works.
   session curates directly, disclosed in the comment's provenance.
   (RM-0126)
 - Verification: every curated finding is re-verified against the
-  code — and the verification is SIZED BY SEVERITY, not count: a
-  LOW/INFO-only round verifies main-inline at ANY finding count (no
-  verifier subagents); at any MED/HIGH finding, exactly ONE fresh
-  strong-tier verifier batch runs (verdict files per batch) — a hard
-  gate: skipping an owed batch is a process deviation only a
-  maintainer disclosure can carry, never a time-pressure call. The
-  main session audits the verdicts — re-deriving every MED/HIGH
-  itself, spot-checking LOW/INFO (on a LOW/INFO-only round that audit
-  IS the verification — all of them); refuted findings are retracted
-  with the refuting evidence named. Subagent freshness replaces
-  session rotation as the bias-reduction mechanism: the author's
-  loaded context never verifies its own claims. (RM-0127)
+  code — and the verification is SIZED BY COUNT: at ≤ 10 curated
+  findings the main session verifies inline (no verifier subagents)
+  — every MED/HIGH fully re-derived, all LOW/INFO checked; above 10,
+  exactly ONE verifier batch of 2–3 PARALLEL strong-tier sessions
+  runs (verdict files per batch) — a hard gate: skipping an owed
+  batch is a process deviation only a maintainer disclosure can
+  carry, never a time-pressure call. The count axis, not severity:
+  the finding generator is a fresh-context reviewer either way, the
+  main session re-derives every MED/HIGH in EVERY shape, and past
+  ~10 inline verifications the main session's context grows too far
+  in late waves — the zone where batches measurably earn their cost.
+  The main session audits the verdicts — re-deriving every MED/HIGH
+  itself, spot-checking LOW/INFO; at inline size that audit IS the
+  verification. Refuted findings are retracted with the refuting
+  evidence named. Fresh context is the bias-reduction mechanism
+  where it is load-bearing — the REVIEW pass, never main-solo at any
+  size; the verifier batch's value is context economy and parallel
+  re-derivation at volume, not a second independent judgment.
+  (RM-0127)
 
 ## Reviewer freshness
 
