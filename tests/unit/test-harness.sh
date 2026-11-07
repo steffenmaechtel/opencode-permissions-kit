@@ -536,7 +536,7 @@ has "not a regular file" "9.7b ... same guard, same message"
 # widening escaped — outer_host is the one fixture function whose body
 # carries an indented nested def with its own indented close. A widened
 # end anchor (`/^[[:space:]]*}/`) truncates right after the decoy's
-# `    }` and drops TARGET_REACHED — every earlier pin observes nothing.
+# `    }` and drops HOST_REACHED=1 — every earlier pin observes nothing.
 arm "extract_func \"$_ef_fix/subject.sh\" outer_host"
 rc_is 0 "9.8 outer_host: rc 0"
 has "outer_host() {" "9.8 ... finds the definition line"

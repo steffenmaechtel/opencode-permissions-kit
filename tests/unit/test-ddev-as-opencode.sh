@@ -686,11 +686,14 @@ check "root-file types: flagged project gets the root back (handback)" \
     sh -c "printf 'type: symfony\ndisable_settings_management: true\n' > \"\$2/.ddev/config.yaml\" && . \"\$1\" && ddev_handover_project_back \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\" >/dev/null && test \"\$(stat -c %a \"\$2\")\" = 2775" _ "$HANDOVER" "$HWORK/proj"
 
 # hint coverage (static): the bootstrap hint names the new type classes.
-# Boundary note (#416 a R6): the awk ranges below run inside sh -c
+# Boundary note (#416 a R6): the child-shell function-range awk legs
+# below (this hint-check block and its siblings) run inside sh -c
 # children, where the harness's extract_func is not defined — conversion
 # would need a parent-shell extraction passing bytes down; kept as the
 # documented child-shell residual class (same boundary as fs-baseline's
-# _s245_dhr), not an oversight of the extract_func wave.
+# _s245_dhr), not an oversight of the extract_func wave. (Parent-shell
+# loop-RANGE awk elsewhere in this file, e.g. the projects.conf reader,
+# is a different shape extract_func cannot express at any shell level.)
 check "hint: covers maho/modx settings dirs (issue #149 finding 5)" \
     sh -c "awk '/^_opk_bootstrap_hint\(\)/,/^}/' \"\$1\" | grep -q 'maho | modx'" _ "$FUNC"
 check "hint: covers the root-file types (codeigniter/shopware6/symfony)" \
