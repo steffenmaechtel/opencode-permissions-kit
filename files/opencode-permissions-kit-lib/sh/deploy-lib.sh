@@ -129,6 +129,10 @@ opencode-permissions-kit-lib/sh/path-sane.sh 644
 # by install.sh from its checkout/fetch tree (kit_source, no LIBDIR
 # fallback — install.sh never runs from the installed tree)
 opencode-permissions-kit-lib/sh/install-core.sh 644
+# uninstall-core.sh: the uninstall run's section functions (issue #346),
+# sourced checkout-first by management/uninstall.sh (with the deployed
+# $LIBDIR fallback -- `opk uninstall` runs from the installed tree)
+opencode-permissions-kit-lib/sh/uninstall-core.sh 644
 opencode-permissions-kit-lib/sh/render-agent-config.sh 644
 opencode-permissions-kit-lib/sh/secure-binary.sh 644
 opencode-permissions-kit-lib/sh/shell-warn.sh 755

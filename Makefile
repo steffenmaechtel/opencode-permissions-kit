@@ -1,4 +1,4 @@
-.PHONY: help test lint fmt fmt-scope install-shfmt check-host check-py coverage test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-check-host test-docs test-skills-lint test-reviews-meta-aggregate test-rules-meta test-rules-revisit test-line-length test-string-continuations test-format-gate test-coverage test-install-args test-kit-files test-tui-mode test-uninstall test-status test-status-core test-doctor test-update-flags test-update-core test-install-core test-release test-e2e-sources test-browser-bridge test-security-advisories test-log test-deploy-lib test-update-check test-secure-binary test-sudoers-deploy test-sandbox-policy test-pages test-rules-index-parity rules-report e2e e2e-rootless e2e-ddev e2e-ddev-fresh e2e-all install-dev clean version check-version release
+.PHONY: help test lint fmt fmt-scope install-shfmt check-host check-py coverage test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-check-host test-docs test-skills-lint test-reviews-meta-aggregate test-rules-meta test-rules-revisit test-line-length test-string-continuations test-format-gate test-coverage test-install-args test-kit-files test-tui-mode test-uninstall test-uninstall-core test-status test-status-core test-doctor test-update-flags test-update-core test-install-core test-release test-e2e-sources test-browser-bridge test-security-advisories test-log test-deploy-lib test-update-check test-secure-binary test-sudoers-deploy test-sandbox-policy test-pages test-rules-index-parity rules-report e2e e2e-rootless e2e-ddev e2e-ddev-fresh e2e-all install-dev clean version check-version release
 
 # Scripts checked by `make lint` — DERIVED FROM DISK (0.0.42d C4 /
 # 0.0.42e C10): every file under files/ and scripts/ whose first line is
@@ -92,6 +92,7 @@ help:
 	@echo "  make test-install-args  Run install.sh arg-parsing tests"
 	@echo "  make test-kit-files     Run kit file list consistency tests"
 	@echo "  make test-uninstall     Run uninstall.sh tests"
+	@echo "  make test-uninstall-core  Run uninstall section-lib tests"
 	@echo "  make test-status        Run status.sh tests"
 	@echo "  make test-status-core   Run status section-lib tests"
 	@echo "  make test-update-core   Run update phase-lib tests"
@@ -121,7 +122,7 @@ help:
 	@echo "  make check-version Validate VERSION + consistent KIT_BRANCH in install.sh/update.sh"
 	@echo "  make release VERSION=x.y.z  Cut a release: tag + fast-forward the stable mirror (maintainer)"
 
-test: lint check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-check-host test-docs test-skills-lint test-reviews-meta-aggregate test-rules-meta test-rules-revisit test-line-length test-string-continuations test-format-gate test-coverage test-install-args test-kit-files test-tui-mode test-uninstall test-status test-status-core test-doctor test-update-flags test-update-core test-install-core test-release test-e2e-sources test-browser-bridge test-security-advisories test-log test-deploy-lib test-secure-binary test-sudoers-deploy test-sandbox-policy test-pages test-rules-index-parity test-update-check test-harness
+test: lint check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-check-host test-docs test-skills-lint test-reviews-meta-aggregate test-rules-meta test-rules-revisit test-line-length test-string-continuations test-format-gate test-coverage test-install-args test-kit-files test-tui-mode test-uninstall test-uninstall-core test-status test-status-core test-doctor test-update-flags test-update-core test-install-core test-release test-e2e-sources test-browser-bridge test-security-advisories test-log test-deploy-lib test-secure-binary test-sudoers-deploy test-sandbox-policy test-pages test-rules-index-parity test-update-check test-harness
 	@echo ""
 	@echo "All shell tests passed."
 
@@ -397,6 +398,10 @@ test-tui-mode:
 test-uninstall:
 	@echo "=== Uninstall Tests ==="
 	@./tests/unit/test-uninstall.sh
+
+test-uninstall-core:
+	@echo "=== Uninstall Section-Lib Tests (issue #346) ==="
+	@./tests/unit/test-uninstall-core.sh
 
 test-status:
 	@echo "=== Status Tests ==="

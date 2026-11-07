@@ -146,13 +146,15 @@ check "status.sh flags a dangling kit shim instead of green (0.0.42d C2)" \
 
 # --- uninstall consent (internal/records/wsl-conf-consent.md) --------------------------
 UNINSTALL="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/uninstall.sh"
+UNINSTALL_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/uninstall-core.sh"
 check "uninstall removes only the kit-owned xdg-open symlink" \
-    sh -c "grep -qF 'not kit-owned' \"\$1\"" _ "$UNINSTALL"
+    sh -c "grep -qF 'not kit-owned' \"\$1\"" _ "$UNINSTALL_CORE"
 check "uninstall.sh passes sh -n" sh -n "$UNINSTALL"
+check "uninstall-core.sh passes sh -n" sh -n "$UNINSTALL_CORE"
 check "uninstall.sh asks before removing kit-owned wsl.conf content" \
-    sh -c "grep -q \"Remove the kit's wsl.conf bridge block?\" \"\$1\" && grep -q 'prompt_yn' \"\$1\"" _ "$UNINSTALL"
+    sh -c "grep -q \"Remove the kit's wsl.conf bridge block?\" \"\$1\" && grep -q 'prompt_yn' \"\$1\"" _ "$UNINSTALL_CORE"
 check "uninstall.sh prints the manual line range when declined" \
-    sh -c "grep -q 'browser bridge -- begin\\\$' \"\$1\" && grep -q 'left untouched' \"\$1\"" _ "$UNINSTALL"
+    sh -c "grep -q 'browser bridge -- begin\\\$' \"\$1\" && grep -q 'left untouched' \"\$1\"" _ "$UNINSTALL_CORE"
 check "install.sh and update.sh deploy bin/browser-bridge into the library (lib_deploy manifest)" \
     sh -c "grep -q 'opencode-permissions-kit-lib/bin/browser-bridge 755' \"\$3\" \
         && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\" && grep -q 'lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"' \"\$2\"" _ "$INSTALL_CORE" "$UPDATE_CORE" "$DEPLOYLIB"

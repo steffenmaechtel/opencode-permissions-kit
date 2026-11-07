@@ -102,7 +102,7 @@ check make "make test / make lint / make e2e" "$APT make / $BREW make"
 check python3 "jsonc parser + kit CLI + git-config tests" "$APT python3 / $BREW python"
 check shellcheck "static analysis of the shipped scripts (make lint)" "$APT shellcheck / $BREW shellcheck"
 check setsid "hermetic ui tests (detach the controlling tty)" "$APT util-linux"
-check script "pty capture for prompt pins — test-ui, test-kit-cli, test-uninstall, test-browser-bridge (util-linux -qec)" "$APT util-linux"
+check script "pty capture for prompt pins — test-ui, test-kit-cli, test-uninstall, test-uninstall-core, test-browser-bridge (util-linux -qec)" "$APT util-linux"
 check seq "probes in test-skills-lint + test-line-length (pr-00263 a F26 — load-bearing counters)" "$APT coreutils"
 check timeout "no-hang discriminators in test-doctor + test-project-paths (#357 a A1 pins — rc 124 vs rc 1)" "$APT coreutils"
 

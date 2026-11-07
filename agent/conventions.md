@@ -190,11 +190,11 @@ do not refactor the site into the canonical shape.
 
 Suites that reference a management entry script together with its
 sourced phase lib (the #346 waves: `status.sh`/`status-core.sh`,
-`update.sh`/`update-core.sh`, `install.sh`/`install-core.sh` —
-`uninstall.sh` follows in wave 4)
+`update.sh`/`update-core.sh`, `install.sh`/`install-core.sh`,
+`uninstall.sh`/`uninstall-core.sh`)
 name the two path variables after the entry script:
-`STATUS`/`STATUS_CORE`, `UPDATE`/`UPDATE_CORE`, `INSTALL`/`INSTALL_CORE`
-— later `UNINSTALL`/`UNINSTALL_CORE`. No bare `CORE`
+`STATUS`/`STATUS_CORE`, `UPDATE`/`UPDATE_CORE`, `INSTALL`/`INSTALL_CORE`,
+`UNINSTALL`/`UNINSTALL_CORE`. No bare `CORE`
 and no per-suite abbreviations (`SCORE`, `UCORE`): suites grow second
 and third lib references over time, and a grep for one lib's pins must
 find every referencing suite under one variable name. (The shipped

@@ -124,6 +124,8 @@ jobs:
         run: ./tests/unit/test-tui-mode.sh
       - name: Run uninstall tests
         run: ./tests/unit/test-uninstall.sh
+      - name: Run uninstall section-lib tests (issue #346)
+        run: ./tests/unit/test-uninstall-core.sh
       - name: Run status tests
         run: ./tests/unit/test-status.sh
       - name: Run status section-lib tests (issue #346)

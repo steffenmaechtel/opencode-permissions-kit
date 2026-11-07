@@ -246,14 +246,16 @@ fi
 # braced self-default fallback (`var="${var:-/home/${DEFAULT_USER:-$USER}}"`
 # — status.sh's openchamber home, positively pinned by the 0.0.47c C1 rows).
 # status.sh's home usages live in its section lib since the #346 wave-1
-# decomposition — both files are checked (getent in either, hardcoded
-# usage sites in neither).
+# decomposition, uninstall.sh's since wave 4 — entry + lib are checked for
+# those two (getent in either, hardcoded usage sites in neither).
 _v14_core="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core.sh"
 for _v14_sib in status update uninstall; do
     _v14_sh="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/$_v14_sib.sh"
     _v14_files="$_v14_sh"
     [ "$_v14_sib" = status ] && _v14_files="$_v14_sh
 $_v14_core"
+    [ "$_v14_sib" = uninstall ] && _v14_files="$_v14_sh
+$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/uninstall-core.sh"
     _v14_bad="$(printf '%s\n' "$_v14_files" | while IFS= read -r _v14_f; do
         grep -e '/home/\$DEFAULT_USER' -e '/home/\${DEFAULT_USER' "$_v14_f" 2>/dev/null ||
             true
