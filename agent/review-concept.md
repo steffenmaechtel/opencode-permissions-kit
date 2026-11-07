@@ -54,6 +54,44 @@ round a: review (comment) → fixes →
 round b: review (comment) → fixes → … → closing summary → merge
 ```
 
+The alternation in positions — the fixed sequence every loop session
+runs, and every resuming session re-derives from its chain state
+(commission plus scratch `posted.log`; the write-through rule stands —
+position comes from the session's records, never from reading the PR
+back):
+
+| You just… | The one next step |
+|---|---|
+| pushed the birth-PR | round a's review pass, posted as its "Review a" comment |
+| posted a round comment | that round's fix wave (the dispositions) |
+| pushed a fix wave | the next round's review comment — or, stop rule holding, the closing summary |
+| posted the closing summary | report; the maintainer merges (closure = merge) |
+
+- A fix-wave re-review is itself a full round in the loop's strict
+  alternation — birth-PR → review a → comment → fix wave a →
+  review b → comment → fix wave b → review c → comment → fix wave c →
+  … → closing summary → merge: the re-review of a fix wave takes the
+  NEXT letter, posts its OWN round comment (format v2), and that
+  comment obeys the same hard seam before the round's own fixes —
+  there is no smaller comment-less "check" shape, whatever the
+  finding count (a two-finding re-review owes the same comment as an
+  opening round). After a PUSHED fix wave exactly two next actions
+  exist, both PR comments: the next round's review comment (owed
+  whenever the wave touched review-relevant code — "The loop and the
+  stop rule") or, once the stop rule provably holds, the closing
+  summary — a fix push is never a terminal state. Vocabulary: a round
+  is its review plus the disposition of its findings; the fix wave
+  shares its round's letter ("fix wave a" dispositions round a's
+  findings), and a wave never carries its own letter — historical
+  "wave b/c/d" spellings (handovers, older timelines, #412's loop
+  status among them) read as the named round's fixes. A session that
+  fixes a re-review's findings before its comment, or ends its turn
+  after a fix push with neither comment posted, has dropped the loop:
+  #407 (rounds b–e posted as a batch after their fixes) and #412
+  (round b's B2 fixed in cb4b2384 before round b's comment, which
+  posted only on the maintainer's request) are the two live instances;
+  the resuming session runs the owed step next and discloses the gap
+  in that round's run provenance. (RM-0138)
 - Before the first review round runs, the birth-PR exists — its number
   is the case key (citations, comment markers, the PR timeline itself).
   The agent creates the PR itself in every mode (AGENTS.md Rules (the never-commit-on-master rule) —
@@ -136,8 +174,12 @@ nothing to review.
 - Review-relevant is everything that has or wires behavior: `files/`
   (including the sudoers/config templates), tests and their pins, the
   Makefile, workflows, `scripts/`. Comments, `docs/`, CHANGELOG and
-  bookkeeping are not. There is deliberately no "trivial" carve-out.
-  (RM-0065)
+  bookkeeping are not — the axis is the CHANGE KIND, never the file
+  class: comment-only or bookkeeping bytes inside a review-relevant
+  file (a citation fix in a test file, #412 b B3) close the loop as
+  comments/bookkeeping; "touch code" means source bytes changed
+  (executable logic, pins, manifest lines). There is deliberately no
+  "trivial" carve-out. (RM-0065)
 - A round whose fixes stay in comments/docs/bookkeeping closes the
   loop. (RM-0066)
 - On the non-shipped track, a deliberate-not-done disposition of a
@@ -172,8 +214,9 @@ nothing to review.
   `from-review` label (provenance: the issue came from a
   review pass — urgency NEVER travels in it), the `prio:` label
   derived from the finding's severity
-  (LOW→prio:low, MED→prio:med, HIGH→prio:high; no label without a
-  severity), and source pointers. The PROPOSAL lives on the PR
+  (INFO→prio:info, LOW→prio:low, MED→prio:med, HIGH→prio:high; no
+  label without a severity), and source pointers. The PROPOSAL lives
+  on the PR
   timeline (the closing summary's work-order section); the ASK is
   posed to the maintainer in the SESSION CHAT — both modes: the gate
   is a maintainer decision, and the chat is where the maintainer

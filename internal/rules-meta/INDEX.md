@@ -6,7 +6,7 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**137 metas · 134 active · 3 retired · 0 review-pending · next due 2026-11-14**
+**138 metas · 135 active · 3 retired · 0 review-pending · next due 2026-11-14**
 
 ## Actionable
 
@@ -110,6 +110,7 @@
 | [RM-0121](0/1/2/RM-0121.md) | Write-through: the loop never | active | approved | 1m | 2026-11-28 |
 | [RM-0122](0/1/2/RM-0122.md) | Scope brake (binding in | active | approved | 1m | 2026-11-28 |
 | [RM-0123](0/1/2/RM-0123.md) | Scope budget (autonomous commissions): the | active | approved | 1m | 2026-11-28 |
+| [RM-0138](0/1/3/RM-0138.md) | A fix-wave re-review is itself | active | approved | 1m | 2026-12-07 |
 
 ### The loop and the stop rule
 

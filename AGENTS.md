@@ -175,7 +175,12 @@ in pr-00263: the fix wave committed through a red line-length ratchet
 behind a piped gate, and the d wave's `; echo` separator let a
 121-char resolution row slip past the gate (caught by amending the
 still-unpushed commit). Check-then-commit is only protection if the
-check can fail the chain.
+check can fail the chain. The chain's SCOPE for fix waves is the full
+gate (`make test`), never only the touched suites: tree-wide invariant
+suites (rules-meta, sandbox-policy, workflows, format-gate) redden on
+changes their own files never touched — #412's round-b B3 (bare
+rule-ID citations in new comment text) was locally invisible and red
+in CI exactly through that gap.
 
 Both e2e suites are part of the definition of done for changes to
 `install.sh`, `update.sh`, the wrapper, or backend provisioning — and for

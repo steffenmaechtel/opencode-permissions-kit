@@ -1,6 +1,6 @@
 ---
 name: opk-review-pass
-description: Execute a review round (low/med/high tier, snapshot-scope pass, fresh session) — load when a review is owed or the maintainer commissions one. Covers track/tier classification, fan-out, curation + verification, round comments v2; rules: agent/review-concept.md. Redundancy passes stay independent by operator setup; one that loads this skill anyway discloses it in its Skills: line.
+description: Execute a review round (low/med/high tier, snapshot-scope pass, fresh session) — load when a review is owed or the maintainer commissions one. Covers track/tier classification, fan-out, curation + verification, round comments v2, fix-phase duties; rules: agent/review-concept.md. Redundancy passes stay independent by operator setup; one that loads it anyway discloses it in its Skills: line.
 ---
 
 # opk-review-pass — executing a review round
@@ -64,6 +64,13 @@ session's commission, then gather:
 | Tier | classified from the round's diff BEFORE staging (section 2) |
 | Base + diff | base SHA and `git diff <range>` for diff scope; tree SHA for snapshot scope |
 | Tree state | clean and committed — the comment posts before any fix ("The PR-native loop") |
+
+Loop position: the alternation is fixed — birth-PR → review a →
+comment → fix wave a → review b → comment → … — and a fix-wave
+re-review is itself a round (next letter, own round comment, same
+seam before its own fixes; review-concept, "The PR-native loop").
+Confirm from the chain state WHICH round this session is running
+before classifying — the position table there is the discriminator.
 
 ## 2. Classify the track and tier BEFORE staging
 
@@ -240,6 +247,9 @@ the maintainer reads):
   violations (0 or disclosed), CI status of the last push;
 - review-relevant code touched this round: yes/no (drives the stop
   rule — review-concept, "The loop and the stop rule");
+- the ONE next step (this round's fix wave; after a pushed fix wave:
+  the next round's review comment, or the closing summary when the
+  stop rule holds — never blank: a fix push is not a terminal state);
 - round typing: converging or BUILDING (predominantly fix-induced
   findings = building, said explicitly);
 - cap distance from round 5 on; scope-brake activity (deferred work
@@ -285,3 +295,27 @@ When the stop rule holds, the closing summary proposes closure
 (`"state":"closing-proposed"`, stop-rule check cited, ledger and
 check visible at top level) — the maintainer's merge confirms; this
 skill never writes a `"closed"` state.
+
+## 9. Fix phase — the mechanical duties after the round comment
+
+The skill's rounds end at the report (section 8); the fixes are the
+session's NEXT phase, and without this section it enters with no step
+list — both #407 and #412 dropped the loop exactly here. Checklist at
+the phase's entry:
+
+1. SEAM first: re-read the case scratch `posted.log` — it must
+   contain THIS round's comment URL before the first fix commit of
+   the wave; no entry, no fix (review-concept, "The PR-native loop").
+2. CITATIONS: fix commits qualify every finding they resolve
+   (`(#<PR> <round> <ID>)` — review-concept, "Who records what").
+3. GATE SCOPE: the wave's gate chain runs the FULL suite
+   (`make test`), never only the touched suites — tree-wide
+   invariant suites (rules-meta, sandbox-policy, workflows,
+   format-gate) redden on changes their own files never touched
+   (AGENTS.md, Testing; the #412 round-b B3 instance).
+4. PUSH, then the loop continues: every fix wave whose fixes touch
+   review-relevant code owes its re-review — which is the NEXT round
+   (next letter, comment before its own fixes, this skill from
+   section 1 again); a round whose dispositions touch no
+   review-relevant code leads to the closing summary (section 8)
+   instead. A fix push is never a terminal state.
