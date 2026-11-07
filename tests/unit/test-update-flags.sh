@@ -62,11 +62,7 @@ fi
 # --- 1. flag parsing (static extraction, same pattern as test-install-args) ------
 # The binary helpers are top-level definitions in sh/update-core.sh
 # since #346 wave 2, so function extraction works on that file.
-extract_core_fn() {
-    sed -n "/^$1() {/,/^}/p" "$UPDATE_CORE"
-}
-
-if [ -n "$(extract_core_fn resolve_latest_opencode_version)" ]; then
+if [ -n "$(extract_func "$UPDATE_CORE" resolve_latest_opencode_version)" ]; then
     pass "resolve_latest_opencode_version defined in update-core.sh"
 else
     fail "resolve_latest_opencode_version defined in update-core.sh"
@@ -118,12 +114,12 @@ chmod +x "$WORK/bin/curl"
 # Top-level definitions in sh/update-core.sh since #346 wave 2.
 FUNCS="$WORK/funcs.sh"
 {
-    sed -n '/^detect_target() {/,/^}/p' "$UPDATE_CORE"
-    sed -n '/^version_major() {/,/^}/p' "$UPDATE_CORE"
-    sed -n '/^opencode_version_line() {/,/^}/p' "$UPDATE_CORE"
-    sed -n '/^current_opencode_major() {/,/^}/p' "$UPDATE_CORE"
-    sed -n '/^resolve_latest_opencode_version() {/,/^}/p' "$UPDATE_CORE"
-    sed -n '/^fetch_opencode_version() {/,/^}/p' "$UPDATE_CORE"
+    extract_func "$UPDATE_CORE" detect_target
+    extract_func "$UPDATE_CORE" version_major
+    extract_func "$UPDATE_CORE" opencode_version_line
+    extract_func "$UPDATE_CORE" current_opencode_major
+    extract_func "$UPDATE_CORE" resolve_latest_opencode_version
+    extract_func "$UPDATE_CORE" fetch_opencode_version
 } >"$FUNCS"
 
 # Stubs for current_opencode_major (2.x and 1.x --version shapes).
@@ -182,7 +178,7 @@ RLVDIAG='platform independent libraries'
 # Site-scoped needle (#244 d Q2): read only the resolve function — a
 # same-shape redirect elsewhere in update-core.sh must not red this pin
 # with a misleading "resolve:" message.
-RLVFN="$(sed -n '/^resolve_latest_opencode_version() {/,/^}/p' "$UPDATE_CORE")"
+RLVFN="$(extract_func "$UPDATE_CORE" resolve_latest_opencode_version)"
 if [ -z "$RLVFN" ]; then
     fail "resolve: function extractable for the site-scoped redirect pin (#244 d Q2)"
 elif printf '%s\n' "$RLVFN" | grep -qF "' 2>/dev/null || true)"; then
@@ -508,8 +504,8 @@ if [ -n "$_restamp_block" ]; then
     # current_opencode_major anchors the same way (0.0.44e E2): this value
     # picks the UPGRADE CHANNEL — a misparsed probe on a 2.x host must fall
     # through to the install.conf stamp, not resolve the 1.x channel.
-    _com_fns=$(sed -n '/^version_major() {/,/^}/p' "$UPDATE_CORE")
-    _com_c=$(sed -n '/^current_opencode_major() {/,/^}/p' "$UPDATE_CORE")
+    _com_fns=$(extract_func "$UPDATE_CORE" version_major)
+    _com_c=$(extract_func "$UPDATE_CORE" current_opencode_major)
     # literal newline in quotes: $(printf '\n') strips it and glues the
     # function bodies together (Syntax error: Bad function name)
     _com_fns="$_com_fns

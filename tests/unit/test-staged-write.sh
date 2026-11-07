@@ -363,7 +363,7 @@ fi
 _dh_order() {
     # comment-stripped at extraction (#385): sed s/// keeps the line
     # numbers stable for the -lt comparison below
-    _dh_blk=$(sed -n "/^$1()/,/^}/p" "$HANDOVER" | sed 's/^[[:space:]]*#.*$//')
+    _dh_blk=$(extract_func "$HANDOVER" "$1" | sed 's/^[[:space:]]*#.*$//')
     _dh_cl=$(printf '%s\n' "$_dh_blk" | grep -nF 'chmod -R g+w "' | head -1 | cut -d: -f1)
     _dh_hl=$(printf '%s\n' "$_dh_blk" | grep -nF 'chown -R "' | head -1 | cut -d: -f1)
     [ -n "$_dh_cl" ] && [ -n "$_dh_hl" ] || return 1
@@ -422,7 +422,7 @@ mkdir -p "$BIN"
 printf '#!/bin/sh\nout=""\nprev=""\nfor a in "$@"; do\n  [ "$prev" = "-o" ] && out="$a"\n  prev="$a"\ndone\ncase "$CURL_STUB" in\n  fail) exit 1 ;;\n  empty) : > "$out" ;;\n  *) printf "KIT FILE CONTENT\\n" > "$out" ;;\nesac\n' >"$BIN/curl"
 chmod +x "$BIN/curl"
 
-eval "$(sed -n '/^ensure_local_file() {/,/^}/p' "$UPDATE")"
+eval "$(extract_func "$UPDATE" ensure_local_file)"
 FILES_ROOT="$WORK/fr"
 KIT_BASE_URL="https://example.invalid"
 _tmp_track() { :; } # scratch-registry stub (update.sh's real one is a no-op here)

@@ -131,15 +131,11 @@ grep_last_out() {
     fi
 }
 
-extract_fn() {
-    sed -n "/^$1()/,/^}/p" "$DOCTOR"
-}
-
 echo "=== doctor.sh unit tests ==="
 
 # --- 1. doctor_userns_ranges: the live-map shape filter (#313) --------------------
 RANGES_FN="$WORK/userns-fn.sh"
-extract_fn doctor_userns_ranges >"$RANGES_FN"
+extract_func "$DOCTOR" doctor_userns_ranges >"$RANGES_FN"
 [ -s "$RANGES_FN" ] &&
     pass "doctor_userns_ranges extractable" ||
     fail "doctor_userns_ranges extractable"
@@ -203,8 +199,8 @@ fi
 
 # --- 2. doctor_classify / doctor_examples: uid classification ---------------------
 CLS_FN="$WORK/cls-fn.sh"
-extract_fn doctor_classify >"$CLS_FN"
-extract_fn doctor_examples >>"$CLS_FN"
+extract_func "$DOCTOR" doctor_classify >"$CLS_FN"
+extract_func "$DOCTOR" doctor_examples >>"$CLS_FN"
 [ -s "$CLS_FN" ] &&
     pass "doctor_classify/doctor_examples extractable" ||
     fail "doctor_classify/doctor_examples extractable"
@@ -280,7 +276,7 @@ _out="$(_ex_run "$WORK/extsv" 1001 "165536 65536" | tr '\n' ' ')"
 
 # --- 3. doctor_load_policy: opk.json validation (strict JSON) ---------------------
 POL_FN="$WORK/pol-fn.sh"
-extract_fn doctor_load_policy >"$POL_FN"
+extract_func "$DOCTOR" doctor_load_policy >"$POL_FN"
 [ -s "$POL_FN" ] &&
     pass "doctor_load_policy extractable" ||
     fail "doctor_load_policy extractable"

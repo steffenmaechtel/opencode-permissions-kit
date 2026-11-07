@@ -285,15 +285,12 @@ fi
 # every field that leaves the script as argv/query. Static extraction,
 # same technique as test-status.sh's backend case.
 SCAN="$SCRIPT_DIR/../../scripts/advisory-watch.sh"
-extract_scan_guard() {
-    sed -n '/^scan_advisory_valid() {/,/^}/p' "$SCAN"
-}
-if [ -n "$(extract_scan_guard)" ]; then
+if [ -n "$(extract_func "$SCAN" scan_advisory_valid)" ]; then
     pass "advisory-watch.sh: guard function extractable"
 else
     fail "advisory-watch.sh: guard function extractable"
 fi
-eval "$(extract_scan_guard)"
+eval "$(extract_func "$SCAN" scan_advisory_valid)"
 
 # the real feed shape stays usable (spaces in comparators tolerated)
 if scan_advisory_valid "GHSA-632h-h47v-g4x4" "high" ">=1.14.30, < 1.18.22" "1.18.22"; then
@@ -439,11 +436,8 @@ if [ -n "$_idclean_ln" ] && [ -n "$_tracked_ln" ] && [ "$_idclean_ln" -lt "$_tra
 else
     fail "advisory-watch.sh: id gate -> both dedups -> validation (V12)"
 fi
-extract_id_gate() {
-    sed -n '/^scan_id_clean() {/,/^}/p' "$SCAN"
-}
-if [ -n "$(extract_id_gate)" ]; then
-    eval "$(extract_id_gate)"
+if [ -n "$(extract_func "$SCAN" scan_id_clean)" ]; then
+    eval "$(extract_func "$SCAN" scan_id_clean)"
     if scan_id_clean "GHSA-632h-h47v-g4x4"; then
         pass "scan id gate: well-formed id passes"
     else

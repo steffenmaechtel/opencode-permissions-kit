@@ -905,7 +905,7 @@ fi
         'fs_baseline_root() { echo "FSB: $1"; }' \
         'ddev_handover_root() { echo "HO: $1"; }' \
         'ddev_handover_stamp_write() { :; }'
-    sed -n '/^refresh() {/,/^}$/p' "$CONFIG"
+    extract_func "$CONFIG" refresh
     printf '%s\n' 'refresh'
 } >"$S245/run-refresh.sh"
 # conf order: real … malformed/link entries … real2 — real2 AFTER every
@@ -1006,6 +1006,9 @@ fi
 # sibling fs_baseline_root shape. rc 0 let a caller stamp "applied"
 # over nothing (executed in the b review); the warn alone did not stop
 # the unconditional stamp writes. Function extracted, never sourced.
+# Boundary note (#416 a R6): the sed range runs inside the sh -c child,
+# where the harness's extract_func is not defined (child-shell residual
+# class, same boundary as test-ddev-as-opencode's awk legs) — deliberate.
 # c X1 arms ride along: the form spellings (`link/.`, `link//`) and a
 # non-absolute root refuse too — review c's probe had the find walk
 # descend the TARGET through the old one-slash-only belt.

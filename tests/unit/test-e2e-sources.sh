@@ -100,7 +100,7 @@ case "${FAKE_CURL_MODE:-ok}" in
 esac
 CURLEOF
 chmod +x "$NPMWORK/bin/curl"
-sed -n '/^npm_dist_latest() {/,/^}/p' "$LIB" >"$NPMWORK/fn.sh"
+extract_func "$LIB" npm_dist_latest >"$NPMWORK/fn.sh"
 
 _npmres() {
     FAKE_CURL_MODE="$1" PATH="$NPMWORK/bin:$PATH" \
