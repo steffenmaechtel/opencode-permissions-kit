@@ -220,7 +220,11 @@ review-concept, "The round comment contract"):
    trimmed.
 5. Post to the PR timeline; append the comment URL to the case
    scratch `posted.log`. The comment posts BEFORE any fix starts —
-   the hard seam.
+   the hard seam. MECHANICAL FORM: before the first fix commit of
+   the wave, re-read `posted.log` and confirm it contains THIS
+   round's URL — no entry, no fix; post first. Long sessions lose
+   prose, not logs (#407: rounds b–e posted as a batch after the
+   fixes, disclosed as a deviation).
 6. Nothing here fixes anything: dispositions for THIS round's
    findings land in the NEXT round's comment (or the closing
    summary).
@@ -245,29 +249,34 @@ the maintainer reads):
 
 Before composing the closing summary, run the deferred-work-order
 issue gate (the rule: review-concept, "The loop and the stop rule"):
-duplicate-check every collected work order
-against the tracker (open list + search), propose the bundling with
-title + `from-review` + `prio:` label derived from severity + source pointers, and
-agree EVERY work order with the maintainer in ONE ask at the very END
-of the report — the answer is free-form, per work order or per
-proposed bundle ("A and B yes, C no"), never a single rigid yes/no
-over the whole set. For every YES: file the issue (`gh issue create`,
+duplicate-check every collected work order against the tracker — the
+open list AND a search covering issue TITLES AND BODIES
+(`gh search issues` covers both; #407's title-only search missed two
+live matches) — propose the bundling with title + `from-review` +
+`prio:` label derived from severity + source pointers, record the
+proposal in the closing summary's work-order section, and pose the
+ASK to the maintainer in the SESSION CHAT (both modes) as the LAST
+block of the chat report, nothing after it — the answer is
+free-form, per work order or per proposed bundle ("A and B yes, C
+no"), never a single rigid yes/no over the whole set. For every YES,
+one of two equal dispositions: file a new issue (`gh issue create`,
 permission prompt = runtime gate) with the issue body citing the
 birth-PR as its source (GitHub cross-references the PR timeline
-automatically — no manual pointer comment); every NO is recorded as
-deliberately not done. The closing summary lists the created issues
-alongside the recorded declines.
+automatically), or FOLD the work order into the matched existing
+issue with a pointer comment carrying the finding and its evidence.
+Every NO is recorded as deliberately not done. The closing summary
+lists the created issues and folds alongside the recorded declines.
 
-The ask's canonical shape — plain markdown ONLY, no HTML (terminal
-clients render tags as literal text); it is the report's LAST block,
-nothing follows it:
+The ask's canonical CHAT shape — plain markdown ONLY, no HTML
+(terminal clients render tags as literal text):
 
 ```
 ---
 
 CREATE ISSUES? → F3 / F5 / F8
 
-(free-form per work order or bundle — e.g. "F3 and F5 yes, F8 no")
+(free-form per work order or bundle — e.g. "F3 and F5 yes, fold F8
+into #27, F2 no")
 
 ---
 ```
