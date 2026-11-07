@@ -6,12 +6,12 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**138 metas · 135 active · 3 retired · 2 review-pending · next due 2026-11-14**
+**138 metas · 135 active · 3 retired · 3 review-pending · next due 2026-11-14**
 
 ## Actionable
 
 - **Review pending:** RM-0138
-- **Amended — pending:** RM-0136 (2026-11-07)
+- **Amended — pending:** RM-0065 (2026-11-07), RM-0136 (2026-11-07)
 - **Overdue:** none
 
 ## AGENTS.md
@@ -117,7 +117,7 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0064](0/0/6/RM-0064.md) | Stop when a round leaves | active | approved | 1m | 2026-11-19 |
-| [RM-0065](0/0/6/RM-0065.md) | Review-relevant is everything that has | active | approved | 1m | 2026-11-19 |
+| [RM-0065](0/0/6/RM-0065.md) | Review-relevant is everything that has | active | **amended — pending** | 1m | 2026-11-19 |
 | [RM-0066](0/0/6/RM-0066.md) | A round whose fixes stay | active | approved | 1m | 2026-11-19 |
 | [RM-0067](0/0/6/RM-0067.md) | Any round whose fixes touch | active | approved | 1m | 2026-11-19 |
 | [RM-0068](0/0/6/RM-0068.md) | If a chain has not converged | retired | approved | 1m | 2026-11-19 |
