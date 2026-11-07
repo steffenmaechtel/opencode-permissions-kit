@@ -3,10 +3,12 @@
 #
 # The uninstall run's section logic (issue #346, wave 4): every removal
 # section of management/uninstall.sh as functions -- pure code movement,
-# output byte-identical (the entry calls them in the former statement
-# order). Sourced (never executed) by uninstall.sh via a candidate list
-# like update.sh's UPDATE_CORE -- checkout-first ($(dirname "$0")/../sh,
-# the checkout or the DEPLOYED tree `opk uninstall` execs), then the
+# user-visible output byte-identical (the entry calls them in the former
+# statement order; --debug xtrace adds the sourcing/call lines --
+# diagnostics, not output). Sourced (never executed) by uninstall.sh via
+# a candidate list
+# like update.sh's UPDATE_CORE -- checkout-first (readlink -f-resolved
+# $0 → ../sh, the checkout or the DEPLOYED tree `opk uninstall` execs), then the
 # deployed $LIBDIR fallback, loud abort when both miss (the #165 class:
 # no silent section drops). This differs DELIBERATELY from install.sh's
 # kit_source-without-fallback: install.sh never runs from the installed

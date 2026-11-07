@@ -5,11 +5,13 @@
 # stub the environment). This suite is the #396 payoff of wave 4: the
 # block-extraction pins test-uninstall.sh used to carry (project loop,
 # rc-observing runner, OPENCODE_USER gate, config-dirs section, prompt_yn,
-# group/user/audit-log blocks) became sourcing pins here; the two honest
-# exceptions kept as retargeted extractions: the W2/F2 agents-backup loop
-# (its /home/ paths are literal — the driver rewrites them onto scratch)
-# and the F27 bridge consent arm (grep /etc/wsl.conf is host-dependent —
-# the block stays standalone-eval'd with stubs). The root-run rm
+# group/user/audit-log blocks) became sourcing pins here. Two extraction
+# pins remain, deliberately (RM-0130 — the pins work; converting them is
+# recorded as pin polish, not owed here): the W2 agents-backup gate (its
+# success fixture needs a readable dir at the literal /home/<agent> path —
+# the sed scratch rewrite is the only hermetic shape for THAT leg) and the
+# F27 bridge consent arm (kept standalone-eval'd with stubs; a grep-shadow
+# sourcing drive is feasible but is the same polish class). The root-run rm
 # orchestration is e2e territory (category 3, no coverage promise).
 # Covers:
 #   - sourcing purity: definitions only, zero top-level side effects
@@ -70,21 +72,22 @@ else
     fail "functions missing after sourcing:$_missing"
 fi
 
-# The entry's resolver: checkout-first ($(dirname "$0")/../sh) WITH the
+# The entry's resolver: checkout-first (readlink -f-resolved $0 → ../sh,
+# update.sh parity) WITH the
 # deployed $LIBDIR fallback — the update.sh UPDATE_CORE shape, deliberately
 # NOT install.sh's kit_source-without-fallback (uninstall.sh runs from the
 # deployed tree via `opk uninstall`; install.sh never does). Loud abort when
 # both candidates miss.
-if grep -qF 'UNINSTALL_CORE="$(dirname "$0")/../sh/uninstall-core.sh"' "$UNINSTALL" &&
+if grep -qF 'UNINSTALL_CORE="$(dirname "$(readlink -f "$0")")/../sh/uninstall-core.sh"' "$UNINSTALL" &&
     grep -qF 'UNINSTALL_CORE="/usr/local/lib/opencode-permissions-kit/sh/uninstall-core.sh"' "$UNINSTALL" &&
     grep -qF 'error: uninstall-core.sh not found' "$UNINSTALL" &&
     ! sed 's/^[[:space:]]*#.*$//' "$UNINSTALL" | grep -q 'kit_source'; then
-    pass "entry resolver: checkout-first + \$LIBDIR fallback, loud abort (update.sh shape)"
+    pass "entry resolver: checkout-first (readlink -f, update.sh parity) + \$LIBDIR fallback, loud abort"
 else
     fail "entry resolver shape (checkout-first + LIBDIR fallback)"
 fi
 # resolver sits before the first section call (order pin)
-_res_ln=$(grep -n 'UNINSTALL_CORE="$(dirname "$0")/../sh/uninstall-core.sh"' "$UNINSTALL" | cut -d: -f1)
+_res_ln=$(grep -n 'UNINSTALL_CORE="$(dirname "$(readlink -f "$0")")/../sh/uninstall-core.sh"' "$UNINSTALL" | cut -d: -f1)
 _ctx_ln=$(grep -n '^un_context_load$' "$UNINSTALL" | cut -d: -f1)
 _first_sec_ln=$(grep -n '^un_sudoers_remove$' "$UNINSTALL" | cut -d: -f1)
 if [ -n "$_res_ln" ] && [ -n "$_ctx_ln" ] && [ -n "$_first_sec_ln" ] &&
@@ -331,9 +334,10 @@ fi
 # un_rc_q, un_opencode_user_gate) — the former extraction pins are the
 # sourcing pins below; the loop driver calls the real function with a
 # fixture UNINSTALL_PROJECTS_CONF (the function reads the variable its
-# `done <` redirect names — no stdin surgery anymore).
-if printf '%s' "$(grep -c 'un_rc_q "' "$LIB" || true)" | grep -qE '^[0-9]+$' &&
-    [ "$(grep -c 'un_rc_q "' "$LIB")" -gt 10 ]; then
+# `done <` redirect names — no stdin surgery anymore). Comment-strip
+# rider on the count (conventions.md, "Source-counting pins").
+_unq_all="$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -c 'un_rc_q "' || true)"
+if printf '%s' "$_unq_all" | grep -qE '^[0-9]+$' && [ "$_unq_all" -gt 10 ]; then
     pass "rc-observing runner wired across the sections (#218)"
 else
     fail "rc-observing runner wiring (#218)"
@@ -1149,11 +1153,16 @@ fi
 # The silent noop stub + unconditional echo claimed a removal that never
 # ran when the helper was missing. Extract the real consent block and
 # drive both arms with a stubbed browser_bridge_remove + auto-yes prompt.
-# Retargeted extraction (honest exception, NOT a sourcing pin): the
-# consent arm greps the REAL /etc/wsl.conf — driving the whole section
-# function would branch on host state; the extracted block with stubbed
-# helpers stays hermetic. Anchors moved with the section into
-# un_wsl_bridge_remove (end anchor one level deeper now).
+# Retargeted extraction, deliberately kept (RM-0130): the obstacle is the
+# marker GUARD's hardcoded /etc/wsl.conf grep — a whole-section sourcing
+# drive would need a grep shadow to stay hermetic (feasible, but that
+# conversion is recorded pin polish, not owed here); the standalone block
+# with stubbed helpers stays hermetic as-is. Its declined arm still greps
+# the host's /etc/wsl.conf, silenced — assertions are substring-based and
+# survive marker-carrying hosts. Anchors moved with the section into
+# un_wsl_bridge_remove (end anchor one level deeper now); over-capture
+# after future indent drift stays syntactically consumable — the
+# block-identity upgrade rides the same polish order.
 _f27_block="$(sed -n "/Remove the kit's wsl.conf bridge block/,/^            fi$/p" \
     "$LIB")"
 if [ -n "$_f27_block" ] && printf '%s' "$_f27_block" | grep -q 'browser_bridge_remove'; then
@@ -1349,10 +1358,14 @@ else
 fi
 
 # --- agents-backup failure arm names the failing commands (#211 f W2) ----------
-# Retargeted extraction (honest exception, NOT a sourcing pin): the loop
-# hardcodes /home/<agent> paths — the driver rewrites them onto scratch via
-# sed, which a function call cannot do; the anchors moved with the loop
-# into un_user_remove (12-space nesting).
+# Retargeted extraction, deliberately kept (RM-0130): this driver stubs
+# sudo (test/ls/mkdir/cp) — the /home/<agent> literals are never executed
+# as paths, so no rewrite is needed and the failure arm pins verbatim; a
+# whole-function sourcing drive (un_user_remove with the same stubs) has
+# suite precedent but is recorded pin polish, not owed here. The W2 gate
+# pin below is the one that genuinely needs the sed scratch rewrite (its
+# sudo stub EXECs, so the readable-.agents fixture must live at a
+# rewritable path). Anchors: 12-space nesting inside un_user_remove.
 _f2_bak_block="$(sed -n '/^            for _un_ag_dirname in \.agents \.claude; do$/,/^            done$/p' "$LIB")"
 if [ -n "$_f2_bak_block" ]; then
     pass "agents-backup loop extractable (#211 f W2)"

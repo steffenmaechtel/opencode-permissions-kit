@@ -29,6 +29,7 @@ STATUS_CORE="$REPO/files/opencode-permissions-kit-lib/sh/status-core.sh"
 UPDATE_CORE="$REPO/files/opencode-permissions-kit-lib/sh/update-core.sh"
 CONFIG="$REPO/files/opencode-permissions-kit-lib/management/config.sh"
 UNINSTALL="$REPO/files/opencode-permissions-kit-lib/management/uninstall.sh"
+UNINSTALL_CORE="$REPO/files/opencode-permissions-kit-lib/sh/uninstall-core.sh"
 SUDOERS="$REPO/files/opencode-permissions-kit-lib/templates/sudoers.template"
 TEST_YML="$REPO/.github/workflows/test-unit.yml"
 
@@ -256,7 +257,7 @@ check "status.sh has no WWW_GROUP fallback" \
     grep_absent -Fq 'OPENCODE_GROUP:-${WWW_GROUP:-opencode}' "$STATUS"
 check "uninstall.sh has no WWW_GROUP fallback" \
     sh -c '! grep -Fq "\$WWW_GROUP" "$1" && ! grep -Fq "\$WWW_GROUP" "$2"' _ \
-    "$UNINSTALL" "$REPO/files/opencode-permissions-kit-lib/sh/uninstall-core.sh"
+    "$UNINSTALL" "$UNINSTALL_CORE"
 check "no remaining WWW_GROUP variable use in install.sh" \
     sh -c '! grep -Fq "\$WWW_GROUP" "$1" && ! grep -Fq "\$WWW_GROUP" "$2"' _ "$INSTALL" "$INSTALL_CORE"
 

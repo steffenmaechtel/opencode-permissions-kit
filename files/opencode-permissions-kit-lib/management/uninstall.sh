@@ -142,7 +142,7 @@ fi
 # lib is a broken kit (the #165 class): loud error, no silent section
 # drops. Unlike install.sh's kit_source there IS a $LIBDIR fallback here
 # -- uninstall.sh runs from the deployed tree, install.sh never does.
-UNINSTALL_CORE="$(dirname "$0")/../sh/uninstall-core.sh"
+UNINSTALL_CORE="$(dirname "$(readlink -f "$0")")/../sh/uninstall-core.sh"
 [ -f "$UNINSTALL_CORE" ] || UNINSTALL_CORE="/usr/local/lib/opencode-permissions-kit/sh/uninstall-core.sh"
 if [ -f "$UNINSTALL_CORE" ]; then
     # shellcheck disable=SC1090
@@ -156,7 +156,9 @@ fi
 # The uninstall as a linear section list; everything above is bootstrap,
 # helpers and the section-lib resolver (the definitions live in
 # sh/uninstall-core.sh). Plain statements in the former top-level order
-# -- output byte-identical.
+# -- user-visible output byte-identical (proven by dry-run execution;
+# --debug xtrace legitimately adds the sourcing event and the section
+# call lines — diagnostics, not output).
 un_context_load
 
 trace "first prompt ..."
