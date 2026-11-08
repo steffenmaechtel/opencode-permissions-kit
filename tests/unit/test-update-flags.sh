@@ -1409,7 +1409,7 @@ else
 fi
 if [ "$_vsg_b1rc" -eq 0 ] &&
     printf '%s\n' "$_vsg_b1" | grep -qxE 'V=[0-9]+\.[0-9]+\.[0-9]+'; then
-    pass "fallback read survives bash+set -eu+pipefail (pr-00429 a B1)"
+    pass "fallback read survives bash+set -e+pipefail (pr-00429 a B1)"
 else
     fail "fallback read dies under bash+pipefail (rc=$_vsg_b1rc out=$_vsg_b1) (pr-00429 a B1)"
 fi
