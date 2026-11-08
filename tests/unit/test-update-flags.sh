@@ -1391,8 +1391,13 @@ fi
 # production context. HOST NOTE: with a kit installed the read
 # succeeds — the survival assert still exercises the pipefail path; on
 # a bare host it is the discriminating arm (sabotage: drop the || true).
+# The child uses set -e WITHOUT -u: kcov's BASH_ENV instrumentation
+# references BASH_SOURCE when the sourced fragment's DEBUG trap fires
+# and dies under set -u (the same documented-conflict family as the
+# fs-baseline cat-arm rider, scripts/coverage.sh header) — -u is not
+# part of what this pin discriminates (pipefail-promoted rc is).
 if _vsg_b1=$(FILES_ROOT="$_VSG/froot" bash -c '
-        set -eu
+        set -e
         (set -o pipefail) 2>/dev/null && set -o pipefail || true
         _opk_binonly=true
         . "$1" >/dev/null 2>&1
@@ -1425,7 +1430,7 @@ fi
 printf '0.1.2\n' >"$_VSG/VERSION"
 chmod 000 "$_VSG/VERSION"
 if _vsg_b2=$(FILES_ROOT="$_VSG/froot" bash -c '
-        set -eu
+        set -e
         (set -o pipefail) 2>/dev/null && set -o pipefail || true
         _opk_binonly=false
         . "$1"
