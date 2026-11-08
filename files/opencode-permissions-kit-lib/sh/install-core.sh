@@ -325,8 +325,16 @@ do_plan_phase() {
         sudo -u "$OPENCODE_USER" git -C / config --global --list \
             >"$BACKUP_DIR/gitconfig-$OPENCODE_USER.txt" 2>/dev/null || _bk_fail "gitconfig-$OPENCODE_USER"
     else
-        log "backup skipped: no global gitconfig for '$OPENCODE_USER' (user absent, or no""\
- ${_oc_gcfg_home:-<no-home>}/.gitconfig) — nothing to copy"
+        # Per-scenario wording (review b B1, #424): "user absent" is
+        # false on the most common re-install shape (user exists, the
+        # kit never creates a gitconfig for the agent) — name what was
+        # actually checked instead.
+        if [ -n "$_oc_gcfg_home" ]; then
+            log "backup skipped: no global gitconfig for '$OPENCODE_USER' (checked""\
+ ${_oc_gcfg_home}/.gitconfig and ${_oc_gcfg_home}/.config/git/config — neither exists) — nothing to copy"
+        else
+            log "backup skipped: user '$OPENCODE_USER' absent — no home to check for a global gitconfig"
+        fi
     fi
     if [ -f /etc/opencode-permissions-kit/sudoers ]; then
         cp /etc/opencode-permissions-kit/sudoers "$BACKUP_DIR/sudoers" 2>/dev/null || _bk_fail "sudoers"
