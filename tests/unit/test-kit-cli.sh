@@ -270,7 +270,13 @@ else
     echo "  ${RED}FAIL${NC}  bypass-removal prompt defaults to n (#370 a E3)"
     failures=$((failures + 1))
 fi
-if printf '%s' "$(sed -n '/^    ui_confirm() {/,/^    }/p' "$KIT")" | grep -qF 'fails closed'; then
+# wrap-robust (round a A5): join the extracted lines first -- the old
+# single-line grep passed only because the phrase happened to wrap
+# mid-comment in bin/opk; a benign reflow would have flipped the pin
+# with no semantic change. The joined regex catches the claim in any
+# spacing (and the hyphenated spelling).
+if printf '%s' "$(sed -n '/^    ui_confirm() {/,/^    }/p' "$KIT" | tr '\n' ' ')" |
+    grep -qE 'fails[[:space:]]*-?[[:space:]]*closed'; then
     echo "  ${RED}FAIL${NC}  fallback ui_confirm header states true EOF semantics (#370 a E3)"
     failures=$((failures + 1))
 else
@@ -1112,7 +1118,7 @@ oc_pin "opk fallback: unknown input falls back to a y default (issue #187 A clas
 oc_pin "opk fallback: unknown input falls back to an n default (issue #187 A class)" garbage n no
 oc_pin "opk fallback: padded ' y' accepted under an n default (#189 a W2)" " y" n yes
 oc_pin "opk fallback: trailing-space 'no ' declines under a y default (#189 a W2)" "no " y no
-oc_pin "opk fallback: empty input fails closed to the default" "" n no
+oc_pin "opk fallback: empty input follows the caller's default (#370 a E3)" "" n no
 _ocline=$(opk_uc "" y)
 if printf '%s' "$_ocline" | grep -qF '  Remove them now? [Y/n] ' &&
     ! printf '%s' "$_ocline" | grep -qF '[?]'; then
@@ -1138,7 +1144,7 @@ sed -n '/^\[ -n "\$_handover" \] || ddev_handover_root/,/^}$/p' "$CONFIG" >"$_st
 sed -n '/^\[ -n "\$_handover" \] || ddev_rootless_bindmounts/,/^}$/p' "$CONFIG" >"$_stubs/rb.sh"
 sed -n '/^\[ -n "\$_handover" \] || ddev_devowned_enabled/,/^}$/p' "$CONFIG" >"$_stubs/dde.sh"
 sed -n '/^command -v fs_baseline_root/,/^}$/p' "$CONFIG" >"$_stubs/fsb.sh"
-for _s in ho rb fsb; do
+for _s in ho rb fsb dde; do
     if [ -s "$_stubs/$_s.sh" ] && grep -q 'unavailable' "$_stubs/$_s.sh"; then
         echo "  ${GREEN}PASS${NC}  F2: $_s stub present and names its cause"
         passed=$((passed + 1))
@@ -1244,10 +1250,10 @@ _f11_block="$(sed -n '/^for arg; do$/,/#211 a F11 gate end/p' \
     "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh")"
 # #211 b W23 (the #198 a W5 / F7 shapes): end anchors are a shipped
 # marker comment (F11) — if it ever drifts, the extract runs to EOF and
-# the eval fails confusingly. Bound it: the loop+gate is 85 lines
-# (shfmt-canonical; was 51 before the #370 a D4/D5 gate grew the
-# projects arm — list junk refusal + the whitespace flag check).
-if [ -n "$_f11_block" ] && [ "$(printf '%s\n' "$_f11_block" | wc -l)" -le 88 ]; then
+# the eval fails confusingly. Bound it: the loop+gate is 95 lines
+# (shfmt-canonical; 51 pre-#370, 85 after D4/D5, 95 after round a
+# A3/A4 grew the messages and the divergence comment).
+if [ -n "$_f11_block" ] && [ "$(printf '%s\n' "$_f11_block" | wc -l)" -le 98 ]; then
     echo "  ${GREEN}PASS${NC}  config arg loop + F11 gate extractable (#211 a F11)"
     passed=$((passed + 1))
     _f11_run() {
@@ -1380,23 +1386,23 @@ if [ -n "$_f11_block" ] && [ "$(printf '%s\n' "$_f11_block" | wc -l)" -le 88 ]; 
     # word-splitting consumers -- the gate refuses it at parse time
     _out=$(_f11_run projects add "/a/proj with space") || true
     case "$_out" in
-        *"die: path arguments must not contain whitespace"*)
-            echo "  ${GREEN}PASS${NC}  spaced path operand to projects add refused (#370 a D5)"
+        *"die: path arguments must not contain whitespace"*"not supported as project roots"*)
+            echo "  ${GREEN}PASS${NC}  spaced path operand to projects add refused, names the limit (#370 a D5, a A3)"
             passed=$((passed + 1))
             ;;
         *)
-            echo "  ${RED}FAIL${NC}  spaced path operand to projects add refused (out=$_out) (#370 a D5)"
+            echo "  ${RED}FAIL${NC}  spaced path operand to projects add refused (out=$_out) (#370 a D5, a A3)"
             failures=$((failures + 1))
             ;;
     esac
     _out=$(_f11_run handover "/a/b c") || true
     case "$_out" in
-        *"die: path arguments must not contain whitespace"*)
-            echo "  ${GREEN}PASS${NC}  spaced path operand to handover refused (#370 a D5)"
+        *"die: path arguments must not contain whitespace"*"not expressible through config.sh"*"opk handover <me|opencode>"*)
+            echo "  ${GREEN}PASS${NC}  spaced path operand to handover refused, hint names the escape (#370 a D5, a A3)"
             passed=$((passed + 1))
             ;;
         *)
-            echo "  ${RED}FAIL${NC}  spaced path operand to handover refused (out=$_out) (#370 a D5)"
+            echo "  ${RED}FAIL${NC}  spaced path operand to handover refused (out=$_out) (#370 a D5, a A3)"
             failures=$((failures + 1))
             ;;
     esac

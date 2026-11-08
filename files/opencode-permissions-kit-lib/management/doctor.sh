@@ -123,6 +123,33 @@ else
     exit 1
 fi
 
+# doctor_cntrl_bad <string> -> rc 0 when the string carries control
+# CHARACTERS: C0, DEL, or the C1 range 0x80-0x9F -- the same set the
+# python validator gates (#370 a C1; round a A1 closed the shell-side
+# gap). Two tiers on purpose: a byte-level 0x80-0x9F bracket alone
+# cannot tell a raw C1 byte from a UTF-8 TRAIL byte (U+00DC = 0xC3
+# 0x9C -- the plain bracket pattern false-positives on legit UTF-8
+# roots, measured), so the cheap grep is only the PREFILTER (ctrl or
+# ANY non-ASCII byte) and the python decoder decides at character
+# level: valid UTF-8 passes, undecodable bytes fall back to latin-1,
+# where a raw C1 byte stays a control character.
+doctor_cntrl_bad() {
+    if ! printf '%s' "$1" | LC_ALL=C grep -q "$(printf '[[:cntrl:]\200-\277]')"; then
+        return 1
+    fi
+    printf '%s' "$1" | python3 -c '
+import sys
+data = sys.stdin.buffer.read()
+try:
+    text = data.decode("utf-8")
+except UnicodeDecodeError:
+    text = data.decode("latin-1")
+sys.exit(0 if any(
+    ord(c) < 32 or ord(c) == 127 or 0x80 <= ord(c) <= 0x9F
+    for c in text) else 1)
+'
+}
+
 # --- CLI --------------------------------------------------------------------------
 # Strict grammar (#313 increment b): 'fix', 'detect' or 'all' as the FIRST
 # token switches the mode; then at most one positional (the project root,
@@ -294,13 +321,18 @@ if [ "$DOCTOR_MODE" = "all" ]; then
             ui_error "doctor: OPK_DOCTOR_SCAN_ROOTS is set but not a readable file: $OPK_DOCTOR_SCAN_ROOTS"
             exit 1
         else
-            grep -v '^[[:space:]]*$' "$OPK_DOCTOR_SCAN_ROOTS" >>"$WORK_ALL/roots" || true
+            # -a (round a A1): a line carrying a raw C1 byte makes GNU
+            # grep deem the whole list BINARY -- it then prints "binary
+            # file matches" and delivers NO lines, so the per-root gate
+            # below never sees the offending root. --text keeps the
+            # line stream intact; the gate refuses it sanitized.
+            grep -a -v '^[[:space:]]*$' "$OPK_DOCTOR_SCAN_ROOTS" >>"$WORK_ALL/roots" || true
         fi
     else
         [ -d /var/www/vhosts ] && printf '%s\n' /var/www/vhosts >>"$WORK_ALL/roots"
         if [ -f "$PROJECTS_CONF" ]; then
             if [ -r "$PROJECTS_CONF" ]; then
-                grep -v '^[[:space:]]*$' "$PROJECTS_CONF" >>"$WORK_ALL/roots" || true
+                grep -a -v '^[[:space:]]*$' "$PROJECTS_CONF" >>"$WORK_ALL/roots" || true
             else
                 ui_kv_warn "scan root" "$PROJECTS_CONF unreadable -- its roots are not scanned"
             fi
@@ -338,11 +370,12 @@ if [ "$DOCTOR_MODE" = "all" ]; then
         # raw-line gate above screens the spelling, this one the
         # resolution).
         _da_root="$(realpath -m "$_da_root" 2>/dev/null || printf '%s' "$_da_root")"
-        # root gate (#360 a F8): control bytes or a backslash make the
-        # root unusable as a find operand AND clobber the rows -- warn
-        # sanitized, skip
-        if printf '%s' "$_da_root" | LC_ALL=C grep -q '[[:cntrl:]\\]'; then
-            _da_show="$(printf '%s' "$_da_root" | tr -d '[:cntrl:]\\')"
+        # root gate (#360 a F8, class completed round a A1): control
+        # bytes or a backslash make the root unusable as a find operand
+        # AND clobber the rows -- warn sanitized, skip
+        if printf '%s' "$_da_root" | LC_ALL=C grep -qF '\' ||
+            doctor_cntrl_bad "$_da_root"; then
+            _da_show="$(printf '%s' "$_da_root" | tr -d '\000-\037\177\200-\237\\')"
             ui_kv_warn "scan root" "'$_da_show' carries control characters or backslashes -- skipped"
             continue
         fi
@@ -400,7 +433,7 @@ if [ "$DOCTOR_MODE" = "all" ]; then
                 *) _da_corrupt=1 ;;
             esac
             if [ "$_da_corrupt" = 1 ]; then
-                _da_show="$(printf '%s' "$_da_hit" | tr -d '[:cntrl:]')"
+                _da_show="$(printf '%s' "$_da_hit" | tr -d '\000-\037\177\200-\237')"
                 ui_kv_warn "scan root" "corrupted marker path '$_da_show' skipped (a newline in a name under $_da_root?)"
                 ALL_MARK_SKIP=$((ALL_MARK_SKIP + 1))
                 continue
@@ -409,16 +442,20 @@ if [ "$DOCTOR_MODE" = "all" ]; then
             # file through symlinks; anything else (a directory, a
             # dangling symlink, a link to a directory) is not a marker
             if [ ! -f "$_da_hit" ]; then
-                ui_kv_warn "scan root" "'$_da_hit' is not a regular file through symlinks -- not a marker (the walk-up rule)"
+                _da_show="$(printf '%s' "$_da_hit" | tr -d '\000-\037\177\200-\237')"
+                ui_kv_warn "scan root" "'$_da_show' is not a regular file through symlinks -- not a marker (the walk-up rule)"
                 ALL_MARK_SKIP=$((ALL_MARK_SKIP + 1))
                 continue
             fi
             _da_proj="$(dirname "$_da_hit")"
-            # marker gate (detect's charset class): control characters or
-            # backslashes cannot round-trip child argv, rows and prompts
-            # cleanly -- warn and skip, never a silent drop
-            if printf '%s' "$_da_proj" | LC_ALL=C grep -q '[[:cntrl:]\\]'; then
-                ui_kv_warn "scan root" "marker at '$_da_proj' skipped -- control characters or backslashes in the path"
+            # marker gate (detect's charset class, completed round a A1):
+            # control characters or backslashes cannot round-trip child
+            # argv, rows and prompts cleanly -- warn sanitized, skip,
+            # never a silent drop
+            if printf '%s' "$_da_proj" | LC_ALL=C grep -qF '\' ||
+                doctor_cntrl_bad "$_da_proj"; then
+                _da_show="$(printf '%s' "$_da_proj" | tr -d '\000-\037\177\200-\237\\')"
+                ui_kv_warn "scan root" "marker at '$_da_show' skipped -- control characters or backslashes in the path"
                 ALL_MARK_SKIP=$((ALL_MARK_SKIP + 1))
                 continue
             fi
@@ -542,7 +579,8 @@ if [ "$DOCTOR_MODE" = "detect" ] && [ "$DOCTOR_ROOT" = "/" ]; then
     ui_error "doctor: refusing to walk the whole filesystem (detect on '/')"
     exit 64
 fi
-# (#356 a B4): a detect root carrying control characters or a backslash
+# (#356 a B4; class completed round a A1 via doctor_cntrl_bad): a
+# detect root carrying control characters or a backslash
 # classifies NOTHING -- the boundary awk's root-prefix match never hits
 # (a TAB root splits find rows, a backslash root is mangled by awk -v
 # escape processing) -- and the run reads "no evidence found", the
@@ -550,7 +588,7 @@ fi
 # gate above (#348 a C3) covers the same class for the TSV round-trip;
 # detect needs it for the walk itself.
 if [ "$DOCTOR_MODE" = "detect" ] &&
-    printf '%s' "$DOCTOR_ROOT" | LC_ALL=C grep -q '[[:cntrl:]\\]'; then
+    { printf '%s' "$DOCTOR_ROOT" | LC_ALL=C grep -qF '\' || doctor_cntrl_bad "$DOCTOR_ROOT"; }; then
     ui_error "doctor: project root contains control characters or backslashes -- unusable for 'detect'"
     exit 64
 fi
@@ -563,7 +601,7 @@ fi
 # uid-only output, and the examples pass (a TAB TSV) degrades display
 # rows only -- verdict and rc stay intact (#344 a S1/S2 class).
 if [ "$DOCTOR_MODE" = "fix" ] &&
-    printf '%s' "$DOCTOR_ROOT" | LC_ALL=C grep -q '[[:cntrl:]]'; then
+    doctor_cntrl_bad "$DOCTOR_ROOT"; then
     ui_error "doctor: project root contains control characters -- unusable for 'fix' (candidate round-trip)"
     exit 64
 fi

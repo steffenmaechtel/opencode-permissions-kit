@@ -1002,6 +1002,36 @@ rc_doctor_roots "c S1: cntrl target behind a clean symlink skipped -> rc 2" 2 "$
 grep_last_out "c S1: the normalized value is gated" \
     grep -qF "carries control characters or backslashes -- skipped"
 
+# --- (round a A1): the shell-side gates carry the FULL control set ---------------
+# A raw C1 byte (0x9B, 8-bit CSI) in a scan-root line is skipped like
+# C0 with a sanitized warn row; a valid UTF-8 root (U+00DC = 0xC3 0x9C
+# -- a trail byte INSIDE the range a plain byte-bracket would
+# over-match) stays scannable: the python decoder decides at character
+# level, so completing the class does not refuse legit UTF-8 roots.
+rm -rf "$PROCFIX"
+mkmap 42 "0 0 1" "1 $CURUID 65536"
+ALLC1="$WORK/all-c1.txt"
+ALLC1ROOT="$WORK/ro$(printf '\233')ot"
+mkdir -p "$ALLC1ROOT"
+printf '%s\n' "$ALLC1ROOT" >"$ALLC1"
+rc_doctor_roots "a A1: C1-byte root line skipped -> rc 2" 2 "$ALLC1" all
+grep_last_out "a A1: C1 skip warn (sanitized root)" \
+    grep -qF "carries control characters or backslashes -- skipped"
+if printf '%s' "$_rd_out" | LC_ALL=C grep -q "$(printf '\233')"; then
+    fail "a A1: the warn row carries no raw C1 byte"
+else
+    pass "a A1: the warn row carries no raw C1 byte"
+fi
+ALLUROOT="$WORK/$(printf '\303\234')proj"
+mkdir -p "$ALLUROOT/tree"
+echo one >"$ALLUROOT/tree/one"
+printf '%s\n' '{"containerTrees":["tree"]}' >"$ALLUROOT/opk.json"
+ALLU="$WORK/all-umlaut.txt"
+printf '%s\n' "$ALLUROOT" >"$ALLU"
+rc_doctor_roots "a A1: valid UTF-8 root stays scannable (rc 0)" 0 "$ALLU" all
+grep_last_out "a A1: the UTF-8 root's project scanned green" \
+    grep -qF "tree -- 2 entries mapped-safe"
+
 # static source pins (comment-strip rider, the canonical shape): the
 # default roots are the vhosts layout plus the kit's own registry, at
 # the design's depth -- hermetic execution of the DEFAULT arm would scan
@@ -1724,6 +1754,10 @@ BS_PROJ="$WORK/bs\\root"
 mkdir -p "$BS_PROJ/tree"
 echo x >"$BS_PROJ/tree/one"
 rc_doctor "B4: backslash root refused for detect (rc 64)" 64 detect "$BS_PROJ"
+C1_PROJ="$WORK/c$(printf '\233')1"
+mkdir -p "$C1_PROJ/tree"
+echo x >"$C1_PROJ/tree/one"
+rc_doctor "B4+a A1: C1-byte root refused for detect (rc 64)" 64 detect "$C1_PROJ"
 
 # B1/B2 order pin: the [ -L ] gate must sit IMMEDIATELY before the
 # chmod (the swapped-symlink window spans the python run), the mv gate

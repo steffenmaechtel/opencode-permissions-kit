@@ -203,15 +203,27 @@ case "$ACTION" in
         # fragmented into phantom paths (unreachable add/handover
         # operands, a confusing double "not found" on remove). The
         # flag comes from the arg loop above; refuse loudly here.
+        # (round a A3): the refusal names the real limitation -- no
+        # argument spelling can express a spaced path through config.sh,
+        # but opk handover carries paths as single arguments and can.
+        # (round a A4): the gate covers the CLI parse only -- the
+        # interactive menu (cases 1/2 below) still feeds ui_ask's
+        # space-separated answer into TARGETS and word-splits it, by
+        # design: the menu's question text says "space-separated", the
+        # user is present to see the fragment skips, and no project
+        # root may carry whitespace anyway (the registry writer's
+        # path-sane gate refuses it at write).
         if [ "${_TGT_SPACED:-0}" = 1 ]; then
-            die "path arguments must not contain whitespace — pass each path as its own argument"
+            die "path arguments must not contain whitespace — a spaced path is not ""\
+expressible through config.sh; use: opk handover <me|opencode> \"<path>\""
         fi
         ;;
     projects)
         case "$SUB" in
             add | remove)
                 if [ "${_TGT_SPACED:-0}" = 1 ]; then
-                    die "path arguments must not contain whitespace — pass each path as its own argument"
+                    die "path arguments must not contain whitespace — spaced paths ""\
+are not supported as project roots (the registry refuses them too)"
                 fi
                 ;;
             *)

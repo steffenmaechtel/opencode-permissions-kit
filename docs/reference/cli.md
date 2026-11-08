@@ -172,10 +172,12 @@ Default scan roots: `/var/www/vhosts` when it exists, plus every root
 registered via `opk config projects` (reading the kit's existing
 registry — not building a new one; its entries are often parents of
 several projects). A positional scans exactly that tree instead. List
-roots are normalized (relative lines resolve against the working
-directory); a root that has gone missing, stays non-absolute, or
-carries control characters or backslashes is reported and skipped; a
-partially unreadable root warns that its marker list may be incomplete.
+roots must be absolute — a relative line is refused on its raw
+spelling with a warning and never resolved against the working
+directory; the surviving spellings are normalized, and a root that
+has gone missing, is not a directory, or carries control characters
+or backslashes is reported and skipped; a partially unreadable root
+warns that its marker list may be incomplete.
 
 The exit code aggregates **worst-of** in the usual severity order: `1`
 when any project has at-risk findings — or a per-project scan fails

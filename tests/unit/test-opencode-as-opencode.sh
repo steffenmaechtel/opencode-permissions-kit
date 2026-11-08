@@ -279,11 +279,18 @@ fi
 # message argument, "--help" is message text. Extract the REAL scan
 # loop and drive it with the discriminating argument shapes.
 _hr_scan="$(sed -n '/^_hr_first=true$/,/^done$/p' "$WRAPPER_FILE")"
-if [ -n "$_hr_scan" ] && printf '%s' "$_hr_scan" | grep -q '_hr_help'; then
+# comment-strip rider (round a A5): the extract includes the loop's
+# comment lines -- the presence check must see the CODE, not a
+# commented-out arm
+if [ -n "$_hr_scan" ] &&
+    printf '%s' "$_hr_scan" | sed 's/^[[:space:]]*#.*$//' | grep -q '_hr_help'; then
     echo "  ${GREEN}PASS${NC}  leading-region help scan extractable (#370 a E1)"
     passed=$((passed + 1))
     printf '%s\n' "$_hr_scan" >"$TMPDIR/hr-scan.sh"
-    hr_class() { # <args...> -> the loop's msg/help state
+    hr_class() { # <args...> -> the loop's msg/help state. Sourcing the
+        # extracted loop INSIDE this function is the mechanism: POSIX
+        # positional parameters stay visible to sourced code, so the
+        # loop's "$@" resolves to hr_class's arguments (round a A9).
         (
             HEADLESS=false
             _hr_first=true
