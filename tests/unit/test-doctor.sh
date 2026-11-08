@@ -738,6 +738,14 @@ printf '%s\n' '{"containerTrees":[]}' >"$ALLCT/opk.json"
 rc_doctor_roots "all: control-char marker skipped, fleet rc 1" 1 "$ALLROOTS" all
 grep_last_out "charset skip warn" \
     grep -qF "skipped -- control characters or backslashes in the path"
+# (round d D1): THIS run fires the SECOND composed tr site (the marker
+# gate's display sanitize) -- the absence check here is the plural
+# claim's other half (the a-A1 pin covers the first site's run).
+if printf '%s' "$_rd_out" | grep -qF "tr: warning"; then
+    fail "d D1: no tr portability warning on the marker-gate warn path"
+else
+    pass "d D1: no tr portability warning on the marker-gate warn path"
+fi
 _n_child="$(printf '%s' "$_rd_out" | grep -c 'Doctor -- container-tree ownership')"
 if [ "$_n_child" = 3 ]; then
     pass "the skipped marker runs no child"
@@ -1057,6 +1065,27 @@ printf '/definitely/not/there\0junk\n' >"$ALLB1"
 rc_doctor_roots "b B2: NUL-carrying list line refused (rc 2)" 2 "$ALLB1" all
 grep_last_out "b B2+c C3: the NUL/STX warn row names the class" \
     grep -qF "list line carries a NUL or STX byte -- skipped"
+
+# --- (round d D2): the NUL->STX swap's failure is loud ----------------------------
+# A failing tr (PATH stub; the swap is the FIRST tr call in the all
+# flow) must abort with the named error -- never silently scan the
+# unswapped list (the B2 bug's return path, round c C2).
+NOTR="$WORK/notr-bin"
+mkdir -p "$NOTR"
+printf '#!/bin/sh\nexit 1\n' >"$NOTR/tr"
+chmod +x "$NOTR/tr"
+_rd_rc=0
+_rd_out="$(
+    PATH="$NOTR:$PATH" OPK_INSTALL_CONF="$CONF" OPK_DOCTOR_PROC_ROOT="$PROCFIX" \
+        OPK_DOCTOR_SCAN_ROOTS="$ALLU" OPK_DOCTOR_OPK="" NO_COLOR=1 setsid sh "$DOCTOR" all </dev/null 2>&1
+)" || _rd_rc=$?
+if [ "$_rd_rc" = 1 ] &&
+    printf '%s' "$_rd_out" | grep -qF "cannot process the scan-root list (tr failed)"; then
+    pass "d D2: swap tr failure -> loud rc 1 with the named error"
+else
+    fail "d D2: swap tr failure -> loud rc 1 with the named error (rc $_rd_rc)"
+    echo "        output: $_rd_out"
+fi
 
 # static source pins (comment-strip rider, the canonical shape): the
 # default roots are the vhosts layout plus the kit's own registry, at
