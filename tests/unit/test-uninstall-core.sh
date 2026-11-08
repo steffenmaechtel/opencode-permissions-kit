@@ -579,15 +579,18 @@ UNR_OUT=$(PATH="$UNRS/bin:$PATH" CHOWN_LOG="$WORK/unr-chown.log" sh -c '
 assert_eq "worker: only the regular operand reaches chown (#267)" \
     "chown devuser:devgroup $UNR/root/regular.conf" "$(cat "$WORK/unr-chown.log")"
 check "worker: a swapped leaf link never reaches chown (#267)" \
-    sh -c "grep -q leaf-link \"\$1\" && exit 1 || exit 0" _ "$WORK/unr-chown.log"
+    sh -c "! grep -q leaf-link \"\$1\"" _ "$WORK/unr-chown.log"
 check "worker: an operand behind a symlinked parent never reaches chown (#267)" \
-    sh -c "grep -q link-parent \"\$1\" && exit 1 || exit 0" _ "$WORK/unr-chown.log"
+    sh -c "! grep -q link-parent \"\$1\"" _ "$WORK/unr-chown.log"
 check "worker: skipped swaps fail the pass — PARTIALLY via un_rc_q, never green (#267)" \
     sh -c "[ \"\$1\" -ne 0 ]" _ "$UNR_RC"
 
-# mktemp failure is loud (the fail-loud pin for the new || return 1):
-# rc 1 and find never runs — no green revert over a missing operand
-# stream, and no stray find either.
+# mktemp failure is loud (the fail-loud pin for the || return 1 arm,
+# #420 a A3): the DISTINCT message (not just rc 1 — a silent arm is
+# indistinguishable from the find failure below) + rc 1 + find never
+# runs. The message is the discriminator: deleting the loud arm leaves
+# an accidental rc 1 (the empty redirect fails the find condition) but
+# no message — this pin is what reddens.
 UNRM="$(work_new)"
 mkdir -p "$UNRM/bin"
 cat >"$UNRM/bin/mktemp" <<'EOF'
@@ -607,6 +610,15 @@ UNRM_OUT=$(PATH="$UNRM/bin:$PATH" sh -c '
     UN_DEV_GROUP=devgroup
     _un_revert_chown "$3"
 ' _ "$LIB" "$WORK/unr-find.log" "$UNR/root" 2>&1) || UNRM_RC=$?
+case "$UNRM_OUT" in
+    *"cannot stage the revert operand stream (mktemp failed)"*)
+        pass "worker: mktemp failure announces itself with its own cause (#267, #420 a A3)"
+        ;;
+    *) fail "worker: mktemp failure must announce its cause (got: $UNRM_OUT) (#267, #420 a A3)" ;;
+esac
+assert_eq "worker: mktemp failure refuses loud (rc 1, #267)" "1" "$UNRM_RC"
+check "worker: mktemp failure runs no find at all (#267)" \
+    sh -c "! grep -q find \"\$1\"" _ "$WORK/unr-find.log"
 # find's own death fails the pass (0.0.43b W4 shape — a wholesale find
 # death never counts as a green revert over a half-walked tree): rc 1
 # and xargs never runs. Logging pass-through sudo so the absence of the
@@ -632,7 +644,7 @@ UNRF_OUT=$(PATH="$UNRF/bin:$PATH" sh -c '
 ' _ "$LIB" "$WORK/unr-find2.log" "$UNR/root" 2>&1) || UNRF_RC=$?
 assert_eq "worker: a dead find fails the pass (rc 1, no green revert — 0.0.43b W4 shape)" "1" "$UNRF_RC"
 check "worker: a dead find never reaches xargs (#267)" \
-    sh -c "grep -q xargs \"\$1\" && exit 1 || exit 0" _ "$WORK/unr-find2.log"
+    sh -c "! grep -q xargs \"\$1\"" _ "$WORK/unr-find2.log"
 rm -rf "${UNR:?}" "${UNRS:?}" "${UNRM:?}" "${UNRF:?}"
 
 # --- issue #245: a symlinked conf root is skipped, never operated on ----

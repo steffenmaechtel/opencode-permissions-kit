@@ -74,7 +74,8 @@ _trap_cleanup() {
         "${RN:-}" "${VN:-}" "${BS1:-}" "${DWORK:-}" "${RACE:-}" \
         "${RACESTUB:-}" "${RACESP:-}" "${RACESPS:-}" "${RACEC:-}" \
         "${RACECT:-}" "${RACEF:-}" "${RACEFT:-}" "${_112_dir:-}" \
-        "${CB285:-}" "${SWAPF:-}" "${SWAPB:-}"
+        "${CB285:-}" "${SWAPF:-}" "${SWAPB:-}" "${SWAPR:-}" \
+        "${SWAPRB:-}"
 }
 trap _trap_cleanup EXIT INT TERM
 
@@ -1594,6 +1595,89 @@ case "$SWAPB_OUT" in
 esac
 assert_eq "settings race (back): skip is not a failure (rc 0)" "0" "$SWAPB_RC"
 rm -rf "${SWAPF:?}" "${SWAPB:?}"
+
+# --- root-inode ops: the same window, closed for them too (#420 a A2) ---------------
+# The root-inode handovers (ddev_handover_project_root forward,
+# _project_back's root handback) carry leaf [ -L ] gates only — a parent
+# swapped at depth >= 2 resolves them into an out-of-tree inode (the A2
+# finding: the #215 boundary record covered static plants, not the swap
+# class this wave closes). Same seam as the settings drives; the
+# component swapped here is the project's PARENT (nest), and the type is
+# codeigniter — no settings dirs, so the ONLY op reachable through the
+# swapped chain is the root handover itself (isolates the new gates).
+SWAPR=$(mktemp -d)
+mkdir -p "$SWAPR/scan/nest/proj/.ddev" "$SWAPR/victim/proj/.ddev"
+printf 'type: codeigniter\n' >"$SWAPR/scan/nest/proj/.ddev/config.yaml"
+printf 'type: codeigniter\n' >"$SWAPR/victim/proj/.ddev/config.yaml"
+chmod 755 "$SWAPR/victim/proj"
+SWAPR_RC=0
+SWAPR_OUT=$(OPK_INSTALL_CONF=/nonexistent sh -c '
+    . "$1"
+    _seam_nest="$2/nest"
+    _seam_victim="$3"
+    ddev_devowned_flagged() {
+        mv "$_seam_nest" "${_seam_nest%/*}/moved-away"
+        ln -s "$_seam_victim" "$_seam_nest"
+        return 1
+    }
+    ddev_handover_root "$2" "$(id -un)" "$(id -gn)"
+' _ "$HANDOVER" "$SWAPR/scan" "$SWAPR/victim" 2>&1) || SWAPR_RC=$?
+if [ -d "$SWAPR/scan/moved-away/proj/.ddev" ] && [ -L "$SWAPR/scan/nest" ]; then
+    pass "root-op race (fwd): seam fired — the project's PARENT swapped before the tail (#266, #420 a A2)"
+else
+    fail "root-op race (fwd): seam fired — the project's PARENT swapped before the tail (#266, #420 a A2)"
+fi
+assert_eq "root-op race (fwd): victim project root keeps its mode — project_root's re-walk skips (#266, #420 a A2)" "755" \
+    "$(stat -c %a "$SWAPR/victim/proj")"
+case "$SWAPR_OUT" in
+    *"warn: skipping project-root handover"*)
+        pass "root-op race (fwd): the skip announces itself (#266, #420 a A2)"
+        ;;
+    *) fail "root-op race (fwd): the skip must announce itself (got: $SWAPR_OUT) (#266, #420 a A2)" ;;
+esac
+case "$SWAPR_OUT" in
+    *"project-root handover:"*)
+        fail "root-op race (fwd): no success echo over a swapped parent (#266, #420 a A2)"
+        ;;
+    *) pass "root-op race (fwd): no success echo over a swapped parent (#266, #420 a A2)" ;;
+esac
+assert_eq "root-op race (fwd): skip is not a failure (rc 0)" "0" "$SWAPR_RC"
+
+# Back twin: _project_back's root-inode handback — same seam, flagged
+# branch (override returns 0), dev user rides as the 4th argument.
+SWAPRB=$(mktemp -d)
+mkdir -p "$SWAPRB/scan/nest/proj/.ddev" "$SWAPRB/victim/proj/.ddev"
+printf 'type: codeigniter\n' >"$SWAPRB/scan/nest/proj/.ddev/config.yaml"
+printf 'type: codeigniter\n' >"$SWAPRB/victim/proj/.ddev/config.yaml"
+chmod 755 "$SWAPRB/victim/proj"
+SWAPRB_RC=0
+SWAPRB_OUT=$(OPK_INSTALL_CONF=/nonexistent sh -c '
+    . "$1"
+    _seam_nest="$2/nest"
+    _seam_victim="$3"
+    ddev_devowned_flagged() {
+        mv "$_seam_nest" "${_seam_nest%/*}/moved-away"
+        ln -s "$_seam_victim" "$_seam_nest"
+        return 0
+    }
+    ddev_handover_root "$2" "$(id -un)" "$(id -gn)" "$(id -un)"
+' _ "$HANDOVER" "$SWAPRB/scan" "$SWAPRB/victim" 2>&1) || SWAPRB_RC=$?
+assert_eq "root-op race (back): victim project root keeps its mode — the handback's re-walk skips (#266, #420 a A2)" "755" \
+    "$(stat -c %a "$SWAPRB/victim/proj")"
+case "$SWAPRB_OUT" in
+    *"warn: skipping root-inode handback"*)
+        pass "root-op race (back): the skip announces itself (#266, #420 a A2)"
+        ;;
+    *) fail "root-op race (back): the skip must announce itself (got: $SWAPRB_OUT) (#266, #420 a A2)" ;;
+esac
+case "$SWAPRB_OUT" in
+    *"dev-owned handback: $SWAPRB/scan/nest/proj (root)"*)
+        fail "root-op race (back): no success echo over a swapped parent (#266, #420 a A2)"
+        ;;
+    *) pass "root-op race (back): no success echo over a swapped parent (#266, #420 a A2)" ;;
+esac
+assert_eq "root-op race (back): skip is not a failure (rc 0)" "0" "$SWAPRB_RC"
+rm -rf "${SWAPR:?}" "${SWAPRB:?}"
 
 # Walk contract edges (pr-00234 a W4): a scan root of '/' refuses LOUD
 # like _fsb_pass — rc 1 plus a warn on stderr (the failure path

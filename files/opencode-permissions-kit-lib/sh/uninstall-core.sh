@@ -626,11 +626,24 @@ un_user_remove() {
 # Swap-skips and genuine chown errors share the "find-chown failed"
 # label deliberately: both mean "entries stayed behind — inspect the
 # tree", and a per-cause channel through xargs is not worth the
-# machinery (the fs-baseline twin logs the same way).
+# machinery (the fs-baseline twin logs the same way). Residual windows
+# (#420 a A4/A5, recorded here): the per-operand recheck->chown gap is
+# microsecond-scale and undetectable (same accepted shape as the
+# handover pair's gate->op residual and _fsb_pass's); and the walk
+# starts BELOW the scan root — the ROOT itself swapped between find and
+# the worker still redirects the batch (the pre-existing _fsb_pass
+# shape, :364 there; closing it is a two-worker class sweep, work order
+# proposed in this PR's review).
 _un_revert_chown() { # <root>; UN_OC_UID/UN_OC_GID select, DEFAULT_USER/
     #                  UN_DEV_GROUP are the chown target
     _unr_root="$1"
-    _unr_nul="$(mktemp "${TMPDIR:-/tmp}/opk-un-revert.XXXXXXXX")" || return 1
+    # Fail LOUD with a distinct message (#420 a A3): a silent || return 1
+    # here is indistinguishable from the later find failure — the message
+    # is what the pin (and the operator) discriminates on.
+    _unr_nul="$(mktemp "${TMPDIR:-/tmp}/opk-un-revert.XXXXXXXX")" || {
+        echo "  WARN: cannot stage the revert operand stream (mktemp failed) — chown pass refused" >&2
+        return 1
+    }
     if command -v _tmp_track >/dev/null 2>&1; then
         _tmp_track "$_unr_nul"
     fi
@@ -831,8 +844,10 @@ un_projects_revert() {
             # statically planted links out of the operand stream; the
             # exec-time half — per-operand leaf recheck + component walk
             # immediately before each chown — lives in _un_revert_chown
-            # (#267, the _fsb_pass shape; an agent-planted or -swapped
-            # link mid-walk must never retarget the root-run chown).
+            # (#267, the _fsb_pass shape; leaf and mid-walk parent swaps
+            # never retarget the chown — a swap of the ROOT itself
+            # between scan and worker remains, the recorded _fsb_pass
+            # residual, see the helper's header).
             # DRY names the real command shape, not the helper (the
             # un_rc_q [DRY] echo would print "_un_revert_chown <root>").
             if [ "$DRY_RUN" = true ]; then

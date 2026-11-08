@@ -393,7 +393,7 @@ ddev_rootless_bindmounts() {
     return 0
 }
 
-# ddev_handover_project_root <project-dir> <oc-user> <group> [dev-user]
+# ddev_handover_project_root <project-dir> <oc-user> <group> [dev-user] [scan-root]
 # Manages the project's ROOT DIRECTORY (the inode only, never its
 # contents) for the TYPO3 bootstrap case and the root-file types.
 #
@@ -438,10 +438,23 @@ ddev_handover_project_root() {
     dhq_user="${2:-}"
     dhq_group="${3:-}"
     dhq_dev="${4:-}"
+    dhq_scan="${5:-}"
     [ -n "$dhq_proj" ] && [ -d "$dhq_proj" ] || return 0
     # [ -L ] gate (0.0.39g S2 class): chown/chmod/stat below dereference a
     # symlink operand — a linked project root is never handed over/back.
     [ -L "$dhq_proj" ] && return 0
+    # Exec-time component re-walk (#266, #420 a A2): a parent swapped
+    # since the iteration-head walk resolves this operand into an
+    # out-of-tree inode and the single-inode chown/chmod below would act
+    # on it — the leaf gate above cannot see that. Skip loud (the .ddev
+    # pair discipline; find never printed through a link between the
+    # scan root and this operand, so a symlinked component on that chain
+    # can only be a swap).
+    if [ -n "$dhq_scan" ] && ! _ddev_components_sane "$dhq_scan" "$dhq_proj"; then
+        printf '%s\n' "  warn: skipping project-root handover for $dhq_proj — a path""\
+ component (parent or operand) is a symlink (swapped mid-scan?)" >&2
+        return 0
+    fi
     [ -f "$dhq_proj/.ddev/config.yaml" ] || return 0
     dhq_type=$(sed -n 's/^type:[[:space:]]*//p' "$dhq_proj/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\r\"'")
     dhq_docroot=$(sed -n 's/^docroot:[[:space:]]*//p' "$dhq_proj/.ddev/config.yaml" 2>/dev/null |
@@ -718,13 +731,11 @@ ddev_handover_root() {
             ddev_handover_project_back "$dhr_p" "$dhr_user" "$dhr_group" "$dhr_dev" "$dhr_root"
         else
             # The scan root rides along as the optional last argument
-            # (#266): the settings pairs re-run the component walk per
-            # operand against it — see their gates.
-            # ddev_handover_project_root stays without one: single-inode
-            # op with its own leaf gate (the #215 sweep's recorded
-            # boundary).
+            # (#266): the settings pairs AND the single-inode root ops
+            # re-run the component walk per operand against it — see
+            # their gates (#420 a A2 closed the root ops' gap).
             ddev_handover_project "$dhr_p" "$dhr_user" "$dhr_group" "$dhr_root"
-            ddev_handover_project_root "$dhr_p" "$dhr_user" "$dhr_group" "$dhr_dev"
+            ddev_handover_project_root "$dhr_p" "$dhr_user" "$dhr_group" "$dhr_dev" "$dhr_root"
         fi
     done
     return 0
@@ -784,12 +795,17 @@ ddev_handover_project_back() {
             # sees a real dir inside the target, and the resolved
             # containment canonicalizes BOTH sides through the swapped
             # parent (the victim stays "contained"). Re-walk against the
-            # scan root immediately before the pair; a hit skips loud —
-            # find never printed through a link, so a symlinked
-            # component can only be a swap.
+            # scan root immediately before the pair. A hit skips loud —
+            # deliberately conservative: between the scan root and .ddev
+            # a symlinked component can only be a swap (find never
+            # printed through a link), but BELOW .ddev a STATIC, legit
+            # symlink (docroot relocated inside the project) also trips
+            # the walk — never acting through a link is the safe
+            # direction either way, and the warn names the suspicion,
+            # not a verdict.
             if [ -n "$dhb_scan" ] && ! _ddev_components_sane "$dhb_scan" "$dhb_proj/$dhb_d"; then
                 printf '%s\n' "  warn: skipping settings dir '$dhb_d' — a path""\
- component (parent or operand) is a symlink (swapped mid-scan?)" >&2
+ component (parent or operand) is a symlink (static plant or swapped mid-scan?)" >&2
                 continue
             fi
             # ORDER is direction-dependent (0.0.45e W1): agent->dev
@@ -814,7 +830,14 @@ ddev_handover_project_back() {
     # Root inode: hand it back only when a previous handover model run
     # gave it to the kit user (never touches developer-owned roots). The
     # [ -L ] gate: stat/chown follow a symlink operand (0.0.39g S2 class).
-    if [ ! -L "$dhb_proj" ] && [ "$(stat -c %U "$dhb_proj" 2>/dev/null)" = "$dhb_user" ]; then
+    # Exec-time component re-walk (#266, #420 a A2): a swapped PARENT
+    # resolves the leaf gate AND the stat prefilter below through to an
+    # out-of-tree inode — re-walk before the single-inode ops like the
+    # settings pairs above; skip loud (never act through a swapped chain).
+    if [ -n "$dhb_scan" ] && ! _ddev_components_sane "$dhb_scan" "$dhb_proj"; then
+        printf '%s\n' "  warn: skipping root-inode handback for $dhb_proj — a path""\
+ component (parent or operand) is a symlink (swapped mid-scan?)" >&2
+    elif [ ! -L "$dhb_proj" ] && [ "$(stat -c %U "$dhb_proj" 2>/dev/null)" = "$dhb_user" ]; then
         # Single-inode sibling of the recursive pair above (#211 b W9):
         # best-effort stays, the line stops claiming success.
         _dhb_ok=true
@@ -882,10 +905,12 @@ ddev_handover_project() {
             # operand's un-classified components (config, system, ...)
             # and any parent swapped since resolve through the leaf gate
             # and the resolved containment above. Re-walk against the
-            # scan root immediately before the pair; skip loud on a hit.
+            # scan root immediately before the pair; skip loud on a hit
+            # (static legit symlink or mid-scan swap — conservative
+            # either way, never act through a link).
             if [ -n "$dhp_scan" ] && ! _ddev_components_sane "$dhp_scan" "$dhp_proj/$dhp_d"; then
                 printf '%s\n' "  warn: skipping settings dir '$dhp_d' — a path""\
- component (parent or operand) is a symlink (swapped mid-scan?)" >&2
+ component (parent or operand) is a symlink (static plant or swapped mid-scan?)" >&2
                 continue
             fi
             # ORDER (0.0.45e W1, same direction argument as

@@ -453,22 +453,33 @@ ddev_migrate_export() {
     # dump per export invocation, resume picked up the next each time).
     printf '%s\n' "$dm_list" | while IFS='|' read -r dm_n dm_ar; do
         echo "  exporting $dm_n ($dm_ar) ..."
-        # Dump-operand symlink gate (#264): the dump dir is agent-group-
-        # writable for the whole minutes-long loop (3770 above), and ddev
-        # export-db opens --file for WRITING as the dev user — a planted
-        # $dm_n.sql.gz link would be truncated THROUGH, clobbering an
-        # arbitrary dev-writable path with dump content. The resume probe
-        # below cannot catch it: its [ -s ] FOLLOWS the link, so a
-        # non-empty target plus an old OK line would resume-mark the
-        # project off the plant (and the post-export check comes too
-        # late — the write already happened). REFUSED, never unlinked by
-        # the kit: the link is evidence of tampering, the operator
-        # removes it and re-runs. Drop-then-FAIL keeps the manifest
-        # single-entry. Per-project continue, not an abort: the loop
-        # body is a piped subshell (return cannot exit the function) and
-        # the other projects' exports are independent of this operand.
-        if [ -L "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" ]; then
-            echo "    REFUSED: $DD_MIG_DUMP_DIR/$dm_n.sql.gz is a symlink — tampering? Remove it and re-run" >&2
+        # Dump-operand gates (#264 + #420 a A6): the dump dir is
+        # agent-group-writable for the whole minutes-long loop (3770
+        # above), and ddev export-db opens --file for WRITING as the dev
+        # user — a planted $dm_n.sql.gz link would be truncated THROUGH,
+        # clobbering an arbitrary dev-writable path with dump content.
+        # The resume probe below cannot catch it: its [ -s ] FOLLOWS the
+        # link, so a non-empty target plus an old OK line would
+        # resume-mark the project off the plant (and the post-export
+        # check comes too late — the write already happened). A6 rounds
+        # the gate to NOT-REGULAR (not just links): a FIFO or device
+        # node passes [ -L ] and blocks export-db's open/write
+        # indefinitely — the dev-side hang this file already closed on
+        # the manifest path (find -type f, 0.0.44c C2). REFUSED, never
+        # unlinked by the kit: the entry is evidence of tampering, the
+        # operator removes it and re-runs. Drop-then-FAIL keeps the
+        # manifest single-entry. Per-project continue, not an abort: the
+        # loop body is a piped subshell (return cannot exit the
+        # function) and the other projects' exports are independent of
+        # this operand.
+        dm_refuse=""
+        [ -L "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" ] && dm_refuse="a symlink"
+        if [ -z "$dm_refuse" ] && [ -e "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" ] &&
+            [ ! -f "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" ]; then
+            dm_refuse="not a regular file (FIFO or device?)"
+        fi
+        if [ -n "$dm_refuse" ]; then
+            echo "    REFUSED: $DD_MIG_DUMP_DIR/$dm_n.sql.gz is $dm_refuse — tampering? Remove it and re-run" >&2
             _dm_manifest_drop "$dm_n"
             _dm_manifest_add "FAIL|$dm_n|$dm_ar|"
             continue
@@ -711,12 +722,16 @@ ddev_migrate_import() {
     while IFS='|' read -r dm_st dm_n dm_ar dm_f; do
         [ "$dm_st" = "OK" ] && [ -n "$dm_n" ] && [ -n "$dm_ar" ] && [ -n "$dm_f" ] || continue
         # Operand gate (#264's import twin): the finalized dump dir is
-        # agent-owned (750 since finalize) — a dump swapped for a symlink
-        # in the export->import gap must never be imported THROUGH: [ -f ]
-        # follows links, and import-db would pour an agent-chosen file's
-        # content into a project database (a content-injection path, not
-        # merely a wrong dump). Refuse loudly and count the project
-        # failed; the operator removes the link and re-imports.
+        # agent-owned (750 since finalize, no sticky) — a dump swapped
+        # for a symlink in the export->import gap must never be imported
+        # THROUGH: [ -f ] follows links, and import-db would read an
+        # agent-chosen OUT-OF-DIR file into a project database. Honest
+        # scope (#420 a A11): this is a tamper-refusal, not a
+        # content-integrity boundary — the agent owns the dir outright
+        # and can rewrite any REGULAR dump's content directly; the gate
+        # removes the out-of-dir redirection, nothing more. Refuse
+        # loudly and count the project failed; the operator removes the
+        # link and re-imports.
         if [ -L "$dm_dir/$dm_f" ]; then
             echo "  $dm_n: REFUSED — dump operand is a symlink ($dm_dir/$dm_f) — tampering? Remove it and re-run"
             dm_failed="$dm_failed $dm_n"
