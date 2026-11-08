@@ -918,7 +918,11 @@ fi
 # the nonexistent home still refuses). All four system entries EXIST on
 # every test host — the blocklist sits after [ -d ], a nonexistent
 # system path would be skipped silently by the existence gate before
-# the blocklist sees it (uninstall-core parity).
+# the blocklist sees it (uninstall-core parity). The /tmp + /var/tmp
+# DIVERGENCE is pinned by the REAL roots themselves: they live under
+# this suite's scratch (TMPDIR territory) and their FSB/HO counts prove
+# those prefixes stay processable — the blocklist deliberately leaves
+# them open (the comments in update-core.sh / config.sh name why).
 printf '%s\n/\n%s\n%s/\n%s/.\n%s//\n%s\n%s\n.\nfoo\n/var/www/foo bar\n/etc\n/usr\n/var\n/home\n/home/toc\n/relocated/opencode\n' \
     "$S245/real" "$S245/link" "$S245/link" "$S245/link" "$S245/link" \
     "$S245/dangling" "$S245/real2" >"$S245/conf"
@@ -1132,20 +1136,31 @@ W65C141=0
 FS_SUDO="" PATH="$W65BIN:$PATH" sh -c '. "$1"; _fsb_py_checked=1; _fsb_py_ok=0; _fsb_count_tee e </dev/null' \
     _ "$LIB" >/dev/null 2>&1 || W65C141=$?
 assert_eq "#265 cat arm: SIGPIPE (141) maps to the consumer-EPIPE 0" "0" "$W65C141"
-# Real-cat rider under bash pipefail (the §11c pattern): a consumer
-# that exits at once ends REAL cat in SIGPIPE — the pipeline must stay
-# green (141 -> 0), or every large install/update/config pass would
-# fail through the tee. Skipped with a note where bash is absent.
-if command -v bash >/dev/null 2>&1; then
+# Real-cat rider under the PRODUCTION shell shape (the §11c pattern,
+# strengthened by #418 a A4/C1): bash with set -eu + pipefail — the
+# shape every shipped caller runs. A consumer that exits at once ends
+# real cat in SIGPIPE; without the cat arm's `|| _fsb_cat_rc=$?`
+# errexit-guard, set -e fires AT the failing cat (141) before the
+# consumer-EPIPE mapping runs and this pin goes red. The python3
+# wrapper resets SIGPIPE to SIG_DFL first (#418 a C1): CI runners
+# inherit SIGPIPE IGNORED from the Node runner agent (a child cannot
+# clear an inherited ignore via shell trap — POSIX forbids
+# re-enabling it), and under SIG_IGN cat exits 1 (write error) instead
+# of dying by signal; the disposition reset must happen in a real
+# process before exec. Skipped with a note where bash/python3 absent.
+if command -v bash >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
     W65BIG="$WORK/issue265-big"
     python3 -c 'import sys; sys.stdout.buffer.write(b"e\0" * 524288)' >"$W65BIG"
     W65PF=0
-    FS_SUDO="" bash -c 'set -o pipefail; . "$1"; _fsb_py_checked=1; _fsb_py_ok=0; _fsb_count_tee pf <"$2" | sh -c "exit 0"' \
-        _ "$LIB" "$W65BIG" >/dev/null 2>&1 || W65PF=$?
-    assert_eq "#265 pipefail rider: real cat's SIGPIPE stays pipeline-green" "0" "$W65PF"
+    FS_SUDO="" python3 -c 'import os, signal, sys
+signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+os.execvp("bash", ["bash", "-c", sys.argv[1], "_"] + sys.argv[2:])' \
+        'set -eu; set -o pipefail; . "$1"; _fsb_py_checked=1; _fsb_py_ok=0; _fsb_count_tee pf <"$2" | sh -c "exit 0"' \
+        "$LIB" "$W65BIG" >/dev/null 2>&1 || W65PF=$?
+    assert_eq "#265 pipefail rider: cat's SIGPIPE stays green under the production set -eu+pipefail shape" "0" "$W65PF"
     rm -rf "$W65BIG"
 else
-    echo "  note: bash absent — cat-arm pipefail rider skipped (#244 a Q1 shape)"
+    echo "  note: bash or python3 absent — cat-arm pipefail rider skipped (#244 a Q1 shape)"
 fi
 # Python arm: an interpreter failure must not be masked either (the
 # stub dies rc 3 before touching the stream — the function's rc is
@@ -1164,9 +1179,12 @@ rm -rf "$W65BIN"
 # EPIPE from a closed fifo reader is the same except arm but carries an
 # unfixable open/close race in a unit harness, so the full device
 # carries the pin). Two 1 MiB chunks with the 2000-entry threshold
-# crossed inside chunk 1: the OLD single-except shape took the
-# consumer-death path here — dup2 stdout to devnull — and lost chunk 2+
-# with every rc 0 (the false-green race). rc 0 + byte-identical
+# crossed inside chunk 1: the OLD shape lost chunk 2+ here too, by
+# whichever arm the sink's failure took — an EPIPE landed in the single
+# consumer-death except (dup2 stdout to devnull, rc 0 — the false-green
+# race); an ENOSPC was an uncaught OSError outside the
+# BrokenPipeError-only tuple (traceback, rc 1). Either way the data
+# stream died with the progress sink. rc 0 + byte-identical
 # passthrough discriminate; the done line is suppressed (progress_dead).
 if [ -w /dev/full ]; then
     W65EP="$WORK/issue265-epipe"

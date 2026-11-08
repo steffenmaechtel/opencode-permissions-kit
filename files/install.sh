@@ -265,6 +265,8 @@ kit_source() {
 # summary. The stamp writer is the deliberate exception: the stamp is a
 # rescan optimization, a missing stamp only costs the next update a scan
 # (the update-core twin's documented contract), never a skipped action.
+# The file's THIRD silent pair sits at the browser-bridge sourcing
+# below — guarded by its is_wsl rc-1 twin, see the comment there.
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-handover.sh"
 command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() {
     echo "error: ddev_handover_root unavailable (ddev-handover.sh incomplete) — the handover is not optional" >&2
@@ -401,7 +403,11 @@ command -v tui_plugin_sync_user >/dev/null 2>&1 ||
 # Shared WSL browser bridge helper (issues #91, #100): deploys the
 # powershell.exe stand-in + /etc/wsl.conf comment block that keep opencode's
 # device logins alive on a hardened /mnt/c. Same sourcing rules as
-# ddev-handover.sh.
+# ddev-handover.sh. The stub pair is deliberately silent (#418 a A3,
+# the update-core #211 b W22 twin): browser_bridge_is_wsl's rc-1 stub
+# keeps the re-apply block CLOSED when the lib is truncated, so the
+# install stub is unreachable in silence — a guarded gate pair, not a
+# #250 false-green action stub.
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh"
 command -v browser_bridge_is_wsl >/dev/null 2>&1 || browser_bridge_is_wsl() { return 1; }
 command -v browser_bridge_install >/dev/null 2>&1 || browser_bridge_install() { :; }

@@ -176,8 +176,18 @@ _fsb_count_tee() {
         # arm's documented consumer-EPIPE 0 below (#244 a Q1); a
         # consumer that DIED still fails the pass through its own rc in
         # the pipeline, and pipefail reads that member, not this one.
-        cat
-        _fsb_cat_rc=$?
+        # The `|| _fsb_cat_rc=$?` guard is load-bearing (#418 a A4):
+        # every shipped caller runs set -e — errexit would fire AT the
+        # failing cat (141 included) BEFORE the mapping runs, and the
+        # documented consumer-EPIPE 0 would silently degrade to a
+        # failed pass (a false RED in degraded-python mode). The
+        # ||-context suppresses errexit for cat alone; everything after
+        # still runs under set -e. (A process inheriting SIGPIPE
+        # ignored — CI runners do — turns the death into cat rc 1
+        # "write error"; that path fails loud through pipefail: safe,
+        # and pinned as the rider's environment note.)
+        _fsb_cat_rc=0
+        cat || _fsb_cat_rc=$?
         if [ "$_fsb_cat_rc" -eq 141 ]; then
             return 0
         fi
@@ -229,7 +239,7 @@ except (BrokenPipeError, KeyboardInterrupt):
     # traceback anyway, so point stdout at devnull before exiting (the
     # CPython SIGPIPE idiom). rc contract, stated truly (#244 a Q1):
     # the production callers run bash WITH pipefail (install.sh:47,
-    # config.sh:28, update.sh:39) and the rc of this pipeline lands
+    # config.sh:28, update.sh:41) and the rc of this pipeline lands
     # in the _fsbp_rc capture of _fsb_pass — exiting 0 on EPIPE is
     # deliberate: a consumer that closed early cannot fail the pass
     # alone, while a consumer that DIED leaves its own rc in the

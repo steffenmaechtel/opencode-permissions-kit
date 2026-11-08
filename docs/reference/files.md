@@ -30,7 +30,9 @@ asks before removing the kit block; your own entries always stay.
   `opk uninstall`) re-validates each line reader-side and skips
   malformed entries, system paths and the agent home loudly — a
   hand-edited line cannot drive the recursive group baseline over
-  system trees.
+  system trees. (A line naming a path that does NOT exist is skipped
+  silently by the existence gates before the loud arms — the safety
+  property is the refusal, not the volume.)
 - `handover/` holds one root-owned file per project root recording the
   last completed handover pass. A matching stamp lets a plain `opk update`
   skip the rescan; `update --refresh` and the `opk config` paths always

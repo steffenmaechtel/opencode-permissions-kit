@@ -829,9 +829,13 @@ refresh() {
             # uninstaller's reader (uninstall-core.sh, #243 b X1), so a
             # hand-edited conf cannot drive the root-run baseline +
             # handover over system trees the sanctioned writer would
-            # never store. Deliberate divergence, pinned in the unit
-            # suite (the uninstaller's documented divergence): the
-            # scratch prefixes /tmp and /var/tmp stay processable —
+            # never store. The writer's whitespace refusal is mirrored
+            # in the form gate above, as in every conf reader now — the
+            # uninstaller's #243 a X2 scope-out was resolved to MIRROR
+            # by #418 a A2 (one loud-skip contract for every consumer
+            # of a hand-edited conf). Deliberate divergence, pinned in
+            # the unit suite (the uninstaller's documented divergence):
+            # the scratch prefixes /tmp and /var/tmp stay processable —
             # unit fixtures live there by sandbox policy, and no
             # sanctioned writer ever stores them.
             case "$p" in

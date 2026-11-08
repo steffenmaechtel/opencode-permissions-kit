@@ -429,8 +429,10 @@ update_redeploy_project_roots() {
             # hand-edited conf cannot drive the root-run baseline +
             # handover over system trees the sanctioned writer would
             # never store. The writer's whitespace refusal is already
-            # mirrored in the form gate above (unlike the uninstaller,
-            # which scoped it out — #243 a X2 disposition).
+            # mirrored in the form gate above, as in every conf reader
+            # now — the uninstaller's #243 a X2 scope-out was resolved
+            # to MIRROR by #418 a A2 (one loud-skip contract for every
+            # consumer of a hand-edited conf).
             # Deliberate divergence, pinned in the unit suite (the
             # uninstaller's documented divergence, uninstall-core.sh):
             # the scratch prefixes /tmp and /var/tmp stay processable —
