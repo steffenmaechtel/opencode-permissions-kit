@@ -884,11 +884,11 @@ update_binary_upgrade() {
         BACKUP_DIR="$(mktemp -d /tmp/opencode-upgrade-backup.XXXXXX)"
         if [ -x "$SYSTEM_BIN" ]; then
             # Fail-loud (issue #371 A5 class sweep from install.sh): the
-            # bare call aborted the whole update cause-less under set -e
-            # (the helper prints nothing), and a swallowed failure would
-            # let the rc-2 restore path below promise a restore point
-            # that does not exist. Nothing has been replaced yet — abort
-            # leaves the binary untouched.
+            # bare call aborted the whole update with only the raw tool
+            # error (the helper adds no kit diagnostic of its own), and
+            # a swallowed failure would let the rc-2 restore path below
+            # promise a restore point that does not exist. Nothing has
+            # been replaced yet — abort leaves the binary untouched.
             copy_binary_atomic "$SYSTEM_BIN" "$BACKUP_DIR/opencode.current" ||
                 {
                     echo "error: pre-upgrade backup of $SYSTEM_BIN failed — binary upgrade aborted, nothing changed" >&2

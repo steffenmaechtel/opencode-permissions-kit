@@ -423,21 +423,22 @@ fi
 
 # --- 8. LOWS-1 (#371/#372/#340): install.sh residual hygiene ----------------------
 
-# A1: the agent-user gitconfig backup is gated on the user EXISTING —
-# the backup phase runs before Step 1 creates the user, so the ungated
-# copy failed (sudo -u on a missing user) and recorded a false
-# INCOMPLETE on every fresh install. The gate's skip arm (the log line
-# exists ONLY because of the gate — deleting the gate deletes it) plus
-# ordering: the id-gate precedes the backup line.
+# A1 + review a S1/P4 (#424 a): the agent-user gitconfig backup is
+# gated on the gitconfig FILES (both of git's global-scope locations),
+# not the user alone — `sudo -u` on a missing user fails unconditionally
+# (fresh install), and `git config --global --list` fails rc 128 when
+# the user exists without a global config (re-install residue). The
+# skip arm's log names what was checked.
 _ocbk_ln=$(sed 's/^[[:space:]]*#.*$//' "$LIB" |
     grep -nF 'BACKUP_DIR/gitconfig-$OPENCODE_USER.txt' | head -1 | cut -d: -f1)
 if [ -n "$_ocbk_ln" ] &&
-    sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF "backup skipped: user '\$OPENCODE_USER' does not exist yet" &&
-    sed -n "$((_ocbk_ln - 8)),$((_ocbk_ln - 1))p" "$LIB" |
-    grep -qF 'if id "$OPENCODE_USER" >/dev/null 2>&1; then'; then
-    pass "gitconfig-opencode backup gated on user existence + skip arm (#371 A1)"
+    sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'backup skipped: no global gitconfig' &&
+    grep -qF '[ -f "$_oc_gcfg_home/.gitconfig" ] || [ -f "$_oc_gcfg_home/.config/git/config" ]' "$LIB" &&
+    sed -n "$((_ocbk_ln - 12)),$((_ocbk_ln - 1))p" "$LIB" |
+    grep -qF '_oc_gcfg_home="$(getent passwd "$OPENCODE_USER"'; then
+    pass "gitconfig backup gated on the global gitconfig files + skip arm (#371 A1 + #424 a S1/P4)"
 else
-    fail "gitconfig-opencode backup gate missing (#371 A1)"
+    fail "gitconfig backup gate missing or user-only (#371 A1 + #424 a S1/P4)"
 fi
 
 # A2: custom-path input rejects glob characters on the RAW input before
@@ -482,12 +483,17 @@ _cba_err_n="$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -cF 'error: copying the 
 
 # A6+I2+H2: the "registered (both users)" success line is conditional
 # on both per-user syncs having succeeded — rc 2/3 skips print their
-# own notes and no longer ride a success row.
+# own notes and no longer ride a success row. #424 a P3: the counter
+# INCREMENT is pinned too — losing it (back to the old `:` no-op)
+# would silence the closing row on the both-succeeded path while every
+# conditional literal survives.
 if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'if [ "$_oc_tps_ok" -eq 2 ]; then' &&
-    sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'elif [ "$_oc_tps_ok" -eq 1 ]; then'; then
-    pass "TUI 2.x closing row is conditional on per-user outcomes (#371 A6)"
+    sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'elif [ "$_oc_tps_ok" -eq 1 ]; then' &&
+    sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    grep -qF '_oc_tps_ok=$((_oc_tps_ok + 1))'; then
+    pass "TUI 2.x closing row conditional + counter increment (#371 A6 + #424 a P3)"
 else
-    fail "TUI 2.x closing row still unconditional (#371 A6)"
+    fail "TUI 2.x closing row incomplete (#371 A6 + #424 a P3)"
 fi
 
 # A7+I3: the rc cleanup deletes only PATH EXPORT lines naming
@@ -532,19 +538,30 @@ _i4_n="$(sed 's/^[[:space:]]*#.*$//' "$LIB" |
     pass "binary pickup excludes /usr/local/bin/opencode only as a symlink (#372 I4)" ||
     fail "binary pickup name-exclusion not symlink-aware at both sites (#372 I4; sites: $_i4_n of 2)"
 
-# I6: the agent-config template carries the kit marker and it survives
-# BOTH render modes (behavioral: the real render lib, both arms); the
-# replace heuristic requires marker OR permission block, and a
-# user-authored config is kept, not re-rendered.
+# I6 (#372 + #424 a P2): the template carries the ANCHORED kit marker;
+# the replace heuristic requires marker OR permission block with the
+# negation in front of the grep (a polarity flip `! grep` -> `grep`
+# inverts the arm — the pin pins the negated SHAPE), and the keep arm
+# sits BEFORE the re-render else (an elif reorder would bury it).
 TEMPLATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/templates/opencode.jsonc"
 RENDER_LIB="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/render-agent-config.sh"
+_i6_keep_ln=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -nF 'existing opencode.jsonc has no kit marker' |
+    head -1 | cut -d: -f1)
+_i6_reap_ln=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -nF 'agent config re-applied' |
+    head -1 | cut -d: -f1)
+# Leg 1 pins the NEGATED shape (a polarity flip drops the `! `); leg 2
+# pins the ANCHORED marker form (the unanchored substring regression of
+# review a S6 loses the `//` comment-form prefix).
 if grep -qF '// _opencode_permissions_kit — kit-managed config' "$TEMPLATE" &&
-    grep -qF "grep -qE '_opencode_permissions_kit|\"permission\"'" "$LIB" &&
+    grep -qF '! grep -qE ' "$LIB" &&
+    grep -qF '//[[:space:]]*_opencode_permissions_kit|"permission' "$LIB" &&
     sed 's/^[[:space:]]*#.*$//' "$LIB" |
-    grep -qF 'user-authored (no kit marker, no permission block) — left untouched'; then
-    pass "agent config: kit marker + keep-user-authored heuristic wired (#372 I6)"
+    grep -qF 'user-authored or broken/unreadable content' &&
+    [ -n "$_i6_keep_ln" ] && [ -n "$_i6_reap_ln" ] &&
+    [ "$_i6_keep_ln" -lt "$_i6_reap_ln" ]; then
+    pass "agent config: anchored marker + negated keep heuristic + arm order (#372 I6 + #424 a P2)"
 else
-    fail "agent config marker/heuristic incomplete (#372 I6)"
+    fail "agent config marker/heuristic pin incomplete (#372 I6 + #424 a P2)"
 fi
 # the marker survives both render modes (the real render lib, driven)
 if . "$RENDER_LIB" &&

@@ -311,14 +311,22 @@ do_plan_phase() {
     # runs before Step 1 creates the user, and `sudo -u` on a missing
     # user fails unconditionally — the a-F6 recorder fired on every
     # fresh install and the closing Backup row read INCOMPLETE over
-    # material that never existed (issue #371 A1). Skip loudly-in-log;
-    # the backup copy itself keeps its failure recorder.
-    if id "$OPENCODE_USER" >/dev/null 2>&1; then
+    # material that never existed (issue #371 A1). Review a S1+P4
+    # (#424): gate on the gitconfig FILES, not the user alone —
+    # `git config --global --list` also fails rc 128 when the user
+    # exists but has no global config (re-install after an aborted
+    # install), and a userdel-without-`-r` leaves the home behind.
+    # Both of git's global-scope locations count; the skip log names
+    # what was actually checked.
+    _oc_gcfg_home="$(getent passwd "$OPENCODE_USER" 2>/dev/null | cut -d: -f6 || true)"
+    if [ -n "$_oc_gcfg_home" ] &&
+        { [ -f "$_oc_gcfg_home/.gitconfig" ] || [ -f "$_oc_gcfg_home/.config/git/config" ]; }; then
         # shellcheck disable=SC2024  # install.sh runs as root; the redirect is root's job
         sudo -u "$OPENCODE_USER" git -C / config --global --list \
             >"$BACKUP_DIR/gitconfig-$OPENCODE_USER.txt" 2>/dev/null || _bk_fail "gitconfig-$OPENCODE_USER"
     else
-        log "backup skipped: user '$OPENCODE_USER' does not exist yet (fresh install) — no gitconfig to copy"
+        log "backup skipped: no global gitconfig for '$OPENCODE_USER' (user absent, or no""\
+ ${_oc_gcfg_home:-<no-home>}/.gitconfig) — nothing to copy"
     fi
     if [ -f /etc/opencode-permissions-kit/sudoers ]; then
         cp /etc/opencode-permissions-kit/sudoers "$BACKUP_DIR/sudoers" 2>/dev/null || _bk_fail "sudoers"
@@ -1620,12 +1628,17 @@ do_deploy_phase() {
     # user-local binary first in every NEW shell. Only those PATH EXPORT
     # lines are removed — the old sed deleted ANY line mentioning
     # .opencode/bin (aliases, comments included). The rc files are backed
-    # up before any edit (sed -i and the appends below rewrite them —
-    # recovery material like every other pre-change copy), and a failed
-    # cleanup warns instead of dying silently (issue #371 I3).
+    # up before any edit WHEN THE COPY SUCCEEDS (review a S2, #424): a
+    # failed backup records itself and the edit proceeds anyway — the
+    # appends below are load-bearing protections (bypass warning, ddev
+    # hook) and must not be skipped over a missing recovery copy; the
+    # degradation is observed (warn + summary row), never silent. A
+    # failed cleanup warns too (issue #371 I3).
     _rc_cleaned=0
+    _rc_files=0
     for cf in "$DEV_HOME/.bashrc" "$DEV_HOME/.zshrc" "$DEV_HOME/.profile"; do
         if [ -f "$cf" ]; then
+            _rc_files=$((_rc_files + 1))
             if sudo cp "$cf" "$BACKUP_DIR/rc-$(basename "$cf")" 2>/dev/null; then
                 :
             else
@@ -1664,8 +1677,14 @@ do_deploy_phase() {
             fi
         fi
     done
-    log "shell PATH config updated for $DEFAULT_USER""\
+    # Honest no-op claim (review a S4, #424): with no rc file at all the
+    # loop never ran — the log must not claim updates or installed hooks.
+    if [ "$_rc_files" -gt 0 ]; then
+        log "shell PATH config updated for $DEFAULT_USER""\
  (stale PATH exports cleaned in $_rc_cleaned rc file(s); wrapper bypass warning + ddev terminal hook installed)"
+    else
+        log "no rc files found for $DEFAULT_USER (.bashrc/.zshrc/.profile) — no PATH config written"
+    fi
 
     # === Step 7: opencode library (consolidated deployment in /usr/local/lib/opencode-permissions-kit/) ===
 
@@ -2010,15 +2029,20 @@ do_deploy_phase() {
         fi
         log "opencode config installed: /home/opencode/.config/opencode/opencode.jsonc (secure_git=$SECURE_GIT_CONFIG)"
     elif [ -f /home/opencode/.config/opencode/opencode.jsonc ] &&
-        ! grep -qE '_opencode_permissions_kit|"permission"' /home/opencode/.config/opencode/opencode.jsonc; then
+        ! grep -qE '^[[:space:]]*//[[:space:]]*_opencode_permissions_kit|"permission"' \
+            /home/opencode/.config/opencode/opencode.jsonc; then
         # User-authored config (issue #372 I6): no kit marker (the
-        # template carries one since this change) and no permission
+        # template carries one since this change; the grep is anchored
+        # to its comment-line form — review a S6, #424: a config merely
+        # MENTIONING the kit stays user-authored) and no permission
         # block (the legacy kit-config heuristic — configs written by
-        # earlier kit versions). Neither present means a hand-written
-        # config; it is left untouched like a custom opencode.json
-        # instead of being re-rendered from the template.
-        ui_detail "existing opencode.jsonc is user-authored (no kit marker, no permission block) — left untouched"
-        log "agent config kept: user-authored opencode.jsonc without kit marker or permission block (not overwritten)"
+        # earlier kit versions). Neither present means the file is not
+        # kit-managed — a hand-written config (kept untouched like a
+        # custom opencode.json) or broken/unreadable content (kept too;
+        # the copy replaces nothing either way — review a G2, #424).
+        ui_detail "existing opencode.jsonc has no kit marker and no permission block""\
+ — left untouched (user-authored or broken/unreadable content)"
+        log "agent config kept: opencode.jsonc without kit marker or permission block (not overwritten)"
     elif [ -f /home/opencode/.config/opencode/opencode.json ] &&
         [ ! -f /home/opencode/.config/opencode/opencode.jsonc ]; then
         ui_detail "opencode.json exists — left untouched (custom user config)"
