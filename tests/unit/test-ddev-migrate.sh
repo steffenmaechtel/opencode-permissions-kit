@@ -479,7 +479,7 @@ if command -v mkfifo >/dev/null 2>&1; then
         *) fail "FIFO dump operand must be refused as not-regular (got: $OUTGF) (#420 a A6)" ;;
     esac
     check "FIFO operand: export-db never opens it (no hang)" \
-        sh -c "! grep -q 'ddev:export-db alpha' \"\$1\"" _ "$WORK/ddev.log"
+        sh -c "test -f \"\$1\" && ! grep -q 'ddev:export-db alpha' \"\$1\"" _ "$WORK/ddev.log"
     check "FIFO operand counts FAIL like the symlink refusal" \
         sh -c "grep -q '^FAIL|alpha|' \"\$1\" && ! grep -q '^OK|alpha|' \"\$1\"" _ "$DUMP_DIR/manifest.conf"
     # restore: remove the FIFO (rm never blocks on a fifo inode), alpha
