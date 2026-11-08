@@ -476,7 +476,7 @@ ddev_migrate_export() {
         [ -L "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" ] && dm_refuse="a symlink"
         if [ -z "$dm_refuse" ] && [ -e "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" ] &&
             [ ! -f "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" ]; then
-            dm_refuse="not a regular file (FIFO or device?)"
+            dm_refuse="not a regular file"
         fi
         if [ -n "$dm_refuse" ]; then
             echo "    REFUSED: $DD_MIG_DUMP_DIR/$dm_n.sql.gz is $dm_refuse — tampering? Remove it and re-run" >&2

@@ -473,7 +473,7 @@ if command -v mkfifo >/dev/null 2>&1; then
         PATH="$WORK/bin:$PATH" \
         sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null 2>&1) || true
     case "$OUTGF" in
-        *"REFUSED: $DUMP_DIR/alpha.sql.gz is not a regular file (FIFO or device?)"*)
+        *"REFUSED: $DUMP_DIR/alpha.sql.gz is not a regular file"*)
             pass "FIFO dump operand refused loudly as not-regular (#420 a A6)"
             ;;
         *) fail "FIFO dump operand must be refused as not-regular (got: $OUTGF) (#420 a A6)" ;;
