@@ -1851,6 +1851,16 @@ fi
 
 # --- summary gate -----------------------------------------------------------------
 echo ""
+# --- #249 sweep floor: doctor's python decoders run isolated ----------------------
+_doc_pi=$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -c 'python3 -I' || true)
+if [ "${_doc_pi:-0}" -ge 4 ]; then
+    echo "  ${GREEN}PASS${NC}  doctor's 4 python3 sites run -I ($_doc_pi found) (#249)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  doctor must run its python decoders with -I (found ${_doc_pi:-0}) (#249)"
+    failures=$((failures + 1))
+fi
+
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"
     exit 1

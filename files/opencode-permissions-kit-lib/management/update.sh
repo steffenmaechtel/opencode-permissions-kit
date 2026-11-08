@@ -271,6 +271,20 @@ ensure_local_file() {
 }
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+# Streamed stdin runs (curl ... | sudo bash, issue #405): $0 is the
+# interpreter, not this script — readlink resolves it against the
+# INVOKING cwd, so SCRIPT_DIR above is cwd-derived and every
+# checkout-first lookup below (ui.sh through update-core.sh) would
+# source whatever sibling files the cwd happens to sit next to, as
+# root, with no vintage pinning. Detect the shape once, for the whole
+# class of lookups: a real script path resolves to an existing file,
+# the interpreter name does not. (A cwd file literally named "bash"
+# re-degenerates to the pre-#405 behavior — accepted; the anchor only
+# ever narrows trust.)
+_opk_stdin_run=false
+if ! [ -f "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")" ]; then
+    _opk_stdin_run=true
+fi
 # Binary-only mode (--only-binary) needs no kit FETCH — when running
 # from the installed library, skip the self-fetch (and the per-file heal
 # loop below, which would re-fetch the whole kit for the deployed
@@ -290,7 +304,12 @@ for _opk_a in "$@"; do
             ;;
     esac
 done
-if [ "$_opk_binonly" != true ] && [ ! -f "$SCRIPT_DIR/../../../VERSION" ]; then
+# Stdin runs never trust the cwd-derived checkout test below (#405): a
+# kit checkout adjacent to the invoking cwd would pass it spuriously
+# and run an unpinned local vintage. The fetch re-pins the vintage
+# (KIT_BASE_URL) and the re-exec gives the fetched copy a real $0.
+if [ "$_opk_binonly" != true ] && { [ "$_opk_stdin_run" = true ] ||
+    [ ! -f "$SCRIPT_DIR/../../../VERSION" ]; }; then
     echo "No local checkout — fetching kit files from $KIT_BASE_URL ..."
     # Direct call, NOT SCRIPT_DIR="$(fetch_kit)" — a subshell's variable
     # writes (incl. the _FETCH_TREE export below and the trap
@@ -320,6 +339,20 @@ if [ "$_opk_binonly" != true ] && [ ! -f "$SCRIPT_DIR/../../../VERSION" ]; then
     # trap removes it on exit.
     export _FETCH_TREE
     exec bash "$SCRIPT_DIR/opencode-permissions-kit-lib/management/update.sh" "$@"
+fi
+# --only-binary skips the fetch by design, so a stdin run gets no
+# fetch-and-re-exec to re-anchor SCRIPT_DIR: pin it to the DEPLOYED
+# library (the installed vintage, root-owned) instead of the invoking
+# cwd, and refuse loudly when nothing is installed — a cwd-sibling
+# update-core.sh is not a substitute (#405).
+if [ "$_opk_stdin_run" = true ] && [ "$_opk_binonly" = true ]; then
+    if [ -f /usr/local/lib/opencode-permissions-kit/sh/update-core.sh ]; then
+        SCRIPT_DIR="/usr/local/lib/opencode-permissions-kit/opencode-permissions-kit-lib/management"
+    else
+        echo "error: streamed --only-binary run found no installed kit library at" >&2
+        echo "       /usr/local/lib/opencode-permissions-kit — run 'sudo opk update --only-binary' instead" >&2
+        exit 1
+    fi
 fi
 # The files/ root this update deploys from: after the fetch+re-exec above
 # $SCRIPT_DIR is the fetched files/ directory itself; run from a checkout it
@@ -767,12 +800,13 @@ fi
 # equally a wiring bug this list makes reviewable).
 update_pairing_guard() {
     for _upg in update_redeploy_library update_redeploy_wsl_bridge \
-        update_redeploy_cli_links update_redeploy_xdg_shim \
+        update_redeploy_cli_links \
         update_redeploy_sudoers update_redeploy_umask \
         update_redeploy_openchamber update_redeploy_shell_hooks \
         update_redeploy_project_roots update_redeploy_git_safe \
         update_redeploy_wsl_mntc update_binary_resecure \
-        update_binary_upgrade update_finalize_opencode_home \
+        update_binary_upgrade update_redeploy_xdg_shim \
+        update_finalize_opencode_home \
         update_finalize_default_config update_finalize_ddev_stamp \
         update_finalize_install_conf update_finalize_tui_files; do
         command -v "$_upg" >/dev/null 2>&1 || {
@@ -831,7 +865,6 @@ if [ "$ONLY_BINARY" != true ]; then
     update_redeploy_library
     update_redeploy_wsl_bridge
     update_redeploy_cli_links
-    update_redeploy_xdg_shim
     update_redeploy_sudoers
     update_redeploy_umask
     update_redeploy_openchamber
@@ -849,6 +882,11 @@ else
 fi
 
 if [ "$ONLY_BINARY" != true ]; then
+    # After the optional binary swap by design (#257): the shim gate
+    # reads the DEPLOYED binary's version — a downgrade + update
+    # re-deploys the shim in the same run, an upgrade past the fix
+    # removes it.
+    update_redeploy_xdg_shim
     update_finalize_opencode_home
     update_finalize_default_config
     update_finalize_ddev_stamp

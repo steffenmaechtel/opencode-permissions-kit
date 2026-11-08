@@ -135,11 +135,13 @@ fi
 # wording, the decision was always equivalent) and the python decoder
 # decides at character level: valid UTF-8 passes, undecodable bytes
 # fall back to latin-1, where a raw C1 byte stays a control character.
+# -I (#249) on every decoder call in this lib: a poisoned
+# PYTHONHOME/PYTHONPATH must not break the diagnostics — stdlib-only.
 doctor_cntrl_bad() {
     if ! printf '%s' "$1" | LC_ALL=C grep -q "$(printf '[[:cntrl:]\200-\277]')"; then
         return 1
     fi
-    printf '%s' "$1" | python3 -c '
+    printf '%s' "$1" | python3 -I -c '
 import sys
 data = sys.stdin.buffer.read()
 try:
@@ -158,7 +160,7 @@ sys.exit(0 if any(
 # U+00DF = 0xC3 0x9F loses its trail byte), raw C1 bytes die in the
 # decoder. Backslash strips separately where a site needs it.
 doctor_show_sanitize() {
-    printf '%s' "$1" | python3 -c '
+    printf '%s' "$1" | python3 -I -c '
 import sys
 data = sys.stdin.buffer.read()
 try:
@@ -843,7 +845,7 @@ fi
 # just read (shell-security convention). Failures print "opk.json: ..."
 # to stderr and exit non-zero.
 doctor_load_policy() {
-    python3 - "$1/opk.json" <<'PYEOF'
+    python3 -I - "$1/opk.json" <<'PYEOF'
 import json
 import sys
 
@@ -1429,7 +1431,7 @@ if [ "$DOCTOR_MODE" = "detect" ]; then
             ui_detail "the candidates above stay valid -- paste the snippets, or re-run with permissions fixed"
             exit 1
         }
-        if python3 - "$DOCTOR_ROOT" "$WORK/dnew" <<'PYEOF' >"$_dt_tmp"
+        if python3 -I - "$DOCTOR_ROOT" "$WORK/dnew" <<'PYEOF' >"$_dt_tmp"
 import json
 import sys
 

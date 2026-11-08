@@ -962,6 +962,44 @@ check "import: the read loop parses the staged copy, never the dump-dir manifest
 check "import: manifest delivery is find -type f with a bounded cat (S6)" \
     sh -c 'grep -qF "dm_found=\$(find \"\$dm_dir\" -maxdepth 1 -type f -name manifest.conf" "$1" && grep -qF "timeout 5 cat \"\$dm_found\" >\"\$dm_manifest\"" "$1"' _ "$MIG"
 
+# --- #322: find's stderr is kept — an unreadable dump dir never folds into
+# "no manifest". Gap: skip-with-note (no gap claimed, the unreadable dir
+# names itself on stderr — the caller-suppressed S6 pins above discard
+# stderr, this one captures it). Import: refused by name. Root-hermetic:
+# relies on the non-root suite user (same as the W5/W5i pins).
+if [ "$(id -u)" != 0 ]; then
+    _g322="$(work_new)"
+    mkdir -p "$_g322/backups/ddev-migration-20260101-000000"
+    printf 'OK|alpha|/roots/alpha|alpha.sql.gz\n' >"$_g322/backups/ddev-migration-20260101-000000/manifest.conf"
+    chmod 000 "$_g322/backups/ddev-migration-20260101-000000"
+    _g322_out=$(DDEV_MIG_BACKUP_ROOT="$_g322/backups" DDEV_MIG_DEV_HOME="$_g322/devhome" \
+        timeout 10 sh -c '. "$1" && ddev_migrate_gap maxmustermann "$2"' \
+        _ "$MIG" "$_g322/roots" 2>&1) || true
+    if printf '%s\n' "$_g322_out" | grep -qF 'cannot inspect' &&
+        printf '%s\n' "$_g322_out" | grep -qF 'partial-export check skipped'; then
+        pass "gap: unreadable dump dir notes itself instead of silent no-manifest (#322)"
+    else
+        fail "gap: unreadable dump dir must skip-with-note, not claim no-manifest (got: $_g322_out) (#322)"
+    fi
+    chmod 755 "$_g322/backups/ddev-migration-20260101-000000"
+    mkdir -p "$_g322/bin"
+    printf '#!/bin/sh\necho 0\n' >"$_g322/bin/id"
+    chmod +x "$_g322/bin/id"
+    chmod 000 "$_g322/backups/ddev-migration-20260101-000000"
+    _i322_out=$(PATH="$_g322/bin:$PATH" timeout 10 sh -c \
+        '. "$1" && ddev_migrate_import "$2"' _ "$MIG" \
+        "$_g322/backups/ddev-migration-20260101-000000" 2>&1) || true
+    chmod 755 "$_g322/backups/ddev-migration-20260101-000000"
+    if printf '%s\n' "$_i322_out" | grep -qF 'dump directory unreadable' &&
+        printf '%s\n' "$_i322_out" | grep -qF 'refusing to import'; then
+        pass "import: unreadable dump dir is refused by name, never 'no manifest' (#322)"
+    else
+        fail "import: unreadable dump dir must be refused distinctly (got: $_i322_out) (#322)"
+    fi
+else
+    echo "  SKIP  #322 unreadable-dir pins need a non-root suite user (#322)"
+fi
+
 # registry subcommand (read-only, no root gate): export/outside view
 OUT=$(DDEV_MIG_DEV_HOME="$WORK/maxmustermann2" sh "$BIN_MIG" registry maxmustermann "$WORK/maxmustermann-vhosts")
 assert_eq "registry cmd: all 12 under the root classified export" "12" \

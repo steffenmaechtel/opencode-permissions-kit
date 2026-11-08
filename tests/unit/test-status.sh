@@ -1006,9 +1006,12 @@ fi
 
 # Checkout-first lib resolution (0.0.46a F4 pattern): a checkout run must
 # source ITS OWN ui.sh/git-check.sh — a deployed pre-#158 copy would drop
-# every ui_kv_ok/ui_kv_bad row (command not found) and the verdict.
-if grep -qF 'UI_LIB="$(cd "$(dirname "$0")" && pwd)/../sh/ui.sh"' "$STATUS" &&
-    grep -qF 'GIT_CHECK_LIB="$(cd "$(dirname "$0")" && pwd)/../sh/git-check.sh"' "$STATUS"; then
+# every ui_kv_ok/ui_kv_bad row (command not found) and the verdict. The
+# resolvers ride ST_CALL_DIR (#405): the caller dir for real script runs
+# (checkout-first, unchanged) with stdin runs pinned to the deployed lib.
+if grep -qF 'UI_LIB="$ST_CALL_DIR/../sh/ui.sh"' "$STATUS" &&
+    grep -qF 'GIT_CHECK_LIB="$ST_CALL_DIR/../sh/git-check.sh"' "$STATUS" &&
+    grep -qF 'ST_CALL_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"' "$STATUS"; then
     pass "status.sh resolves ui.sh/git-check.sh checkout-first"
 else
     fail "status.sh resolves ui.sh/git-check.sh deployed-first (pre-#158 skew)"
@@ -2680,7 +2683,7 @@ fi
 # contract: garbage in -> rc 1, SILENT (the except path is the
 # expected failure; the passthrough must not add noise to it).
 C244ADVPGM="$(sed -n "/if ADV_IDS=\$(printf/,/); then\$/p" "$STATUS_CORE" |
-    sed "1s/^.*python3 -c '//" | sed "\$s/'[[:space:]]*); then\$//")"
+    sed "1s/^.*python3 -I -c '//" | sed "\$s/'[[:space:]]*); then\$//")"
 if printf 'not json' | python3 -c "$C244ADVPGM" >/dev/null 2>"$WORK/t244c-adv.err"; then
     fail "#244 c S3: advisory program must reject an unparseable feed (rc 1)"
 elif [ ! -s "$WORK/t244c-adv.err" ]; then
@@ -2930,7 +2933,7 @@ fi
 # dict envelope exits 1 SILENT (the old shape raised a raw traceback on
 # cron stderr); a list with null and scalar entries yields exactly the
 # real ids.
-ADVPY="$(sed -n "/python3 -c 'import json,sys$/,/'); then\$/p" "$STATUS_CORE" | sed -e "1s/^.*python3 -c '//" -e "\$s/'); then\$//")"
+ADVPY="$(sed -n "/python3 -I -c 'import json,sys$/,/'); then\$/p" "$STATUS_CORE" | sed -e "1s/^.*python3 -I -c '//" -e "\$s/'); then\$//")"
 if [ -n "$ADVPY" ] && printf '%s' "$ADVPY" | grep -q 'isinstance(feed, list)'; then
     pass "advisory feed parser extractable + shape gate present (pr-00263 a F11)"
 else

@@ -1752,9 +1752,22 @@ do_deploy_phase() {
     # xdg-open fallback (opencode 1.18.33+ / 2.0.18+ login fix): their
     # bundled opener (open@11) falls back to xdg-open when powershell.exe
     # is not executable for the caller — without any xdg-open the device
-    # login dies (2.x: uncaught crash). Deploy the kit shim ONLY while no
-    # real xdg-open exists (never shadow one).
-    if ! command -v xdg-open >/dev/null 2>&1 &&
+    # login dies (2.x: uncaught crash). Deploy the kit shim ONLY while
+    # no real xdg-open exists (never shadow one) AND the deployed
+    # binary still needs it: opencode >= 2.0.32 handles a missing
+    # xdg-open itself (upstream #52548, PR #56082; the 1.x line never
+    # got the fix — xdg_shim_needed_for in sh/deploy-lib.sh, issue
+    # #257). Bounded probe like every sibling (issue #80); an
+    # unparseable probe keeps the shim (fail-safe direction).
+    _xdi_ver=$(timeout 10 "$SYSTEM_BIN" --version 2>/dev/null | head -1 || true)
+    _xdi_maj=$(printf '%s' "$_xdi_ver" | sed -n 's/^opencode v\([0-9][0-9]*\).*/\1/p')
+    if [ -z "$_xdi_maj" ] && printf '%s' "$_xdi_ver" | grep -qE '^[0-9]+(\.[0-9]+)*$'; then
+        _xdi_maj=1 # bare version line = 1.x, full-line anchored
+    fi
+    _xdi_trip=$(printf '%s' "$_xdi_ver" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
+    if ! xdg_shim_needed_for "${_xdi_maj:-}" "$_xdi_trip"; then
+        log "xdg-open shim skipped: opencode ${_xdi_trip:-<unparsed>} >= $XDG_SHIM_FIX_VERSION opens without one (#257)"
+    elif ! command -v xdg-open >/dev/null 2>&1 &&
         ! [ -e /usr/local/bin/xdg-open ] && ! [ -L /usr/local/bin/xdg-open ]; then
         sudo ln -s "$LIBDIR/bin/xdg-open" /usr/local/bin/xdg-open
         ui_success "xdg-open fallback installed: /usr/local/bin/xdg-open -> $LIBDIR/bin/xdg-open"

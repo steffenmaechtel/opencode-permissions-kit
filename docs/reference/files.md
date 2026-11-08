@@ -181,7 +181,9 @@ The deployed library mirrors the repository layout
 Deployment notes:
 
 - `/usr/local/bin/xdg-open` is deployed only while no real xdg-open exists
-  — opencode 1.18.33+/2.0.18+ device-logins crash without it.
+  AND the installed opencode predates the upstream fix — opencode
+  1.18.33+/2.0.18+ device-logins crash without it; opencode ≥ 2.0.32 opens
+  without one and the kit withholds/removes the shim there.
 - `bin/browser-bridge` is deployed into the `wsl/` tree; re-deployed by
   `opk wsl-add-opencode-1-fix`. The powershell.exe stand-in forwards to the
   real powershell.exe when the caller may execute it, `exit 0` otherwise

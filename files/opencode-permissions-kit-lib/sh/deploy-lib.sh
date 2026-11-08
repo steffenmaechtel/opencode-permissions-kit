@@ -24,6 +24,31 @@
 
 _dl_sudo() { ${DL_SUDO-sudo} "$@"; }
 
+# --- xdg-open shim gate (issue #257) ---------------------------------------------
+# opencode 2.x crashed `auth login` on hosts without any xdg-open
+# (upstream anomalyco/opencode#52548, fixed in PR #56082; first release
+# carrying the fix: v2.0.32, tagged 2026-10-16 — verified against the
+# upstream tags by ancestry: v2.0.31 predates the merge, v2.0.32 is the
+# first tag containing the fix commit). The 1.x line never received
+# the fix (v1.19.x diverged from it), so the shim stays required there.
+# Both consumers (install-core.sh, update-core.sh) read this through
+# sourcing — the ONE definition keeps the version pin from drifting.
+XDG_SHIM_FIX_VERSION="2.0.32"
+
+# xdg_shim_needed_for <major> <x.y.z>: rc 0 = the binary still needs
+# the fallback shim; rc 1 = it opens without one itself (2.x at or
+# above XDG_SHIM_FIX_VERSION). An empty/unparseable version keeps the
+# shim — the probe must prove safety, never assume it (the wrapper's
+# fail-open idiom; 1.x is never fixed, so only a parsed 2.x triple can
+# ever return 1). Version order via sort -V, the advisories.sh idiom.
+xdg_shim_needed_for() {
+    [ "$1" = 2 ] || return 0
+    [ -n "$2" ] || return 0
+    _xsg_hi=$(printf '%s\n%s\n' "$2" "$XDG_SHIM_FIX_VERSION" | sort -V | tail -n 1)
+    [ "$_xsg_hi" = "$2" ] && return 1
+    return 0
+}
+
 # lib_deploy <tree-root> <libdir>
 # <tree-root> is a directory containing opencode-permissions-kit-lib/
 # (a checkout's files/, or the streamed temp fetch tree); <libdir> is

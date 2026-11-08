@@ -1714,6 +1714,15 @@ grep -qF 'entry (key or value) by hand' "$KIT" &&
     }
 
 echo ""
+_kit_pi=$(sed 's/^[[:space:]]*#.*$//' "$KIT" | grep -c 'python3 -I' || true)
+if [ "${_kit_pi:-0}" -ge 1 ]; then
+    echo "${GREEN}PASS${NC}  opk's policy-tree python3 site runs -I ($_kit_pi found) (#249)"
+    passed=$((passed + 1))
+else
+    echo "${RED}FAIL${NC}  opk must run its policy-tree parse with python3 -I (#249)"
+    failures=$((failures + 1))
+fi
+
 if [ "$failures" -gt 0 ]; then
     echo "${RED}$failures test(s) failed${NC}"
     exit 1

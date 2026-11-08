@@ -566,4 +566,92 @@ else
     fail "failed rc backup must degrade loudly without skipping the hook (out=$_rcb2_out) (#425)"
 fi
 
+# --- timeout two-class probe (#248) ----------------------------------------------
+# `command -v timeout` proves findability, not function: a broken-but-
+# findable timeout must degrade to the unguarded arm, not fail the
+# probe. Controlled PATH: scratch bin with a broken timeout shadows the
+# real one; the probe caches its verdict per process (fresh sh each).
+_TO="$(work_new)"
+mkdir -p "$_TO/bin"
+printf '#!/bin/sh\nexit 1\n' >"$_TO/bin/timeout"
+chmod +x "$_TO/bin/timeout"
+printf '#!/bin/sh\necho "opencode v2.2.6"\n' >"$_TO/bin/fake-oc"
+chmod +x "$_TO/bin/fake-oc"
+if PATH="$_TO/bin:/usr/bin:/bin" sh -c '. "$1"
+    if _opk_timeout_ok; then echo gate-ok; else echo gate-fallback; fi
+    SYSTEM_BIN="$2"
+    printf "version=%s\n" "$(opencode_version_line)"
+' _ "$LIB" "$_TO/bin/fake-oc" >"$_TO/out" 2>&1; then
+    :
+fi
+if grep -q '^gate-fallback$' "$_TO/out" && grep -q '^version=opencode v2.2.6$' "$_TO/out"; then
+    pass "timeout probe: broken timeout degrades to fallback arm, probe still answers (#248)"
+else
+    fail "broken timeout must not fail the bounded probe (got: $(cat "$_TO/out")) (#248)"
+fi
+# Healthy timeout present: the gate takes the bounded arm (the probe
+# runs in the suite's own PATH, which check-host verified).
+if sh -c '. "$1" && _opk_timeout_ok' _ "$LIB"; then
+    pass "timeout probe: healthy timeout passes the gate (#248)"
+else
+    fail "healthy timeout must pass the gate (#248)"
+fi
+
+# --- resolve_latest_opencode_version under hostile PYTHONHOME (#249) --------------
+# The 2.x arm pipes the packument through `python3 -I`: a poisoned
+# PYTHONHOME must not break the resolution. curl is faked on PATH
+# (hermetic — no network); detect_target runs for real.
+_RES="$(work_new)"
+mkdir -p "$_RES/bin"
+cat >"$_RES/bin/curl" <<'EOF'
+#!/bin/sh
+# fake registry packument for @opencode/cli-<any-target>
+printf '{"dist-tags":{"latest":"2.9.9"}}\n'
+EOF
+chmod +x "$_RES/bin/curl"
+_res_rc=0
+_res_out=$(PATH="$_RES/bin:/usr/bin:/bin" PYTHONHOME="$_RES/nonexistent-py-home" \
+    sh -c '. "$1"; resolve_latest_opencode_version 2' _ "$LIB" 2>"$_RES/err") || _res_rc=$?
+if [ "$_res_out" = "2.9.9" ]; then
+    pass "resolve: hostile PYTHONHOME cannot break the 2.x resolution (-I, #249)"
+else
+    fail "resolve must ignore PYTHONHOME under -I (rc=$_res_rc got [$_res_out] err $(head -2 "$_RES/err" 2>/dev/null)) (#249)"
+fi
+# Discriminator: the same hostile env DOES break a bare python3 -c (the
+# control arm proves the env is genuinely hostile — without it the pin
+# above would pass vacuously on a PYTHONHOME-ignoring build).
+if PYTHONHOME="$_RES/nonexistent-py-home" python3 -c 'import json' 2>/dev/null; then
+    fail "control arm: PYTHONHOME hostility is not effective on this python (vacuous #249 pin)"
+else
+    pass "control arm: bare python3 breaks under the hostile PYTHONHOME (#249)"
+fi
+# Sweep floor: every python3 invocation in the lib runs isolated.
+_pc=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -c 'python3 -I' || true)
+if [ "${_pc:-0}" -ge 1 ]; then
+    pass "sweep: update-core.sh python3 calls run -I ($_pc site(s), #249)"
+else
+    fail "update-core.sh must invoke python3 -I at the resolve site (#249)"
+fi
+
+# --- #257: the xdg shim section gates on the deployed version ---------------------
+# Execution against /usr/local/bin literals is not hermetic (sandbox
+# policy) — the gate LOGIC is execution-pinned in test-deploy-lib.sh,
+# the run ORDER in test-update-flags.sh, the deploy behavior in e2e.
+# Here: the section consults the gate on BOTH sides (withhold/remove)
+# and names the cause in each arm.
+if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'if ! xdg_shim_needed_for "${_xds_maj:-}" "$_xds_trip"; then' &&
+    sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'needs no fallback (#257)' &&
+    sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'opens without one (>= $XDG_SHIM_FIX_VERSION, #257)'; then
+    pass "xdg shim section: version gate + named causes wired (#257)"
+else
+    fail "the shim section must gate on xdg_shim_needed_for and name its causes (#257)"
+fi
+# The probe basis is the post-swap binary: the section reads
+# opencode_version_line (SYSTEM_BIN), never a stale install.conf stamp.
+if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF '_xds_ver=$(opencode_version_line)'; then
+    pass "xdg shim section probes the deployed binary for its version basis (#257)"
+else
+    fail "the shim gate must probe the deployed binary, not a stamp (#257)"
+fi
+
 suite_done

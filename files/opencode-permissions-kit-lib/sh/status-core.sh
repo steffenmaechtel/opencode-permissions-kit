@@ -17,6 +17,28 @@
 # ADV_VER (advisories verdict, consumed by the WSL2 bridge row) and the
 # _st_py_* progress-interpreter cache.
 
+# _opk_timeout_ok: cached two-class timeout probe (#248) — `command -v`
+# proves findability, not function; a findable-but-broken timeout used
+# to fail the bounded version probes below outright. Only a timeout
+# that actually runs `true` counts; everything else takes the
+# unguarded fallback arm (the absent-timeout trade every site already
+# makes). Residual, accepted: a timeout that hangs on trivial use
+# hangs the probe — nothing left to bound it. Identical copies:
+# sh/update-core.sh and bin/opencode-as-opencode (no shared lib reaches
+# all three — keep them in sync).
+_opk_timeout_ok() {
+    case "${_OPK_TIMEOUT_OK:-}" in
+        1) return 0 ;;
+        2) return 1 ;;
+    esac
+    if command -v timeout >/dev/null 2>&1 && timeout 2 true >/dev/null 2>&1; then
+        _OPK_TIMEOUT_OK=1
+        return 0
+    fi
+    _OPK_TIMEOUT_OK=2
+    return 1
+}
+
 # --- live progress for the project-root scans (issue #210) ------------------------
 # The ddev share scan and the Windows hosts scan below walk every
 # registered project root with find — on WSL with many git projects and
@@ -51,7 +73,9 @@ _st_progress_tee() {
     # status.sh runs without pipefail). Pinned: the SIGINT pin in
     # tests/unit/test-status.sh (#221 b W1) kills the tee's python3
     # mid-stream and asserts zero stderr and a clean exit.
-    python3 -c '
+    # -I (#249): a poisoned PYTHONHOME/PYTHONPATH must not kill the
+    # progress display (or its consumer loop) — stdlib-only import.
+    python3 -I -c '
 import sys, threading, time
 label = sys.argv[1]
 count = 0
@@ -109,6 +133,20 @@ _st_ddev_scan() {
     _sts_label="$1"
     _sts_root="$2"
     _sts_out="$3"
+    # Root readability gate (#322): an EXISTING root this caller cannot
+    # read used to produce an EMPTY list — the report rendered its rows
+    # over that tree as if nothing lived there (false-clean over an
+    # unknown). A MISSING root stays green by design (a configured root
+    # that is gone simply holds no projects — the W2 control's shape).
+    # Unreadable SUBTREES stay suppressed below (deliberate: WSL trees
+    # carry foreign-permission dirs; the walk is best-effort) — only the
+    # registered ROOT is load-bearing for the row's meaning.
+    # Skip-with-note, never block: the remaining roots still scan.
+    if [ -e "$_sts_root" ] && { [ ! -r "$_sts_root" ] || [ ! -x "$_sts_root" ]; }; then
+        ui_kv_warn "$_sts_label" "scan skipped — root unreadable for this caller: $_sts_root"
+        : >"$_sts_out"
+        return 0
+    fi
     _sts_expr='-type d ( -name vendor -o -name node_modules -o -name testdata -o -name .git )'
     _sts_expr="$_sts_expr -prune -o -type d -name .ddev -prune"
     # Progress only on an interactive terminal. The python3 check is a
@@ -120,13 +158,14 @@ _st_ddev_scan() {
     # caches, _st_py_ok carries the verdict), and only on the tty path —
     # piped/--short runs never start python3. On failure the
     # interpreter's own stderr passes through (#244 c S3): the silent
-    # progress degrade never hides the cause.
+    # progress degrade never hides the cause. -I (#249): the health
+    # probe runs the SAME invocation shape as the tee it gates.
     _sts_progress=false
     if [ "${UI_SILENT:-0}" != 1 ] && [ -t 2 ] && [ "${_st_py_checked:-0}" != 1 ]; then
         _st_py_checked=1
         _st_py_ok=0
         command -v python3 >/dev/null 2>&1 &&
-            python3 -c 'import sys, threading, time' >/dev/null &&
+            python3 -I -c 'import sys, threading, time' >/dev/null &&
             _st_py_ok=1
     fi
     [ "${UI_SILENT:-0}" != 1 ] && [ -t 2 ] && [ "${_st_py_ok:-0}" = 1 ] && _sts_progress=true
@@ -410,7 +449,7 @@ status_section_advisories() {
             # install.conf stamp when the probe is empty).
             ui_kv_warn "opencode binary" "missing or not executable — advisory check skipped (fix: sudo opk upgrade-opencode)"
         elif command -v sudo >/dev/null 2>&1; then
-            if command -v timeout >/dev/null 2>&1; then
+            if _opk_timeout_ok; then
                 ADV_VER=$(timeout 10 sudo -n -u "$OPENCODE_USER" "$LIBDIR/bin/opencode" --version 2>/dev/null |
                     grep -m1 -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
             else
@@ -442,7 +481,7 @@ status_section_advisories() {
         ADV_DIRECT_RC=""
         if [ -z "$ADV_VER" ] && [ -x "$LIBDIR/bin/opencode" ]; then
             ADV_DIRECT_RC=0
-            if command -v timeout >/dev/null 2>&1; then
+            if _opk_timeout_ok; then
                 ADV_DIRECT_OUT=$(timeout 10 "$LIBDIR/bin/opencode" --version 2>/dev/null) ||
                     ADV_DIRECT_RC=$?
             else
@@ -516,8 +555,10 @@ EOF
             if [ -n "$ADV_FEED" ] && command -v python3 >/dev/null 2>&1; then
                 # advisory ids from the feed (ghsa_id per entry); exit 1 on
                 # anything that is not JSON — an unparseable feed is
-                # "unavailable", not "no advisories".
-                if ADV_IDS=$(printf '%s' "$ADV_FEED" | python3 -c 'import json,sys
+                # "unavailable", not "no advisories". -I (#249): the ambient
+                # PYTHONHOME/PYTHONPATH must not steer the freshness row —
+                # stdlib-only import.
+                if ADV_IDS=$(printf '%s' "$ADV_FEED" | python3 -I -c 'import json,sys
 try:
     feed = json.load(sys.stdin)
 except Exception:
@@ -1289,6 +1330,10 @@ status_section_root_equiv() {
     sra_sock_list="/var/run/docker.sock /run/containerd/containerd.sock /var/lib/lxd/unix.socket /run/libvirt/libvirt-sock"
     sra_sock_list="${ROOT_EQUIV_SOCKS:-$sra_sock_list}"
     if [ -d /mnt/wsl ]; then
+        # stderr stays suppressed by design (#322 disposition): /mnt/wsl
+        # is foreign-owned mount surface — unreadable subtrees are normal
+        # and sockets found elsewhere still report; a missing partial
+        # dir is the best-effort of a probe, not a verdict flip.
         sra_sock_list="$sra_sock_list $(find /mnt/wsl -maxdepth 4 \( -type s -o -type l \) \( -name docker.sock \
             -o -name podman.sock -o -name containerd.sock -o -name crio.sock \) 2>/dev/null)"
     fi
@@ -1383,7 +1428,9 @@ status_section_leak_scan() {
         # through (#244 c S3): it prints clean "Error ..." lines, so a
         # broken config names its cause above the unscannable verdict.
         scan_unscannable=false
-        if scan_patterns=$(python3 "$PARSER" "$SCAN_CFG"); then
+        # -I (#249): ambient PYTHONHOME/PYTHONPATH must not break the
+        # leak scan — the parser imports stdlib only.
+        if scan_patterns=$(python3 -I "$PARSER" "$SCAN_CFG"); then
             :
         else
             scan_patterns=""
@@ -1391,6 +1438,13 @@ status_section_leak_scan() {
         fi
         scan_hits=""
         if [ -n "$scan_patterns" ]; then
+            # stderr stays suppressed by design (#322 disposition): the
+            # scratch dirs carry other users' 0700 subtrees whose
+            # permission noise is NORMAL — the report already cannot see
+            # into them, a partial walk is the documented best-effort of
+            # a report-only scan, not a silent-negative decision. Only
+            # the scan DIRS themselves are load-bearing (the [ -d ] gates
+            # above skip missing ones explicitly).
             scan_hits=$(
                 for scan_dir in $LEAK_DIRS; do
                     [ -d "$scan_dir" ] || continue

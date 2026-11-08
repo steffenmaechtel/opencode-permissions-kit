@@ -41,7 +41,16 @@ PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
 # below): the checkout's status.sh needs its OWN ui.sh — the deployed one
 # can predate ui_kv_ok/ui_kv_bad (issue #158) and would drop those rows.
 # A deployed run resolves to the identical file anyway.
-UI_LIB="$(cd "$(dirname "$0")" && pwd)/../sh/ui.sh"
+# Caller-dir anchor (#405): the lib resolvers below are checkout-first
+# (a checkout status.sh renders its own libs). A streamed stdin run
+# (curl ... | sh) has no real $0 — dirname lands on the INVOKING cwd and
+# a cwd-sibling lib would shadow the deployed one. Pin stdin runs to
+# the deployed library; checkout and installed runs keep their own dir.
+ST_CALL_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
+if ! [ -f "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")" ]; then
+    ST_CALL_DIR="/usr/local/lib/opencode-permissions-kit/opencode-permissions-kit-lib/management"
+fi
+UI_LIB="$ST_CALL_DIR/../sh/ui.sh"
 [ -f "$UI_LIB" ] || UI_LIB="/usr/local/lib/opencode-permissions-kit/sh/ui.sh"
 if [ -f "$UI_LIB" ]; then
     # shellcheck disable=SC1090
@@ -60,7 +69,7 @@ fi
 # deployed run both resolution candidates are the same path, so a
 # missing file is a broken kit; the call site below renders a counted
 # warn row instead of silently dropping the Core git row.
-GIT_CHECK_LIB="$(cd "$(dirname "$0")" && pwd)/../sh/git-check.sh"
+GIT_CHECK_LIB="$ST_CALL_DIR/../sh/git-check.sh"
 [ -f "$GIT_CHECK_LIB" ] || GIT_CHECK_LIB="$LIBDIR/sh/git-check.sh"
 if [ -f "$GIT_CHECK_LIB" ]; then
     # shellcheck disable=SC1090
@@ -124,7 +133,7 @@ fi
 # older deployed lib could predate a row). A deployed run resolves both
 # candidates to the same path, so a missing lib is a broken kit (issue
 # #165 class): loud error, no silent section drops.
-STATUS_CORE="$(cd "$(dirname "$0")" && pwd)/../sh/status-core.sh"
+STATUS_CORE="$ST_CALL_DIR/../sh/status-core.sh"
 [ -f "$STATUS_CORE" ] || STATUS_CORE="$LIBDIR/sh/status-core.sh"
 if [ -f "$STATUS_CORE" ]; then
     # shellcheck disable=SC1090

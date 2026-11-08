@@ -680,7 +680,7 @@ PYEOF
                 # deliberately tolerated (notes never affect matching).
                 _ho_trc=0
                 _ho_trees="$(
-                    python3 - "$_ho_policy_dir/opk.json" 2>/dev/null <<'PYEOF'
+                    python3 -I - "$_ho_policy_dir/opk.json" 2>/dev/null <<'PYEOF'
 import json
 import sys
 

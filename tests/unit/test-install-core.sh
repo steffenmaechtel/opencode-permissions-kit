@@ -748,5 +748,18 @@ else
     fail "Step 8 blocks must carry 6 agent_home_sane calls, got $_O372C3_N (pr-00429 a C3)"
 fi
 
+# --- #257: install gates the xdg shim on the deployed binary's version ------------
+# Execution against /usr/local/bin literals is not hermetic (sandbox
+# policy) — the gate LOGIC is execution-pinned in test-deploy-lib.sh,
+# the deployed behavior in e2e (2b). Here: the block consults the gate
+# BEFORE the never-shadow deploy arm and logs the withhold cause.
+if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'if ! xdg_shim_needed_for "${_xdi_maj:-}" "$_xdi_trip"; then' &&
+    sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'xdg-open shim skipped: opencode' &&
+    sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'elif ! command -v xdg-open >/dev/null 2>&1 &&'; then
+    pass "install xdg block: version gate before the never-shadow arm (#257)"
+else
+    fail "install must gate the shim deploy on xdg_shim_needed_for (#257)"
+fi
+
 echo ""
 suite_done

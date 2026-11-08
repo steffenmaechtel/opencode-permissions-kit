@@ -247,4 +247,69 @@ else
     fail "sections called by status.sh but absent from the guard:$_pg_missing (#413)"
 fi
 
+# --- progress tee under hostile PYTHONHOME (#249) ---------------------------------
+# _st_progress_tee runs `python3 -I` on the scan pipeline: a poisoned
+# PYTHONHOME must not kill the progress display (or corrupt the stream
+# it reports on — passthrough must stay byte-exact).
+_tee_out=$(printf 'a\0b\0c\0' | PYTHONHOME="$WORK/nonexistent-py-home" \
+    sh -c '. "$1" && _st_progress_tee label' _ "$LIB" 2>/dev/null |
+    od -An -tx1 | tr -s ' ')
+if [ "$_tee_out" = " 61 00 62 00 63 00" ]; then
+    pass "progress tee: hostile PYTHONHOME leaves the stream intact (-I, #249)"
+else
+    fail "progress tee must ignore PYTHONHOME under -I (got [$_tee_out]) (#249)"
+fi
+
+# --- scan-root readability gate (#322) --------------------------------------------
+# A registered root that is missing (or unreadable for the caller) used
+# to scan EMPTY — the report rendered its rows over that tree as a
+# false-clean. The gate renders a counted warn and skips just that
+# root. Root-hermetic: runs as the suite user; skipped when the suite
+# itself runs as root (a root caller reads everything).
+if [ "$(id -u)" != 0 ]; then
+    _srw="$(work_new)"
+    mkdir -p "$_srw/locked"
+    chmod 000 "$_srw/locked"
+    _srw_out=$(
+        UI_SILENT=1 sh -c '. "$1"
+            ui_kv_warn() { echo "warn: $1 $2"; }
+            _st_ddev_scan "ddev share" "$2/locked" "$2/out"
+            echo "outfile-lines=$(wc -l <"$2/out" 2>/dev/null || echo 0)"
+        ' _ "$LIB" "$_srw" 2>&1
+    )
+    chmod 755 "$_srw/locked"
+    if printf '%s\n' "$_srw_out" | grep -qF 'warn: ddev share scan skipped — root unreadable' &&
+        printf '%s\n' "$_srw_out" | grep -qF 'outfile-lines=0'; then
+        pass "scan root gate: unreadable root warns and skips instead of scanning empty (#322)"
+    else
+        fail "unreadable scan root must warn, not false-clean (out=$_srw_out) (#322)"
+    fi
+else
+    echo "  SKIP  scan root gate needs a non-root suite user (root reads everything) (#322)"
+fi
+
+# --- sweep floor: every python3 invocation in the lib runs isolated (#249) --------
+_pc=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -c 'python3 -I' || true)
+if [ "${_pc:-0}" -ge 4 ]; then
+    pass "sweep: status-core.sh python3 calls run -I ($_pc site(s), #249)"
+else
+    fail "status-core.sh must run its 4 python3 sites with -I (found ${_pc:-0}) (#249)"
+fi
+
+# --- #248 sibling copy: the local _opk_timeout_ok executes its failure path -------
+# Same probe as update-core.sh (kept in sync per the copies' comments);
+# the broken-timeout arm runs against THIS copy so a drifted sibling
+# cannot ride on the twin's pin. Arms: broken timeout -> rc 1 (the
+# fallback arm), the suite's own healthy PATH -> rc 0 (the bounded arm).
+_TO2="$(work_new)"
+mkdir -p "$_TO2/bin"
+printf '#!/bin/sh\nexit 1\n' >"$_TO2/bin/timeout"
+chmod +x "$_TO2/bin/timeout"
+if PATH="$_TO2/bin:/usr/bin:/bin" sh -c '. "$1" && ! _opk_timeout_ok' _ "$LIB" &&
+    sh -c '. "$1" && _opk_timeout_ok' _ "$LIB"; then
+    pass "status-core timeout probe: broken timeout degrades, healthy passes (#248)"
+else
+    fail "the status-core timeout probe must discriminate broken vs healthy (#248)"
+fi
+
 suite_done

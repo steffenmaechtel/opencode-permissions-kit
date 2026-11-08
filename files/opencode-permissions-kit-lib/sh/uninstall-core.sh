@@ -338,7 +338,10 @@ un_tui_plugins_remove() {
             _un_partial=""
             _un_revert_failed=0
             un_rc_q "plugins rm" sudo rm -rf "${_un_dir:?}/plugins/opencode-permissions-kit"
-            un_rc_q "tui unregister" sudo python3 /usr/local/lib/opencode-permissions-kit/py/tui-register.py "$_un_dir/cli.json" \
+            # -I (#249): the unregister must survive a poisoned
+            # PYTHONHOME/PYTHONPATH — tui-register.py imports stdlib only.
+            un_rc_q "tui unregister" sudo python3 -I \
+                /usr/local/lib/opencode-permissions-kit/py/tui-register.py "$_un_dir/cli.json" \
                 unregister /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx \
                 --drop /usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx
             if [ -n "$_un_partial" ]; then

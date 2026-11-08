@@ -210,6 +210,47 @@ check "atomic: capturing-mv run leaves the deployed mode correct" \
 check "atomic: capturing-mv run leaves no temp behind" \
     sh -c '[ -z "$(find "$1" -name "*.tmp.*" -print)" ]' _ "$ATD2"
 
+# --- xdg_shim_needed_for (issue #257) --------------------------------------------
+# The version gate behind the shim deploy/withhold decisions in
+# install-core.sh and update-core.sh: 2.x at or above the upstream fix
+# (first release v2.0.32, anomalyco/opencode#52548 / PR #56082) opens
+# without an xdg-open; 1.x (never fixed upstream) and everything the
+# probe cannot parse keep the shim (fail-safe direction).
+_xsg="$(extract_func "$LIB" xdg_shim_needed_for)" || _xsg=""
+if [ -n "$_xsg" ]; then
+    eval "$_xsg"
+    # Source the constant the way the lib defines it (top-level var).
+    XDG_SHIM_FIX_VERSION="$(sed -n 's/^XDG_SHIM_FIX_VERSION="\(.*\)"$/\1/p' "$LIB")"
+    if xdg_shim_needed_for 1 1.19.5; then
+        pass "xdg gate: 1.x needs the shim (1.19.5)"
+    else
+        fail "xdg gate: 1.x needs the shim (1.19.5)"
+    fi
+    if xdg_shim_needed_for 2 2.0.31; then
+        pass "xdg gate: 2.0.31 (pre-fix) needs the shim"
+    else
+        fail "xdg gate: 2.0.31 (pre-fix) needs the shim"
+    fi
+    if xdg_shim_needed_for 2 2.0.32; then
+        fail "xdg gate: 2.0.32 (fix release) withholds the shim"
+    else
+        pass "xdg gate: 2.0.32 (fix release) withholds the shim"
+    fi
+    if xdg_shim_needed_for 2 2.1.0 && xdg_shim_needed_for 2 2.2.6; then
+        fail "xdg gate: 2.1.0/2.2.6 withhold the shim"
+    else
+        pass "xdg gate: 2.1.0/2.2.6 withhold the shim"
+    fi
+    if xdg_shim_needed_for 2 "" && xdg_shim_needed_for "" "9.9.9"; then
+        pass "xdg gate: empty version/major keep the shim (fail-safe)"
+    else
+        fail "xdg gate: empty version/major keep the shim (fail-safe)"
+    fi
+    assert_eq "xdg gate: fix version pin is 2.0.32" "2.0.32" "$XDG_SHIM_FIX_VERSION"
+else
+    fail "xdg gate: xdg_shim_needed_for extractable from deploy-lib.sh"
+fi
+
 # --- summary ----------------------------------------------------------------
 
 echo ""
