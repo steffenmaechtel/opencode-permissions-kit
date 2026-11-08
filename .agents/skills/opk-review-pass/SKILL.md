@@ -1,6 +1,6 @@
 ---
 name: opk-review-pass
-description: Execute a review round (low/med/high tier, snapshot-scope pass, fresh session) — load when a review is owed or the maintainer commissions one. Covers track/tier classification, fan-out, curation + verification, round comments v2, fix-phase duties; rules: agent/review-concept.md. Redundancy passes stay independent by operator setup; one that loads it anyway discloses it in its Skills: line.
+description: Execute a review round (low/med/high tier, snapshot-scope pass, fresh session) — load when a review is owed or the maintainer commissions one. Covers track/tier classification, fan-out, main curation + verification, round comments v2, fix-phase duties; rules: agent/review-concept.md. Redundancy passes stay independent by operator setup; one that loads it anyway discloses it in its Skills: line.
 ---
 
 # opk-review-pass — executing a review round
@@ -103,8 +103,8 @@ both in the loop status BEFORE the fan-out launches:
 - **tier low** — shipped ≤ ~50 lines or message-only,
   non-shipped standard, EVERY fix-wave re-review: exactly ONE
   fast-tier subagent (~5 min, greps + targeted reads);
-  verification per the sizing gate (section 6): ≤ 10 curated →
-  main audit alone; > 10 → exactly one verifier batch (2–3
+  verification per the sizing gate (section 6): ≤ 30 curated →
+  main-inline; > 30 → exactly one verifier batch (2–3
   parallel).
   Solo means one subagent, never main-solo.
 - **tier none** — comments/docs only: no review round owed; closure
@@ -129,7 +129,7 @@ finding escalates scope.
    known blind-spot surfaces in the axis prompt — a gate or claim
    about path operands is tested against `x/`, `x//`, `x/.` forms
    (review-concept, "Parallel reviewer agents").
-4. Scratch layout for the round: checkpoints, digest and verdict
+4. Scratch layout for the round: checkpoints and verdict
    files under `/tmp/opencode/<case>/<letter>/` — OUTSIDE the
    reviewed tree (the tree must stay clean and is a shared read
    substrate). The round comment's run provenance absorbs these files.
@@ -145,10 +145,9 @@ finding escalates scope.
 
   | Role | House model |
   |---|---|
-  | Main session (owns the verification/audit duty) | GLM-5.3 — strong tier |
+  | Main session (owns curation + the verification/audit duty) | GLM-5.3 — strong tier |
   | Reviewer subagents | GLM-5.3-Flash — fast tier |
-  | Curator subagent (section 5) | GLM-5.3-Flash — fast tier |
-  | Verifier subagents (section 6) | GLM-5.3 — strong tier, fresh-context verification |
+  | Verifier subagents (section 6, owed by the sizing gate only) | GLM-5.3 — strong tier, fresh-context verification |
 
   Both directions are load-bearing: reviewers on the strong model
   burn the budget the fast tier exists to save, and verifiers on
@@ -158,8 +157,8 @@ finding escalates scope.
 - Build each reviewer prompt from
   [axis-prompt.md](axis-prompt.md) — role, axis, material, budget,
   checkpoint discipline, output contract. The OUTPUT CONTRACT block
-  goes verbatim into EVERY file-producing subagent prompt: reviewers,
-  the curator, the verifiers.
+  goes verbatim into EVERY file-producing subagent prompt: reviewers
+  and the verifiers.
 - **Cap: 5 concurrent subagents on any tier** — staged launch,
   backfill one seat as each returns. A USER-named cap for the case
   overrides upward; never raise the cap yourself (AGENTS.md,
@@ -178,21 +177,19 @@ finding escalates scope.
 
 ## 5. Curation
 
-- The main session curates by default (review-concept, "Curation and
-  verification"): merge and de-duplicate the checkpoint files into
-  ONE digest — findings table (ID, severity, provenance, summary),
-  merges named, drops with reasons, raw→curated counts. The main
-  session reads the digest, never the raw files. Main curation is
-  disclosed in the comment's provenance.
-- Launch a fast-tier CURATOR subagent only when the round ran
-  ≥ 3 reviewers AND produced > 10 raw findings — its input and
-  deliverable are the same digest shape as above.
+- The main session curates at ANY volume (review-concept, "Curation
+  and verification"): merge and de-duplicate the checkpoint files
+  into the round's findings table (ID, severity, provenance,
+  summary), merges named, drops with reasons, raw→curated counts.
+  There is no curator subagent and no threshold; no digest file is
+  owed — the accounting lives in the round comment (provenance line
+  `Curated by: main`).
 
 ## 6. Verification
 
 - Sizing is a HARD GATE, count-driven (review-concept, "Curation
-  and verification"): ≤ 10 curated findings verify main-inline
-  (every MED/HIGH fully re-derived); above 10, exactly ONE
+  and verification"): ≤ 30 curated findings verify main-inline
+  (every MED/HIGH fully re-derived); above 30, exactly ONE
   strong-tier verifier batch of 2–3 PARALLEL sessions runs —
   skipping an owed batch needs maintainer disclosure, never a
   time-pressure call.
@@ -210,10 +207,10 @@ finding escalates scope.
 One comment per round, format v2 (the contract and template:
 review-concept, "The round comment contract"):
 
-1. Compose from the session's own records — digest, verdict files,
-   the audit notes. Write-through: the loop never reads the PR back.
+1. Compose from the session's own records — checkpoint files,
+   verdict files, the curation accounting. Write-through: the loop never reads the PR back.
 2. Structure: headline + ONE status line visible; outer details
-   (metadata block, curator accounting, findings table with verifier
+   (metadata block, curation accounting, findings table with verifier
    verdicts, dispositions table from the PRIOR round, loop status);
    per-finding detail nested one level deeper; TWO levels maximum;
    blank line after every `<summary>` tag.
@@ -242,7 +239,7 @@ The loop status inside the comment is the round report (it is what
 the maintainer reads):
 
 - track + tier + mode/session + classification evidence (diff
-  shape), reviewers/curator/verifiers with models,
+  shape), reviewers/verifiers with models, `Curated by: main`,
   output-contract
   violations (0 or disclosed), CI status of the last push;
 - review-relevant code touched this round: yes/no (drives the stop

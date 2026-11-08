@@ -59,7 +59,7 @@ build context into the PR body or the review commission — that is
 where its review role ends.
 
 - **Shipped track (shipped code in the diff)** — full weight,
-  unchanged: the tier ladder, curation threshold and verify sizing
+  unchanged: the tier ladder, main curation and verify sizing
   per the review concept; who runs the loop per the paragraph
   above (single case: the implementer session; batch: the fresh
   review session).

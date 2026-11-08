@@ -113,8 +113,9 @@ back):
   chain a, c, d records that b was lost, it does not renumber. Gaps
   burn letters; start at a and spend them in order. (RM-0119)
 - Write-through: the loop never reads the PR back. Comments are
-  composed from the session's own records (checkpoint files, digests,
-  verdict files) and posted; the posted comment URLs are logged to
+  composed from the session's own records (checkpoint files,
+  verdict files, the curation accounting) and posted; the posted
+  comment URLs are logged to
   session scratch (`posted.log`). Reading the timeline back would
   re-import the whole case into context at every round. (RM-0121)
 - The loop cap (default 6) is a hard brake, not a target: from round 5
@@ -352,34 +353,38 @@ works.
 
 ## Curation and verification
 
-- Curation: a fast-tier curator subagent merges and de-duplicates
-  the raw reviewer checkpoint files into ONE digest file — findings
-  table, merges named, drops with reasons — and the main session
-  reads only the digest, never the raw files. The curator deploys
-  only when the round ran ≥ 3 reviewers AND produced > 10 raw
-  findings; at lower volumes the digest is one screen and the main
-  session curates directly, disclosed in the comment's provenance.
-  (RM-0126)
+- Curation: the MAIN session merges and de-duplicates the raw
+  reviewer checkpoint files into the round's findings table —
+  merges named, drops with reasons, raw→curated counts — at ANY
+  volume. There is no curator subagent and no volume threshold
+  (issue #423): the delegation never paid — main read the
+  checkpoints anyway for its audit duty, the digest arrived as an
+  ADDITIONAL document on top of them, and a curator's drops were
+  invisible downstream, where verification worked from the digest.
+  No digest file is owed; the accounting lives in the round comment
+  (provenance line `Curated by: main`). (RM-0126)
 - Verification: every curated finding is re-verified against the
-  code — and the verification is SIZED BY COUNT: at ≤ 10 curated
+  code — and the verification is SIZED BY COUNT: at ≤ 30 curated
   findings the main session verifies inline (no verifier subagents)
-  — every MED/HIGH fully re-derived, all LOW/INFO checked; above 10,
+  — every MED/HIGH fully re-derived, all LOW/INFO checked; above 30,
   exactly ONE verifier batch of 2–3 PARALLEL strong-tier sessions
   runs (verdict files per batch) — a hard gate: skipping an owed
   batch is a process deviation only a maintainer disclosure can
   carry, never a time-pressure call. The count axis, not severity:
   the finding generator is a fresh-context reviewer either way, the
   main session re-derives every MED/HIGH in EVERY shape, and past
-  ~10 inline verifications the main session's context grows too far
-  in late waves — the zone where batches measurably earn their cost.
-  The main session audits the verdicts — re-deriving every MED/HIGH
-  itself, spot-checking LOW/INFO; at inline size that audit IS the
-  verification. Refuted findings are retracted with the refuting
-  evidence named. Fresh context is the bias-reduction mechanism
-  where it is load-bearing — the REVIEW pass, never main-solo at any
-  size; the verifier batch's value is context economy and parallel
-  re-derivation at volume, not a second independent judgment.
-  (RM-0127)
+  ~30 inline verifications the main session's context grows too far
+  in late waves — the zone where batches earn their cost; the double
+  verification the batch shape produced (batch plus main
+  re-derivation) was the single largest review-side cost item
+  measured (issue #423). The main session audits the verdicts —
+  re-deriving every MED/HIGH itself, spot-checking LOW/INFO; at
+  inline size that audit IS the verification. Refuted findings are
+  retracted with the refuting evidence named. Fresh context is the
+  bias-reduction mechanism where it is load-bearing — the REVIEW
+  pass, never main-solo at any size; the verifier batch's value is
+  context economy and parallel re-derivation at volume, not a second
+  independent judgment. (RM-0127)
 
 ## Reviewer freshness
 
@@ -394,8 +399,9 @@ bought comes from subagents instead:
 - The session that runs the case also applies the fixes — no handoff
   back; what the substitution preserves is the rotation's core: a
   round's author never reviews their own fixes. Review passes run
-  fresh-context reviewer subagents, verification runs fresh verifier
-  subagents (see "Curation and verification"). (RM-0060)
+  fresh-context reviewer subagents; verification runs main-inline,
+  with a fresh verifier batch at volume (see "Curation and
+  verification"). (RM-0060)
 - Rounds chain inside Session MAIN — the pauses that remain are the
   ask-gates (push, PR creation), the maintainer steerings, and the
   loop cap. An autonomous round never consumes the maintainer's
@@ -432,10 +438,10 @@ One comment per review round, format v2 (nested details):
 <details><summary>Round <letter> — metadata · findings · dispositions · loop status</summary>
 
 Base: <tag> @ <sha> · Diff: <range>
-Reviewers: N × <fast-tier model> (axes) · Curated by: <flash|main>
-Verified by: N × <strong-tier model> + main audit (MED/HIGH all, LOW/INFO spot)
+Reviewers: N × <fast-tier model> (axes) · Curated by: main
+Verified by: main-inline | N × <strong-tier model> + main audit (MED/HIGH all, LOW/INFO spot)
 CI on last push: <status + check names>
-Curator accounting: raw N → curated N (merges named) · dropped 0
+Curation accounting: raw N → curated N (merges named) · dropped 0
 
 ### Findings
 | ID | Sev | Provenance | Verifier verdict | Summary |
@@ -457,14 +463,14 @@ Review-relevant code touched this round: yes/no → …
      "retracted":N,"dropped":N,"med":N,"high":N,"state":"…",
      "mode":"gated|autonomous","session":"implementer|fresh",
      "track":"shipped|non-shipped","tier":"high|med|low","reviewers":N,
-     "curator":"<flash|main>","verifiers":N} -->
+     "curator":"main","verifiers":N} -->
 ```
 
 - One comment per review round, format v2: visible at level 0 ONLY the
   headline and ONE status line (round, finding count + severity
   breakdown, state, CI status) — notification mails strip details
   content, the status line is what survives. The outer details block
-  (level 1) carries metadata, curator accounting, findings and
+  (level 1) carries metadata, curation accounting, findings and
   dispositions tables, loop status. Per-finding detail prose nests one
   level deeper; TWO levels maximum (deeper nesting renders
   unreliably), and a blank line follows every `<summary>` tag (tables
@@ -681,7 +687,7 @@ here.
   (RM-0089)
 - Final chat answers are EXACTLY one status line plus the file
   path(s) — no findings, no excerpts, no file content (the subagent
-  output contract): the checkpoint/digest/verdict FILE is the
+  output contract): the checkpoint/verdict FILE is the
   deliverable; a response beyond the status line enters the lead's
   context and is ignored, and the violation is disclosed in the next
   comment's run provenance. A subagent's final message lands in the
