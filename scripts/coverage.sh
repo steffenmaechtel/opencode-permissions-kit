@@ -18,6 +18,11 @@
 #     under `set -u` (unbound variable). Affected test blocks carry a
 #     one-line PS4 shield (`PS4="+ "`). Repro and measurements:
 #     internal/records/kcov-coverage.md.
+#   - Same class, signals: kcov's engine turns a child's SIGNAL death
+#     into a plain rc 1 — the cat-arm pipefail rider in
+#     test-fs-baseline.sh therefore skips under the OPK_KCOV_RUN=1
+#     marker this script exports (its stub pins carry the rc contract;
+#     #418 b C2, measurements in the record above).
 #   - Attribution is by executed file path: everything running in a bash
 #     process maps into the report (sourced libs, `sh <repo-path>`
 #     invocations, and scripts suites copy into scratch count under the
@@ -142,6 +147,12 @@ for suite in tests/unit/test-*.sh; do
         *"$filter"*) ;;
         *) continue ;;
     esac
+    # OPK_KCOV_RUN=1 (#418 b C2): marks the suite child as running
+    # under kcov — the cat-arm pipefail rider in test-fs-baseline.sh
+    # skips with a note under this marker (kcov's engine turns cat's
+    # SIGPIPE death into rc 1 regardless of the disposition; the
+    # marker is the documented-conflict pattern this header carries,
+    # like the PS4 shields). Do not drop: without it coverage re-reddens.
     if OPK_KCOV_RUN=1 PATH="$OUT/shim:$PATH" "$KCOV" \
         --include-pattern="$REPO/files/,$REPO/scripts/" \
         "$OUT/runs/$name" "$suite" >"$OUT/logs/$name.log" 2>&1; then

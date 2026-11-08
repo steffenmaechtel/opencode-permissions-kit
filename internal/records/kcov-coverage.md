@@ -159,3 +159,20 @@ The guard failure paths were EXECUTED, not reasoned (PR #343 rounds a/b):
 - pin sabotages: a commented `# --bash-method=DEBUG` line in the runner
   REDDENS the method pin (absence pins count commented lines); commenting
   out the stamp-guard die REDDENS the guards pin; restore green
+
+## Signal deaths under kcov (#418 b C2, measured 2026-11-08)
+
+kcov's engine (LD_PRELOAD instrumentation, bash PS4 method) turns a
+child's SIGNAL death into a plain rc 1 — measured with the cat-arm
+pipefail rider in test-fs-baseline.sh: real `cat` feeding a consumer
+that exits at once dies by SIGPIPE outside kcov (rc 141, mapped to the
+consumer-EPIPE 0), but under kcov the pipeline reports rc 1 even with
+SIGPIPE reset to SIG_DFL in a real process before exec (a python3
+wrapper — shells cannot re-enable an inherited ignore). The rider
+therefore skips under the `OPK_KCOV_RUN=1` marker scripts/coverage.sh
+exports into the kcov invocation; the stub-cat pins carry the rc
+contract unconditionally (explicit `exit 7`/`exit 141`, shebang
+/bin/sh bypasses the sh→bash shim). The suite-wide signal sweep
+(round c, verified-clean notes) confirmed the rider is the only
+kcov-affected pin: the python-arm riders handle EPIPE inside python,
+/dev/full is ENOSPC=OSError, §11e's SIGINT lands in python's KI arm.
