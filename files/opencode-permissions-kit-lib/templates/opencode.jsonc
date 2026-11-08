@@ -1,5 +1,9 @@
 {
     "$schema": "https://opencode.ai/config.json",
+    // _opencode_permissions_kit — kit-managed config: re-installs and
+    // `opk config git-config` re-render this file (backup first). A
+    // config WITHOUT this marker (and without a permission block) is
+    // treated as user-authored and never overwritten.
     // opencode permissions kit — default permission template
     // SOFT PROTECTION ONLY: these rules are enforced by opencode's own
     // permission layer. The kit no longer mirrors them into Linux ACLs —

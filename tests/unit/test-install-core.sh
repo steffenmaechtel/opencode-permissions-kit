@@ -421,5 +421,150 @@ else
     fail "phases called by install.sh but absent from the guard:$_pg_missing (#413)"
 fi
 
+# --- 8. LOWS-1 (#371/#372/#340): install.sh residual hygiene ----------------------
+
+# A1: the agent-user gitconfig backup is gated on the user EXISTING —
+# the backup phase runs before Step 1 creates the user, so the ungated
+# copy failed (sudo -u on a missing user) and recorded a false
+# INCOMPLETE on every fresh install. The gate's skip arm (the log line
+# exists ONLY because of the gate — deleting the gate deletes it) plus
+# ordering: the id-gate precedes the backup line.
+_ocbk_ln=$(sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    grep -nF 'BACKUP_DIR/gitconfig-$OPENCODE_USER.txt' | head -1 | cut -d: -f1)
+if [ -n "$_ocbk_ln" ] &&
+    sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF "backup skipped: user '\$OPENCODE_USER' does not exist yet" &&
+    sed -n "$((_ocbk_ln - 8)),$((_ocbk_ln - 1))p" "$LIB" |
+    grep -qF 'if id "$OPENCODE_USER" >/dev/null 2>&1; then'; then
+    pass "gitconfig-opencode backup gated on user existence + skip arm (#371 A1)"
+else
+    fail "gitconfig-opencode backup gate missing (#371 A1)"
+fi
+
+# A2: custom-path input rejects glob characters on the RAW input before
+# the unquoted for-loop can pathname-expand them (the --projects
+# sibling's 0.0.42f S2 rule). Behavioral: read 1 picks [c]ustom, read 2
+# carries a glob word, read 3 answers clean — the glob word must be
+# refused AND must not leak into PROJECTS_ROOTS (without the gate the
+# literal word rides the stub gate straight into the list).
+_out=$(sh -c '
+    . "$1"
+    ui_section() { :; }
+    ui_warn() { :; }
+    ui_error() { printf "ui_error: %s\n" "$*" >&2; }
+    _ui_read() {
+        _n=$((_n + 1))
+        if [ "$_n" -eq 1 ]; then eval "$1=c"
+        elif [ "$_n" -eq 2 ]; then eval "$1=\"/srv/x[ab] /srv/ok\""
+        else eval "$1=/srv/ok"; fi
+    }
+    _n=0
+    project_path_sane() { _PP_NORM="$1"; return 0; }
+    install_project_roots_select && printf "ROOTS=[%s]" "${PROJECTS_ROOTS-UNSET}"
+' _ "$LIB" 2>&1)
+case "$_out" in
+    *"glob characters"*)
+        case "$_out" in
+            *"ROOTS=[ /srv/ok]"*) pass "custom-path glob input rejected, never joins roots (#372 A2)" ;;
+            *) fail "glob gate ran but the word leaked into roots (#372 A2 out=$_out)" ;;
+        esac
+        ;;
+    *)
+        fail "custom-path glob input not rejected (#372 A2 out=$_out)"
+        ;;
+esac
+
+# A5: every copy_binary_atomic call site names its cause on failure
+# (four sites — the count is pinned at four in test-bypass-guard.sh).
+_cba_err_n="$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -cF 'error: copying the opencode binary' || true)"
+[ "$_cba_err_n" = 4 ] &&
+    pass "all four binary-copy failures abort cause-loud (#371 A5)" ||
+    fail "binary-copy failure arms incomplete (#371 A5; sites: $_cba_err_n of 4)"
+
+# A6+I2+H2: the "registered (both users)" success line is conditional
+# on both per-user syncs having succeeded — rc 2/3 skips print their
+# own notes and no longer ride a success row.
+if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'if [ "$_oc_tps_ok" -eq 2 ]; then' &&
+    sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'elif [ "$_oc_tps_ok" -eq 1 ]; then'; then
+    pass "TUI 2.x closing row is conditional on per-user outcomes (#371 A6)"
+else
+    fail "TUI 2.x closing row still unconditional (#371 A6)"
+fi
+
+# A7+I3: the rc cleanup deletes only PATH EXPORT lines naming
+# .opencode/bin (the old sed matched ANY line containing it — aliases,
+# comments), backs the rc file up first, observes a failed cleanup, and
+# the audit log names the cleaned count instead of claiming blindly.
+if sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    grep -qF '\|^[[:space:]]*export PATH=.*[.]opencode/bin|d' &&
+    ! grep -qF 'sed -i '\''\|\.opencode/bin|d'\''' "$LIB" &&
+    sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    grep -qF '_bk_fail "rc-$(basename "$cf")"' &&
+    sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    grep -qF 'could not remove a stale .opencode/bin PATH export from $cf' &&
+    sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    grep -qF 'stale PATH exports cleaned in $_rc_cleaned rc file(s)'; then
+    pass "rc cleanup anchored + backed up + observed + honest claim (#371 A7/I3)"
+else
+    fail "rc cleanup hygiene incomplete (#371 A7/I3)"
+fi
+
+# A4R: _oc_install_agent_config propagates staged_write's rc past the
+# trailing rm (the latent trap for a future tested-context caller).
+if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF '_oic_rc=$?' &&
+    sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'return "$_oic_rc"'; then
+    pass "agent-config install propagates staged_write rc (#371 A4R)"
+else
+    fail "agent-config rc still masked by trailing rm (#371 A4R)"
+fi
+
+# A8: the truncated backend-selection comment line is gone.
+if ! grep -qF 'Rootless is MANDATORY: docker-rootless' "$LIB"; then
+    pass "backend-selection comment residue removed (#371 A8)"
+else
+    fail "backend-selection comment residue still present (#371 A8)"
+fi
+
+# I4: /usr/local/bin/opencode is excluded as a pickup source only in
+# its wrapper-SYMLINK form — both loops (inventory + deploy pickup).
+_i4_n="$(sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    grep -cF '[ "$loc" != "/usr/local/bin/opencode" ] || [ ! -L "$loc" ]' || true)"
+[ "$_i4_n" = 2 ] &&
+    pass "binary pickup excludes /usr/local/bin/opencode only as a symlink (#372 I4)" ||
+    fail "binary pickup name-exclusion not symlink-aware at both sites (#372 I4; sites: $_i4_n of 2)"
+
+# I6: the agent-config template carries the kit marker and it survives
+# BOTH render modes (behavioral: the real render lib, both arms); the
+# replace heuristic requires marker OR permission block, and a
+# user-authored config is kept, not re-rendered.
+TEMPLATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/templates/opencode.jsonc"
+RENDER_LIB="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/render-agent-config.sh"
+if grep -qF '// _opencode_permissions_kit — kit-managed config' "$TEMPLATE" &&
+    grep -qF "grep -qE '_opencode_permissions_kit|\"permission\"'" "$LIB" &&
+    sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    grep -qF 'user-authored (no kit marker, no permission block) — left untouched'; then
+    pass "agent config: kit marker + keep-user-authored heuristic wired (#372 I6)"
+else
+    fail "agent config marker/heuristic incomplete (#372 I6)"
+fi
+# the marker survives both render modes (the real render lib, driven)
+if . "$RENDER_LIB" &&
+    agent_config_render "$TEMPLATE" "$WORK/render-on.jsonc" on 2>/dev/null &&
+    agent_config_render "$TEMPLATE" "$WORK/render-off.jsonc" off 2>/dev/null &&
+    grep -qF '_opencode_permissions_kit' "$WORK/render-on.jsonc" &&
+    grep -qF '_opencode_permissions_kit' "$WORK/render-off.jsonc"; then
+    pass "kit marker survives both render modes (#372 I6)"
+else
+    fail "kit marker lost in a render mode (#372 I6)"
+fi
+
+# #340: the tilde-home setup is ONE call into sh/path-sane.sh, no
+# inline copy left in the phase lib.
+if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qxE '^[[:space:]]*path_sane_tilde_home$' &&
+    ! grep -qE '^[[:space:]]*PROJECT_TILDE_HOME="\$HOME"$' "$LIB"; then
+    pass "tilde-home setup delegated to path-sane.sh, no inline copy (#340)"
+else
+    fail "tilde-home setup not consolidated (#340)"
+fi
+
 echo ""
 suite_done

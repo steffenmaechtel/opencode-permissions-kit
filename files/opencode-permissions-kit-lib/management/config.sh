@@ -134,16 +134,6 @@ case "$OPENCODE_USER" in
         OPENCODE_USER=opencode
         ;;
 esac
-# ~ in project paths must expand to the DEFAULT user's home, not $HOME:
-# config.sh usually runs via sudo, where $HOME is /root and "~/dev" would
-# be rejected as a "/root system path" with a confusing error.
-# project_path_sane reads PROJECT_TILDE_HOME.
-PROJECT_TILDE_HOME="$HOME"
-if [ "$(id -u)" = "0" ] && [ -n "${SUDO_USER:-}" ]; then
-    # || true: see install.sh — a stale SUDO_USER must not abort (fix-wave review)
-    _th="$(getent passwd "$SUDO_USER" 2>/dev/null | cut -d: -f6 || true)"
-    if [ -n "$_th" ]; then PROJECT_TILDE_HOME="$_th"; fi
-fi
 # Sharing group: the opencode user's own usergroup; prefer the live value
 # over any stale conf entry.
 OPENCODE_GROUP="${OPENCODE_GROUP:-opencode}"
@@ -345,6 +335,14 @@ command -v project_path_sane >/dev/null 2>&1 ||
         echo "error: project_path_sane unavailable (path-sane.sh missing) — refusing every project path" >&2
         return 1
     }
+# PROJECT_TILDE_HOME setup, ONE implementation with install.sh (issue
+# #340, the #216 sibling — this block used to exist near-identically in
+# both entry scripts). Fail-safe stub for a damaged library: the
+# variable is not a gate, and the project_path_sane stub above keeps
+# the gate fail-closed on its own.
+command -v path_sane_tilde_home >/dev/null 2>&1 ||
+    path_sane_tilde_home() { PROJECT_TILDE_HOME="$HOME"; }
+path_sane_tilde_home
 
 projects_list() {
     ui_info "Project roots ($PROJECTS_CONF):"
@@ -553,8 +551,19 @@ git_config_apply() {
         rm -f "$_gca_tmp"
         die "cannot render the agent config template (git-config $enable)"
     fi
-    staged_write 664 "$OPENCODE_USER:$OPENCODE_GROUP" "$_gca_tmp" "$target"
-    rm -f "$_gca_tmp"
+    # Explicit rc propagation (#371 A4R, the install-core
+    # _oc_install_agent_config twin — maintainer-commissioned sweep
+    # adoption): the trailing rm must not mask staged_write's exit
+    # status for a future tested-context caller; today's bare calls
+    # abort under set -e either way, but the temp is cleaned on the
+    # failure leg now too. Success falls through to the toggle's rows.
+    if staged_write 664 "$OPENCODE_USER:$OPENCODE_GROUP" "$_gca_tmp" "$target"; then
+        rm -f "$_gca_tmp"
+    else
+        _gca_rc=$?
+        rm -f "$_gca_tmp"
+        return "$_gca_rc"
+    fi
 
     if [ "$enable" = "on" ]; then
         ui_kv "git-config" "ON — protected (soft-only — agent tools blocked)" "$UI_GREEN"

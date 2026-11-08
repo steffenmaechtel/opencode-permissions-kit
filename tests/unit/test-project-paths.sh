@@ -264,6 +264,76 @@ else
 fi
 HOME="$_save_home"
 
+# --- issue #340: the tilde-home setup is ONE leaf helper, driven -----------------
+# path_sane_tilde_home replaces the near-identical inline blocks that
+# lived in install.sh (do_plan_phase) and config.sh. Behavioral drive
+# with stubbed id/getent — the suite never runs as root, and local
+# users must not decide the outcome (the 0.0.46a F2 class). Arms: root
+# + resolvable SUDO_USER -> developer home; root + stale SUDO_USER
+# (getent empty) -> $HOME (the || true arm); non-root -> $HOME.
+_tth=""
+_tth="$(sh -c '
+    . "$1"
+    HOME=/root
+    SUDO_USER=dev
+    id() { [ "$1" = "-u" ] && printf "0\n"; }
+    getent() { [ "$1" = "passwd" ] && [ "$2" = "dev" ] && printf "x:x:1000:1000::/home/dev:/bin/sh\n"; }
+    path_sane_tilde_home && printf "%s" "$PROJECT_TILDE_HOME"
+' _ "$PATH_SANE" 2>/dev/null)" || true
+[ "$_tth" = "/home/dev" ] &&
+    pass "tilde-home helper: root + SUDO_USER resolves the developer home (#340)" ||
+    fail "tilde-home helper: root + SUDO_USER arm (#340; got ${_tth:-nothing})"
+_tth=""
+_tth="$(sh -c '
+    . "$1"
+    HOME=/root
+    SUDO_USER=ghost-user
+    id() { [ "$1" = "-u" ] && printf "0\n"; }
+    getent() { return 2; }
+    path_sane_tilde_home && printf "%s" "$PROJECT_TILDE_HOME"
+' _ "$PATH_SANE" 2>/dev/null)" || true
+[ "$_tth" = "/root" ] &&
+    pass "tilde-home helper: stale SUDO_USER keeps \$HOME (#340, the || true arm)" ||
+    fail "tilde-home helper: stale SUDO_USER arm (#340; got ${_tth:-nothing})"
+_tth=""
+_tth="$(sh -c '
+    . "$1"
+    HOME=/home/tester
+    id() { [ "$1" = "-u" ] && printf "1000\n"; }
+    path_sane_tilde_home && printf "%s" "$PROJECT_TILDE_HOME"
+' _ "$PATH_SANE" 2>/dev/null)" || true
+[ "$_tth" = "/home/tester" ] &&
+    pass "tilde-home helper: non-root keeps \$HOME (#340)" ||
+    fail "tilde-home helper: non-root arm (#340; got ${_tth:-nothing})"
+
+# Wiring: the lib defines the helper; both entry scripts CALL it and
+# carry no inline copy (whole-line absence — the fail-safe stubs put
+# the assignment inside a one-line function body and do not match);
+# config.sh calls it only AFTER sourcing the lib (the helper lives
+# there), and both callers keep their fail-safe stubs for a damaged
+# lib (the gate's own stub stays fail-closed — its arms are pinned
+# above, issue #216).
+if grep -q '^path_sane_tilde_home() {' "$PATH_SANE" &&
+    ! grep -qE '^[[:space:]]*PROJECT_TILDE_HOME="\$HOME"$' "$INSTALL_CORE" &&
+    ! grep -qE '^[[:space:]]*PROJECT_TILDE_HOME="\$HOME"$' "$CONFIG" &&
+    ! grep -qE '^[[:space:]]*PROJECT_TILDE_HOME="\$HOME"$' "$INSTALL" &&
+    sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" | grep -qE '^[[:space:]]*path_sane_tilde_home$' &&
+    grep -qF 'path_sane_tilde_home() { PROJECT_TILDE_HOME="$HOME"; }' "$INSTALL" &&
+    grep -qF 'path_sane_tilde_home() { PROJECT_TILDE_HOME="$HOME"; }' "$CONFIG"; then
+    pass "tilde-home setup: one lib implementation, callers delegate + fail-safe stubs (#340)"
+else
+    fail "tilde-home setup wiring incomplete (#340)"
+fi
+# config.sh ordering: the call sits after the path-sane sourcing loop
+# (a call before the sourcing would die on the undefined function).
+_cfg_src_ln=$(grep -n 'for cand in "$SCRIPT_DIR/../sh/path-sane.sh"' "$CONFIG" | cut -d: -f1)
+_cfg_call_ln=$(grep -n '^path_sane_tilde_home$' "$CONFIG" | cut -d: -f1)
+if [ -n "$_cfg_src_ln" ] && [ -n "$_cfg_call_ln" ] && [ "$_cfg_src_ln" -lt "$_cfg_call_ln" ]; then
+    pass "config.sh calls the tilde-home helper after sourcing path-sane.sh (#340)"
+else
+    fail "config.sh tilde-home call ordering (#340; src=$_cfg_src_ln call=$_cfg_call_ln)"
+fi
+
 # empty is rejected (no accidental defaults)
 if project_path_sane ""; then
     fail "rejects empty path"

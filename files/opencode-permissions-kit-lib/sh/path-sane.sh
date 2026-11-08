@@ -1,9 +1,10 @@
 # shellcheck shell=sh
 # opencode permissions kit -- path-sane.sh
 #
-# Shared project-root policy — TWO leaf functions:
-#   project_path_sane  the system-path gate (below)
-#   opk_policy_root    walk-up opk.json discovery (#353 / #313 phase 4)
+# Shared project-root policy — THREE leaf functions:
+#   path_sane_tilde_home  PROJECT_TILDE_HOME setup (#340, the #216 sibling)
+#   project_path_sane     the system-path gate (below)
+#   opk_policy_root       walk-up opk.json discovery (#353 / #313 phase 4)
 # project_path_sane has ONE implementation for install.sh (do_plan_phase:
 # --projects validation, the standard prompt, the custom dialog) and
 # config.sh (projects add/remove, handover): the function existed
@@ -35,15 +36,37 @@
 # at the head of the sh/ block is convention, not a load-bearing fix.
 #
 # Reads at CALL time (safe to source early): PROJECT_TILDE_HOME
-# (fallback $HOME) and OPENCODE_USER (fallback "opencode") — both are
-# set by the callers long before any call. Returns the normalized path
-# in _PP_NORM for the caller.
+# (fallback $HOME) and OPENCODE_USER (fallback "opencode") — the former
+# is set by path_sane_tilde_home below (one implementation, issue #340),
+# the latter by the callers long before any call. Returns the
+# normalized path in _PP_NORM for the caller.
 #
 # POSIX sh, SOURCED by install.sh (via kit_source — aborts loud when
 # missing) and config.sh (checkout copy first, deployed LIBDIR fallback
 # — same rules as staged-write.sh, but with a fail-closed stub). Never
 # executed directly. Deployed to
 # /usr/local/lib/opencode-permissions-kit/sh/path-sane.sh.
+
+# path_sane_tilde_home
+# PROJECT_TILDE_HOME setup, ONE implementation for install.sh
+# (do_plan_phase) and config.sh (issue #340, the #216 sibling: the block
+# existed near-identically in both — install.sh's copy carried the
+# pipefail note, config.sh's cited it). ~ in project paths must expand
+# to the DEFAULT user's home, not $HOME: under sudo, $HOME is /root and
+# "~/dev" would be rejected as a "/root system path" with a confusing
+# error. Sets PROJECT_TILDE_HOME; project_path_sane reads it at call
+# time. Call AFTER the sourcing gate (a damaged lib keeps the callers'
+# HOME fallback — the gate itself stays fail-closed through its stub).
+path_sane_tilde_home() {
+    PROJECT_TILDE_HOME="$HOME"
+    if [ "$(id -u)" = "0" ] && [ -n "${SUDO_USER:-}" ]; then
+        # || true: a stale SUDO_USER must not abort under pipefail — the
+        # [ -n "$_th" ] guard below handles the empty case (fix-wave
+        # review).
+        _th="$(getent passwd "$SUDO_USER" 2>/dev/null | cut -d: -f6 || true)"
+        if [ -n "$_th" ]; then PROJECT_TILDE_HOME="$_th"; fi
+    fi
+}
 
 # project_path_sane <path>
 # A project root must never be (or live directly under) a system path:

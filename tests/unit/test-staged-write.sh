@@ -485,9 +485,13 @@ check "wiring: update.sh tui.json write goes through staged_write" \
 # carve-out in conventions.md "Source-counting pins".)
 # #346 wave 3: the render sites moved to install-core.sh; the sed -i
 # absence stays RAW on both files (#285 idiom below).
+# Issue #372 I6 lowered the floor from 4 to 3: the user-authored-config
+# replace arm no longer renders (a jsonc without kit marker and without
+# a permission block is KEPT now) — definition + fresh-install +
+# re-render calls remain.
 _iac_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" | grep -c '_oc_install_agent_config' || true)"
-check "wiring: install.sh config writes go through staged_write (0.0.39h F8: offline-rendered, ONE write per branch; render sites: $_iac_n, need 4-9)" \
-    sh -c '[ "$2" -ge 4 ] && [ "$2" -le 9 ] && ! grep -q "sed -i .*opencode\.jsonc" "$1" && ! grep -q "sed -i .*opencode\.jsonc" "$3"' _ "$INSTALL_CORE" "$_iac_n" "$INSTALL"
+check "wiring: install.sh config writes go through staged_write (0.0.39h F8: offline-rendered, ONE write per branch; render sites: $_iac_n, need 3-9)" \
+    sh -c '[ "$2" -ge 3 ] && [ "$2" -le 9 ] && ! grep -q "sed -i .*opencode\.jsonc" "$1" && ! grep -q "sed -i .*opencode\.jsonc" "$3"' _ "$INSTALL_CORE" "$_iac_n" "$INSTALL"
 _gca_n="$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" | grep -c 'staged_write 664' || true)"
 check "wiring: config.sh git_config_apply renders offline, ONE staged_write (0.0.39h F8; staged_write sites: $_gca_n of 2)" \
     sh -c 'grep -qF "_gca_tmp" "$1" && [ "$2" = 2 ] && ! grep -qF "sed -i '"'"'s|" "$1"' _ "$CONFIG" "$_gca_n"
