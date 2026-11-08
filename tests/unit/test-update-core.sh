@@ -332,4 +332,19 @@ else
     fail "sections called by update.sh but absent from the guard:$_pg_missing (#413)"
 fi
 
+# LOWS-1 (#371 A5, class sweep from install.sh): the pre-upgrade binary
+# backup copy names its cause on failure — the bare call aborted the
+# whole update cause-less under set -e (the helper prints nothing), and
+# a swallowed failure would let the rc-2 restore path promise a restore
+# point that does not exist.
+if sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    grep -qF 'error: pre-upgrade backup of $SYSTEM_BIN failed' &&
+    sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    grep -A2 -F 'error: pre-upgrade backup of $SYSTEM_BIN failed' |
+        grep -qF 'return 1'; then
+    pass "pre-upgrade binary backup failure aborts cause-loud (#371 A5 sweep)"
+else
+    fail "pre-upgrade binary backup still bare or cause-less (#371 A5 sweep)"
+fi
+
 suite_done

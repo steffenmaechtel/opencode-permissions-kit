@@ -13,8 +13,9 @@
 # CALLER's shell under its `set -eu`: they read the globals install.sh
 # sets before the phase calls (KIT_BRANCH, VERSION, LIBDIR, SCRIPT_DIR,
 # OPENCODE_USER, OPENCODE_GROUP, SKIP_PROMPTS, PREDEFINED_PROJECTS,
-# SECURE_GIT_CONFIG, CONTAINER_BACKEND_OPT, SKIP_DDEV_MIGRATION,
-# MIGRATE_AGENTS_OPT, DDEV_DEV_OWNED, DDEV_SETTINGS_GIVEN,
+# PROJECTS_ARG_SPACED, SECURE_GIT_CONFIG, CONTAINER_BACKEND_OPT,
+# SKIP_DDEV_MIGRATION, MIGRATE_AGENTS_OPT, DDEV_DEV_OWNED,
+# DDEV_SETTINGS_GIVEN,
 # GIT_FLAG_GIVEN, OPENCHAMBER_POLICY_OPT/GIVEN, FORCE_UNSUPPORTED_DISTRO
 # via _distro_gate) and call the entry's
 # helpers (banner, confirm, _yes_no_backup_menu, _distro_gate,
@@ -140,6 +141,17 @@ install_project_roots_select() {
                         continue
                     fi
                     _custom_empty=0
+                    # Glob gate (issue #372 A2, the --projects sibling's
+                    # 0.0.42f S2 rule): the for-loop below expands $custom
+                    # UNQUOTED — a word with glob characters that matches
+                    # files silently substitutes them for what was typed.
+                    # Reject the raw input before that loop runs.
+                    case "$custom" in
+                        *[\*\?\[]*)
+                            ui_error "paths must not contain glob characters (* ? [): $custom"
+                            continue
+                            ;;
+                    esac
                     _custom=""
                     _bad=""
                     for p in $custom; do
@@ -211,17 +223,12 @@ do_plan_phase() {
     # a root shell is a broken install no later choice can repair.
     _root_user_gate "$DEFAULT_USER"
 
-    # ~ in project paths must expand to the DEFAULT user's home, not $HOME:
-    # under `curl | sudo bash` / `sudo bash install.sh`, $HOME is /root and
-    # "~/dev" would be rejected as a "/root system path" with a confusing
-    # error. project_path_sane reads PROJECT_TILDE_HOME.
-    PROJECT_TILDE_HOME="$HOME"
-    if [ "$(id -u)" = "0" ] && [ -n "${SUDO_USER:-}" ]; then
-        # || true: a stale SUDO_USER must not abort under pipefail — the
-        # [ -n "$_th" ] guard below handles the empty case (fix-wave review).
-        _th="$(getent passwd "$SUDO_USER" 2>/dev/null | cut -d: -f6 || true)"
-        if [ -n "$_th" ]; then PROJECT_TILDE_HOME="$_th"; fi
-    fi
+    # ~ in project paths must expand to the DEFAULT user's home, not $HOME
+    # (under sudo, $HOME is /root and "~/dev" would be rejected as a
+    # "/root system path" with a confusing error). One implementation in
+    # sh/path-sane.sh (issue #340): install.sh and config.sh shared this
+    # block near-identically before.
+    path_sane_tilde_home
     # Developer home for every developer-side provisioning path (0.0.44a
     # V14): ddev discovery, the .ddev registry check, binary candidates,
     # rc-file hooks, agents-migration sources, the deny-all config and the
@@ -300,9 +307,35 @@ do_plan_phase() {
     # -C /: same unreadable-CWD class as issue #116 (git >= 2.55).
     sudo -u "$DEFAULT_USER" git -C / config --global --list \
         >"$BACKUP_DIR/gitconfig-$DEFAULT_USER.txt" 2>/dev/null || _bk_fail "gitconfig-$DEFAULT_USER"
-    # shellcheck disable=SC2024  # install.sh runs as root; the redirect is root's job
-    sudo -u "$OPENCODE_USER" git -C / config --global --list \
-        >"$BACKUP_DIR/gitconfig-$OPENCODE_USER.txt" 2>/dev/null || _bk_fail "gitconfig-$OPENCODE_USER"
+    # The agent user's gitconfig only exists on a RE-install: this phase
+    # runs before Step 1 creates the user, and `sudo -u` on a missing
+    # user fails unconditionally — the a-F6 recorder fired on every
+    # fresh install and the closing Backup row read INCOMPLETE over
+    # material that never existed (issue #371 A1). Review a S1+P4
+    # (#424): gate on the gitconfig FILES, not the user alone —
+    # `git config --global --list` also fails rc 128 when the user
+    # exists but has no global config (re-install after an aborted
+    # install), and a userdel-without-`-r` leaves the home behind.
+    # Both of git's global-scope locations count; the skip log names
+    # what was actually checked.
+    _oc_gcfg_home="$(getent passwd "$OPENCODE_USER" 2>/dev/null | cut -d: -f6 || true)"
+    if [ -n "$_oc_gcfg_home" ] &&
+        { [ -f "$_oc_gcfg_home/.gitconfig" ] || [ -f "$_oc_gcfg_home/.config/git/config" ]; }; then
+        # shellcheck disable=SC2024  # install.sh runs as root; the redirect is root's job
+        sudo -u "$OPENCODE_USER" git -C / config --global --list \
+            >"$BACKUP_DIR/gitconfig-$OPENCODE_USER.txt" 2>/dev/null || _bk_fail "gitconfig-$OPENCODE_USER"
+    else
+        # Per-scenario wording (review b B1, #424): "user absent" is
+        # false on the most common re-install shape (user exists, the
+        # kit never creates a gitconfig for the agent) — name what was
+        # actually checked instead.
+        if [ -n "$_oc_gcfg_home" ]; then
+            log "backup skipped: no global gitconfig for '$OPENCODE_USER' (checked""\
+ ${_oc_gcfg_home}/.gitconfig and ${_oc_gcfg_home}/.config/git/config — neither exists) — nothing to copy"
+        else
+            log "backup skipped: user '$OPENCODE_USER' absent — no home to check for a global gitconfig"
+        fi
+    fi
     if [ -f /etc/opencode-permissions-kit/sudoers ]; then
         cp /etc/opencode-permissions-kit/sudoers "$BACKUP_DIR/sudoers" 2>/dev/null || _bk_fail "sudoers"
     fi
@@ -420,7 +453,6 @@ do_plan_phase() {
         fi
     fi
 
-    # Container backend selection. Rootless is MANDATORY: docker-rootless
     # The container backend is rootless-only: docker-rootless (default) or
     # podman-rootless. On a re-install over an existing kit, preserve a
     # previously configured rootless backend unless --container-backend overrides.
@@ -549,7 +581,12 @@ do_plan_phase() {
     OC_BINARY_FOUND=""
     for loc in "$DEV_HOME/.opencode/bin/opencode" "/root/.opencode/bin/opencode" \
         "/usr/local/bin/opencode" "/usr/bin/opencode"; do
-        if [ -x "$loc" ] && [ "$loc" != "/usr/local/bin/opencode" ]; then
+        # /usr/local/bin/opencode is skipped only as the kit WRAPPER
+        # SYMLINK (present after any completed install — copying it over
+        # the secured binary would deploy the wrapper script as the
+        # binary). A REAL file there (a manual official-installer
+        # install) is a valid pickup source (issue #372 I4).
+        if [ -x "$loc" ] && { [ "$loc" != "/usr/local/bin/opencode" ] || [ ! -L "$loc" ]; }; then
             OC_BINARY_FOUND="$loc"
             ui_have "opencode binary" "$loc — will be secured under the kit"
             break
@@ -588,6 +625,14 @@ do_plan_phase() {
             if ! project_path_sane "$_fp"; then
                 ui_error "'$_fp' is not a valid project root (system path, symlink, or malformed form) — refusing to use it."
                 ui_info "Use a dedicated folder like /var/www/vhosts or /home/<you>/projects."
+                # Issue #372 A3: a --projects value with internal
+                # whitespace word-splits here — the fragment above may
+                # be HALF a path the user typed. Name the cause instead
+                # of leaving a misleading "system path" diagnosis.
+                if [ "${PROJECTS_ARG_SPACED:-false}" = true ]; then
+                    ui_info "a --projects value contained whitespace: if '$_fp' is part of one path,""\
+ that path cannot be a project root (roots are stored space-separated) — pass each root as its own argument."
+                fi
                 exit 1
             fi
             _fp_norm="$_fp_norm $_PP_NORM"
@@ -1436,12 +1481,20 @@ do_deploy_phase() {
 
     for loc in "$DEV_HOME/.opencode/bin/opencode" "/root/.opencode/bin/opencode" \
         "/usr/local/bin/opencode" "/usr/bin/opencode"; do
-        if [ -x "$loc" ] && [ "$loc" != "/usr/local/bin/opencode" ]; then
+        # Same symlink-aware /usr/local/bin/opencode exclusion as the
+        # inventory loop in do_plan_phase (issue #372 I4): the wrapper
+        # symlink is never a pickup source; a real file is.
+        if [ -x "$loc" ] && { [ "$loc" != "/usr/local/bin/opencode" ] || [ ! -L "$loc" ]; }; then
             ans=$(_yes_no_backup_menu "opencode binary found at $loc. Copy to system path and secure with wrapper?")
             case "$ans" in
                 y)
                     sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
-                    copy_binary_atomic "$loc" "$SYSTEM_BIN"
+                    copy_binary_atomic "$loc" "$SYSTEM_BIN" ||
+                        {
+                            echo "error: copying the opencode binary $loc -> $SYSTEM_BIN failed — aborting" >&2
+                            log "binary copy FAILED: $loc -> $SYSTEM_BIN"
+                            exit 1
+                        }
                     secure_binary "$SYSTEM_BIN" "$BINARY_GROUP"
                     remove_shadow_binary "$loc"
                     opencode_found=true
@@ -1460,7 +1513,12 @@ do_deploy_phase() {
                         _ocb_bk="binary backup FAILED — see Backup summary"
                     fi
                     sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
-                    copy_binary_atomic "$loc" "$SYSTEM_BIN"
+                    copy_binary_atomic "$loc" "$SYSTEM_BIN" ||
+                        {
+                            echo "error: copying the opencode binary $loc -> $SYSTEM_BIN failed — aborting" >&2
+                            log "binary copy FAILED: $loc -> $SYSTEM_BIN"
+                            exit 1
+                        }
                     secure_binary "$SYSTEM_BIN" "$BINARY_GROUP"
                     remove_shadow_binary "$loc"
                     opencode_found=true
@@ -1495,14 +1553,24 @@ do_deploy_phase() {
             # the user's home.
             if [ -x "/root/.opencode/bin/opencode" ]; then
                 sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
-                copy_binary_atomic "/root/.opencode/bin/opencode" "$SYSTEM_BIN"
+                copy_binary_atomic "/root/.opencode/bin/opencode" "$SYSTEM_BIN" ||
+                    {
+                        echo "error: copying the opencode binary /root/.opencode/bin/opencode -> $SYSTEM_BIN failed — aborting" >&2
+                        log "binary copy FAILED: /root/.opencode/bin/opencode -> $SYSTEM_BIN"
+                        exit 1
+                    }
                 secure_binary "$SYSTEM_BIN" "$BINARY_GROUP"
                 remove_shadow_binary "/root/.opencode/bin/opencode"
                 echo "Installed to $SYSTEM_BIN."
                 log "binary installed (official installer): /root/.opencode/bin/opencode -> $SYSTEM_BIN"
             elif [ -x "$DEV_HOME/.opencode/bin/opencode" ]; then
                 sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
-                copy_binary_atomic "$DEV_HOME/.opencode/bin/opencode" "$SYSTEM_BIN"
+                copy_binary_atomic "$DEV_HOME/.opencode/bin/opencode" "$SYSTEM_BIN" ||
+                    {
+                        echo "error: copying the opencode binary $DEV_HOME/.opencode/bin/opencode -> $SYSTEM_BIN failed — aborting" >&2
+                        log "binary copy FAILED: $DEV_HOME/.opencode/bin/opencode -> $SYSTEM_BIN"
+                        exit 1
+                    }
                 secure_binary "$SYSTEM_BIN" "$BINARY_GROUP"
                 remove_shadow_binary "$DEV_HOME/.opencode/bin/opencode"
                 echo "Installed to $SYSTEM_BIN."
@@ -1563,9 +1631,36 @@ do_deploy_phase() {
         log "major stamp skipped: version probe unparseable (resolved OPENCODE_MAJOR=$OPENCODE_MAJOR)"
     fi
 
+    # Stale PATH cleanup (issue #371 A7): the opencode installer appends
+    # `export PATH=".../.opencode/bin:$PATH"` lines that keep the
+    # user-local binary first in every NEW shell. Only those PATH EXPORT
+    # lines are removed — the old sed deleted ANY line mentioning
+    # .opencode/bin (aliases, comments included). The rc files are backed
+    # up before any edit WHEN THE COPY SUCCEEDS (review a S2, #424): a
+    # failed backup records itself and the edit proceeds anyway — the
+    # appends below are load-bearing protections (bypass warning, ddev
+    # hook) and must not be skipped over a missing recovery copy; the
+    # degradation is observed (warn + summary row), never silent. A
+    # failed cleanup warns too (issue #371 I3).
+    _rc_cleaned=0
+    _rc_files=0
     for cf in "$DEV_HOME/.bashrc" "$DEV_HOME/.zshrc" "$DEV_HOME/.profile"; do
         if [ -f "$cf" ]; then
-            sudo sed -i '\|\.opencode/bin|d' "$cf" 2>/dev/null || true
+            _rc_files=$((_rc_files + 1))
+            if sudo cp "$cf" "$BACKUP_DIR/rc-$(basename "$cf")" 2>/dev/null; then
+                :
+            else
+                _bk_fail "rc-$(basename "$cf")"
+            fi
+            if sudo grep -q '^[[:space:]]*export PATH=.*[.]opencode/bin' "$cf" 2>/dev/null; then
+                if sudo sed -i '\|^[[:space:]]*export PATH=.*[.]opencode/bin|d' "$cf" 2>/dev/null; then
+                    _rc_cleaned=$((_rc_cleaned + 1))
+                    log "stale .opencode/bin PATH export removed from $cf"
+                else
+                    ui_warn "could not remove a stale .opencode/bin PATH export from $cf — edit the file yourself"
+                    log "rc PATH cleanup FAILED for $cf"
+                fi
+            fi
             if ! sudo grep -q 'export PATH="/usr/local/bin:$PATH"' "$cf" 2>/dev/null; then
                 echo "" | sudo tee -a "$cf" >/dev/null
                 echo 'export PATH="/usr/local/bin:$PATH"' | sudo tee -a "$cf" >/dev/null
@@ -1590,7 +1685,14 @@ do_deploy_phase() {
             fi
         fi
     done
-    log "shell PATH config cleaned/updated for $DEFAULT_USER (wrapper bypass warning + ddev terminal hook installed)"
+    # Honest no-op claim (review a S4, #424): with no rc file at all the
+    # loop never ran — the log must not claim updates or installed hooks.
+    if [ "$_rc_files" -gt 0 ]; then
+        log "shell PATH config updated for $DEFAULT_USER""\
+ (stale PATH exports cleaned in $_rc_cleaned rc file(s); wrapper bypass warning + ddev terminal hook installed)"
+    else
+        log "no rc files found for $DEFAULT_USER (.bashrc/.zshrc/.profile) — no PATH config written"
+    fi
 
     # === Step 7: opencode library (consolidated deployment in /usr/local/lib/opencode-permissions-kit/) ===
 
@@ -1908,8 +2010,18 @@ do_deploy_phase() {
             rm -f "$_oic_tmp"
             return 1
         fi
-        staged_write 664 "$OPENCODE_USER:$OPENCODE_GROUP" "$_oic_tmp" /home/opencode/.config/opencode/opencode.jsonc
-        rm -f "$_oic_tmp"
+        # Explicit rc propagation (issue #371 A4R): the trailing rm must
+        # not mask staged_write's exit status for a future tested-context
+        # caller — today's bare calls abort under set -e either way.
+        if staged_write 664 "$OPENCODE_USER:$OPENCODE_GROUP" "$_oic_tmp" \
+            /home/opencode/.config/opencode/opencode.jsonc; then
+            rm -f "$_oic_tmp"
+            return 0
+        else
+            _oic_rc=$?
+            rm -f "$_oic_tmp"
+            return "$_oic_rc"
+        fi
     }
     if ! agent_home_sane "$OPENCODE_USER" /home/opencode/.config/opencode; then
         ui_warn "the chain to /home/opencode/.config/opencode contains a symlink — agent config NOT (re)installed""\
@@ -1925,32 +2037,32 @@ do_deploy_phase() {
         fi
         log "opencode config installed: /home/opencode/.config/opencode/opencode.jsonc (secure_git=$SECURE_GIT_CONFIG)"
     elif [ -f /home/opencode/.config/opencode/opencode.jsonc ] &&
-        ! grep -q '"permission"' /home/opencode/.config/opencode/opencode.jsonc; then
-        # pr-00263 d W2 (the a F6 class sweep): both existing-config
-        # backup sites observe the copy — failure degrades the announce
-        # and the summary row (the re-render twin below shares this).
-        if sudo cp /home/opencode/.config/opencode/opencode.jsonc "$BACKUP_DIR/opencode.jsonc-existing" 2>/dev/null; then
-            _occ_bk="Backup saved."
-        else
-            _bk_fail "opencode.jsonc-existing"
-            _occ_bk="config backup FAILED — see Backup summary"
-        fi
-        _oc_install_agent_config
-        if [ "$SECURE_GIT_CONFIG" = true ]; then
-            echo "Default config installed (opencode.jsonc) — .git/config blocked (soft). $_occ_bk"
-        else
-            echo "Default config installed (opencode.jsonc). $_occ_bk"
-        fi
-        log "opencode config replaced (backup attempt: $BACKUP_DIR/opencode.jsonc-existing — $_occ_bk)"
+        ! grep -qE '^[[:space:]]*//[[:space:]]*_opencode_permissions_kit|"permission"' \
+            /home/opencode/.config/opencode/opencode.jsonc; then
+        # User-authored config (issue #372 I6): no kit marker (the
+        # template carries one since this change; the grep is anchored
+        # to its comment-line form — review a S6, #424: a config merely
+        # MENTIONING the kit stays user-authored) and no permission
+        # block (the legacy kit-config heuristic — configs written by
+        # earlier kit versions). Neither present means the file is not
+        # kit-managed — a hand-written config (kept untouched like a
+        # custom opencode.json) or broken/unreadable content (kept too;
+        # the copy replaces nothing either way — review a G2, #424).
+        ui_detail "existing opencode.jsonc has no kit marker and no permission block""\
+ — left untouched (user-authored or broken/unreadable content)"
+        log "agent config kept: opencode.jsonc without kit marker or permission block (not overwritten)"
     elif [ -f /home/opencode/.config/opencode/opencode.json ] &&
         [ ! -f /home/opencode/.config/opencode/opencode.jsonc ]; then
         ui_detail "opencode.json exists — left untouched (custom user config)"
         log "opencode config kept: custom opencode.json (not overwritten)"
     else
-        # Kit-managed opencode.jsonc already exists (re-install). The git choice
-        # above must not be silently ignored: re-render from the template with
-        # the chosen SECURE_GIT state — same semantics as `config.sh git-config
-        # on|off` — with a backup of the previous file.
+        # Kit-managed opencode.jsonc already exists (re-install): the
+        # file carries the kit marker or (legacy configs from earlier
+        # kit versions) a permission block — the elif above keeps
+        # everything else user-authored. The git choice above must not
+        # be silently ignored: re-render from the template with the
+        # chosen SECURE_GIT state — same semantics as `config.sh
+        # git-config on|off` — with a backup of the previous file.
         if sudo cp /home/opencode/.config/opencode/opencode.jsonc "$BACKUP_DIR/opencode.jsonc-existing" 2>/dev/null; then
             _occ_bk="backup saved"
         else
@@ -2072,6 +2184,11 @@ do_deploy_phase() {
     # unregistered. The tui.json deployment above stays: it is inert under
     # 2.x and makes a later 1.x binary swap work instantly.
     if [ "$OPENCODE_MAJOR" = 2 ]; then
+        # Honest closing row (issue #371 A6 + I2/H2): the per-user skip
+        # arms (rc 2/3) print their own notes — the old unconditional
+        # "registered (both users)" success line claimed registration
+        # even when every user was skipped.
+        _oc_tps_ok=0
         for _oc_dir_user in "/home/$OPENCODE_USER/.config/opencode:$OPENCODE_USER" "$DEFAULT_OC_DIR:$DEFAULT_USER"; do
             _oc_user_dir="${_oc_dir_user%%:*}"
             _oc_dir_owner="${_oc_dir_user#*:}"
@@ -2084,7 +2201,7 @@ do_deploy_phase() {
             # reorder silently abort the install.
             if tui_plugin_sync_user "$OPENCODE_MAJOR" "$_oc_user_dir" "$_oc_dir_owner" \
                 "$OPENCODE_GROUP" "$LIBDIR" "$OPENCODE_USER"; then
-                :
+                _oc_tps_ok=$((_oc_tps_ok + 1))
             else
                 _oc_tps_rc=$?
                 if [ "$_oc_tps_rc" -eq 1 ]; then
@@ -2099,8 +2216,13 @@ do_deploy_phase() {
                 fi
             fi
         done
-        ui_success "TUI mode display registered for opencode 2.x: plugins/opencode-permissions-kit/tui.tsx (both users)"
-        log "tui mode registered for 2.x: plugin dir + symlink (kit-mode-2x.tsx)"
+        if [ "$_oc_tps_ok" -eq 2 ]; then
+            ui_success "TUI mode display registered for opencode 2.x: plugins/opencode-permissions-kit/tui.tsx (both users)"
+            log "tui mode registered for 2.x: plugin dir + symlink (kit-mode-2x.tsx)"
+        elif [ "$_oc_tps_ok" -eq 1 ]; then
+            ui_detail "TUI mode display registered for one user only — the other was skipped (see the note above)"
+            log "tui mode registered for 2.x: one user, the other skipped (user-managed)"
+        fi
     fi
 
     # === Step 9: Clean stale runtime state ===

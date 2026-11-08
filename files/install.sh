@@ -319,6 +319,12 @@ command -v project_path_sane >/dev/null 2>&1 ||
         echo "error: project_path_sane unavailable (path-sane.sh missing) — refusing every project path" >&2
         return 1
     }
+# Same present-but-incomplete-copy coverage for the tilde-home setup
+# (issue #340): this stub is deliberately silent and fail-safe — the
+# variable is not a gate, and the gate above stays fail-closed on its
+# own. do_plan_phase calls the real helper after this sourcing.
+command -v path_sane_tilde_home >/dev/null 2>&1 ||
+    path_sane_tilde_home() { PROJECT_TILDE_HOME="$HOME"; }
 
 # Shared git presence/version check (soft floor, issue #118): one
 # implementation for the pre-flight here, update.sh and status.sh.
@@ -462,6 +468,12 @@ OPENCODE_GROUP="opencode"
 
 SKIP_PROMPTS=false
 PREDEFINED_PROJECTS=""
+# True when a --projects value carried internal whitespace (several
+# roots in one quoted argument — legal). Read by do_plan_phase: when a
+# fragment of such a value fails the path gate, the refusal names the
+# whitespace cause instead of letting a misleading "system path"
+# diagnosis stand (issue #372 A3).
+PROJECTS_ARG_SPACED=false
 # Default true = .git/config deny rules active = git blocked for the agent
 # (the recommended, pre-Phase-4 --yes behavior). The questions below and
 # the --secure-git-config flag set it explicitly.
@@ -576,6 +588,17 @@ parse_args() {
                             echo "error: --projects value contains glob characters: $1" >&2
                             exit 1
                             ;;
+                    esac
+                    # Whitespace in a value is LEGAL here (one quoted
+                    # argument may carry several roots — the e2e
+                    # invocation shape) but a single path WITH spaces
+                    # word-splits into fragments that fail the path
+                    # gate with a misleading diagnosis (issue #372 A3).
+                    # Remember the shape; the validation in
+                    # do_plan_phase names the cause when a fragment
+                    # actually fails.
+                    case "$1" in
+                        *[[:space:]]*) PROJECTS_ARG_SPACED=true ;;
                     esac
                     PREDEFINED_PROJECTS="$PREDEFINED_PROJECTS $1"
                     shift

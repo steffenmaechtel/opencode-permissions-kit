@@ -306,6 +306,17 @@ else
     fail "config.sh: git-config toggle backs up the existing agent config"
 fi
 
+# LOWS-1 (#371 A4R sweep twin, maintainer-commissioned): git_config_apply
+# propagates staged_write's rc past the trailing rm (the install-core
+# _oc_install_agent_config fix's same-shape sibling — the L2 sweep found
+# it); the success leg falls through to the toggle rows below.
+if grep -qF '_gca_rc=$?' "$CONFIG" &&
+    grep -A2 -F '_gca_rc=$?' "$CONFIG" | grep -qF 'return "$_gca_rc"'; then
+    pass "config.sh: git-config apply propagates staged_write rc (#371 A4R twin)"
+else
+    fail "config.sh: git-config apply still masks staged_write rc (#371 A4R twin)"
+fi
+
 # Issue #205: the git-config rows keep the ON/OFF prefix (it mirrors the
 # on|off subcommands) but spell out the effect with the same phrases
 # `opk status` uses (issue #158 wording) — no bare "ON  (...)"/"OFF  (...)"

@@ -56,6 +56,7 @@ eval "$(extract_func "$INSTALL" parse_args)"
 reset_globals() {
     SKIP_PROMPTS=false
     PREDEFINED_PROJECTS=""
+    PROJECTS_ARG_SPACED=false
     SECURE_GIT_CONFIG=true
     GIT_FLAG_GIVEN=""
     CONTAINER_BACKEND_OPT=""
@@ -323,6 +324,39 @@ expect_rc 1 "--migrate-agents with an invalid value aborts" --yes --migrate-agen
 expect_rc 1 "--projects value with glob characters aborts" --yes --projects '/var/www/vhosts/*'
 expect_rc 1 "--projects value with question mark aborts" --yes --projects '/opt/?vhosts'
 expect_rc 0 "plain --projects value passes parse_args" --yes --projects /var/www/vhosts
+
+# Whitespace in a --projects value is LEGAL at parse time (issue #372
+# A3): one quoted argument may carry SEVERAL roots — the e2e suites'
+# invocation shape (`--projects "/var/www/vhosts /home/dev/vhosts"`).
+# A parse-time rejection here was an e2e-caught regression; the honest
+# fix records the shape (PROJECTS_ARG_SPACED) so the path-gate refusal
+# in do_plan_phase can name the whitespace cause for fragments. The
+# behavioral pin is the e2e form itself: it must parse rc 0 and set the
+# flag (a reverted gate or a lost flag both fail this).
+reset_globals
+_cw_out="$( (parse_args --yes --projects '/var/www/vhosts /home/dev/vhosts' &&
+    printf 'ROOTS=[%s] SPACED=%s' "$PREDEFINED_PROJECTS" "$PROJECTS_ARG_SPACED") 2>/dev/null)" || true
+case "$_cw_out" in
+    "ROOTS=[ /var/www/vhosts /home/dev/vhosts] SPACED=true")
+        pass "multi-root single-argument --projects parses + sets the spaced flag (#372 A3)"
+        ;;
+    *) fail "multi-root --projects parse (#372 A3; got: ${_cw_out:-abort})" ;;
+esac
+reset_globals
+parse_args --yes --projects /var/www/vhosts
+if [ "$PROJECTS_ARG_SPACED" = false ]; then
+    pass "single-argument --projects leaves the spaced flag false (#372 A3)"
+else
+    fail "single-argument --projects leaves the spaced flag false (#372 A3)"
+fi
+# the refusal names the whitespace cause when the flag is set
+# (static: the hint is flag-gated in do_plan_phase's validation)
+if grep -qF 'a --projects value contained whitespace' "$INSTALL_CORE" &&
+    grep -qF '"${PROJECTS_ARG_SPACED:-false}" = true' "$INSTALL_CORE"; then
+    pass "path-gate refusal names the whitespace cause for spaced values (#372 A3)"
+else
+    fail "whitespace cause missing from the path-gate refusal (#372 A3)"
+fi
 
 # --- channel stamp (issue #38) -----------------------------------------------
 
@@ -1159,17 +1193,24 @@ fi
 # Comment-strip riders (#261, the #244 g W1 class — sweep finds beyond
 # the issue list): commented-out failure-recorder sites stop counting;
 # full-line comments only (#244 h W6 residual).
+# LOWS-1: the count stays 10 — #371 A7 ADDS the rc-file backup site
+# (before the PATH cleanup), #372 I6 REMOVES the user-authored-config
+# replace arm's site with the arm itself. Net zero, both conscious.
 _bk_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" | grep -c '_bk_fail' || true)"
 [ "$_bk_n" = 10 ] &&
     grep -qF 'INCOMPLETE: $_BK_FAIL' "$INSTALL" &&
     pass "backup failures record loudly + degrade the summary row (pr-00263 a F6 + d W1/W2)" ||
     fail "backup failure silence survived somewhere (pr-00263 a F6 + d W1/W2; _bk_fail sites: $_bk_n of 10)"
+# LOWS-1 (#372 I6): the count moved 2 -> 1 — the user-authored-config
+# replace arm (no kit marker, no permission block) no longer renders,
+# so its backup+announce site is gone with it; the re-render twin
+# keeps the honest announce.
 _cba_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" |
     grep -cF 'config backup FAILED — see Backup summary' || true)"
-[ "$_cba_n" = 2 ] &&
+[ "$_cba_n" = 1 ] &&
     grep -qF 'binary backup FAILED — see Backup summary' "$INSTALL_CORE" &&
-    pass "the three swept backup sites degrade their announce on failure (pr-00263 d W1/W2)" ||
-    fail "a backup announce still lies on failure (pr-00263 d W1/W2; config-announce sites: $_cba_n of 2)"
+    pass "the swept backup sites degrade their announce on failure (pr-00263 d W1/W2)" ||
+    fail "a backup announce still lies on failure (pr-00263 d W1/W2; config-announce sites: $_cba_n of 1)"
 _acl_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" | grep -cF 'no ACL recovery material' || true)"
 [ "$_acl_n" = 2 ] &&
     pass "both getfacl backups announce failure instead of success (pr-00263 a F8)" ||
