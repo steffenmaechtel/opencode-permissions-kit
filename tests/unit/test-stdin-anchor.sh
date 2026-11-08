@@ -54,20 +54,24 @@ _IN="$(strip "$INSTALL")"
 # --- 1. behavioral: a stdin-shaped status.sh run cannot source a cwd sibling ------
 # $0 is forced to "bash" (the interpreter-name shape of curl | sh);
 # dash's `.` passes no arguments, so the positionals are set BEFORE the
-# dot. The cwd sits NEXT TO a poison sh/ui.sh sibling — exactly the
-# pre-#405 lookup $cwd/../sh/ui.sh. The sibling must never be sourced:
-# with the anchor, status.sh resolves from the deployed library
-# (missing → loud abort; present → the real ui.sh and a read-only
-# report) — either way the poison stays silent. Sabotage: delete the
-# anchor → POISON prints (the run passes the arg loop first; a usage
-# abort would make the pin vacuous, which is why --short rides $1).
+# dot. The cwd sits NEXT TO poison sh/ui.sh, sh/update-check.sh and
+# sh/ddev-handover.sh siblings — the pre-#405 lookups at
+# $cwd/../sh/<lib>, INCLUDING the two resolvers inside the SOURCED
+# status-core.sh (review a A1/C1: those re-derived from $0 and would
+# have sourced the siblings into the same root shell). None may ever
+# be sourced: the entry's anchor pins ST_CALL_DIR and the lib's
+# resolvers ride it; the deployed library decides from there (missing
+# → loud abort; present → the real libs and a read-only report).
+# Sabotage: delete an anchor → the matching POISON line prints.
 mkdir -p "$WORK/cwd" "$WORK/sh"
 printf 'echo UI-POISON-SOURCED >&2\n' >"$WORK/sh/ui.sh"
+printf 'echo UPC-POISON-SOURCED >&2\n' >"$WORK/sh/update-check.sh"
+printf 'echo DHO-POISON-SOURCED >&2\n' >"$WORK/sh/ddev-handover.sh"
 _st_out=$(cd "$WORK/cwd" && timeout 30 sh -c '_sa="$1"; set -- --short; . "$_sa"' \
     bash "$STATUS" 2>&1) || _st_rc=$?
 case "$_st_out" in
-    *UI-POISON-SOURCED*)
-        fail "stdin-run status.sh must not source a cwd-sibling ui.sh (#405)"
+    *UI-POISON-SOURCED* | *UPC-POISON-SOURCED* | *DHO-POISON-SOURCED*)
+        fail "stdin-run status.sh must not source cwd-sibling libs (#405)"
         ;;
     *usage*)
         fail "status.sh run aborted at the arg loop — pin vacuous (out=$_st_out) (#405)"
@@ -77,14 +81,28 @@ case "$_st_out" in
         ;;
 esac
 
-# Control arm: the same sibling IS reachable at the path the old
-# derivation built (proves the poison placement — without this the pin
-# above would pass vacuously on a misplaced fixture).
-if (cd "$WORK/cwd" && [ -f "../sh/ui.sh" ] && grep -q UI-POISON ../sh/ui.sh); then
-    pass "control arm: the poison sibling sits at the pre-#405 lookup path"
+# Control arm: the siblings ARE reachable at the paths the old
+# derivations built (proves the fixture placement — without this the
+# pin above would pass vacuously on misplaced fixtures).
+_ctrl_ok=0
+for _plib in ui.sh update-check.sh ddev-handover.sh; do
+    if (cd "$WORK/cwd" && [ -f "../sh/$_plib" ]); then
+        _ctrl_ok=$((_ctrl_ok + 1))
+    fi
+done
+if [ "$_ctrl_ok" -eq 3 ]; then
+    pass "control arm: all three poison siblings sit at the pre-#405 lookup paths"
 else
-    fail "control arm: poison sibling misplaced (vacuous #405 pin)"
+    fail "control arm: poison siblings misplaced (found $_ctrl_ok of 3 — vacuous #405 pin)"
 fi
+
+# status-core.sh's own resolvers ride the entry's anchor (review a
+# A1/C1): a bare dirname-$0 derivation inside the sourced lib would
+# reopen the hole the entry's anchor closes.
+check "status-core resolvers ride ST_CALL_DIR (review a A1/C1)" \
+    sh -c 'printf "%s" "$1" | grep -qF "_ku_lib=\"\${ST_CALL_DIR:-" &&
+        printf "%s" "$1" | grep -qF "_st_dhl=\"\${ST_CALL_DIR:-"' \
+    _ "$(sed 's/^[[:space:]]*#.*$//' "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core.sh")"
 
 # --- 2. wiring: update.sh ----------------------------------------------------------
 # The stdin flag, the forced fetch (a cwd-adjacent checkout can no
@@ -98,7 +116,7 @@ check "update.sh forces the fetch for stdin runs (#405)" \
     has "$_UP" '[ "$_opk_stdin_run" = true ] ||'
 check "update.sh pins streamed --only-binary runs to the deployed library (#405)" \
     sh -c 'printf "%s" "$1" | grep -qF "if [ \"\$_opk_stdin_run\" = true ] && [ \"\$_opk_binonly\" = true ]; then" &&
-        printf "%s" "$1" | grep -qF "SCRIPT_DIR=\"/usr/local/lib/opencode-permissions-kit/opencode-permissions-kit-lib/management\""' \
+        printf "%s" "$1" | grep -qF "SCRIPT_DIR=\"/usr/local/lib/opencode-permissions-kit/management\""' \
     _ "$_UP"
 check "update.sh refuses streamed --only-binary without an installed library (#405)" \
     has "$_UP" 'streamed --only-binary run found no installed kit library'
@@ -110,7 +128,7 @@ check "install.sh streams (fetches) on stdin runs (#405)" \
 
 # --- 4. wiring: config.sh ----------------------------------------------------------
 check "config.sh pins stdin runs to the deployed library (#405)" \
-    has "$_CF" 'SCRIPT_DIR="/usr/local/lib/opencode-permissions-kit/opencode-permissions-kit-lib/management"'
+    has "$_CF" 'SCRIPT_DIR="/usr/local/lib/opencode-permissions-kit/management"'
 check "config.sh anchors on the same stdin detection (#405)" \
     has "$_CF" 'if ! [ -f "$(readlink -f "$0" 2>/dev/null || printf '"'"'%s'"'"' "$0")" ]; then'
 
@@ -129,5 +147,14 @@ check "uninstall.sh resolvers ride UN_CALL_DIR (#405)" \
         printf "%s" "$1" | grep -qF "\"\$UN_CALL_DIR/../sh/log.sh\""' _ "$_UN"
 check "uninstall.sh keeps no inline dirname-\$0 resolver (#405)" \
     lacks "$_UN" 'for cand in "$(dirname "$0")/../sh/log.sh"'
+check "uninstall.sh keeps symlink resolution in its caller dir (review a B1)" \
+    has "$_UN" 'UN_CALL_DIR="$(dirname "$(readlink -f "$0" 2>/dev/null || printf '"'"'%s'"'"' "$0")")"'
+
+# --- 6. wiring: doctor.sh rides the same anchor (review a A2) ----------------------
+_DR="$(strip "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/doctor.sh")"
+check "doctor.sh anchors stdin runs to the deployed library (review a A2)" \
+    sh -c 'printf "%s" "$1" | grep -qF "DR_CALL_DIR=\"/usr/local/lib/opencode-permissions-kit/management\"" &&
+        printf "%s" "$1" | grep -qF "UI_LIB=\"\$DR_CALL_DIR/../sh/ui.sh\"" &&
+        printf "%s" "$1" | grep -qF "DOCTOR_OPK=\"\$DR_CALL_DIR/../bin/opk\""' _ "$_DR"
 
 suite_done "tests"

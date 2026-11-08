@@ -288,10 +288,11 @@ else
     echo "  SKIP  scan root gate needs a non-root suite user (root reads everything) (#322)"
 fi
 
-# --- sweep floor: every python3 invocation in the lib runs isolated (#249) --------
+# --- sweep floor: status-core's four sites run isolated (#249; the
+# tree-wide absence pin in test-update-core.sh is the ceiling) --------
 _pc=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -c 'python3 -I' || true)
 if [ "${_pc:-0}" -ge 4 ]; then
-    pass "sweep: status-core.sh python3 calls run -I ($_pc site(s), #249)"
+    pass "sweep floor: status-core.sh python3 calls run -I ($_pc site(s), #249)"
 else
     fail "status-core.sh must run its 4 python3 sites with -I (found ${_pc:-0}) (#249)"
 fi

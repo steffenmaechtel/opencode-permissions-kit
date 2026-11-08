@@ -1758,7 +1758,13 @@ do_deploy_phase() {
     # xdg-open itself (upstream #52548, PR #56082; the 1.x line never
     # got the fix — xdg_shim_needed_for in sh/deploy-lib.sh, issue
     # #257). Bounded probe like every sibling (issue #80); an
-    # unparseable probe keeps the shim (fail-safe direction).
+    # unparseable probe keeps the shim (fail-safe direction). The
+    # probe is RAW timeout here, deliberately unlike update-core's
+    # two-class gate (review a B6): a broken-but-findable timeout
+    # yields an empty probe → keep shim — the conservative direction —
+    # while update's gate degrades to the unbounded probe and gets a
+    # real verdict; both directions fail safe and mirror each file's
+    # neighboring probe idioms.
     _xdi_ver=$(timeout 10 "$SYSTEM_BIN" --version 2>/dev/null | head -1 || true)
     _xdi_maj=$(printf '%s' "$_xdi_ver" | sed -n 's/^opencode v\([0-9][0-9]*\).*/\1/p')
     if [ -z "$_xdi_maj" ] && printf '%s' "$_xdi_ver" | grep -qE '^[0-9]+(\.[0-9]+)*$'; then

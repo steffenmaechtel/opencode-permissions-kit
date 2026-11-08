@@ -246,6 +246,14 @@ if [ -n "$_xsg" ]; then
     else
         fail "xdg gate: empty version/major keep the shim (fail-safe)"
     fi
+    # Non-empty garbage must ALSO keep the shim (review a A3): sort -V
+    # places non-numeric strings after the triple — without the shape
+    # gate a garbage version would compare as "newer" and fail OPEN.
+    if xdg_shim_needed_for 2 "unknown" && xdg_shim_needed_for 2 "2.0.x"; then
+        pass "xdg gate: non-version-shaped values keep the shim (review a A3)"
+    else
+        fail "xdg gate: garbage versions must fail CLOSED (review a A3)"
+    fi
     assert_eq "xdg gate: fix version pin is 2.0.32" "2.0.32" "$XDG_SHIM_FIX_VERSION"
 else
     fail "xdg gate: xdg_shim_needed_for extractable from deploy-lib.sh"

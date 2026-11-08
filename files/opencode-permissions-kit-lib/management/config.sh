@@ -49,7 +49,10 @@ SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 # as root, unpinned. Pin stdin runs to the deployed library; checkout
 # and installed runs keep their own derivation.
 if ! [ -f "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")" ]; then
-    SCRIPT_DIR="/usr/local/lib/opencode-permissions-kit/opencode-permissions-kit-lib/management"
+    # The DEPLOYED management dir on the flat library layout (review a
+    # B1: the repo-layout path does not exist deployed) — a stdin run
+    # then resolves exactly like a deployed run.
+    SCRIPT_DIR="/usr/local/lib/opencode-permissions-kit/management"
 fi
 LIBDIR="/usr/local/lib/opencode-permissions-kit"
 

@@ -207,8 +207,12 @@ status_section_core() {
     # who cannot reach the mirror must not read yellow forever). Checkout-
     # first resolution like ui.sh above: a checkout status.sh needs its own
     # lib. A missing lib is the broken-kit class (issue #165): counted
-    # warn, never a silently dropped row.
-    _ku_lib="$(cd "$(dirname "$0")" && pwd)/../sh/update-check.sh"
+    # warn, never a silently dropped row. Rides the ENTRY's caller-dir
+    # anchor (#405, review a A1/C1): status.sh defines ST_CALL_DIR for
+    # stdin runs; the fallback covers standalone/extraction contexts
+    # (this lib shares the entry's $0 — a bare dirname would resolve
+    # against the invoking cwd again).
+    _ku_lib="${ST_CALL_DIR:-$(cd "$(dirname "$0")" 2>/dev/null && pwd)}/../sh/update-check.sh"
     [ -f "$_ku_lib" ] || _ku_lib="$LIBDIR/sh/update-check.sh"
     if [ ! -f "$_ku_lib" ]; then
         ui_kv_warn "kit update" "not checked — kit file sh/update-check.sh missing (fix: sudo opk update)"
@@ -849,8 +853,10 @@ _st_ddev_share_scan() {
     # detection even when the deployed kit is older and its lib still
     # lacks ddev_reshare_needed (deployed-first would leave that case
     # swallowed by the `|| continue` below); deployed mode resolves to the
-    # identical file anyway.
-    _st_dhl="$(cd "$(dirname "$0")" && pwd)/../sh/ddev-handover.sh"
+    # identical file anyway. Rides the entry's ST_CALL_DIR anchor
+    # (#405, review a A1/C1) — same stdin-run discipline as ui.sh and
+    # update-check.sh above.
+    _st_dhl="${ST_CALL_DIR:-$(cd "$(dirname "$0")" 2>/dev/null && pwd)}/../sh/ddev-handover.sh"
     [ -f "$_st_dhl" ] || _st_dhl="$LIBDIR/sh/ddev-handover.sh"
     if [ -f "$_st_dhl" ] && [ "$(id -u)" != "$(id -u "$OPENCODE_USER" 2>/dev/null || echo 1)" ]; then
         # shellcheck disable=SC1090  # checkout or deployed lib, resolved above

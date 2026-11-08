@@ -183,7 +183,14 @@ ddev_migrate_gap() {
     # itself on stderr for install/status output.
     dmg_found=$(find "$dmg_dir" -maxdepth 1 -type f -name manifest.conf -print -quit 2>"$dmg_finderr")
     if [ -s "$dmg_finderr" ]; then
-        echo "ddev-migrate: cannot inspect $dmg_dir ($(head -1 "$dmg_finderr")) — partial-export check skipped" >&2
+        # UI_SILENT-gated (review a B2): status --short's one-verdict-line
+        # contract (agent/conventions.md, "Script output style") must
+        # survive the note — the ui.sh printers are muted under it, a raw
+        # echo is not. The CLI and install paths (no UI_SILENT) keep the
+        # stderr note.
+        if [ "${UI_SILENT:-0}" != 1 ]; then
+            echo "ddev-migrate: cannot inspect $dmg_dir ($(head -1 "$dmg_finderr")) — partial-export check skipped" >&2
+        fi
         rm -f "$dmg_stage" "$dmg_finderr" 2>/dev/null || true
         return 1
     fi
@@ -790,7 +797,7 @@ ddev_migrate_import() {
             dm_failed="$dm_failed $dm_n"
         fi
     done <"$dm_manifest"
-    rm -f "$dm_manifest" 2>/dev/null || true
+    rm -f "$dm_manifest" "$dm_finderr" 2>/dev/null || true
 
     echo ""
     echo "  imported $dm_ok database(s) from $dm_dir"

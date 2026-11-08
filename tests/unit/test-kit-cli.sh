@@ -1534,14 +1534,15 @@ fi
 # and driven with PATH-fixing sudo shims over a binary farm (the
 # test-tui-mode arm idiom).
 OCW2_BLOCK="$(sed -n '/#244 f W2/,/^            fi$/p' "$KIT")"
-# Bound is 35 lines: 33 (the #244 f W2 compound) + 2 for pr-00263 c C2
-# (the else branch exits 1 instead of falling through to exit 0).
+# Bound is 38 lines: 33 (the #244 f W2 compound) + 2 for pr-00263 c C2
+# (the else branch exits 1 instead of falling through to exit 0) + 3
+# for the #249 isolation note (review a C2).
 if [ -n "$OCW2_BLOCK" ] &&
-    [ "$(printf '%s\n' "$OCW2_BLOCK" | wc -l)" -le 35 ] &&
+    [ "$(printf '%s\n' "$OCW2_BLOCK" | wc -l)" -le 38 ] &&
     printf '%s\n' "$OCW2_BLOCK" |
     grep -qF 'sh -c ' &&
     printf '%s\n' "$OCW2_BLOCK" |
-    grep -qF 'command -v python3 >/dev/null 2>&1 && exec python3 "$@"'; then
+    grep -qF 'command -v python3 >/dev/null 2>&1 && exec python3 -I "$@"'; then
     echo "  ${GREEN}PASS${NC}  settings-edit guard runs inside the sudo context (#244 f W2)"
     passed=$((passed + 1))
 else
@@ -1715,11 +1716,19 @@ grep -qF 'entry (key or value) by hand' "$KIT" &&
 
 echo ""
 _kit_pi=$(sed 's/^[[:space:]]*#.*$//' "$KIT" | grep -c 'python3 -I' || true)
-if [ "${_kit_pi:-0}" -ge 1 ]; then
-    echo "${GREEN}PASS${NC}  opk's policy-tree python3 site runs -I ($_kit_pi found) (#249)"
+if [ "${_kit_pi:-0}" -ge 2 ]; then
+    echo "${GREEN}PASS${NC}  opk's python3 sites run -I (policy tree + settings edit, $_kit_pi found) (#249, review a C2)"
     passed=$((passed + 1))
 else
-    echo "${RED}FAIL${NC}  opk must run its policy-tree parse with python3 -I (#249)"
+    echo "${RED}FAIL${NC}  opk must run both its python3 sites with -I (found ${_kit_pi:-0}) (#249, review a C2)"
+    failures=$((failures + 1))
+fi
+_kit_exec_pi=$(sed 's/^[[:space:]]*#.*$//' "$KIT" | grep -c 'exec python3 -I' || true)
+if [ "${_kit_exec_pi:-0}" -ge 1 ]; then
+    echo "${GREEN}PASS${NC}  opk's settings-edit exec runs python3 -I (review a C2)"
+    passed=$((passed + 1))
+else
+    echo "${RED}FAIL${NC}  the settings-edit exec must run python3 -I (review a C2)"
     failures=$((failures + 1))
 fi
 

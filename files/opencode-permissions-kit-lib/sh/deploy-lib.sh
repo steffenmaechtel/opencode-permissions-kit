@@ -37,13 +37,17 @@ XDG_SHIM_FIX_VERSION="2.0.32"
 
 # xdg_shim_needed_for <major> <x.y.z>: rc 0 = the binary still needs
 # the fallback shim; rc 1 = it opens without one itself (2.x at or
-# above XDG_SHIM_FIX_VERSION). An empty/unparseable version keeps the
-# shim — the probe must prove safety, never assume it (the wrapper's
-# fail-open idiom; 1.x is never fixed, so only a parsed 2.x triple can
-# ever return 1). Version order via sort -V, the advisories.sh idiom.
+# above XDG_SHIM_FIX_VERSION). An empty or non-version-shaped value
+# keeps the shim — the probe must prove safety, never assume it (the
+# wrapper's fail-open idiom; 1.x is never fixed, so only a parsed 2.x
+# triple can ever return 1). The shape gate is load-bearing (review a
+# A3): sort -V places non-numeric strings AFTER the triple, so without
+# it a garbage version would compare as "newer" and fail OPEN.
+# Version order via sort -V, the advisories.sh idiom.
 xdg_shim_needed_for() {
     [ "$1" = 2 ] || return 0
     [ -n "$2" ] || return 0
+    printf '%s' "$2" | grep -qE '^[0-9]+(\.[0-9]+)*$' || return 0
     _xsg_hi=$(printf '%s\n%s\n' "$2" "$XDG_SHIM_FIX_VERSION" | sort -V | tail -n 1)
     [ "$_xsg_hi" = "$2" ] && return 1
     return 0

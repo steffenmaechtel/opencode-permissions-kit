@@ -48,7 +48,10 @@ PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
 # the deployed library; checkout and installed runs keep their own dir.
 ST_CALL_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
 if ! [ -f "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")" ]; then
-    ST_CALL_DIR="/usr/local/lib/opencode-permissions-kit/opencode-permissions-kit-lib/management"
+    # The DEPLOYED management dir on the flat library layout (review a
+    # B1: the repo-layout path does not exist deployed) — a stdin run
+    # then resolves exactly like a deployed run.
+    ST_CALL_DIR="/usr/local/lib/opencode-permissions-kit/management"
 fi
 UI_LIB="$ST_CALL_DIR/../sh/ui.sh"
 [ -f "$UI_LIB" ] || UI_LIB="/usr/local/lib/opencode-permissions-kit/sh/ui.sh"

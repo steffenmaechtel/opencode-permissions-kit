@@ -98,7 +98,18 @@
 set -u
 
 # --- shared UI helpers (checkout-first, status.sh pattern) ------------------------
-UI_LIB="$(cd "$(dirname "$0")" && pwd)/../sh/ui.sh"
+# Caller-dir anchor (#405, review a A2): a streamed stdin run
+# (curl ... | sudo sh) has no real $0 — the dirname-$0 lookups below
+# (and DOCTOR_OPK's exec in fix mode) would resolve cwd-sibling files,
+# unpinned, as root. Pin stdin runs to the deployed library's
+# management dir on the FLAT layout; checkout and installed runs keep
+# their own dir. A real script path resolves to an existing file, the
+# interpreter name does not.
+DR_CALL_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
+if ! [ -f "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")" ]; then
+    DR_CALL_DIR="/usr/local/lib/opencode-permissions-kit/management"
+fi
+UI_LIB="$DR_CALL_DIR/../sh/ui.sh"
 [ -f "$UI_LIB" ] || UI_LIB="/usr/local/lib/opencode-permissions-kit/sh/ui.sh"
 if [ -f "$UI_LIB" ]; then
     # shellcheck disable=SC1090
@@ -113,7 +124,7 @@ fi
 # uses — one implementation, not per-command copies; see path-sane.sh).
 # Hard fail like ui.sh: a missing sibling means the deployment is
 # broken, and the default root needs the walker.
-PS_LIB="$(cd "$(dirname "$0")" && pwd)/../sh/path-sane.sh"
+PS_LIB="$DR_CALL_DIR/../sh/path-sane.sh"
 [ -f "$PS_LIB" ] || PS_LIB="/usr/local/lib/opencode-permissions-kit/sh/path-sane.sh"
 if [ -f "$PS_LIB" ]; then
     # shellcheck disable=SC1090
@@ -665,7 +676,7 @@ fi
 # OPK_INSTALL_CONF / OPK_DOCTOR_PROC_ROOT).
 DOCTOR_OPK="${OPK_DOCTOR_OPK:-}"
 if [ "$DOCTOR_MODE" = "fix" ] && [ -z "$DOCTOR_OPK" ]; then
-    DOCTOR_OPK="$(cd "$(dirname "$0")" && pwd)/../bin/opk"
+    DOCTOR_OPK="$DR_CALL_DIR/../bin/opk"
     [ -f "$DOCTOR_OPK" ] || DOCTOR_OPK="/usr/local/lib/opencode-permissions-kit/bin/opk"
 fi
 if [ "$DOCTOR_MODE" = "fix" ] && [ ! -f "$DOCTOR_OPK" ]; then

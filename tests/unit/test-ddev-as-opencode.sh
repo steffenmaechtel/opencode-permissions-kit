@@ -925,8 +925,8 @@ check "reshare detect: status.sh prints the opk ensure-shared one-command fix (i
     sh -c "grep -qF 'opk ensure-shared \\\"\$_st_d\\\"' \"\$1\"" _ "$STATUS_CORE"
 check "reshare detect: status.sh fix line is the short form only (no raw helper call)" \
     sh -c "! grep -q -- '--opk-ensure-shared' \"\$1\" && ! grep -q -- '--opk-ensure-shared' \"\$2\"" _ "$STATUS" "$STATUS_CORE"
-check "reshare detect: status.sh resolves the lib checkout-first (0.0.46a F4)" \
-    sh -c "grep -qF '_st_dhl=\"\$(cd \"\$(dirname \"\$0\")\" && pwd)/../sh/ddev-handover.sh\"' \"\$1\" && grep -qF '[ -f \"\$_st_dhl\" ] || _st_dhl=\"\$LIBDIR/sh/ddev-handover.sh\"' \"\$1\"" _ "$STATUS_CORE"
+check "reshare detect: status.sh resolves the lib checkout-first (0.0.46a F4; rides the entry's ST_CALL_DIR anchor #405)" \
+    sh -c "grep -qF '_st_dhl=\"\${ST_CALL_DIR:-\$(cd \"\$(dirname \"\$0\")\" 2>/dev/null && pwd)}/../sh/ddev-handover.sh\"' \"\$1\" && grep -qF '[ -f \"\$_st_dhl\" ] || _st_dhl=\"\$LIBDIR/sh/ddev-handover.sh\"' \"\$1\"" _ "$STATUS_CORE"
 check "reshare detect: status fix names 'any ddev command' — every invocation heals (0.0.46a F7 wording inverted by issue #279)" \
     sh -c "grep -q 'any ddev command in this project' \"\$1\" && ! grep -q 'tree-creating ddev command (config/get/start/restart' \"\$1\" && ! grep -q 'tree-creating ddev command (config/get/start/restart' \"\$2\"" _ "$STATUS_CORE" "$STATUS"
 check "reshare detect: warn line names the general cause, not only agent runs (issue #279)" \

@@ -625,12 +625,38 @@ if PYTHONHOME="$_RES/nonexistent-py-home" python3 -c 'import json' 2>/dev/null; 
 else
     pass "control arm: bare python3 breaks under the hostile PYTHONHOME (#249)"
 fi
-# Sweep floor: every python3 invocation in the lib runs isolated.
+# Sweep floor: update-core's own site runs isolated (floor — the
+# tree-wide absence pin below is the ceiling).
 _pc=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -c 'python3 -I' || true)
 if [ "${_pc:-0}" -ge 1 ]; then
-    pass "sweep: update-core.sh python3 calls run -I ($_pc site(s), #249)"
+    pass "sweep floor: update-core.sh python3 call runs -I ($_pc site(s), #249)"
 else
     fail "update-core.sh must invoke python3 -I at the resolve site (#249)"
+fi
+
+# --- #249 absence sweep (review a C5): NO bare python3 execution anywhere ----------
+# The per-file count pins are floors — a NEW bare site would stay green.
+# This is the ceiling: every python3 INVOCATION shape (a flag, "-",
+# quoted variable, path) in every shipped file that mentions python3
+# must carry -I. Message strings name python3 in prose (a word follows,
+# not a flag/quote/dollar/slash) and match no arm of the regex.
+# Dual mentions on one line occur only as guard+exec pairs or prose
+# (the tui-plugin.sh:82 shape): the -I exclusion drops those lines when
+# the exec is isolated — a BARE exec behind a guard keeps the line
+# (no -I anywhere) and stays caught.
+_bare_py=""
+while IFS= read -r _pyf; do
+    _hits=$(sed 's/^[[:space:]]*#.*$//' "$_pyf" |
+        grep -nE 'python3 (-[A-Za-z]|-$|"|/|\$)' | grep -v 'python3 -I' || true)
+    [ -z "$_hits" ] || _bare_py="$_bare_py
+$_pyf: $_hits"
+done <<EOF
+$(grep -rl 'python3' "$SCRIPT_DIR/../../files" | grep -v '\.py$' | sort)
+EOF
+if [ -z "$_bare_py" ]; then
+    pass "sweep ceiling: no bare python3 execution site in files/ (#249, review a C5)"
+else
+    fail "bare python3 execution sites remain (review a C5):$_bare_py"
 fi
 
 # --- #257: the xdg shim section gates on the deployed version ---------------------

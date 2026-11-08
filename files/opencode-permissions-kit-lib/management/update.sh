@@ -347,10 +347,15 @@ fi
 # update-core.sh is not a substitute (#405).
 if [ "$_opk_stdin_run" = true ] && [ "$_opk_binonly" = true ]; then
     if [ -f /usr/local/lib/opencode-permissions-kit/sh/update-core.sh ]; then
-        SCRIPT_DIR="/usr/local/lib/opencode-permissions-kit/opencode-permissions-kit-lib/management"
+        # The DEPLOYED management dir on the flat library layout — a
+        # stdin run then resolves exactly like a deployed run (every
+        # checkout-first candidate misses, the LIBDIR fallbacks hit;
+        # review a B1: the repo-layout path does not exist deployed).
+        SCRIPT_DIR="/usr/local/lib/opencode-permissions-kit/management"
     else
         echo "error: streamed --only-binary run found no installed kit library at" >&2
-        echo "       /usr/local/lib/opencode-permissions-kit — run 'sudo opk update --only-binary' instead" >&2
+        echo "       /usr/local/lib/opencode-permissions-kit — install the kit first," >&2
+        echo "       or run a full streamed update without --only-binary" >&2
         exit 1
     fi
 fi
@@ -883,9 +888,13 @@ fi
 
 if [ "$ONLY_BINARY" != true ]; then
     # After the optional binary swap by design (#257): the shim gate
-    # reads the DEPLOYED binary's version — a downgrade + update
+    # reads the DEPLOYED binary's version — a downgrade + full update
     # re-deploys the shim in the same run, an upgrade past the fix
-    # removes it.
+    # removes it. (Full updates and --binary runs only: under
+    # --only-binary this block is skipped by design — review a B5 —
+    # so `opk upgrade-opencode` alone leaves a stale shim until the
+    # next full update, matching that mode's "kit files untouched"
+    # contract and the docs' full-update advice.)
     update_redeploy_xdg_shim
     update_finalize_opencode_home
     update_finalize_default_config

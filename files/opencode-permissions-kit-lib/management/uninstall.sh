@@ -56,13 +56,15 @@ done
 # Caller-dir anchor (#405), placed before the first dirname-$0 lookup:
 # a streamed stdin run (curl ... | sudo sh) has no real $0 — the
 # lookups below would resolve a cwd-sibling lib and source it as root,
-# unpinned. Pin stdin runs to the deployed library (uninstall only ever
-# makes sense against an install anyway); checkout and installed runs
-# keep their own dir. A real script path resolves to an existing file,
-# the interpreter name does not.
-UN_CALL_DIR="$(dirname "$0")"
+# unpinned. Pin stdin runs to the deployed library's management dir on
+# the FLAT layout (review a B1: the repo-layout path does not exist
+# deployed); checkout and installed runs keep their own dir — resolved
+# through readlink like the pre-#405 UNINSTALL_CORE line (review a B1:
+# the bare dirname lost symlink resolution). A real script path
+# resolves to an existing file, the interpreter name does not.
+UN_CALL_DIR="$(dirname "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")")"
 if ! [ -f "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")" ]; then
-    UN_CALL_DIR="/usr/local/lib/opencode-permissions-kit/opencode-permissions-kit-lib/management"
+    UN_CALL_DIR="/usr/local/lib/opencode-permissions-kit/management"
 fi
 log() { :; }
 for cand in "$UN_CALL_DIR/../sh/log.sh" \

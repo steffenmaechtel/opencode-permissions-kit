@@ -1508,10 +1508,12 @@ else
 fi
 # Pairing guard list: binary upgrade before xdg shim, same as the run
 # order above (the guard pins the section list — keep them in agreement).
-# The list spans backslash-continued lines — joined first, then the
-# ORDER is proven by prefix: whatever precedes update_redeploy_xdg_shim
-# must already contain update_binary_upgrade.
-_pg_list="$(sed -n "/^update_pairing_guard() {/,/^}/p" "$UPDATE" | tr -d '\\' | tr -s '[:space:]' ' ')"
+# The list spans backslash-continued lines — joined first, comments
+# stripped (the rider idiom — a comment inside the guard must not carry
+# the order proof, review a C3), then the ORDER is proven by prefix:
+# whatever precedes update_redeploy_xdg_shim must already contain
+# update_binary_upgrade.
+_pg_list="$(sed -n "/^update_pairing_guard() {/,/^}/p" "$UPDATE" | sed 's/^[[:space:]]*#.*$//' | tr -d '\\' | tr -s '[:space:]' ' ')"
 case "$_pg_list" in
     *update_binary_upgrade*update_redeploy_xdg_shim*)
         pass "pairing guard list keeps the same order (#257)"

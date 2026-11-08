@@ -981,6 +981,17 @@ if [ "$(id -u)" != 0 ]; then
     else
         fail "gap: unreadable dump dir must skip-with-note, not claim no-manifest (got: $_g322_out) (#322)"
     fi
+    # UI_SILENT gate (review a B2): `opk status --short` must keep its
+    # one-verdict-line contract — the note mutes under UI_SILENT=1 the
+    # way the ui.sh printers do.
+    _g322s_out=$(DDEV_MIG_BACKUP_ROOT="$_g322/backups" DDEV_MIG_DEV_HOME="$_g322/devhome" \
+        UI_SILENT=1 timeout 10 sh -c '. "$1" && ddev_migrate_gap maxmustermann "$2"' \
+        _ "$MIG" "$_g322/roots" 2>&1) || true
+    if ! printf '%s\n' "$_g322s_out" | grep -qF 'partial-export check skipped'; then
+        pass "gap: the skip-note is UI_SILENT-gated (status --short stays one line) (review a B2)"
+    else
+        fail "gap: the skip-note must mute under UI_SILENT=1 (review a B2, got: $_g322s_out)"
+    fi
     chmod 755 "$_g322/backups/ddev-migration-20260101-000000"
     mkdir -p "$_g322/bin"
     printf '#!/bin/sh\necho 0\n' >"$_g322/bin/id"

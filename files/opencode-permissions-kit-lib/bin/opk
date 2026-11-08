@@ -380,7 +380,10 @@ case "$cmd" in
             # the two disagree (not-found noise on one arm, a skipped edit
             # sudo could perform on the other). Operands pass as argv to
             # the inner sh; the heredoc feeds python3's stdin through it.
-            if sudo -u "$_oc_duser" sh -c 'command -v python3 >/dev/null 2>&1 && exec python3 "$@"' \
+            # -I (#249, review a C2): the tui-plugin twin's shape — the
+            # edit must not follow a poisoned PYTHONHOME/PYTHONPATH
+            # (sudo's env_reset strips them today; env_keep re-opens it).
+            if sudo -u "$_oc_duser" sh -c 'command -v python3 >/dev/null 2>&1 && exec python3 -I "$@"' \
                 opk-settings-edit - "$_oc_settings" <<'PYEOF'
 import json, sys, pathlib
 p = pathlib.Path(sys.argv[1])

@@ -728,11 +728,15 @@ _opk_timeout_ok() {
 
 # Verify a candidate binary actually runs, then install it over $SYSTEM_BIN.
 # Bounded `--version` probe (0.0.43b W3): a wedged 2.x service can make
-# even --version hang (issue #80) — the update paths, including the
-# pre-upgrade major resolution, must never block on it. Empty output
-# means unknown, never a guess. The gate is the #248 two-class probe:
-# a broken-but-findable timeout degrades to the unbounded arm, not to
-# a failed probe.
+# even --version hang (issue #80) — with a WORKING timeout the update
+# paths, including the pre-upgrade major resolution, never block on it
+# and empty output means unknown, never a guess. The gate is the #248
+# two-class probe: a broken-but-findable timeout degrades to the
+# UNBOUNDED arm, not to a failed probe — for install_binary that
+# converts the old bounded refusal (probe failed → candidate rejected)
+# into an unbounded run of the candidate (review a A4: same deliberate
+# trade an absent timeout already made, now named); a broken timeout
+# PLUS the #80 wedge can hang the update on such hosts.
 opencode_version_line() {
     if _opk_timeout_ok; then
         timeout 10 "$SYSTEM_BIN" --version 2>/dev/null | head -1 || true
