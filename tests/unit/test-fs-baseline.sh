@@ -1147,8 +1147,14 @@ assert_eq "#265 cat arm: SIGPIPE (141) maps to the consumer-EPIPE 0" "0" "$W65C1
 # clear an inherited ignore via shell trap — POSIX forbids
 # re-enabling it), and under SIG_IGN cat exits 1 (write error) instead
 # of dying by signal; the disposition reset must happen in a real
-# process before exec. Skipped with a note where bash/python3 absent.
-if command -v bash >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+# process before exec. Under kcov the rider is SKIPPED via the
+# OPK_KCOV_RUN marker (#418 b C2): kcov's engine turns cat's signal
+# death into rc 1 regardless of the disposition — an instrumentation
+# property (the PS4-shield pattern this header documents), pinned as
+# the skip note below. Skipped with a note where bash/python3 absent.
+if [ "${OPK_KCOV_RUN:-0}" = 1 ]; then
+    echo "  note: under kcov — cat-arm pipefail rider skipped (kcov's engine turns cat's SIGPIPE death into rc 1; the stub pins above carry the rc contract) (#418 b C2)"
+elif command -v bash >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
     W65BIG="$WORK/issue265-big"
     python3 -c 'import sys; sys.stdout.buffer.write(b"e\0" * 524288)' >"$W65BIG"
     W65PF=0

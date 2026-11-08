@@ -184,8 +184,10 @@ _fsb_count_tee() {
         # ||-context suppresses errexit for cat alone; everything after
         # still runs under set -e. (A process inheriting SIGPIPE
         # ignored — CI runners do — turns the death into cat rc 1
-        # "write error"; that path fails loud through pipefail: safe,
-        # and pinned as the rider's environment note.)
+        # "write error"; that path fails loud through pipefail: safe.
+        # Documented, not pinned, in the rider's environment note, and
+        # skipped under kcov, whose instrumentation turns signal deaths
+        # into rc 1 (#418 b C2/R3).)
         _fsb_cat_rc=0
         cat || _fsb_cat_rc=$?
         if [ "$_fsb_cat_rc" -eq 141 ]; then

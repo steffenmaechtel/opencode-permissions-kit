@@ -142,7 +142,7 @@ for suite in tests/unit/test-*.sh; do
         *"$filter"*) ;;
         *) continue ;;
     esac
-    if PATH="$OUT/shim:$PATH" "$KCOV" \
+    if OPK_KCOV_RUN=1 PATH="$OUT/shim:$PATH" "$KCOV" \
         --include-pattern="$REPO/files/,$REPO/scripts/" \
         "$OUT/runs/$name" "$suite" >"$OUT/logs/$name.log" 2>&1; then
         echo "OK    $name"

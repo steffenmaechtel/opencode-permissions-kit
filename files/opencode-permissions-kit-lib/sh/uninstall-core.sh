@@ -694,8 +694,10 @@ un_projects_revert() {
         # quoting defang it"). #247's reader-parity wave closed the
         # pending mirror-or-scope decision the OTHER way: the arm is
         # mirrored now (this case arm above), matching the update-core
-        # and config.sh refresh readers — a spaced line gets the same
-        # loud skip everywhere, and no consumer of a hand-edited conf
+        # and config.sh refresh readers — every reader's FORM gate
+        # refuses the same spellings (an existence gate may still eat a
+        # NONEXISTENT line silently first; docs/reference/files.md
+        # names the nuance), and no consumer of a hand-edited conf
         # processes an entry the writer would never store.
         # Deliberate divergence, pinned in the unit suite: the scratch
         # prefixes /tmp and /var/tmp stay processable (the sandbox

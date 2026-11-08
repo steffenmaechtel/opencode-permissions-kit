@@ -265,8 +265,8 @@ kit_source() {
 # summary. The stamp writer is the deliberate exception: the stamp is a
 # rescan optimization, a missing stamp only costs the next update a scan
 # (the update-core twin's documented contract), never a skipped action.
-# The file's THIRD silent pair sits at the browser-bridge sourcing
-# below — guarded by its is_wsl rc-1 twin, see the comment there.
+# The browser-bridge pair at the sourcing below is silent too —
+# guarded by its is_wsl rc-1 twin, see the comment there.
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-handover.sh"
 command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() {
     echo "error: ddev_handover_root unavailable (ddev-handover.sh incomplete) — the handover is not optional" >&2
