@@ -385,18 +385,25 @@ if [ -n "$_ubd_dir" ] && [ -d "$_ubd_dir" ] &&
 else
     fail "backup dir helper broken (out=$_ubd_out) (#376 B5)"
 fi
-mkdir -p "$_UBW/full"  # occupy the root path: mkdir -p ok, but the
-chmod 500 "$_UBW/full" # 700-dir create inside fails for non-root
-_ubd_fail=$(UPD_BACKUP_ROOT="$_UBW/full/nodir" sh -c '
+mkdir -p "$_UBW/leafroot"  # EXISTS (mkdir -p passes) but unwritable: the
+chmod 500 "$_UBW/leafroot" # failure lands on the LEAF mkdir — the
+# pr-00429 a B3 arm (a pre-root failure never reaches the flag and
+# cannot discriminate; verified both ways during sabotage)
+_ubd_fail=$(UPD_BACKUP_ROOT="$_UBW/leafroot" sh -c '
         log() { :; }
         . "$1"
         if update_ensure_backup_dir; then echo "BAD: rc 0"; else echo "rc1=$?"; fi
+        if update_ensure_backup_dir; then echo "BAD: second rc 0"; else echo "rc2=$?"; fi
     ' _ "$LIB" 2>&1)
+chmod 700 "$_UBW/leafroot"
 case "$_ubd_fail" in
-    rc1=1) pass "backup dir: unwritable root fails loud rc 1 (#376 B5)" ;;
-    *) fail "backup dir must refuse rc 1 on an unwritable root (got $_ubd_fail)" ;;
+    rc1=1*rc2=1*)
+        pass "backup dir: leaf failure fails loud rc 1, BOTH calls — the idempotence flag is not set on failure (pr-00429 a B3)"
+        ;;
+    *)
+        fail "backup dir must refuse rc 1 on leaf failure, first AND second call (got $_ubd_fail) (pr-00429 a B3)"
+        ;;
 esac
-chmod 700 "$_UBW/full"
 
 # --- 18. library rollback (#376 B5): failed lib_deploy restores the tree -----------
 # lib_deploy stubbed to rc 1 after half-planting a new file (the mixed

@@ -653,6 +653,50 @@ if printf '%s\n' "$_O372C_OUT" | grep -qF 'SUDO: cp -a' &&
 else
     fail "happy path broken by the recheck (out=$_O372C_OUT) (#377 O2)"
 fi
+# pr-00429 a C2: the SECOND exec-time recheck (after the copy, before
+# the baseline legs) must trip on a swapped leaf — the chmod/chown legs
+# dereference their operands (chmod has no -P, measured), so a trip
+# must skip them loudly. Three walks: entry gate passes, pre-copy
+# recheck passes, post-copy recheck trips.
+_O372C2_OUT=$(
+    DEV_HOME="$_O372W/dev" OPENCODE_USER=oc _opk_ag=c sh -c '
+        . "$1"
+        _ahs_calls=0
+        agent_home_sane() {
+            _ahs_calls=$((_ahs_calls + 1))
+            [ "$_ahs_calls" -ge 3 ] && return 1
+            return 0
+        }
+        sudo() { echo "SUDO: $*"; }
+        ui_warn() { echo "warn: $*"; }
+        ui_success() { echo "success: $*"; }
+        ui_info() { :; }
+        ui_detail() { :; }
+        log() { echo "log: $*"; }
+        _opk_migrate_one .agents
+    ' _ "$_O372W/migrate-one.sh" 2>&1
+)
+if printf '%s\n' "$_O372C2_OUT" | grep -qF 'SUDO: cp -a' &&
+    ! printf '%s\n' "$_O372C2_OUT" | grep -qE 'SUDO: (find|chown -R|chmod)' &&
+    printf '%s\n' "$_O372C2_OUT" | grep -qF 'warn: agent resources copied but the sharing baseline was NOT applied:' &&
+    ! printf '%s\n' "$_O372C2_OUT" | grep -qF 'success: agent resources COPIED'; then
+    pass "second recheck trips before the baseline legs: no chmod/chown operand touched (pr-00429 a C2)"
+else
+    fail "post-copy recheck must skip the baseline legs loudly (out=$_O372C2_OUT) (pr-00429 a C2)"
+fi
+# pr-00429 a C3: the Step 8 blocks (.config, .config/opencode, .agents)
+# carry the same exec-time recheck — one entry gate + one re-walk per
+# block before the chown -R/chmod legs. Count on comment-stripped
+# source between the Step 8 and Step 8a markers: 3 entry gates + 3
+# rechecks = 6 agent_home_sane calls (the migration helper has its own
+# two, outside this range).
+_O372C3_N=$(sed -n '/=== Step 8: opencode Home ===/,/=== Step 8a:/p' "$_MIG_CORE" |
+    sed 's/^[[:space:]]*#.*$//' | grep -c 'agent_home_sane' || true)
+if [ "$_O372C3_N" -eq 6 ]; then
+    pass "Step 8 blocks: 3 entry gates + 3 exec-time rechecks (pr-00429 a C3)"
+else
+    fail "Step 8 blocks must carry 6 agent_home_sane calls, got $_O372C3_N (pr-00429 a C3)"
+fi
 
 echo ""
 suite_done

@@ -690,7 +690,7 @@ check "binary byte-identical (sha256 unchanged)" \
 check "projects.conf content unchanged" \
     E 'test "$(cat /etc/opencode-permissions-kit/projects.conf)" = "$(cat /tmp/projects.conf.before)"'
 check "install.conf VERSION bumped to sentinel" \
-    E 'grep -q "VERSION=9.9.9" /etc/opencode-permissions-kit/install.conf'
+    E 'grep -qx "VERSION=9.9.9" /etc/opencode-permissions-kit/install.conf'
 E 'rm -rf /tmp/update-test'
 
 echo ""
@@ -714,7 +714,7 @@ check "11b: binary replaced by the stub (--only-binary)" \
 check "11b: kit re-deploy skipped (marker survived)" \
     E 'test "$(sudo cat /usr/local/lib/opencode-permissions-kit/.only-binary-marker)" = "marker"'
 check "11b: install.conf version NOT re-stamped (still section 11's sentinel)" \
-    E 'grep -q "VERSION=9.9.9" /etc/opencode-permissions-kit/install.conf && ! grep -q "VERSION=8.8.8" /etc/opencode-permissions-kit/install.conf'
+    E 'grep -qx "VERSION=9.9.9" /etc/opencode-permissions-kit/install.conf && ! grep -qx "VERSION=8.8.8" /etc/opencode-permissions-kit/install.conf'
 # top-level shorthand (issue #24): kit CLI maps upgrade-opencode onto
 # update.sh --yes --only-binary, flags pass through
 E 'printf "#!/bin/sh\necho \"opencode version 7.7.7-shorthand\"\n" > /tmp/stub-opencode2 && chmod +x /tmp/stub-opencode2'

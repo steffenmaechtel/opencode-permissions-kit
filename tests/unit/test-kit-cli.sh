@@ -350,16 +350,16 @@ fi
 # writer-parity tripwire lives in test-project-paths.sh).
 _ho377_block=$(sed -n '/case "\$_ho_np" in/,/hand over project trees/p' "$KIT")
 _ho377_n=0
-for _ho377_fam in /var/backups /var/opt /var/crash /var/local /var/lock; do
+for _ho377_fam in /var/backups /var/opt /var/crash /var/local /var/lock /var/account /var/games /var/run; do
     printf '%s\n' "$_ho377_block" | grep -qF "$_ho377_fam |" &&
         printf '%s\n' "$_ho377_block" | grep -qF "$_ho377_fam/*" &&
         _ho377_n=$((_ho377_n + 1))
 done
-if [ "$_ho377_n" -eq 5 ]; then
-    echo "  ${GREEN}PASS${NC}  handover gate: all five completed /var families blocked (#377 O1)"
+if [ "$_ho377_n" -eq 8 ]; then
+    echo "  ${GREEN}PASS${NC}  handover gate: all eight completed /var families blocked (#377 O1, pr-00429 a A1)"
     passed=$((passed + 1))
 else
-    echo "  ${RED}FAIL${NC}  handover gate: only $_ho377_n/5 new /var families present (#377 O1)"
+    echo "  ${RED}FAIL${NC}  handover gate: only $_ho377_n/8 new /var families present (#377 O1, pr-00429 a A1)"
     failures=$((failures + 1))
 fi
 

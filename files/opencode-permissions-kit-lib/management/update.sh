@@ -341,7 +341,11 @@ fi
 # match would otherwise leave VERSION empty instead of "0.0.0"
 # (review 0.0.39b Q3).
 if [ "$_opk_binonly" != true ] && [ -f "$FILES_ROOT/../VERSION" ]; then
-    VERSION="$(cat "$FILES_ROOT/../VERSION" 2>/dev/null)"
+    # || true (pr-00429 a B2): an existing-but-unreadable file makes cat
+    # fail — the bare assignment would die silently under set -e; the
+    # || true routes it into the empty-content arm of the gate (named
+    # abort with got '<empty>').
+    VERSION="$(cat "$FILES_ROOT/../VERSION" 2>/dev/null)" || true
     # Shape gate (#376 B3, review #370 a B3): the fetched VERSION is
     # remote-mirror content that ends up re-stamped into install.conf
     # (sourced by root) — previously only non-empty was checked, while
@@ -365,7 +369,12 @@ if [ "$_opk_binonly" != true ] && [ -f "$FILES_ROOT/../VERSION" ]; then
         exit 1
     fi
 else
-    VERSION=$(sed -n 's/^VERSION=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1)
+    # || true (pr-00429 a B1, the :96-98 pattern): with pipefail the sed
+    # failure on a missing/unreadable install.conf must not abort — the
+    # old chain's `|| echo "0.0.0"` protected exactly this arm, and the
+    # preflight's named "Not installed yet" die (not a silent rc 1
+    # before the banner) is the contract.
+    VERSION=$(sed -n 's/^VERSION=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1 || true)
     [ -n "$VERSION" ] || VERSION="0.0.0"
 fi
 LIBDIR="/usr/local/lib/opencode-permissions-kit"

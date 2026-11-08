@@ -110,7 +110,8 @@ GitHub releases, 2.x through npm). Binary upgrades are best-effort: a
 failure leaves the current binary in place, the previous one is kept in
 `/var/backups/opencode-permissions-kit/update-*/bin/`.
 
-Every update run also writes its other recovery material under
+Every **full** update run (not `--only-binary`, which touches only the
+binary) also writes its other recovery material under
 `/var/backups/opencode-permissions-kit/update-<timestamp>/`: a copy of the
 rc files before the shell-hook rewrites are applied, and — before the
 library is re-deployed — a full copy of the previous library tree. A

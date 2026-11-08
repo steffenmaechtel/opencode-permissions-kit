@@ -125,6 +125,7 @@ REJECT="/ /usr /etc /home /root /var /tmp /tmp/build-dir /bin /sbin /lib /lib64 
 /var/cache /var/mail /var/mail/root \
 /var/backups /var/backups/dpkg /var/opt /var/opt/vendor-app /var/crash /var/crash/kernel \
 /var/local /var/local/proj /var/lock /var/lock/lck \
+/var/account /var/account/pacct /var/games /var/games/highscores /var/run /var/run/screen \
 /usr/share /etc/nginx /root/projects /home/../etc /./etc /etc/ /usr/ \
 relative/path ../etc ./here subdir \
 /home/opencode ///"

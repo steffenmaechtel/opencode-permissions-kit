@@ -236,7 +236,11 @@ if [ "$STREAMED" = true ]; then UI_NO_STDIN_FALLBACK=1; fi
 # grep -x alone accepts "1.2.3\njunk"); a local checkout's VERSION is
 # always bare x.y.z, so the gate only ever bites a broken mirror.
 if [ -f "$SCRIPT_DIR/../VERSION" ]; then
-    VERSION="$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null)"
+    # || true (pr-00429 a B2): an existing-but-unreadable file makes cat
+    # fail — the bare assignment would die silently under set -e; the
+    # || true routes it into the empty-content arm of the gate (named
+    # abort with got '<empty>').
+    VERSION="$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null)" || true
     _vsg_nl='
 '
     case "$VERSION" in

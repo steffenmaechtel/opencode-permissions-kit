@@ -811,17 +811,19 @@ un_projects_revert() {
         # policy pins unit-fixture roots there, and a temp-prefix
         # entry is bounded — uid/gid-matched chown, kit-gid ACL strip
         # and one setgid-bit clear (chmod g-s) only).
-        # #377 (review #370 a O1): the /var families are completed to the
-        # writer's arm list — /var/backups, /var/opt, /var/crash,
-        # /var/local, /var/lock (verbatim parity with path-sane.sh).
+        # #377 (review #370 a O1) + pr-00429 a A1: the /var families are
+        # FHS-complete — /var/account, /var/backups, /var/crash, /var/games,
+        # /var/local, /var/lock, /var/opt, /var/run (verbatim parity with
+        # path-sane.sh).
         case "$root" in
             / | /bin | /bin/* | /boot | /boot/* | /dev | /dev/* | /etc | /etc/* | /home | /lib* | \
                 /media | /media/* | /mnt | /mnt/* | /opt | /opt/* | /proc | /proc/* | /root | /root/* | \
                 /run | /run/* | /sbin | /sbin/* | /srv | /srv/* | /sys | /sys/* | /usr | /usr/* | \
-                /var | /var/backups | /var/backups/* | /var/cache | /var/cache/* | /var/crash | \
-                /var/crash/* | /var/lib | /var/lib/* | /var/local | /var/local/* | /var/lock | \
-                /var/lock/* | /var/log | /var/log/* | /var/mail | /var/mail/* | /var/opt | \
-                /var/opt/* | /var/spool | /var/spool/*)
+                /var | /var/account | /var/account/* | /var/backups | /var/backups/* | /var/cache | \
+                /var/cache/* | /var/crash | /var/crash/* | /var/games | /var/games/* | /var/lib | \
+                /var/lib/* | /var/local | /var/local/* | /var/lock | /var/lock/* | /var/log | \
+                /var/log/* | /var/mail | /var/mail/* | /var/opt | /var/opt/* | /var/run | \
+                /var/run/* | /var/spool | /var/spool/*)
                 echo "  Skipping system path: $root"
                 continue
                 ;;

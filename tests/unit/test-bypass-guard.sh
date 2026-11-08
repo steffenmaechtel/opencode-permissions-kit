@@ -115,9 +115,12 @@ fi
 if [ "$_bgw_rc" -ne 0 ] &&
     printf '%s\n' "$_bgw_out" | grep -qF "error: fetched VERSION file is malformed (expected x.y.z, got '0.0.59-suffix')"; then
     echo "  ${GREEN}PASS${NC}  install.sh gates its fetched VERSION to x.y.z (#376 B3 sweep)"
+    passed=$((passed + 1))
 else
     echo "  ${RED}FAIL${NC}  install.sh VERSION gate missing (rc=$_bgw_rc out=$_bgw_out) (#376 B3 sweep)"
+    failures=$((failures + 1))
 fi
+rm -rf "$_BGW"
 # #211 b W4: the sourced-lib mode invariant needs a pin per lib —
 # shell-warn.sh was the only one here (log.sh via test-deploy-lib);
 # advisories.sh and ui.sh had no mode pin anywhere. Modes flipped 755 ->

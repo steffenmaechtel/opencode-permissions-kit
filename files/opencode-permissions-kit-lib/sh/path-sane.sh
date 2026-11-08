@@ -136,16 +136,23 @@ project_path_sane() {
         # documented project-home. The named families were completed for
         # #377 (review #370 a O1): /var/backups (dpkg passwd/shadow
         # backups), /var/opt, /var/crash, /var/local and /var/lock had
-        # slipped past the "everything else system-ish" claim — the same
-        # arms ship in every reader mirror (uninstall-core, update-core,
-        # config.sh refresh, bin/opk handover).
+        # slipped past the "everything else system-ish" claim — and
+        # pr-00429 a A1 closed the remaining FHS set (/var/account,
+        # /var/games, /var/run — real-dir layouts expose /var/run where
+        # mainstream symlinks it to /run). The list is FHS-complete for
+        # /var now; non-FHS distro-specific dirs (/var/empty and
+        # friends) are an accepted residual — no sanctioned layout
+        # registers them as project homes. The same arms ship in every
+        # reader mirror (uninstall-core, update-core, config.sh
+        # refresh, bin/opk handover).
         / | /bin | /bin/* | /boot | /boot/* | /dev | /dev/* | /etc | /etc/* | /home | /lib* | \
             /media | /media/* | /mnt | /mnt/* | /opt | /opt/* | /proc | /proc/* | /root | /root/* | \
             /run | /run/* | /sbin | /sbin/* | /srv | /srv/* | /sys | /sys/* | /tmp | /tmp/* | /var/tmp/* | \
-            /usr | /usr/* | /var | /var/tmp | /var/backups | /var/backups/* | /var/cache | \
-            /var/cache/* | /var/crash | /var/crash/* | /var/lib | /var/lib/* | /var/local | \
-            /var/local/* | /var/lock | /var/lock/* | /var/log | /var/log/* | /var/mail | \
-            /var/mail/* | /var/opt | /var/opt/* | /var/spool | /var/spool/*)
+            /usr | /usr/* | /var | /var/tmp | /var/account | /var/account/* | /var/backups | \
+            /var/backups/* | /var/cache | /var/cache/* | /var/crash | /var/crash/* | /var/games | \
+            /var/games/* | /var/lib | /var/lib/* | /var/local | /var/local/* | /var/lock | \
+            /var/lock/* | /var/log | /var/log/* | /var/mail | /var/mail/* | /var/opt | \
+            /var/opt/* | /var/run | /var/run/* | /var/spool | /var/spool/*)
             return 1
             ;;
     esac

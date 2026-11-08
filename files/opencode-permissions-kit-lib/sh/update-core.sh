@@ -4,7 +4,12 @@
 # The update run's phase logic (issue #346, wave 2): every phase section
 # of management/update.sh as a function — pure code movement, output
 # byte-identical. Sourced (never executed) by update.sh, checkout-first;
-# POSIX sh, no top-level side effects (definitions and comments only).
+# POSIX sh, no top-level side effects beyond definitions, comments and
+# two variable defaults (UPD_BACKUP_ROOT/UPD_BACKUP_DIR — pr-00429 a
+# C6: assignments into the caller's namespace, no output, no
+# filesystem ops; the "definitions only" wording of the sourcing
+# purity pin covers output/rc and these defaults are its documented
+# exception).
 # The functions run in the CALLER's shell under its `set -eu`: they read
 # the globals update.sh's main flow sets (YES, REFRESH, BINARY_UPDATE,
 # ONLY_BINARY, BINARY_PATH, UPGRADE_MAJOR, UPGRADE_VERSION, VERSION,
@@ -28,21 +33,26 @@
 # /var/backups/opencode-permissions-kit/update-<ts> — the old binary
 # backup was a volatile mktemp under /tmp (reboot/tmpfs wipe destroyed
 # the only restore material of a FAILED upgrade), and the library
-# re-deploy had no tree-level rollback at all. Root-owned /var/backups
-# needs no unpredictable name (install-core's #370 a I1 wording); the
-# base is shared with the install backups, the ddev dumps and the
-# uninstall agents-backup. UPD_BACKUP_ROOT is an env override for the
-# unit sandbox (the DDEV_MIG_BACKUP_ROOT pattern — suites cannot create
-# under /var/backups); created lazily (mode 700) on first use; a
-# same-second rerun gets a PID suffix instead of clobbering.
+# re-deploy had no tree-level rollback at all. The shared base root
+# follows install-core's #370 a I1 doctrine (readable timestamp, umask
+# mode); the update-<ts> LEAF is created mode 700 — it gates the
+# recovery material. UPD_BACKUP_ROOT is an env override for the unit
+# sandbox (the DDEV_MIG_BACKUP_ROOT pattern — suites cannot create
+# under /var/backups); created lazily on first use; a same-second
+# rerun gets a PID suffix instead of clobbering.
 UPD_BACKUP_ROOT="${UPD_BACKUP_ROOT:-/var/backups/opencode-permissions-kit}"
 UPD_BACKUP_DIR=""
 update_ensure_backup_dir() {
     [ -n "$UPD_BACKUP_DIR" ] && return 0
     mkdir -p "$UPD_BACKUP_ROOT" 2>/dev/null || return 1
-    UPD_BACKUP_DIR="$UPD_BACKUP_ROOT/update-$(date +%Y%m%d-%H%M%S)"
-    [ -e "$UPD_BACKUP_DIR" ] && UPD_BACKUP_DIR="$UPD_BACKUP_DIR.$$"
-    mkdir -m 700 "$UPD_BACKUP_DIR" 2>/dev/null || return 1
+    _ubd_dir="$UPD_BACKUP_ROOT/update-$(date +%Y%m%d-%H%M%S)"
+    [ -e "$_ubd_dir" ] && _ubd_dir="$_ubd_dir.$$"
+    # The idempotence flag is assigned only once the dir exists
+    # (pr-00429 a B3): a transient mkdir failure must not poison later
+    # same-run calls into rc 0 over a nonexistent dir (the binary arm's
+    # mkdir -p would then resurrect intermediates at umask mode).
+    mkdir -m 700 "$_ubd_dir" 2>/dev/null || return 1
+    UPD_BACKUP_DIR="$_ubd_dir"
     log "update backup dir created: $UPD_BACKUP_DIR"
     return 0
 }
@@ -516,16 +526,16 @@ update_redeploy_project_roots() {
             # the blocklist allows is creatable in a unit sandbox),
             # and no sanctioned writer ever stores them.
             case "$root" in
-                # #377 (review #370 a O1): /var families completed to the
-                # writer's arms — /var/backups, /var/opt, /var/crash,
-                # /var/local, /var/lock (path-sane.sh parity).
+                # #377 (review #370 a O1) + pr-00429 a A1: FHS-complete
+                # /var families — path-sane.sh parity.
                 / | /bin | /bin/* | /boot | /boot/* | /dev | /dev/* | /etc | /etc/* | /home | /lib* | \
                     /media | /media/* | /mnt | /mnt/* | /opt | /opt/* | /proc | /proc/* | /root | /root/* | \
                     /run | /run/* | /sbin | /sbin/* | /srv | /srv/* | /sys | /sys/* | /usr | /usr/* | \
-                    /var | /var/backups | /var/backups/* | /var/cache | /var/cache/* | /var/crash | \
-                    /var/crash/* | /var/lib | /var/lib/* | /var/local | /var/local/* | /var/lock | \
-                    /var/lock/* | /var/log | /var/log/* | /var/mail | /var/mail/* | /var/opt | \
-                    /var/opt/* | /var/spool | /var/spool/*)
+                    /var | /var/account | /var/account/* | /var/backups | /var/backups/* | /var/cache | \
+                    /var/cache/* | /var/crash | /var/crash/* | /var/games | /var/games/* | /var/lib | \
+                    /var/lib/* | /var/local | /var/local/* | /var/lock | /var/lock/* | /var/log | \
+                    /var/log/* | /var/mail | /var/mail/* | /var/opt | /var/opt/* | /var/run | \
+                    /var/run/* | /var/spool | /var/spool/*)
                     ui_warn "skip $root (system path — never a project root)"
                     continue
                     ;;

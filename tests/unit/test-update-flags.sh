@@ -1383,6 +1383,65 @@ if printf '%s\n' "$_vsg_fb" | grep -qxE 'V=[0-9]+\.[0-9]+\.[0-9]+'; then
 else
     fail "library fallback broken (got $_vsg_fb) (#376 B3)"
 fi
+# pr-00429 a B1: the fallback read survives bash+pipefail — the bare
+# assignment died silently (rc 2, zero output) on a missing/unreadable
+# install.conf before the banner, the entry-shell divergence between
+# `sudo bash update.sh` and `opk upgrade-opencode` (sh). The §10 pins
+# above run bare sh and cannot see this class; this pin runs the
+# production context. HOST NOTE: with a kit installed the read
+# succeeds — the survival assert still exercises the pipefail path; on
+# a bare host it is the discriminating arm (sabotage: drop the || true).
+if _vsg_b1=$(FILES_ROOT="$_VSG/froot" bash -c '
+        set -eu
+        (set -o pipefail) 2>/dev/null && set -o pipefail || true
+        _opk_binonly=true
+        . "$1" >/dev/null 2>&1
+        printf "V=%s\n" "$VERSION"
+    ' _ "$_VSG/vergate.sh" 2>&1); then
+    _vsg_b1rc=0
+else
+    _vsg_b1rc=$?
+fi
+if [ "$_vsg_b1rc" -eq 0 ] &&
+    printf '%s\n' "$_vsg_b1" | grep -qxE 'V=[0-9]+\.[0-9]+\.[0-9]+'; then
+    pass "fallback read survives bash+set -eu+pipefail (pr-00429 a B1)"
+else
+    fail "fallback read dies under bash+pipefail (rc=$_vsg_b1rc out=$_vsg_b1) (pr-00429 a B1)"
+fi
+# Static arm (discriminates on installed hosts where the behavioral arm
+# above cannot force a missing install.conf): the fallback read carries
+# the || true guard, comment-stripped.
+if sed 's/^[[:space:]]*#.*$//' "$UPDATE" |
+    grep -qF 'sed -n '"'"'s/^VERSION=//p'"'"' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1 || true'; then
+    pass "fallback read carries the pipefail || true guard (pr-00429 a B1, static arm)"
+else
+    fail "fallback read lost its || true guard (pr-00429 a B1, static arm)"
+fi
+# pr-00429 a B2: an existing-but-unreadable VERSION file must route
+# into the named empty-content abort, not a silent set -e death. The
+# chmod-000 injection only bites for NON-ROOT runners (root reads
+# through it — environment-marked, L4); either way the fragment must
+# never exit with a raw rc > 1 and no message.
+printf '0.1.2\n' >"$_VSG/VERSION"
+chmod 000 "$_VSG/VERSION"
+if _vsg_b2=$(FILES_ROOT="$_VSG/froot" bash -c '
+        set -eu
+        (set -o pipefail) 2>/dev/null && set -o pipefail || true
+        _opk_binonly=false
+        . "$1"
+    ' _ "$_VSG/vergate.sh" 2>&1); then
+    _vsg_b2rc=0
+else
+    _vsg_b2rc=$?
+fi
+chmod 644 "$_VSG/VERSION"
+if [ "$_vsg_b2rc" -le 1 ] &&
+    { [ "$_vsg_b2rc" -eq 0 ] ||
+        printf '%s\n' "$_vsg_b2" | grep -qF 'error: fetched VERSION file is malformed'; }; then
+    pass "unreadable VERSION routes into the named abort, never silent death (pr-00429 a B2)"
+else
+    fail "unreadable VERSION must not die silently (rc=$_vsg_b2rc out=$_vsg_b2) (pr-00429 a B2)"
+fi
 
 # B4 behavioral: ensure_local_file with an uncreatable TMPDIR fails
 # with the NAMED cause (file + TMPDIR hint) instead of set -e's raw
