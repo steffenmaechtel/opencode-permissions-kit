@@ -823,7 +823,7 @@ un_projects_revert() {
                 /var/cache/* | /var/crash | /var/crash/* | /var/games | /var/games/* | /var/lib | \
                 /var/lib/* | /var/local | /var/local/* | /var/lock | /var/lock/* | /var/log | \
                 /var/log/* | /var/mail | /var/mail/* | /var/opt | /var/opt/* | /var/run | \
-                /var/run/* | /var/spool | /var/spool/*)
+                /var/run/* | /var/spool | /var/spool/* | /var/yp | /var/yp/*)
                 echo "  Skipping system path: $root"
                 continue
                 ;;

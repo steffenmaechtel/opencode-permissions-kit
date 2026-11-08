@@ -535,7 +535,7 @@ update_redeploy_project_roots() {
                     /var/cache/* | /var/crash | /var/crash/* | /var/games | /var/games/* | /var/lib | \
                     /var/lib/* | /var/local | /var/local/* | /var/lock | /var/lock/* | /var/log | \
                     /var/log/* | /var/mail | /var/mail/* | /var/opt | /var/opt/* | /var/run | \
-                    /var/run/* | /var/spool | /var/spool/*)
+                    /var/run/* | /var/spool | /var/spool/* | /var/yp | /var/yp/*)
                     ui_warn "skip $root (system path — never a project root)"
                     continue
                     ;;

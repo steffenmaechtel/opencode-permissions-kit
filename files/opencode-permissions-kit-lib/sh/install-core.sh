@@ -1944,17 +1944,20 @@ do_deploy_phase() {
         # cp -a (not mv): merges into the existing target and works when src
         # and dst would collide on a re-install.
         if sudo cp -a "$_opk_src/." "$_opk_dst/" 2>/dev/null; then
-            [ "$_opk_ag" = m ] && sudo rm -rf "$_opk_src"
             # SECOND exec-time recheck (pr-00429 a C2): the baseline legs
             # below end in chmod OPERANDS that dereference a swapped leaf
             # (the find walks themselves stay inside). A trip skips the
-            # baseline loudly — the copied tree then keeps dev-owned
-            # modes (re-run the install to normalize); nothing is
-            # chowned or re-moded through a link.
+            # baseline loudly — and move mode's source removal waits for
+            # the pass arm (pr-00429 b D1): the dev's original survives
+            # as recovery, so the re-run remedy below holds for BOTH
+            # modes (the entry gate skips a vanished source, and no
+            # other code path baselines .claude/skills).
             if ! agent_home_sane "$OPENCODE_USER" "$_opk_dst"; then
                 ui_warn "agent resources copied but the sharing baseline was NOT applied:""\
  the chain to $_opk_dst turned into a symlink mid-step (user-managed)"
-                log "agents migration: exec-time recheck tripped before the baseline legs for $_opk_dst"
+                ui_warn "the original at $_opk_src is untouched — re-run the install to normalize""\
+ $_opk_dst"
+                log "agents migration: exec-time recheck tripped before the baseline legs for $_opk_dst (source kept)"
             else
                 # Sharing baseline: opencode owns, the developer keeps rw
                 # through the group (dirs setgid so new files inherit it). The
@@ -1981,6 +1984,10 @@ do_deploy_phase() {
                         sudo chmod 2775 "$_opk_parent" 2>/dev/null || true
                         ;;
                 esac
+                # Move-mode source removal runs LAST, after copy AND
+                # baseline both succeeded (pr-00429 b D1) — a trip above
+                # keeps the dev's original as recovery material.
+                [ "$_opk_ag" = m ] && sudo rm -rf "$_opk_src"
                 if [ "$_opk_ag" = m ]; then
                     ui_success "agent resources MOVED: $_opk_src -> $_opk_dst (group $OPENCODE_GROUP: both sides read/write)"
                     log "agents migration: moved $_opk_src -> $_opk_dst"

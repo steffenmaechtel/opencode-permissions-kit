@@ -139,7 +139,8 @@ project_path_sane() {
         # slipped past the "everything else system-ish" claim — and
         # pr-00429 a A1 closed the remaining FHS set (/var/account,
         # /var/games, /var/run — real-dir layouts expose /var/run where
-        # mainstream symlinks it to /run). The list is FHS-complete for
+        # mainstream symlinks it to /run); pr-00429 b D2 added /var/yp
+        # (the FHS NIS dir). The list is FHS-complete for
         # /var now; non-FHS distro-specific dirs (/var/empty and
         # friends) are an accepted residual — no sanctioned layout
         # registers them as project homes. The same arms ship in every
@@ -152,7 +153,7 @@ project_path_sane() {
             /var/backups/* | /var/cache | /var/cache/* | /var/crash | /var/crash/* | /var/games | \
             /var/games/* | /var/lib | /var/lib/* | /var/local | /var/local/* | /var/lock | \
             /var/lock/* | /var/log | /var/log/* | /var/mail | /var/mail/* | /var/opt | \
-            /var/opt/* | /var/run | /var/run/* | /var/spool | /var/spool/*)
+            /var/opt/* | /var/run | /var/run/* | /var/spool | /var/spool/* | /var/yp | /var/yp/*)
             return 1
             ;;
     esac
