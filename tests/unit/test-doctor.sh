@@ -334,7 +334,11 @@ for _bad in \
     '{"containerTrees":[{"path":"a\"b"}]}' \
     '{"containerTrees":[{"path":"a\u0027b"}]}' \
     '{"containerTrees":[{"path":"a","note":7}]}' \
-    '{"containerTrees":[{"path":"a","note":"x\u001by"}]}'; do
+    '{"containerTrees":[{"path":"a","note":"x\u001by"}]}' \
+    '{"containerTrees":[{"path":"a\u007fb"}]}' \
+    '{"containerTrees":[{"path":"a\u009bb"}]}' \
+    '{"containerTrees":[{"path":"a\u0085b"}]}' \
+    '{"containerTrees":[{"path":"a","note":"x\u007fy"}]}'; do
     _pol_rc=0
     pol "$_bad" >/dev/null || _pol_rc=$?
     _pol_msg="$(cat "$WORK/pol.err" 2>/dev/null || true)"
@@ -713,6 +717,20 @@ grep_last_out "missing-root warn row" grep -qF "is missing -- skipped"
 grep_last_out "names the nothing-scanned state" \
     grep -qF "no scan root could be scanned -- every listed root is missing or unusable"
 
+# existing FILE as scan root (#370 a C4): the row must not claim
+# "missing" for a path that exists -- not-a-directory is its own state
+ALLFILE="$WORK/all-file.txt"
+: >"$WORK/root-is-file"
+printf '%s\n' "$WORK/root-is-file" >"$ALLFILE"
+rc_doctor_roots "all: file as scan root skipped -> rc 2" 2 "$ALLFILE" all
+grep_last_out "C4: not-a-directory row (no false 'missing')" \
+    grep -qF "'$WORK/root-is-file' is not a directory -- skipped"
+if printf '%s' "$_rd_out" | grep -qF "'$WORK/root-is-file' is missing"; then
+    fail "C4: existing file no longer reported missing"
+else
+    pass "C4: existing file no longer reported missing"
+fi
+
 # control-char marker: skipped loudly; the siblings' children unaffected
 ALLCT="$ALLSCAN/we$(printf '\t')ird"
 mkdir -p "$ALLCT"
@@ -720,6 +738,14 @@ printf '%s\n' '{"containerTrees":[]}' >"$ALLCT/opk.json"
 rc_doctor_roots "all: control-char marker skipped, fleet rc 1" 1 "$ALLROOTS" all
 grep_last_out "charset skip warn" \
     grep -qF "skipped -- control characters or backslashes in the path"
+# (round d D1): THIS run fires the SECOND composed tr site (the marker
+# gate's display sanitize) -- the absence check here is the plural
+# claim's other half (the a-A1 pin covers the first site's run).
+if printf '%s' "$_rd_out" | grep -qF "tr: warning"; then
+    fail "d D1: no tr portability warning on the marker-gate warn path"
+else
+    pass "d D1: no tr portability warning on the marker-gate warn path"
+fi
 _n_child="$(printf '%s' "$_rd_out" | grep -c 'Doctor -- container-tree ownership')"
 if [ "$_n_child" = 3 ]; then
     pass "the skipped marker runs no child"
@@ -905,10 +931,13 @@ fi
 rc_doctor "all: scan root '/' -> rc 64" 64 all /
 
 # --- 4e. round-b fix-wave pins (#360 b) ----------------------------------------------
-# S1: '//' and '/./' list lines normalize onto the '/' belt; S2: a
-# relative list line is refused (keeps the fragment gate's absolute-
-# prefix assumption airtight); S3: with realpath absent, -H follows a
-# symlinked list root (the belt the b-comment documents).
+# S1: seam lines spelling the filesystem root variants; S2: a
+# relative list line is refused ON THE RAW LINE (#370 a C3 -- realpath
+# -m used to anchor it to the cwd first, silently scanning the
+# cwd-anchored tree instead of warning; the absolute gate was
+# near-unreachable behind the normalization); S3: with realpath
+# absent, -H follows a symlinked list root (the belt the b-comment
+# documents).
 
 # S1: seam lines spelling the filesystem root variants
 ALLFS="$WORK/all-fs.txt"
@@ -917,14 +946,19 @@ rc_doctor_roots "b S1: '//' and '/./' refused via normalization -> rc 2" 2 "$ALL
 grep_last_out "b S1: refusal row names the belt" \
     grep -qF "refused -- doctor all does not walk the whole filesystem"
 
-# S2: a relative seam line is NORMALIZED against the cwd (realpath) --
-# it lands absolute, so the fragment gate's absolute-prefix assumption
-# holds; the absolute-only warn is the realpath-absent fallback (below)
+# S2 + C3: a relative seam line warns ON THE RAW SPELLING and is
+# skipped -- the absolute gate must be reachable on realpath-present
+# hosts too, or a hand-edited list silently scans a cwd-anchored tree
 ALLREL="$WORK/all-rel.txt"
 printf '%s\n' "relative-root" >"$ALLREL"
-rc_doctor_roots "b S2: relative root line normalized -> rc 2" 2 "$ALLREL" all
-grep_last_out "b S2: the warn names the RESOLVED absolute path" \
-    grep -qF "'$PWD/relative-root' is missing -- skipped"
+rc_doctor_roots "b S2+C3: relative root line refused loudly -> rc 2" 2 "$ALLREL" all
+grep_last_out "b S2+C3: the warn names the RAW relative line" \
+    grep -qF "'relative-root' is not an absolute path -- skipped"
+if printf '%s' "$_rd_out" | grep -qF "$PWD/relative-root"; then
+    fail "b S2+C3: no cwd-anchored scan of a relative line"
+else
+    pass "b S2+C3: no cwd-anchored scan of a relative line"
+fi
 
 # S3: symlinked seam root + failing realpath (the A1 stub pattern) --
 # -H is what follows the link then; the marker must be found. The same
@@ -975,6 +1009,83 @@ printf '%s\n' "$WORK/all-clean-link" >"$ALLCLN"
 rc_doctor_roots "c S1: cntrl target behind a clean symlink skipped -> rc 2" 2 "$ALLCLN" all
 grep_last_out "c S1: the normalized value is gated" \
     grep -qF "carries control characters or backslashes -- skipped"
+
+# --- (round a A1): the shell-side gates carry the FULL control set ---------------
+# A raw C1 byte (0x9B, 8-bit CSI) in a scan-root line is skipped like
+# C0 with a sanitized warn row; a valid UTF-8 root (U+00DC = 0xC3 0x9C
+# -- a trail byte INSIDE the range a plain byte-bracket would
+# over-match) stays scannable: the python decoder decides at character
+# level, so completing the class does not refuse legit UTF-8 roots.
+rm -rf "$PROCFIX"
+mkmap 42 "0 0 1" "1 $CURUID 65536"
+ALLC1="$WORK/all-c1.txt"
+ALLC1ROOT="$WORK/ro$(printf '\233')ot"
+mkdir -p "$ALLC1ROOT"
+printf '%s\n' "$ALLC1ROOT" >"$ALLC1"
+rc_doctor_roots "a A1: C1-byte root line skipped -> rc 2" 2 "$ALLC1" all
+grep_last_out "a A1: C1 skip warn (sanitized root)" \
+    grep -qF "carries control characters or backslashes -- skipped"
+if printf '%s' "$_rd_out" | grep -qF "tr: warning"; then
+    fail "c C1: no tr portability warning on the warn paths"
+else
+    pass "c C1: no tr portability warning on the warn paths"
+fi
+if printf '%s' "$_rd_out" | LC_ALL=C grep -q "$(printf '\233')"; then
+    fail "a A1: the warn row carries no raw C1 byte"
+else
+    pass "a A1: the warn row carries no raw C1 byte"
+fi
+ALLUROOT="$WORK/$(printf '\303\234')proj"
+mkdir -p "$ALLUROOT/tree"
+echo one >"$ALLUROOT/tree/one"
+printf '%s\n' '{"containerTrees":["tree"]}' >"$ALLUROOT/opk.json"
+ALLU="$WORK/all-umlaut.txt"
+printf '%s\n' "$ALLUROOT" >"$ALLU"
+rc_doctor_roots "a A1: valid UTF-8 root stays scannable (rc 0)" 0 "$ALLU" all
+grep_last_out "a A1: the UTF-8 root's project scanned green" \
+    grep -qF "tree -- 2 entries mapped-safe"
+
+# --- (round b B1): display sanitize is UTF-8-aware ---------------------------------
+# The old byte-range strip mangled legit names (U+00DF = 0xC3 0x9F --
+# trail byte inside 0x80-0x9F): a directory named opk.json under an
+# ß-carrying root takes the not-a-marker row, and the ß must survive
+# the row intact (the character-level decoder replaces the byte strip).
+ALLB1ROOT="$WORK/$(printf '\303\237')dir"
+mkdir -p "$ALLB1ROOT/opk.json" # a DIRECTORY named opk.json: hit, not a marker
+ALLB1="$WORK/all-b1.txt"
+printf '%s\n' "$ALLB1ROOT" >"$ALLB1"
+rc_doctor_roots "b B1: ss-name root with dir-marker -> rc 2" 2 "$ALLB1" all
+grep_last_out "b B1: the not-a-marker row keeps the UTF-8 name intact" \
+    grep -qF "$(printf '\303\237')dir/opk.json"
+
+# --- (round b B2): NUL in a list line is refused, not silently stripped ------------
+# POSIX read cannot store NUL -- pre-fix the stripped spelling flowed
+# through every gate as a clean path ("is missing" warn, no NUL row).
+printf '/definitely/not/there\0junk\n' >"$ALLB1"
+rc_doctor_roots "b B2: NUL-carrying list line refused (rc 2)" 2 "$ALLB1" all
+grep_last_out "b B2+c C3: the NUL/STX warn row names the class" \
+    grep -qF "list line carries a NUL or STX byte -- skipped"
+
+# --- (round d D2): the NUL->STX swap's failure is loud ----------------------------
+# A failing tr (PATH stub; the swap is the FIRST tr call in the all
+# flow) must abort with the named error -- never silently scan the
+# unswapped list (the B2 bug's return path, round c C2).
+NOTR="$WORK/notr-bin"
+mkdir -p "$NOTR"
+printf '#!/bin/sh\nexit 1\n' >"$NOTR/tr"
+chmod +x "$NOTR/tr"
+_rd_rc=0
+_rd_out="$(
+    PATH="$NOTR:$PATH" OPK_INSTALL_CONF="$CONF" OPK_DOCTOR_PROC_ROOT="$PROCFIX" \
+        OPK_DOCTOR_SCAN_ROOTS="$ALLU" OPK_DOCTOR_OPK="" NO_COLOR=1 setsid sh "$DOCTOR" all </dev/null 2>&1
+)" || _rd_rc=$?
+if [ "$_rd_rc" = 1 ] &&
+    printf '%s' "$_rd_out" | grep -qF "cannot process the scan-root list (tr failed)"; then
+    pass "d D2: swap tr failure -> loud rc 1 with the named error"
+else
+    fail "d D2: swap tr failure -> loud rc 1 with the named error (rc $_rd_rc)"
+    echo "        output: $_rd_out"
+fi
 
 # static source pins (comment-strip rider, the canonical shape): the
 # default roots are the vhosts layout plus the kit's own registry, at
@@ -1093,6 +1204,24 @@ atrisk_setup() { # daemon-only namespace: the test uid is unmapped
 rc_doctor "--dry-run without fix -> rc 64" 64 --dry-run
 rc_doctor "unknown flag in fix mode -> rc 64" 64 fix --bogus
 rc_doctor "two positionals in fix mode -> rc 64" 64 fix "$PROJ" extra
+
+# empty root argument (#370 a C6): a usage error, not walk-up
+# discovery -- scripted $ROOT-unset invocations must fail their
+# caller's contract instead of scanning the wrong tree
+rc_doctor "empty root argument -> rc 64" 64 ""
+grep_last_out "C6: empty-root refusal row" \
+    grep -qF "the project root must not be empty"
+
+# root argument with a newline (#370 a C7): command substitution in
+# the normalization strips a TRAILING newline -- doctor would operate
+# on a DIFFERENT tree than the argument named. Refuse loudly.
+# (printf '%s\nx' + strip-x: command substitution eats trailing
+# newlines, so the newline must ride behind a non-newline last char)
+C7ROOT="$(printf '%s\nx' "$PROJ")"
+C7ROOT="${C7ROOT%x}"
+rc_doctor "root argument with trailing newline -> rc 64" 64 "$C7ROOT"
+grep_last_out "C7: newline refusal row" \
+    grep -qF "the project root must not contain newlines"
 
 # control bytes in the project root: fix mode rejects loudly (the
 # candidate TSV round-trip would truncate the handover operand away
@@ -1225,6 +1354,14 @@ printf 'y\n' >"$WORK/ans"
 rc_doctor_ans "fix, answer y, failing handover -> rc 1" 1 "$WORK/ans" fix "$PROJ"
 grep_last_out "handover failure row" grep -qF "handover failed for 'tree'"
 grep_last_out "re-check runs after failure too" grep -qF "re-check after handover"
+# (#370 a C5): the failure must survive the re-check's counter reset --
+# the header's rc contract promises rc 1 on a failed handover even when
+# the post-failure re-scan would read green. The bad row is the trace;
+# a green re-scan cannot swallow it (sandbox note at the stub block:
+# the rc-0-despite-failure variant needs a real ownership transition
+# and stays e2e territory -- this pin holds the row the rc gate keys on).
+grep_last_out "C5: failed-handover row survives the counter reset" \
+    grep -qF "a handover failed this run"
 
 # two candidates, y then n: fd-3 loop discipline (a loop reading stdin
 # would eat the answer lines as candidates) and per-tree prompts
@@ -1540,6 +1677,33 @@ chmod 755 "$PROJ"
         echo "        output: $_rd_out"
     }
 
+# unreadable mode of an EXISTING opk.json (#370 a C8): the stat failure
+# used to leave the mode variable empty -- chmod "" failed warn-only
+# and opk.json landed with mktemp's 0600. Fail loud instead (stat
+# shadowed on PATH; only doctor's mode read calls it in this run).
+NOSTAT="$WORK/nostat-bin"
+mkdir -p "$NOSTAT"
+printf '#!/bin/sh\nexit 1\n' >"$NOSTAT/stat"
+chmod +x "$NOSTAT/stat"
+detproj
+printf '{"containerTrees":[]}\n' >"$PROJ/opk.json"
+printf 'y\n' >"$WORK/ans"
+_rd_rc=0
+_rd_out="$(PATH="$NOSTAT:$PATH" OPK_INSTALL_CONF="$CONF_ME" OPK_DOCTOR_PROC_ROOT="$PROCFIX" \
+    OPK_DOCTOR_OPK="" NO_COLOR=1 setsid sh "$DOCTOR" detect "$PROJ" <"$WORK/ans" 2>&1)" || _rd_rc=$?
+if [ "$_rd_rc" = 1 ] &&
+    printf '%s' "$_rd_out" | grep -qF "cannot read the mode of the existing opk.json"; then
+    pass "C8: stat failure on existing opk.json -> loud rc 1"
+else
+    fail "C8: stat failure on existing opk.json -> loud rc 1 (rc $_rd_rc)"
+    echo "        output: $_rd_out"
+fi
+if printf '%s' "$_rd_out" | grep -qF "candidates above stay valid"; then
+    pass "C8: the refusal keeps the candidates recoverable"
+else
+    fail "C8: the refusal keeps the candidates recoverable"
+fi
+
 # git unavailable (broken stub): the ignore answers are gone, D evidence
 # cannot be verified -- warn row, not silence; S evidence would still
 # work (fixture A would find its candidates without any ignore answers)
@@ -1558,6 +1722,28 @@ _rd_out="$(PATH="$NOGIT:$PATH" OPK_INSTALL_CONF="$CONF_ME" OPK_DOCTOR_PROC_ROOT=
         fail "git unavailable -> warn row + consequence, rc 2 (rc $_rd_rc)"
         echo "        output: $_rd_out"
     }
+
+# git failing WITH a diagnosis (#370 a C2): check-ignore's stderr used
+# to land in an unread-back file -- dubious ownership's remedy never
+# reached the row. The first stderr line surfaces sanitized instead.
+DUBGIT="$WORK/dubious-bin"
+mkdir -p "$DUBGIT"
+{
+    echo '#!/bin/sh'
+    echo "printf 'fatal: detected dubious ownership in repository at %s\\n' \"\$2\" >&2"
+    echo 'exit 128'
+} >"$DUBGIT/git"
+chmod +x "$DUBGIT/git"
+_rd_rc=0
+_rd_out="$(PATH="$DUBGIT:$PATH" OPK_INSTALL_CONF="$CONF_ME" OPK_DOCTOR_PROC_ROOT="$PROCFIX" \
+    OPK_DOCTOR_OPK="" NO_COLOR=1 setsid sh "$DOCTOR" detect "$PROJ" </dev/null 2>&1)" || _rd_rc=$?
+if [ "$_rd_rc" = 2 ] &&
+    printf '%s' "$_rd_out" | grep -qF "git said: fatal: detected dubious ownership"; then
+    pass "C2: git's stderr diagnosis surfaces in the fallback row"
+else
+    fail "C2: git's stderr diagnosis surfaces in the fallback row (rc $_rd_rc)"
+    echo "        output: $_rd_out"
+fi
 
 # unusable path forms are dropped at classify time (charset belt): a
 # single-quote directory and a non-ASCII directory are evidence-class S
@@ -1623,6 +1809,10 @@ BS_PROJ="$WORK/bs\\root"
 mkdir -p "$BS_PROJ/tree"
 echo x >"$BS_PROJ/tree/one"
 rc_doctor "B4: backslash root refused for detect (rc 64)" 64 detect "$BS_PROJ"
+C1_PROJ="$WORK/c$(printf '\233')1"
+mkdir -p "$C1_PROJ/tree"
+echo x >"$C1_PROJ/tree/one"
+rc_doctor "B4+a A1: C1-byte root refused for detect (rc 64)" 64 detect "$C1_PROJ"
 
 # B1/B2 order pin: the [ -L ] gate must sit IMMEDIATELY before the
 # chmod (the swapped-symlink window spans the python run), the mv gate

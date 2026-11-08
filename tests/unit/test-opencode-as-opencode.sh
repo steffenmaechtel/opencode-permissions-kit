@@ -271,6 +271,74 @@ else
     failures=$((failures + 1))
 fi
 
+# --- Help in the leading flag region (#370 a E1) -----------------------------------
+# `opencode run --help` (tty stdin, non-project cwd) used to hit the
+# project-dir refusal instead of help: the #91 any-dir path covered
+# flags in $1 only. Classification contract: a -h/--help BEFORE the
+# first message argument is a help query (any-dir exec); past the first
+# message argument, "--help" is message text. Extract the REAL scan
+# loop and drive it with the discriminating argument shapes.
+_hr_scan="$(sed -n '/^_hr_first=true$/,/^done$/p' "$WRAPPER_FILE")"
+# comment-strip rider (round a A5): the extract includes the loop's
+# comment lines -- the presence check must see the CODE, not a
+# commented-out arm
+if [ -n "$_hr_scan" ] &&
+    printf '%s' "$_hr_scan" | sed 's/^[[:space:]]*#.*$//' | grep -q '_hr_help'; then
+    echo "  ${GREEN}PASS${NC}  leading-region help scan extractable (#370 a E1)"
+    passed=$((passed + 1))
+    printf '%s\n' "$_hr_scan" >"$TMPDIR/hr-scan.sh"
+    hr_class() { # <args...> -> the loop's msg/help state. Sourcing the
+        # extracted loop INSIDE this function is the mechanism: POSIX
+        # positional parameters stay visible to sourced code, so the
+        # loop's "$@" resolves to hr_class's arguments (round a A9).
+        (
+            HEADLESS=false
+            _hr_first=true
+            _hr_msg=false
+            _hr_help=false
+            . "$TMPDIR/hr-scan.sh"
+            echo "msg=$_hr_msg help=$_hr_help"
+        )
+    }
+    _got="$(hr_class run --help)"
+    if [ "$_got" = "msg=false help=true" ]; then
+        echo "  ${GREEN}PASS${NC}  'run --help' classifies as a help query (#370 a E1)"
+        passed=$((passed + 1))
+    else
+        echo "  ${RED}FAIL${NC}  'run --help' classifies as a help query (got: $_got) (#370 a E1)"
+        failures=$((failures + 1))
+    fi
+    _got="$(hr_class run "please --help me")"
+    if [ "$_got" = "msg=true help=false" ]; then
+        echo "  ${GREEN}PASS${NC}  '--help' INSIDE a message stays message text (#370 a E1)"
+        passed=$((passed + 1))
+    else
+        echo "  ${RED}FAIL${NC}  '--help' INSIDE a message stays message text (got: $_got) (#370 a E1)"
+        failures=$((failures + 1))
+    fi
+    _got="$(hr_class run --verbose --help)"
+    if [ "$_got" = "msg=false help=true" ]; then
+        echo "  ${GREEN}PASS${NC}  help behind other leading flags still a query (#370 a E1)"
+        passed=$((passed + 1))
+    else
+        echo "  ${RED}FAIL${NC}  help behind other leading flags still a query (got: $_got) (#370 a E1)"
+        failures=$((failures + 1))
+    fi
+    # the any-dir exec for _hr_help must ALSO precede the refusal (the
+    # classification is worthless if the refusal runs first)
+    _ehelp_ln="$(sed 's/^[[:space:]]*#.*$//' "$WRAPPER_FILE" | grep -n 'if \[ "\$_hr_help" = true \]; then' | head -1 | cut -d: -f1)"
+    if [ -n "$_ehelp_ln" ] && [ -n "$_refusal_ln" ] && [ "$_ehelp_ln" -lt "$_refusal_ln" ]; then
+        echo "  ${GREEN}PASS${NC}  the _hr_help exec precedes the project-dir refusal (#370 a E1)"
+        passed=$((passed + 1))
+    else
+        echo "  ${RED}FAIL${NC}  the _hr_help exec precedes the project-dir refusal (help:$_ehelp_ln refusal:$_refusal_ln) (#370 a E1)"
+        failures=$((failures + 1))
+    fi
+else
+    echo "  ${RED}FAIL${NC}  leading-region help scan extractable (#370 a E1)"
+    failures=$((failures + 1))
+fi
+
 # --- Headless mode (third-party UIs + orchestrators, issue #42) ---
 # Ecosystem tools spawn opencode non-interactively: `opencode serve`
 # (OpenChamber, cezar, CodeWalk — stdout parsed for the "listening on"

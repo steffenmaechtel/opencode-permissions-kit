@@ -144,6 +144,9 @@ YES=false
 ACTION=""
 SUB=""
 TARGETS=""
+# (#370 a D5): set by the arg loop when ONE argument destined for
+# TARGETS carries whitespace -- consumed by the usage gate below.
+_TGT_SPACED=0
 
 for arg; do
     case "$arg" in
@@ -161,6 +164,9 @@ for arg; do
             # usage gate below instead.
             [ "$arg" = "status" ] && [ -z "$SUB" ] && SUB="status" && continue
             TARGETS="$TARGETS $arg"
+            case "$arg" in
+                *[[:space:]]*) _TGT_SPACED=1 ;;
+            esac
             ;;
         on | off)
             [ "$ACTION" = "git-config" ] && SUB="$arg"
@@ -172,7 +178,12 @@ for arg; do
         list | add | remove)
             [ "$ACTION" = "projects" ] && SUB="$arg" && continue
             ;;
-        *) TARGETS="$TARGETS $arg" ;;
+        *)
+            TARGETS="$TARGETS $arg"
+            case "$arg" in
+                *[[:space:]]*) _TGT_SPACED=1 ;;
+            esac
+            ;;
     esac
 done
 TARGETS="${TARGETS# }"
@@ -186,7 +197,45 @@ TARGETS="${TARGETS# }"
 case "$ACTION" in
     # projects add/remove and handover carry path targets (the header
     # documents `config.sh handover <path>`).
-    projects | handover) ;;
+    handover)
+        # (#370 a D5): TARGETS is space-joined and every consumer
+        # word-splits it -- a single argument carrying whitespace
+        # fragmented into phantom paths (unreachable add/handover
+        # operands, a confusing double "not found" on remove). The
+        # flag comes from the arg loop above; refuse loudly here.
+        # (round a A3): the refusal names the real limitation -- no
+        # argument spelling can express a spaced path through config.sh,
+        # but opk handover carries paths as single arguments and can.
+        # (round a A4): the gate covers the CLI parse only -- the
+        # interactive menu (cases 1/2 below) still feeds ui_ask's
+        # space-separated answer into TARGETS and word-splits it, by
+        # design: the menu's question text says "space-separated", the
+        # user is present to see the fragment skips, and no project
+        # root may carry whitespace anyway (the registry writer's
+        # path-sane gate refuses it at write).
+        if [ "${_TGT_SPACED:-0}" = 1 ]; then
+            die "path arguments must not contain whitespace — a spaced path is not ""\
+expressible through config.sh; use: opk handover <me|opencode> \"<path>\""
+        fi
+        ;;
+    projects)
+        case "$SUB" in
+            add | remove)
+                if [ "${_TGT_SPACED:-0}" = 1 ]; then
+                    die "path arguments must not contain whitespace — spaced paths ""\
+are not supported as project roots (the registry refuses them too)"
+                fi
+                ;;
+            *)
+                # (#370 a D4): `projects list` takes no path targets --
+                # junk after it was silently ignored with rc 0 (the
+                # #211 a F11 gate exempted the whole projects action).
+                if [ -n "$TARGETS" ]; then
+                    die "unknown or misplaced argument(s):$TARGETS — run 'opk config' for the menu"
+                fi
+                ;;
+        esac
+        ;;
     *) # if/fi, not a bare `&& die` tail (0.0.41f C1): the empty-TARGETS
         # case would exit 1 under set -e and abort config for every
         # legitimate no-argument invocation.
@@ -255,6 +304,16 @@ done
 [ -n "$_handover" ] || {
     ddev_handover_stamp_valid() { return 1; }
     ddev_handover_stamp_write() { :; }
+}
+# (#370 a D3R): the mode probe needs its stub too -- its only call
+# site sits in an if-condition (ddev_settings_status), where a MISSING
+# function reads as false: stderr carried "ddev_devowned_enabled: not
+# found" and `ddev-settings status` FALSE-reported "off" with rc 0.
+# die, not return 1: the condition context swallows the rc and would
+# print the wrong verdict row again.
+[ -n "$_handover" ] || ddev_devowned_enabled() {
+    echo "error: ddev_devowned_enabled unavailable (ddev-handover.sh missing) -- cannot report ddev-settings" >&2
+    exit 1
 }
 
 # Shared group-baseline helper with live progress (issue #14). Same

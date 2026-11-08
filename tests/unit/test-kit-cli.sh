@@ -256,6 +256,34 @@ case "$errout" in
         ;;
 esac
 
+# (#370 a E3): the bypass-removal prompt defaults to n (the
+# conventions' system-change default, agent/conventions.md
+# "Interactive prompts"; under the old y default an unattended EOF
+# followed the caller's default and REMOVED the files), and the
+# fallback ui_confirm header no longer claims "fails closed" (EOF
+# follows the caller's default — sh/ui.sh documents the true
+# semantics). Comment-strip ridden: a commented-out call must not count.
+if sed 's/^[[:space:]]*#.*$//' "$KIT" | grep -qF 'ui_confirm "Remove them now?" "n"'; then
+    echo "  ${GREEN}PASS${NC}  bypass-removal prompt defaults to n (#370 a E3)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  bypass-removal prompt defaults to n (#370 a E3)"
+    failures=$((failures + 1))
+fi
+# wrap-robust (round a A5): join the extracted lines first -- the old
+# single-line grep passed only because the phrase happened to wrap
+# mid-comment in bin/opk; a benign reflow would have flipped the pin
+# with no semantic change. The joined regex catches the claim in any
+# spacing (and the hyphenated spelling).
+if printf '%s' "$(sed -n '/^    ui_confirm() {/,/^    }/p' "$KIT" | tr '\n' ' ')" |
+    grep -qE 'fails[[:space:]]*-?[[:space:]]*closed'; then
+    echo "  ${RED}FAIL${NC}  fallback ui_confirm header states true EOF semantics (#370 a E3)"
+    failures=$((failures + 1))
+else
+    echo "  ${GREEN}PASS${NC}  fallback ui_confirm header states true EOF semantics (#370 a E3)"
+    passed=$((passed + 1))
+fi
+
 # unknown command fails with exit 1
 if run_kit frobnicate >/dev/null 2>&1; then
     echo "  ${RED}FAIL${NC}  unknown command exits non-zero"
@@ -314,6 +342,21 @@ if run_kit handover me >/dev/null 2>&1; then
 else
     echo "  ${GREEN}PASS${NC}  handover without a path exits non-zero"
     passed=$((passed + 1))
+fi
+
+# (#370 a E2): --dry-run is NOT an operand — `handover me --dry-run`
+# (a forgotten path) passed the arity gate ($#=2) and every consumer
+# loop skipped the flag: silent rc 0, nothing printed, a forgotten path
+# read as a clean dry run. Refuse loudly instead.
+_e2_rc=0
+errout="$(OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opk" handover me --dry-run 2>&1 >/dev/null)" || _e2_rc=$?
+if [ "$_e2_rc" -ne 0 ] &&
+    printf '%s' "$errout" | grep -qF "need at least one path"; then
+    echo "  ${GREEN}PASS${NC}  handover me --dry-run without a path refused (#370 a E2)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  handover me --dry-run without a path refused (rc=$_e2_rc got: $errout) (#370 a E2)"
+    failures=$((failures + 1))
 fi
 
 # unknown target -> usage error naming the choices (hermetic: explicit
@@ -1027,12 +1070,12 @@ fi
 # --- damaged-library fallback ui_confirm (issue #187 C) -------------------------
 # The fallback definition in bin/opk exists only for a damaged library
 # (sh/ui.sh missing) — extract it and run it standalone under a real
-# pty (script(1)): it reads /dev/tty ONLY (no stdin fallback, fails
-# closed). Mixed-case answers must be honored — the old arms
-# y|Y|yes|YES mapped Yes/No/yEs to the DEFAULT, silently declining an
-# explicit yes and accepting an explicit no under a y default. Unknown
-# input falls back to the default; the shape is ui_confirm's
-# marker-less render.
+# pty (script(1)): it reads /dev/tty ONLY (no stdin fallback; EOF or
+# unrecognized input follows the CALLER'S default, #370 a E3). Mixed-
+# case answers must be honored — the old arms y|Y|yes|YES mapped
+# Yes/No/yEs to the DEFAULT, silently declining an explicit yes and
+# accepting an explicit no under a y default. Unknown input falls
+# back to the default; the shape is ui_confirm's marker-less render.
 OPK_UC="$(sed -n '/^    ui_confirm() {/,/^    }/p' "$KIT")"
 if [ -n "$OPK_UC" ] && printf '%s' "$OPK_UC" | grep -qF "tr '[:upper:]' '[:lower:]'"; then
     echo "  ${GREEN}PASS${NC}  opk fallback ui_confirm extractable (lowercased, issue #187 C)"
@@ -1075,7 +1118,7 @@ oc_pin "opk fallback: unknown input falls back to a y default (issue #187 A clas
 oc_pin "opk fallback: unknown input falls back to an n default (issue #187 A class)" garbage n no
 oc_pin "opk fallback: padded ' y' accepted under an n default (#189 a W2)" " y" n yes
 oc_pin "opk fallback: trailing-space 'no ' declines under a y default (#189 a W2)" "no " y no
-oc_pin "opk fallback: empty input fails closed to the default" "" n no
+oc_pin "opk fallback: empty input follows the caller's default (#370 a E3)" "" n no
 _ocline=$(opk_uc "" y)
 if printf '%s' "$_ocline" | grep -qF '  Remove them now? [Y/n] ' &&
     ! printf '%s' "$_ocline" | grep -qF '[?]'; then
@@ -1099,8 +1142,9 @@ CONFIG="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.s
 _stubs=$(mktemp -d)
 sed -n '/^\[ -n "\$_handover" \] || ddev_handover_root/,/^}$/p' "$CONFIG" >"$_stubs/ho.sh"
 sed -n '/^\[ -n "\$_handover" \] || ddev_rootless_bindmounts/,/^}$/p' "$CONFIG" >"$_stubs/rb.sh"
+sed -n '/^\[ -n "\$_handover" \] || ddev_devowned_enabled/,/^}$/p' "$CONFIG" >"$_stubs/dde.sh"
 sed -n '/^command -v fs_baseline_root/,/^}$/p' "$CONFIG" >"$_stubs/fsb.sh"
-for _s in ho rb fsb; do
+for _s in ho rb fsb dde; do
     if [ -s "$_stubs/$_s.sh" ] && grep -q 'unavailable' "$_stubs/$_s.sh"; then
         echo "  ${GREEN}PASS${NC}  F2: $_s stub present and names its cause"
         passed=$((passed + 1))
@@ -1152,6 +1196,23 @@ _rc=0
 _handover="" sh -c '. "$1" >/dev/null 2>&1; ddev_rootless_bindmounts u b v bin' \
     sh "$_stubs/rb.sh" >/dev/null 2>&1 || _rc=$?
 assert "F2: ddev_rootless_bindmounts stub returns 2 (caller's warn arm)" "2" "$_rc"
+# (#370 a D3R): the mode probe's stub must DIE, not return 1 — its only
+# call site sits in an if-condition (ddev_settings_status), where rc 1
+# reads as false and `config ddev-settings status` FALSE-reported "off"
+# over a damaged library (rc 0, "not found" on stderr). The drive below
+# reproduces the caller's shape: no OFF verdict may print.
+_rc=0
+_out=$(_handover="" sh -c '. "$1" >/dev/null 2>&1; if ddev_devowned_enabled; then echo ON; else echo OFF; fi' \
+    sh "$_stubs/dde.sh" 2>&1) || _rc=$?
+if [ "$_rc" -eq 1 ] &&
+    printf '%s' "$_out" | grep -q 'ddev_devowned_enabled unavailable' &&
+    ! printf '%s' "$_out" | grep -qF 'OFF'; then
+    echo "  ${GREEN}PASS${NC}  D3R: ddev_devowned_enabled stub dies in-condition, no false 'off' (#370 a D3R)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  D3R: ddev_devowned_enabled stub dies in-condition (rc=$_rc out=$_out) (#370 a D3R)"
+    failures=$((failures + 1))
+fi
 # The update.sh twins of the same stub (#211 a F2 sweep — its loop logs
 # "ddev handover pass completed" unconditionally; #211 b W3 — the
 # fs_baseline_root stub, in the refresh arm of the project-root loop
@@ -1189,9 +1250,11 @@ _f11_block="$(sed -n '/^for arg; do$/,/#211 a F11 gate end/p' \
     "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh")"
 # #211 b W23 (the #198 a W5 / F7 shapes): end anchors are a shipped
 # marker comment (F11) — if it ever drifts, the extract runs to EOF and
-# the eval fails confusingly. Bound it: the loop+gate is 51 lines
-# (shfmt-canonical since the #255 stage 0a reformat; was 47 joined).
-if [ -n "$_f11_block" ] && [ "$(printf '%s\n' "$_f11_block" | wc -l)" -le 54 ]; then
+# the eval fails confusingly. Bound it: the loop+gate is 97 lines
+# (shfmt-canonical; 51 pre-#370, 85 after D4/D5, 97 after round a's
+# messages, divergence comment and the D5-pin tails — re-measured,
+# round b B3: the comment had said 95). Slack is 3 lines to ≤100.
+if [ -n "$_f11_block" ] && [ "$(printf '%s\n' "$_f11_block" | wc -l)" -le 100 ]; then
     echo "  ${GREEN}PASS${NC}  config arg loop + F11 gate extractable (#211 a F11)"
     passed=$((passed + 1))
     _f11_run() {
@@ -1200,6 +1263,7 @@ if [ -n "$_f11_block" ] && [ "$(printf '%s\n' "$_f11_block" | wc -l)" -le 54 ]; 
             ACTION=""
             SUB=""
             TARGETS=""
+            _TGT_SPACED=0
             die() {
                 echo "die: $*"
                 exit 1
@@ -1293,6 +1357,64 @@ if [ -n "$_f11_block" ] && [ "$(printf '%s\n' "$_f11_block" | wc -l)" -le 54 ]; 
             ;;
         *)
             echo "  ${RED}FAIL${NC}  bare --yes stays clean (out=$_out)"
+            failures=$((failures + 1))
+            ;;
+    esac
+    # --- #370 a D4: `projects list` takes no path targets ---------------------
+    _out=$(_f11_run projects list) || true
+    case "$_out" in
+        *"OK ACTION=[projects] SUB=[list] TARGETS=[]"*)
+            echo "  ${GREEN}PASS${NC}  bare projects list stays clean (#370 a D4)"
+            passed=$((passed + 1))
+            ;;
+        *)
+            echo "  ${RED}FAIL${NC}  bare projects list stays clean (out=$_out) (#370 a D4)"
+            failures=$((failures + 1))
+            ;;
+    esac
+    _out=$(_f11_run projects list /junk/path) || true
+    case "$_out" in
+        *"die: unknown or misplaced argument(s):/junk/path"*)
+            echo "  ${GREEN}PASS${NC}  junk after projects list dies loudly (#370 a D4)"
+            passed=$((passed + 1))
+            ;;
+        *)
+            echo "  ${RED}FAIL${NC}  junk after projects list dies loudly (out=$_out) (#370 a D4)"
+            failures=$((failures + 1))
+            ;;
+    esac
+    # --- #370 a D5: ONE argument carrying whitespace never reaches the
+    # word-splitting consumers -- the gate refuses it at parse time
+    _out=$(_f11_run projects add "/a/proj with space") || true
+    case "$_out" in
+        *"die: path arguments must not contain whitespace"*"not supported as project roots"*)
+            echo "  ${GREEN}PASS${NC}  spaced path operand to projects add refused, names the limit (#370 a D5, a A3)"
+            passed=$((passed + 1))
+            ;;
+        *)
+            echo "  ${RED}FAIL${NC}  spaced path operand to projects add refused (out=$_out) (#370 a D5, a A3)"
+            failures=$((failures + 1))
+            ;;
+    esac
+    _out=$(_f11_run handover "/a/b c") || true
+    case "$_out" in
+        *"die: path arguments must not contain whitespace"*"not expressible through config.sh"*"opk handover <me|opencode>"*)
+            echo "  ${GREEN}PASS${NC}  spaced path operand to handover refused, hint names the escape (#370 a D5, a A3)"
+            passed=$((passed + 1))
+            ;;
+        *)
+            echo "  ${RED}FAIL${NC}  spaced path operand to handover refused (out=$_out) (#370 a D5, a A3)"
+            failures=$((failures + 1))
+            ;;
+    esac
+    _out=$(_f11_run projects add /a/proj /b/other) || true
+    case "$_out" in
+        *"OK ACTION=[projects] SUB=[add] TARGETS=[/a/proj /b/other]"*)
+            echo "  ${GREEN}PASS${NC}  separate path arguments keep flowing (#370 a D5)"
+            passed=$((passed + 1))
+            ;;
+        *)
+            echo "  ${RED}FAIL${NC}  separate path arguments keep flowing (out=$_out) (#370 a D5)"
             failures=$((failures + 1))
             ;;
     esac

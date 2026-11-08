@@ -36,8 +36,10 @@ and the [audit log](../reference/audit-log.md) records the root as
 `setfacl` line to run by hand for orphaned group ids.
 
 On WSL, the uninstaller also **asks** whether to remove the kit's
-browser-bridge block from `/etc/wsl.conf` (kit-owned comment lines only;
-default: yes). Decline and it prints the exact line range to delete by hand.
+browser-bridge block from `/etc/wsl.conf` (kit-owned lines: the marked
+comment block, plus the legacy `[opencode-permissions-kit]` section if
+present; default: no). Decline and it prints the exact line range to
+delete by hand.
 
 ## What stays behind (harmless)
 

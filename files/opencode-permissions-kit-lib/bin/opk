@@ -45,7 +45,10 @@ else
     ui_success() { echo "  ok       $1"; }
     ui_warn() { echo "  warn     $1" >&2; }
     ui_detail() { echo "           $1"; }
-    ui_confirm() { # <question> <y|n default> — reads /dev/tty, fails closed
+    ui_confirm() { # <question> <y|n default> — reads /dev/tty; EOF or
+        # unrecognized input follows the CALLER'S default (the same
+        # semantics as sh/ui.sh's ui_confirm, #370 a E3 — NOT "fails
+        # closed": under a y default an unattended EOF answers yes)
         printf '  %s ' "$1" >&2
         case "$2" in y | Y) printf '[Y/n] ' >&2 ;; *) printf '[y/N] ' >&2 ;; esac
         read -r _uic </dev/tty 2>/dev/null || _uic=""
@@ -354,7 +357,12 @@ case "$cmd" in
         grep -q '"opencodeBinary"' "$_oc_settings" 2>/dev/null &&
             ui_detail "  settings pin: \"opencodeBinary\" in $_oc_settings"
         if [ "$OC_YES" != true ]; then
-            if ! ui_confirm "Remove them now?" "y"; then
+            # (#370 a E3): default n (the conventions' system-change
+            # direction, agent/conventions.md "Interactive prompts" —
+            # removal changes the system). Under the old y default an unattended EOF (the
+            # fallback confirm follows the caller's default) REMOVED
+            # the bypass files; scripted callers use --yes.
+            if ! ui_confirm "Remove them now?" "n"; then
                 ui_detail "kept — 'sudo opk openchamber-secure' removes them later"
                 ui_detail "restart OpenChamber if it is running (full stop + start)"
                 exit 0
@@ -542,9 +550,21 @@ PYEOF
         _ho_target="$1"
         shift
         _ho_dry=0
+        _ho_npaths=0
         for _ho_a in "$@"; do
-            [ "$_ho_a" = "--dry-run" ] && _ho_dry=1
+            if [ "$_ho_a" = "--dry-run" ]; then
+                _ho_dry=1
+            else
+                _ho_npaths=$((_ho_npaths + 1))
+            fi
         done
+        # (#370 a E2): `handover me --dry-run` (a forgotten path) passed
+        # the $#-ge-2 gate above, every consumer loop skipped the flag,
+        # and the dry run exited 0 printing NOTHING -- a forgotten path
+        # read as a clean dry run. Flags are not operands; refuse.
+        if [ "$_ho_npaths" -lt 1 ]; then
+            _ho_err "handover: need at least one path (--dry-run only previews real paths)"
+        fi
         # Usage errors first: a wrong target must not be masked by a
         # missing install.conf (e.g. dev checkouts without an install).
         case "$_ho_target" in
@@ -667,11 +687,20 @@ except Exception:
 if not isinstance(doc, dict):
     sys.exit(1)
 trees = doc.get("containerTrees", [])
+
+
+def _cntrl(c):
+    # Same set as doctor's validator (#370 a C1 sweep): DEL (0x7F) and
+    # C1 (0x80-0x9F) reach the warning text below as display injection.
+    o = ord(c)
+    return o < 32 or o == 127 or 0x80 <= o <= 0x9F
+
+
 if not isinstance(trees, list):
     sys.exit(1)
 for e in trees:
     p = e.get("path") if isinstance(e, dict) else e
-    if not isinstance(p, str) or not p or any(ord(c) < 32 for c in p):
+    if not isinstance(p, str) or not p or any(_cntrl(c) for c in p):
         sys.exit(1)
     sys.stdout.write(p + "\n")
 PYEOF

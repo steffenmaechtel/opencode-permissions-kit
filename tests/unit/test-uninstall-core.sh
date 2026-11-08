@@ -1352,6 +1352,43 @@ if [ -n "$_f27_block" ] && printf '%s' "$_f27_block" | grep -q 'browser_bridge_r
         *"WARN: could not remove the wsl.conf bridge block"*) pass "helper missing: warn, no false removed (#211 a F27)" ;;
         *) fail "helper missing: warn, no false removed (got: $_out)" ;;
     esac
+    # (#370 a D2): the WARN names the real arm (helper or staging
+    # mktemp -- the log always said so), and the by-hand hint covers
+    # BOTH shapes the marker gate serves: the comment block AND the
+    # legacy [opencode-permissions-kit] section (the same gate serves
+    # both; "comment-only" was false for the section shape).
+    case "$_out" in
+        *"helper or staging mktemp failed)"*) pass "fail arm names the real cause (#370 a D2)" ;;
+        *) fail "fail arm names the real cause (got: $_out) (#370 a D2)" ;;
+    esac
+    case "$_out" in
+        *"[opencode-permissions-kit] section"*) pass "by-hand hint covers the legacy section too (#370 a D2)" ;;
+        *) fail "by-hand hint covers the legacy section too (got: $_out) (#370 a D2)" ;;
+    esac
+    case "$_out" in
+        *"comment-only"*) fail "false 'comment-only' claim gone (#370 a D2)" ;;
+        *) pass "false 'comment-only' claim gone (#370 a D2)" ;;
+    esac
+    # (#370 a D1): the consent prompt defaults to n (the conventions'
+    # system-change default, agent/conventions.md "Interactive
+    # prompts" — a change
+    # to the user-owned wsl.conf; the DRY row says the same). Source
+    # pins: the marker-guarded arm is not hermetically driveable (the
+    # guard greps the host's /etc/wsl.conf, see the F27 note above) --
+    # the call spans the dq splice, so the second line carries the
+    # default. Comment-strip ridden.
+    if printf '%s' "$_f27_block" | sed 's/^[[:space:]]*#.*$//' |
+        grep -qF 'kit-owned lines only; your own entries stay)" "n"'; then
+        pass "wsl.conf consent defaults to n (#370 a D1)"
+    else
+        fail "wsl.conf consent defaults to n (#370 a D1)"
+    fi
+    if sed 's/^[[:space:]]*#.*$//' "$LIB" |
+        grep -qF '[DRY] ask: remove the kit-owned wsl.conf bridge block? (default: no)'; then
+        pass "DRY row states the default: no (#370 a D1)"
+    else
+        fail "DRY row states the default: no (#370 a D1)"
+    fi
 else
     fail "bridge removal block extractable (#211 a F27)"
 fi

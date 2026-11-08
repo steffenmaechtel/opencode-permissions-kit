@@ -123,6 +123,55 @@ else
     exit 1
 fi
 
+# doctor_cntrl_bad <string> -> rc 0 when the string carries control
+# CHARACTERS: C0, DEL, or the C1 range 0x80-0x9F -- the same set the
+# python validator gates (#370 a C1; round a A1 closed the shell-side
+# gap). Two tiers on purpose: a byte-level 0x80-0x9F bracket alone
+# cannot tell a raw C1 byte from a UTF-8 TRAIL byte (U+00DC = 0xC3
+# 0x9C -- the plain bracket pattern false-positives on legit UTF-8
+# roots, measured), so the cheap grep is only the PREFILTER (ctrl or
+# any 0x80-0xBF byte -- sufficient because every non-ASCII character
+# carries a trail byte in that range; round b B4 sharpened the
+# wording, the decision was always equivalent) and the python decoder
+# decides at character level: valid UTF-8 passes, undecodable bytes
+# fall back to latin-1, where a raw C1 byte stays a control character.
+doctor_cntrl_bad() {
+    if ! printf '%s' "$1" | LC_ALL=C grep -q "$(printf '[[:cntrl:]\200-\277]')"; then
+        return 1
+    fi
+    printf '%s' "$1" | python3 -c '
+import sys
+data = sys.stdin.buffer.read()
+try:
+    text = data.decode("utf-8")
+except UnicodeDecodeError:
+    text = data.decode("latin-1")
+sys.exit(0 if any(
+    ord(c) < 32 or ord(c) == 127 or 0x80 <= ord(c) <= 0x9F
+    for c in text) else 1)
+'
+}
+
+# doctor_show_sanitize <string> -> display-safe copy on stdout: control
+# CHARACTERS removed at character level (round b B1) -- valid UTF-8
+# round-trips byte-identical (a byte-range tr strip mangles legit names:
+# U+00DF = 0xC3 0x9F loses its trail byte), raw C1 bytes die in the
+# decoder. Backslash strips separately where a site needs it.
+doctor_show_sanitize() {
+    printf '%s' "$1" | python3 -c '
+import sys
+data = sys.stdin.buffer.read()
+try:
+    text = data.decode("utf-8")
+except UnicodeDecodeError:
+    text = data.decode("latin-1")
+clean = "".join(c for c in text
+                if not (ord(c) < 32 or ord(c) == 127
+                        or 0x80 <= ord(c) <= 0x9F))
+sys.stdout.buffer.write(clean.encode("utf-8", "replace"))
+'
+}
+
 # --- CLI --------------------------------------------------------------------------
 # Strict grammar (#313 increment b): 'fix', 'detect' or 'all' as the FIRST
 # token switches the mode; then at most one positional (the project root,
@@ -160,6 +209,15 @@ for _do_arg in "$@"; do
             exit 64
             ;;
         *)
+            if [ -z "$_do_arg" ]; then
+                # (#370 a C6): an empty root argument is a usage error,
+                # not walk-up discovery -- a scripted $ROOT-unset
+                # invocation ("opk doctor \"\"") silently scanned the
+                # wrong tree instead of failing its caller's contract.
+                _doctor_usage
+                echo "error: doctor: the project root must not be empty" >&2
+                exit 64
+            fi
             if [ -n "$DOCTOR_ROOT" ]; then
                 _doctor_usage
                 echo "error: doctor: only one project root allowed" >&2
@@ -171,6 +229,17 @@ for _do_arg in "$@"; do
     esac
 done
 DOCTOR_ROOT="${DOCTOR_ROOT:-.}"
+# (#370 a C7): command substitution strips a TRAILING newline off the
+# root before every control-byte gate below -- doctor would silently
+# operate on a DIFFERENT tree than the argument named (a directory
+# "x\n" reads as "x"). A newline ANYWHERE in the operand refuses
+# loudly instead; the wc -l probe counts complete lines, so any
+# embedded newline trips it while plain spellings stay at 0.
+if [ "$(printf '%s' "$DOCTOR_ROOT" | wc -l)" -gt 0 ]; then
+    _doctor_usage
+    echo "error: doctor: the project root must not contain newlines" >&2
+    exit 64
+fi
 DOCTOR_ROOT="$(realpath -m "$DOCTOR_ROOT" 2>/dev/null || printf '%s' "$DOCTOR_ROOT")"
 # (#357 a A1): the fallback arm re-feeds the RAW argument -- with
 # realpath absent or failing (deleted cwd) that is a relative path, and
@@ -274,19 +343,39 @@ if [ "$DOCTOR_MODE" = "all" ]; then
             ui_error "doctor: OPK_DOCTOR_SCAN_ROOTS is set but not a readable file: $OPK_DOCTOR_SCAN_ROOTS"
             exit 1
         else
-            grep -v '^[[:space:]]*$' "$OPK_DOCTOR_SCAN_ROOTS" >>"$WORK_ALL/roots" || true
+            # -a (round a A1): a line carrying a raw C1 byte makes GNU
+            # grep deem the whole list BINARY -- it then prints "binary
+            # file matches" and delivers NO lines, so the per-root gate
+            # below never sees the offending root. --text keeps the
+            # line stream intact; the gate refuses it sanitized.
+            grep -a -v '^[[:space:]]*$' "$OPK_DOCTOR_SCAN_ROOTS" >>"$WORK_ALL/roots" || true
         fi
     else
         [ -d /var/www/vhosts ] && printf '%s\n' /var/www/vhosts >>"$WORK_ALL/roots"
         if [ -f "$PROJECTS_CONF" ]; then
             if [ -r "$PROJECTS_CONF" ]; then
-                grep -v '^[[:space:]]*$' "$PROJECTS_CONF" >>"$WORK_ALL/roots" || true
+                grep -a -v '^[[:space:]]*$' "$PROJECTS_CONF" >>"$WORK_ALL/roots" || true
             else
                 ui_kv_warn "scan root" "$PROJECTS_CONF unreadable -- its roots are not scanned"
             fi
         fi
     fi
     LC_ALL=C sort -u "$WORK_ALL/roots" >"$WORK_ALL/roots.s" && mv "$WORK_ALL/roots.s" "$WORK_ALL/roots"
+    # (round b B2): a NUL byte in a list line is invisible to POSIX
+    # read -- it drops the byte silently and the STRIPPED spelling would
+    # flow through every gate with no warn row, contradicting the doc
+    # (NUL is a control character). NUL cannot ride a shell variable,
+    # so swap it for STX BEFORE the loop; the loop refuses STX-carrying
+    # lines loudly (doctor_show_sanitize strips STX from the display).
+    # (round c C2): the swap itself fails LOUD -- a silent skip would
+    # return exactly the bug this closes (tr fails -> unswapped roots
+    # -> read strips the NUL with no row).
+    _da_stx="$(printf '\002')"
+    if ! tr '\000' '\002' <"$WORK_ALL/roots" >"$WORK_ALL/roots.t"; then
+        ui_error "doctor: cannot process the scan-root list (tr failed) -- refusing to scan"
+        exit 1
+    fi
+    mv "$WORK_ALL/roots.t" "$WORK_ALL/roots"
 
     # --- marker discovery: one project root per opk.json found ----------------------
     ALL_ROOTS_N=0
@@ -296,15 +385,23 @@ if [ "$DOCTOR_MODE" = "all" ]; then
     while IFS= read -r _da_root; do
         [ -n "$_da_root" ] || continue
         ALL_ROOTS_N=$((ALL_ROOTS_N + 1))
-        # normalization FIRST (#360 b S1/S2, c S1): list roots enter RAW --
-        # realpath them like the positional above, so '//' and '/./'
-        # spellings hit the '/' belt below instead of walking the whole
-        # filesystem, and the fragment gate's absolute-prefix assumption
-        # holds. Every gate below then sees the FINAL value: a clean line
-        # resolving through a symlink to a cntrl/backslash-carrying target
-        # is caught AFTER normalization too (#360 c S1 -- the raw-line
-        # gate alone screened the line, not what it resolves to).
-        _da_root="$(realpath -m "$_da_root" 2>/dev/null || printf '%s' "$_da_root")"
+        case "$_da_root" in
+            *"$_da_stx"*)
+                # (round c C3): after the NUL->STX swap a hit is either
+                # a swapped NUL or a pre-existing literal STX (argv
+                # roots join the same list) -- name both, the display
+                # strips the byte either way
+                _da_show="$(doctor_show_sanitize "$_da_root")"
+                ui_kv_warn "scan root" "list line carries a NUL or STX byte -- skipped: '$_da_show'"
+                continue
+                ;;
+        esac
+        # RAW-line absolute gate FIRST (#370 a C3): the absolute check
+        # must see the hand-edited line itself -- behind realpath -m a
+        # relative spelling lands cwd-anchored and ABSOLUTE, so a gate
+        # BELOW the normalization was near-unreachable (realpath-present
+        # hosts silently scanned the cwd-anchored tree instead of
+        # warning; only the realpath-absent fallback ever tripped).
         case "$_da_root" in
             /*) ;;
             *)
@@ -312,11 +409,21 @@ if [ "$DOCTOR_MODE" = "all" ]; then
                 continue
                 ;;
         esac
-        # root gate (#360 a F8): control bytes or a backslash make the
-        # root unusable as a find operand AND clobber the rows -- warn
-        # sanitized, skip
-        if printf '%s' "$_da_root" | LC_ALL=C grep -q '[[:cntrl:]\\]'; then
-            _da_show="$(printf '%s' "$_da_root" | tr -d '[:cntrl:]\\')"
+        # normalization second (#360 b S1, c S1): '//' and '/./'
+        # spellings hit the '/' belt below instead of walking the whole
+        # filesystem, and the fragment gate's absolute-prefix assumption
+        # holds. Every gate below sees the FINAL value: a clean line
+        # resolving through a symlink to a cntrl/backslash-carrying
+        # target is caught AFTER normalization too (#360 c S1 -- the
+        # raw-line gate above screens the spelling, this one the
+        # resolution).
+        _da_root="$(realpath -m "$_da_root" 2>/dev/null || printf '%s' "$_da_root")"
+        # root gate (#360 a F8, class completed round a A1): control
+        # bytes or a backslash make the root unusable as a find operand
+        # AND clobber the rows -- warn sanitized, skip
+        if printf '%s' "$_da_root" | LC_ALL=C grep -qF '\' ||
+            doctor_cntrl_bad "$_da_root"; then
+            _da_show="$(doctor_show_sanitize "$_da_root" | tr -d '\\')"
             ui_kv_warn "scan root" "'$_da_show' carries control characters or backslashes -- skipped"
             continue
         fi
@@ -333,7 +440,13 @@ if [ "$DOCTOR_MODE" = "all" ]; then
                 ;;
         esac
         if [ ! -d "$_da_root" ]; then
-            ui_kv_warn "scan root" "'$_da_root' is missing -- skipped"
+            if [ -e "$_da_root" ]; then
+                # (#370 a C4): an existing NON-directory is not
+                # "missing" -- the row must not lie about the tree
+                ui_kv_warn "scan root" "'$_da_root' is not a directory -- skipped"
+            else
+                ui_kv_warn "scan root" "'$_da_root' is missing -- skipped"
+            fi
             continue
         fi
         ALL_ROOTS_USED=$((ALL_ROOTS_USED + 1))
@@ -368,7 +481,7 @@ if [ "$DOCTOR_MODE" = "all" ]; then
                 *) _da_corrupt=1 ;;
             esac
             if [ "$_da_corrupt" = 1 ]; then
-                _da_show="$(printf '%s' "$_da_hit" | tr -d '[:cntrl:]')"
+                _da_show="$(doctor_show_sanitize "$_da_hit")"
                 ui_kv_warn "scan root" "corrupted marker path '$_da_show' skipped (a newline in a name under $_da_root?)"
                 ALL_MARK_SKIP=$((ALL_MARK_SKIP + 1))
                 continue
@@ -377,16 +490,20 @@ if [ "$DOCTOR_MODE" = "all" ]; then
             # file through symlinks; anything else (a directory, a
             # dangling symlink, a link to a directory) is not a marker
             if [ ! -f "$_da_hit" ]; then
-                ui_kv_warn "scan root" "'$_da_hit' is not a regular file through symlinks -- not a marker (the walk-up rule)"
+                _da_show="$(doctor_show_sanitize "$_da_hit")"
+                ui_kv_warn "scan root" "'$_da_show' is not a regular file through symlinks -- not a marker (the walk-up rule)"
                 ALL_MARK_SKIP=$((ALL_MARK_SKIP + 1))
                 continue
             fi
             _da_proj="$(dirname "$_da_hit")"
-            # marker gate (detect's charset class): control characters or
-            # backslashes cannot round-trip child argv, rows and prompts
-            # cleanly -- warn and skip, never a silent drop
-            if printf '%s' "$_da_proj" | LC_ALL=C grep -q '[[:cntrl:]\\]'; then
-                ui_kv_warn "scan root" "marker at '$_da_proj' skipped -- control characters or backslashes in the path"
+            # marker gate (detect's charset class, completed round a A1):
+            # control characters or backslashes cannot round-trip child
+            # argv, rows and prompts cleanly -- warn sanitized, skip,
+            # never a silent drop
+            if printf '%s' "$_da_proj" | LC_ALL=C grep -qF '\' ||
+                doctor_cntrl_bad "$_da_proj"; then
+                _da_show="$(doctor_show_sanitize "$_da_proj" | tr -d '\\')"
+                ui_kv_warn "scan root" "marker at '$_da_show' skipped -- control characters or backslashes in the path"
                 ALL_MARK_SKIP=$((ALL_MARK_SKIP + 1))
                 continue
             fi
@@ -510,7 +627,8 @@ if [ "$DOCTOR_MODE" = "detect" ] && [ "$DOCTOR_ROOT" = "/" ]; then
     ui_error "doctor: refusing to walk the whole filesystem (detect on '/')"
     exit 64
 fi
-# (#356 a B4): a detect root carrying control characters or a backslash
+# (#356 a B4; class completed round a A1 via doctor_cntrl_bad): a
+# detect root carrying control characters or a backslash
 # classifies NOTHING -- the boundary awk's root-prefix match never hits
 # (a TAB root splits find rows, a backslash root is mangled by awk -v
 # escape processing) -- and the run reads "no evidence found", the
@@ -518,7 +636,7 @@ fi
 # gate above (#348 a C3) covers the same class for the TSV round-trip;
 # detect needs it for the walk itself.
 if [ "$DOCTOR_MODE" = "detect" ] &&
-    printf '%s' "$DOCTOR_ROOT" | LC_ALL=C grep -q '[[:cntrl:]\\]'; then
+    { printf '%s' "$DOCTOR_ROOT" | LC_ALL=C grep -qF '\' || doctor_cntrl_bad "$DOCTOR_ROOT"; }; then
     ui_error "doctor: project root contains control characters or backslashes -- unusable for 'detect'"
     exit 64
 fi
@@ -531,7 +649,7 @@ fi
 # uid-only output, and the examples pass (a TAB TSV) degrades display
 # rows only -- verdict and rc stay intact (#344 a S1/S2 class).
 if [ "$DOCTOR_MODE" = "fix" ] &&
-    printf '%s' "$DOCTOR_ROOT" | LC_ALL=C grep -q '[[:cntrl:]]'; then
+    doctor_cntrl_bad "$DOCTOR_ROOT"; then
     ui_error "doctor: project root contains control characters -- unusable for 'fix' (candidate round-trip)"
     exit 64
 fi
@@ -754,6 +872,15 @@ trees = doc.get("containerTrees", [])
 if not isinstance(trees, list):
     bad("containerTrees must be an array")
 
+def _cntrl(c):
+    # C0 AND the 8-bit control sets (#370 a C1): DEL (0x7F) and the C1
+    # range (0x80-0x9F) carry the same display-injection class (8-bit
+    # CSI sequences reach ui rows and prompts) as the C0 range -- the
+    # message says "control characters", the gate must mean it.
+    o = ord(c)
+    return o < 32 or o == 127 or 0x80 <= o <= 0x9F
+
+
 def path_error(p):
     if not isinstance(p, str) or not p:
         return "tree path must be a non-empty string"
@@ -761,9 +888,8 @@ def path_error(p):
         return "tree path %r must be relative to the project root" % p
     if "\\" in p:
         return "tree path %r must not contain backslashes" % p
-    for ch in p:
-        if ord(ch) < 32:
-            return "tree path %r must not contain control characters" % p
+    if any(_cntrl(ch) for ch in p):
+        return "tree path %r must not contain control characters" % p
     # Shell-significant characters (#344 a S3; rationale updated #356 a
     # A5 -- the copy-paste sudo hint is gone, but policy paths still
     # flow into fix-mode prompts and the 'would run:'/'running:' rows):
@@ -796,9 +922,8 @@ for i, entry in enumerate(trees):
     # control chars (ESC, BEL, ...) reach the terminal via ui_detail —
     # the same gate the path has, now on both fields
     note = " ".join(note.split())
-    for ch in note:
-        if ord(ch) < 32:
-            bad('containerTrees[%d]: "note" must not contain control characters' % i)
+    if any(_cntrl(ch) for ch in note):
+        bad('containerTrees[%d]: "note" must not contain control characters' % i)
     sys.stdout.write("%s\t%s\n" % (rel, note))
 PYEOF
 }
@@ -1117,6 +1242,16 @@ if [ "$DOCTOR_MODE" = "detect" ]; then
         # fallback is a warn row in EVERY arm of it, never silence)
         ui_kv_warn "detect" "git ignore answers unavailable -- daemon-owned entries need them and do not count"
         ui_detail "only subuid-owner evidence is used; run detect inside the repo for full evidence"
+        # (#370 a C2): a REAL git failure (rc > 1) wrote its diagnosis
+        # to ign.err -- dubious ownership names its safe.directory
+        # remedy there, and the row above never showed it. Surface the
+        # first stderr line, C0/DEL/C1-stripped: the repo path inside
+        # the message is root-argument-influenced, and 8-bit CSI bytes
+        # must not ride it into the ui row (the #370 a C1 class).
+        if [ "${_dt_grc:-0}" -gt 1 ] && [ -s "$WORK/ign.err" ]; then
+            _dt_igmsg="$(head -n 1 "$WORK/ign.err" | tr -d '\000-\037\177\200-\237')"
+            [ -n "$_dt_igmsg" ] && ui_detail "git said: $_dt_igmsg"
+        fi
     fi
     [ "$DOCTOR_IG" = 1 ] || : >"$WORK/ign"
     # (#356 a D1): the two-file FNR==NR idiom below mis-consumes the
@@ -1277,7 +1412,18 @@ if [ "$DOCTOR_MODE" = "detect" ]; then
         # existing file keeps its mode, a new one takes the kit's 664
         # group baseline
         _dt_mode=664
-        [ -f "$DOCTOR_ROOT/opk.json" ] && _dt_mode="$(stat -c %a "$DOCTOR_ROOT/opk.json")"
+        if [ -f "$DOCTOR_ROOT/opk.json" ]; then
+            # (#370 a C8): a stat failure (the file vanished or locked
+            # down between the -f probe and here) used to leave
+            # _dt_mode EMPTY -- chmod "" failed warn-only and opk.json
+            # landed with the mktemp default 0600. Fail loud instead:
+            # the candidates stay valid, re-run after fixing access.
+            _dt_mode="$(stat -c %a "$DOCTOR_ROOT/opk.json" 2>/dev/null)" || {
+                ui_error "detect: cannot read the mode of the existing opk.json -- not writing over it"
+                ui_detail "the candidates above stay valid -- fix access to opk.json, then re-run detect"
+                exit 1
+            }
+        fi
         _dt_tmp=$(mktemp "$DOCTOR_ROOT/opk.json.opk.XXXXXX") || {
             ui_error "detect: cannot create a temp file in $DOCTOR_ROOT (not writable?)"
             ui_detail "the candidates above stay valid -- paste the snippets, or re-run with permissions fixed"
@@ -1288,6 +1434,15 @@ import json
 import sys
 
 root, newfile = sys.argv[1], sys.argv[2]
+
+
+def _cntrl(c):
+    # Same set as the validator's gate (#370 a C1): the write-side
+    # re-validation must not accept bytes the reader rejects.
+    o = ord(c)
+    return o < 32 or o == 127 or 0x80 <= o <= 0x9F
+
+
 path = root + "/opk.json"
 doc = {}
 try:
@@ -1319,7 +1474,7 @@ with open(newfile, "r", encoding="utf-8") as f:
         if not line:
             continue
         rel, _, note = line.partition("\t")
-        if not rel or any(c in rel for c in "'\"`$;\\") or any(ord(c) < 32 for c in rel):
+        if not rel or any(c in rel for c in "'\"`$;\\") or any(_cntrl(c) for c in rel):
             sys.stderr.write("opk.json: refusing to write an unvalidated path\n")
             sys.exit(1)
         trees.append({"path": rel, "note": note})
@@ -1401,6 +1556,7 @@ doctor_scan_trees
 # decides the summary. Note the loop is redirect-fed, not pipeline-fed --
 # DOCTOR_FIX_RAN survives it in the main shell (ui.sh counter rule).
 DOCTOR_FIX_RAN=0
+DOCTOR_FIX_FAILED=0
 if [ "$DOCTOR_MODE" = "fix" ] && [ -s "$WORK/fixcand" ]; then
     if [ "$DOCTOR_FIX_DRY" = 1 ]; then
         ui_section "Doctor fix -- dry run (nothing is changed)"
@@ -1427,6 +1583,7 @@ if [ "$DOCTOR_MODE" = "fix" ] && [ -s "$WORK/fixcand" ]; then
                 else
                     ui_error "fix: handover failed for '$_fx_rel' -- see the errors above"
                     DOCTOR_FIX_RAN=1
+                    DOCTOR_FIX_FAILED=1
                 fi
             else
                 ui_detail "skipped '$_fx_rel' -- 'opk doctor fix' re-offers it any time"
@@ -1444,6 +1601,14 @@ if [ "$DOCTOR_MODE" = "fix" ] && [ -s "$WORK/fixcand" ]; then
         UI_ROWS_WARN=0
         UI_ROWS_BAD=0
         doctor_scan_trees
+        if [ "$DOCTOR_FIX_FAILED" = 1 ]; then
+            # (#370 a C5): the header's rc contract promises rc 1 on a
+            # failed handover -- without this row a failure AFTER the
+            # ownership change re-verified green and the summary exited
+            # 0 over it (the counter reset above wiped every trace of
+            # the failure). The bad row feeds the shared verdict gate.
+            ui_kv_bad "fix" "a handover failed this run -- the rows above reflect the post-failure state; re-run 'opk doctor fix'"
+        fi
     fi
 fi
 if [ "$DOCTOR_MODE" = "fix" ] && [ "$DOCTOR_FIX_RAN" = 0 ] && [ ! -s "$WORK/fixcand" ]; then
