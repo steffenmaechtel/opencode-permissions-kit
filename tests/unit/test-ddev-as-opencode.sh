@@ -74,7 +74,7 @@ _trap_cleanup() {
         "${RN:-}" "${VN:-}" "${BS1:-}" "${DWORK:-}" "${RACE:-}" \
         "${RACESTUB:-}" "${RACESP:-}" "${RACESPS:-}" "${RACEC:-}" \
         "${RACECT:-}" "${RACEF:-}" "${RACEFT:-}" "${_112_dir:-}" \
-        "${CB285:-}"
+        "${CB285:-}" "${SWAPF:-}" "${SWAPB:-}"
 }
 trap _trap_cleanup EXIT INT TERM
 
@@ -1493,6 +1493,107 @@ assert_eq "flag race: victim settings untouched too (whole iteration skipped)" "
     "$(stat -c %a "$RACEF/victim/config/system/settings.php")"
 assert_eq "flag race: skip is not a failure (rc 0)" "0" "$RACEF_RC"
 rm -rf "${RACEF:?}" "${RACEFT:?}"
+
+# --- settings-pair parent-swap races (#266): the #215 walk's unswept sibling ----------
+# The per-.ddev component walk fires ONCE per iteration, BEFORE the
+# .ddev pair; the settings pairs run at the iteration TAIL and their
+# operands (proj/config/system, ...) carry components no find ever
+# classified. A parent swapped AFTER the walk resolves through every
+# downstream gate: the leaf [ -L ] sees a real dir inside the target,
+# and the resolved containment canonicalizes BOTH sides through the
+# swapped parent (the victim stays "contained"). Deterministic seam —
+# no find stub needed: ddev_devowned_flagged() runs after the .ddev
+# pair and right before the tail, so overriding it after sourcing
+# performs the swap at exactly the #266 window, then returns the real
+# flag state so the chosen branch runs into its gate.
+# Forward (unflagged -> ddev_handover_project): the override returns 1.
+SWAPF=$(mktemp -d)
+mkdir -p "$SWAPF/scan/proj/.ddev" "$SWAPF/victim/.ddev" "$SWAPF/victim/config/system"
+printf 'type: typo3\n' >"$SWAPF/scan/proj/.ddev/config.yaml"
+# The victim needs its own .ddev/config.yaml: ddev_type_settings_dirs
+# resolves it THROUGH the swapped parent — without it the settings list
+# is empty and every pin below would pass vacuously (the b W6 class).
+printf 'type: typo3\n' >"$SWAPF/victim/.ddev/config.yaml"
+printf 'victim-settings\n' >"$SWAPF/victim/config/system/settings.php"
+chmod 600 "$SWAPF/victim/config/system/settings.php"
+chmod 755 "$SWAPF/victim/config/system"
+SWAPF_RC=0
+SWAPF_OUT=$(OPK_INSTALL_CONF=/nonexistent sh -c '
+    . "$1"
+    _seam_scan="$2"
+    _seam_victim="$3"
+    ddev_devowned_flagged() {
+        # the swap lands after the .ddev walk + pair, before the tail
+        mv "$_seam_scan/proj" "$_seam_scan/moved-away"
+        ln -s "$_seam_victim" "$_seam_scan/proj"
+        return 1
+    }
+    ddev_handover_root "$2" "$(id -un)" "$(id -gn)"
+' _ "$HANDOVER" "$SWAPF/scan" "$SWAPF/victim" 2>&1) || SWAPF_RC=$?
+if [ -d "$SWAPF/scan/moved-away/.ddev" ] && [ -L "$SWAPF/scan/proj" ]; then
+    pass "settings race (fwd): seam fired — parent swapped between the walk and the tail (#266)"
+else
+    fail "settings race (fwd): seam fired — parent swapped between the walk and the tail (#266)"
+fi
+assert_eq "settings race (fwd): victim settings keep their mode — the pair's re-walk skips (#266)" "600" \
+    "$(stat -c %a "$SWAPF/victim/config/system/settings.php")"
+case "$SWAPF_OUT" in
+    *"warn: skipping settings dir"*)
+        pass "settings race (fwd): the skip announces itself (#266)"
+        ;;
+    *) fail "settings race (fwd): the skip must announce itself (got: $SWAPF_OUT) (#266)" ;;
+esac
+case "$SWAPF_OUT" in
+    *"ddev settings handover:"*)
+        fail "settings race (fwd): no success echo over a swapped parent (#266)"
+        ;;
+    *) pass "settings race (fwd): no success echo over a swapped parent (#266)" ;;
+esac
+assert_eq "settings race (fwd): skip is not a failure (rc 0)" "0" "$SWAPF_RC"
+
+# Back (flagged -> ddev_handover_project_back): the override returns 0;
+# the 4th ddev_handover_root argument (the dev user) arms the back
+# branch — its chown-FIRST pair is the mirrored swap exposure.
+SWAPB=$(mktemp -d)
+mkdir -p "$SWAPB/scan/proj/.ddev" "$SWAPB/victim/.ddev" "$SWAPB/victim/config/system"
+printf 'type: typo3\n' >"$SWAPB/scan/proj/.ddev/config.yaml"
+printf 'type: typo3\n' >"$SWAPB/victim/.ddev/config.yaml"
+printf 'victim-settings\n' >"$SWAPB/victim/config/system/settings.php"
+chmod 600 "$SWAPB/victim/config/system/settings.php"
+chmod 755 "$SWAPB/victim/config/system"
+SWAPB_RC=0
+SWAPB_OUT=$(OPK_INSTALL_CONF=/nonexistent sh -c '
+    . "$1"
+    _seam_scan="$2"
+    _seam_victim="$3"
+    ddev_devowned_flagged() {
+        mv "$_seam_scan/proj" "$_seam_scan/moved-away"
+        ln -s "$_seam_victim" "$_seam_scan/proj"
+        return 0
+    }
+    ddev_handover_root "$2" "$(id -un)" "$(id -gn)" "$(id -un)"
+' _ "$HANDOVER" "$SWAPB/scan" "$SWAPB/victim" 2>&1) || SWAPB_RC=$?
+if [ -d "$SWAPB/scan/moved-away/.ddev" ] && [ -L "$SWAPB/scan/proj" ]; then
+    pass "settings race (back): seam fired — parent swapped between the walk and the tail (#266)"
+else
+    fail "settings race (back): seam fired — parent swapped between the walk and the tail (#266)"
+fi
+assert_eq "settings race (back): victim settings keep their mode — the back pair's re-walk skips (#266)" "600" \
+    "$(stat -c %a "$SWAPB/victim/config/system/settings.php")"
+case "$SWAPB_OUT" in
+    *"warn: skipping settings dir"*)
+        pass "settings race (back): the skip announces itself (#266)"
+        ;;
+    *) fail "settings race (back): the skip must announce itself (got: $SWAPB_OUT) (#266)" ;;
+esac
+case "$SWAPB_OUT" in
+    *"dev-owned handback:"*)
+        fail "settings race (back): no success echo over a swapped parent (#266)"
+        ;;
+    *) pass "settings race (back): no success echo over a swapped parent (#266)" ;;
+esac
+assert_eq "settings race (back): skip is not a failure (rc 0)" "0" "$SWAPB_RC"
+rm -rf "${SWAPF:?}" "${SWAPB:?}"
 
 # Walk contract edges (pr-00234 a W4): a scan root of '/' refuses LOUD
 # like _fsb_pass — rc 1 plus a warn on stderr (the failure path

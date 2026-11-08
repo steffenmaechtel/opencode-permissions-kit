@@ -316,3 +316,9 @@ A project that no longer **starts** does not block the others: the installer
 lists the failed projects and asks whether to continue anyway or abort so
 you can fix them first. Re-running the installer after an abort **resumes**
 instead of repeating — projects whose dumps already exist are skipped.
+
+A dump file that is a **symlink** is never exported into or imported
+through: the export refuses the operand loudly (the dump directory is
+agent-group-writable during the whole export wave, and a planted link is
+tampering), counts the project as failed and leaves the link in place for
+you to remove — after removing it, re-running exports the project cleanly.

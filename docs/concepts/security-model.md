@@ -54,9 +54,10 @@ the developer — it needs the Windows interop the agent must not have. See
   opencode host UID).
 - **Renamed copies** of secrets are invisible to the name-based
   [leak scan](../how-to/customize-deny-list.md).
-- **Handover symlink swaps:** the root-run `.ddev` handover re-tests every
-  path component immediately before acting, but the gate is not atomic — a
-  swap in the short window before the recursive pair stays undetected.
+- **Handover symlink swaps:** the root-run `.ddev` handover and the ddev
+  settings-dir pairs re-test every path component immediately before
+  acting, but the gates are not atomic — a swap in the short window
+  between a gate and its recursive pair stays undetected.
 - **Dev-owned flag write (accepted race):** the root-run dev-owned flag
   write into `.ddev/config.yaml` screens for symlinks but is not atomic —
   dev-owned mode's flag-write TOCTOU stays accepted (opencode-privilege-
