@@ -58,7 +58,7 @@ session's commission, then gather:
 | Input | Source |
 |---|---|
 | Case key (`pr-ABCDE`) | birth-PR number — the PR timeline IS the case record |
-| Chain state | session records (commission, scratch: posted.log, digests, verdicts) — never read the PR back |
+| Chain state | session records (commission, scratch: posted.log, verdicts) — never read the PR back |
 | Track | PR body (`Track: shipped\|non-shipped (paths)`); any `files/**` path ⇒ shipped (re-derive, section 2) |
 | Mode + session | commission — mode `gated\|autonomous`, session `implementer\|fresh` (provenance) |
 | Tier | classified from the round's diff BEFORE staging (section 2) |
