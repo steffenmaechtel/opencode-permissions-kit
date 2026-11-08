@@ -367,9 +367,15 @@ if [ "$DOCTOR_MODE" = "all" ]; then
     # (NUL is a control character). NUL cannot ride a shell variable,
     # so swap it for STX BEFORE the loop; the loop refuses STX-carrying
     # lines loudly (doctor_show_sanitize strips STX from the display).
+    # (round c C2): the swap itself fails LOUD -- a silent skip would
+    # return exactly the bug this closes (tr fails -> unswapped roots
+    # -> read strips the NUL with no row).
     _da_stx="$(printf '\002')"
-    tr '\000' '\002' <"$WORK_ALL/roots" >"$WORK_ALL/roots.t" 2>/dev/null &&
-        mv "$WORK_ALL/roots.t" "$WORK_ALL/roots"
+    if ! tr '\000' '\002' <"$WORK_ALL/roots" >"$WORK_ALL/roots.t"; then
+        ui_error "doctor: cannot process the scan-root list (tr failed) -- refusing to scan"
+        exit 1
+    fi
+    mv "$WORK_ALL/roots.t" "$WORK_ALL/roots"
 
     # --- marker discovery: one project root per opk.json found ----------------------
     ALL_ROOTS_N=0
@@ -381,8 +387,12 @@ if [ "$DOCTOR_MODE" = "all" ]; then
         ALL_ROOTS_N=$((ALL_ROOTS_N + 1))
         case "$_da_root" in
             *"$_da_stx"*)
+                # (round c C3): after the NUL->STX swap a hit is either
+                # a swapped NUL or a pre-existing literal STX (argv
+                # roots join the same list) -- name both, the display
+                # strips the byte either way
                 _da_show="$(doctor_show_sanitize "$_da_root")"
-                ui_kv_warn "scan root" "list line carries a NUL byte -- skipped: '$_da_show'"
+                ui_kv_warn "scan root" "list line carries a NUL or STX byte -- skipped: '$_da_show'"
                 continue
                 ;;
         esac
@@ -413,7 +423,7 @@ if [ "$DOCTOR_MODE" = "all" ]; then
         # AND clobber the rows -- warn sanitized, skip
         if printf '%s' "$_da_root" | LC_ALL=C grep -qF '\' ||
             doctor_cntrl_bad "$_da_root"; then
-            _da_show="$(doctor_show_sanitize "$_da_root" | tr -d '\')"
+            _da_show="$(doctor_show_sanitize "$_da_root" | tr -d '\\')"
             ui_kv_warn "scan root" "'$_da_show' carries control characters or backslashes -- skipped"
             continue
         fi
@@ -492,7 +502,7 @@ if [ "$DOCTOR_MODE" = "all" ]; then
             # never a silent drop
             if printf '%s' "$_da_proj" | LC_ALL=C grep -qF '\' ||
                 doctor_cntrl_bad "$_da_proj"; then
-                _da_show="$(doctor_show_sanitize "$_da_proj" | tr -d '\')"
+                _da_show="$(doctor_show_sanitize "$_da_proj" | tr -d '\\')"
                 ui_kv_warn "scan root" "marker at '$_da_show' skipped -- control characters or backslashes in the path"
                 ALL_MARK_SKIP=$((ALL_MARK_SKIP + 1))
                 continue

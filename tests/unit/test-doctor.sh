@@ -1017,6 +1017,11 @@ printf '%s\n' "$ALLC1ROOT" >"$ALLC1"
 rc_doctor_roots "a A1: C1-byte root line skipped -> rc 2" 2 "$ALLC1" all
 grep_last_out "a A1: C1 skip warn (sanitized root)" \
     grep -qF "carries control characters or backslashes -- skipped"
+if printf '%s' "$_rd_out" | grep -qF "tr: warning"; then
+    fail "c C1: no tr portability warning on the warn paths"
+else
+    pass "c C1: no tr portability warning on the warn paths"
+fi
 if printf '%s' "$_rd_out" | LC_ALL=C grep -q "$(printf '\233')"; then
     fail "a A1: the warn row carries no raw C1 byte"
 else
@@ -1050,8 +1055,8 @@ grep_last_out "b B1: the not-a-marker row keeps the UTF-8 name intact" \
 # through every gate as a clean path ("is missing" warn, no NUL row).
 printf '/definitely/not/there\0junk\n' >"$ALLB1"
 rc_doctor_roots "b B2: NUL-carrying list line refused (rc 2)" 2 "$ALLB1" all
-grep_last_out "b B2: the NUL warn row names the class" \
-    grep -qF "list line carries a NUL byte -- skipped"
+grep_last_out "b B2+c C3: the NUL/STX warn row names the class" \
+    grep -qF "list line carries a NUL or STX byte -- skipped"
 
 # static source pins (comment-strip rider, the canonical shape): the
 # default roots are the vhosts layout plus the kit's own registry, at
