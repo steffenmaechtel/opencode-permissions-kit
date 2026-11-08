@@ -1250,10 +1250,11 @@ _f11_block="$(sed -n '/^for arg; do$/,/#211 a F11 gate end/p' \
     "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh")"
 # #211 b W23 (the #198 a W5 / F7 shapes): end anchors are a shipped
 # marker comment (F11) — if it ever drifts, the extract runs to EOF and
-# the eval fails confusingly. Bound it: the loop+gate is 95 lines
-# (shfmt-canonical; 51 pre-#370, 85 after D4/D5, 95 after round a
-# A3/A4 grew the messages and the divergence comment).
-if [ -n "$_f11_block" ] && [ "$(printf '%s\n' "$_f11_block" | wc -l)" -le 98 ]; then
+# the eval fails confusingly. Bound it: the loop+gate is 97 lines
+# (shfmt-canonical; 51 pre-#370, 85 after D4/D5, 97 after round a's
+# messages, divergence comment and the D5-pin tails — re-measured,
+# round b B3: the comment had said 95). Slack is 3 lines to ≤100.
+if [ -n "$_f11_block" ] && [ "$(printf '%s\n' "$_f11_block" | wc -l)" -le 100 ]; then
     echo "  ${GREEN}PASS${NC}  config arg loop + F11 gate extractable (#211 a F11)"
     passed=$((passed + 1))
     _f11_run() {

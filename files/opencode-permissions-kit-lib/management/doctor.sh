@@ -130,9 +130,11 @@ fi
 # cannot tell a raw C1 byte from a UTF-8 TRAIL byte (U+00DC = 0xC3
 # 0x9C -- the plain bracket pattern false-positives on legit UTF-8
 # roots, measured), so the cheap grep is only the PREFILTER (ctrl or
-# ANY non-ASCII byte) and the python decoder decides at character
-# level: valid UTF-8 passes, undecodable bytes fall back to latin-1,
-# where a raw C1 byte stays a control character.
+# any 0x80-0xBF byte -- sufficient because every non-ASCII character
+# carries a trail byte in that range; round b B4 sharpened the
+# wording, the decision was always equivalent) and the python decoder
+# decides at character level: valid UTF-8 passes, undecodable bytes
+# fall back to latin-1, where a raw C1 byte stays a control character.
 doctor_cntrl_bad() {
     if ! printf '%s' "$1" | LC_ALL=C grep -q "$(printf '[[:cntrl:]\200-\277]')"; then
         return 1
@@ -147,6 +149,26 @@ except UnicodeDecodeError:
 sys.exit(0 if any(
     ord(c) < 32 or ord(c) == 127 or 0x80 <= ord(c) <= 0x9F
     for c in text) else 1)
+'
+}
+
+# doctor_show_sanitize <string> -> display-safe copy on stdout: control
+# CHARACTERS removed at character level (round b B1) -- valid UTF-8
+# round-trips byte-identical (a byte-range tr strip mangles legit names:
+# U+00DF = 0xC3 0x9F loses its trail byte), raw C1 bytes die in the
+# decoder. Backslash strips separately where a site needs it.
+doctor_show_sanitize() {
+    printf '%s' "$1" | python3 -c '
+import sys
+data = sys.stdin.buffer.read()
+try:
+    text = data.decode("utf-8")
+except UnicodeDecodeError:
+    text = data.decode("latin-1")
+clean = "".join(c for c in text
+                if not (ord(c) < 32 or ord(c) == 127
+                        or 0x80 <= ord(c) <= 0x9F))
+sys.stdout.buffer.write(clean.encode("utf-8", "replace"))
 '
 }
 
@@ -339,6 +361,15 @@ if [ "$DOCTOR_MODE" = "all" ]; then
         fi
     fi
     LC_ALL=C sort -u "$WORK_ALL/roots" >"$WORK_ALL/roots.s" && mv "$WORK_ALL/roots.s" "$WORK_ALL/roots"
+    # (round b B2): a NUL byte in a list line is invisible to POSIX
+    # read -- it drops the byte silently and the STRIPPED spelling would
+    # flow through every gate with no warn row, contradicting the doc
+    # (NUL is a control character). NUL cannot ride a shell variable,
+    # so swap it for STX BEFORE the loop; the loop refuses STX-carrying
+    # lines loudly (doctor_show_sanitize strips STX from the display).
+    _da_stx="$(printf '\002')"
+    tr '\000' '\002' <"$WORK_ALL/roots" >"$WORK_ALL/roots.t" 2>/dev/null &&
+        mv "$WORK_ALL/roots.t" "$WORK_ALL/roots"
 
     # --- marker discovery: one project root per opk.json found ----------------------
     ALL_ROOTS_N=0
@@ -348,6 +379,13 @@ if [ "$DOCTOR_MODE" = "all" ]; then
     while IFS= read -r _da_root; do
         [ -n "$_da_root" ] || continue
         ALL_ROOTS_N=$((ALL_ROOTS_N + 1))
+        case "$_da_root" in
+            *"$_da_stx"*)
+                _da_show="$(doctor_show_sanitize "$_da_root")"
+                ui_kv_warn "scan root" "list line carries a NUL byte -- skipped: '$_da_show'"
+                continue
+                ;;
+        esac
         # RAW-line absolute gate FIRST (#370 a C3): the absolute check
         # must see the hand-edited line itself -- behind realpath -m a
         # relative spelling lands cwd-anchored and ABSOLUTE, so a gate
@@ -375,7 +413,7 @@ if [ "$DOCTOR_MODE" = "all" ]; then
         # AND clobber the rows -- warn sanitized, skip
         if printf '%s' "$_da_root" | LC_ALL=C grep -qF '\' ||
             doctor_cntrl_bad "$_da_root"; then
-            _da_show="$(printf '%s' "$_da_root" | tr -d '\000-\037\177\200-\237\\')"
+            _da_show="$(doctor_show_sanitize "$_da_root" | tr -d '\')"
             ui_kv_warn "scan root" "'$_da_show' carries control characters or backslashes -- skipped"
             continue
         fi
@@ -433,7 +471,7 @@ if [ "$DOCTOR_MODE" = "all" ]; then
                 *) _da_corrupt=1 ;;
             esac
             if [ "$_da_corrupt" = 1 ]; then
-                _da_show="$(printf '%s' "$_da_hit" | tr -d '\000-\037\177\200-\237')"
+                _da_show="$(doctor_show_sanitize "$_da_hit")"
                 ui_kv_warn "scan root" "corrupted marker path '$_da_show' skipped (a newline in a name under $_da_root?)"
                 ALL_MARK_SKIP=$((ALL_MARK_SKIP + 1))
                 continue
@@ -442,7 +480,7 @@ if [ "$DOCTOR_MODE" = "all" ]; then
             # file through symlinks; anything else (a directory, a
             # dangling symlink, a link to a directory) is not a marker
             if [ ! -f "$_da_hit" ]; then
-                _da_show="$(printf '%s' "$_da_hit" | tr -d '\000-\037\177\200-\237')"
+                _da_show="$(doctor_show_sanitize "$_da_hit")"
                 ui_kv_warn "scan root" "'$_da_show' is not a regular file through symlinks -- not a marker (the walk-up rule)"
                 ALL_MARK_SKIP=$((ALL_MARK_SKIP + 1))
                 continue
@@ -454,7 +492,7 @@ if [ "$DOCTOR_MODE" = "all" ]; then
             # never a silent drop
             if printf '%s' "$_da_proj" | LC_ALL=C grep -qF '\' ||
                 doctor_cntrl_bad "$_da_proj"; then
-                _da_show="$(printf '%s' "$_da_proj" | tr -d '\000-\037\177\200-\237\\')"
+                _da_show="$(doctor_show_sanitize "$_da_proj" | tr -d '\')"
                 ui_kv_warn "scan root" "marker at '$_da_show' skipped -- control characters or backslashes in the path"
                 ALL_MARK_SKIP=$((ALL_MARK_SKIP + 1))
                 continue

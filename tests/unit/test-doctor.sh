@@ -1032,6 +1032,27 @@ rc_doctor_roots "a A1: valid UTF-8 root stays scannable (rc 0)" 0 "$ALLU" all
 grep_last_out "a A1: the UTF-8 root's project scanned green" \
     grep -qF "tree -- 2 entries mapped-safe"
 
+# --- (round b B1): display sanitize is UTF-8-aware ---------------------------------
+# The old byte-range strip mangled legit names (U+00DF = 0xC3 0x9F --
+# trail byte inside 0x80-0x9F): a directory named opk.json under an
+# ß-carrying root takes the not-a-marker row, and the ß must survive
+# the row intact (the character-level decoder replaces the byte strip).
+ALLB1ROOT="$WORK/$(printf '\303\237')dir"
+mkdir -p "$ALLB1ROOT/opk.json" # a DIRECTORY named opk.json: hit, not a marker
+ALLB1="$WORK/all-b1.txt"
+printf '%s\n' "$ALLB1ROOT" >"$ALLB1"
+rc_doctor_roots "b B1: ss-name root with dir-marker -> rc 2" 2 "$ALLB1" all
+grep_last_out "b B1: the not-a-marker row keeps the UTF-8 name intact" \
+    grep -qF "$(printf '\303\237')dir/opk.json"
+
+# --- (round b B2): NUL in a list line is refused, not silently stripped ------------
+# POSIX read cannot store NUL -- pre-fix the stripped spelling flowed
+# through every gate as a clean path ("is missing" warn, no NUL row).
+printf '/definitely/not/there\0junk\n' >"$ALLB1"
+rc_doctor_roots "b B2: NUL-carrying list line refused (rc 2)" 2 "$ALLB1" all
+grep_last_out "b B2: the NUL warn row names the class" \
+    grep -qF "list line carries a NUL byte -- skipped"
+
 # static source pins (comment-strip rider, the canonical shape): the
 # default roots are the vhosts layout plus the kit's own registry, at
 # the design's depth -- hermetic execution of the DEFAULT arm would scan
