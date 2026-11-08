@@ -334,7 +334,11 @@ for _bad in \
     '{"containerTrees":[{"path":"a\"b"}]}' \
     '{"containerTrees":[{"path":"a\u0027b"}]}' \
     '{"containerTrees":[{"path":"a","note":7}]}' \
-    '{"containerTrees":[{"path":"a","note":"x\u001by"}]}'; do
+    '{"containerTrees":[{"path":"a","note":"x\u001by"}]}' \
+    '{"containerTrees":[{"path":"a\u007fb"}]}' \
+    '{"containerTrees":[{"path":"a\u009bb"}]}' \
+    '{"containerTrees":[{"path":"a\u0085b"}]}' \
+    '{"containerTrees":[{"path":"a","note":"x\u007fy"}]}'; do
     _pol_rc=0
     pol "$_bad" >/dev/null || _pol_rc=$?
     _pol_msg="$(cat "$WORK/pol.err" 2>/dev/null || true)"
@@ -713,6 +717,20 @@ grep_last_out "missing-root warn row" grep -qF "is missing -- skipped"
 grep_last_out "names the nothing-scanned state" \
     grep -qF "no scan root could be scanned -- every listed root is missing or unusable"
 
+# existing FILE as scan root (#370 a C4): the row must not claim
+# "missing" for a path that exists -- not-a-directory is its own state
+ALLFILE="$WORK/all-file.txt"
+: >"$WORK/root-is-file"
+printf '%s\n' "$WORK/root-is-file" >"$ALLFILE"
+rc_doctor_roots "all: file as scan root skipped -> rc 2" 2 "$ALLFILE" all
+grep_last_out "C4: not-a-directory row (no false 'missing')" \
+    grep -qF "'$WORK/root-is-file' is not a directory -- skipped"
+if printf '%s' "$_rd_out" | grep -qF "'$WORK/root-is-file' is missing"; then
+    fail "C4: existing file no longer reported missing"
+else
+    pass "C4: existing file no longer reported missing"
+fi
+
 # control-char marker: skipped loudly; the siblings' children unaffected
 ALLCT="$ALLSCAN/we$(printf '\t')ird"
 mkdir -p "$ALLCT"
@@ -905,10 +923,13 @@ fi
 rc_doctor "all: scan root '/' -> rc 64" 64 all /
 
 # --- 4e. round-b fix-wave pins (#360 b) ----------------------------------------------
-# S1: '//' and '/./' list lines normalize onto the '/' belt; S2: a
-# relative list line is refused (keeps the fragment gate's absolute-
-# prefix assumption airtight); S3: with realpath absent, -H follows a
-# symlinked list root (the belt the b-comment documents).
+# S1: seam lines spelling the filesystem root variants; S2: a
+# relative list line is refused ON THE RAW LINE (#370 a C3 -- realpath
+# -m used to anchor it to the cwd first, silently scanning the
+# cwd-anchored tree instead of warning; the absolute gate was
+# near-unreachable behind the normalization); S3: with realpath
+# absent, -H follows a symlinked list root (the belt the b-comment
+# documents).
 
 # S1: seam lines spelling the filesystem root variants
 ALLFS="$WORK/all-fs.txt"
@@ -917,14 +938,19 @@ rc_doctor_roots "b S1: '//' and '/./' refused via normalization -> rc 2" 2 "$ALL
 grep_last_out "b S1: refusal row names the belt" \
     grep -qF "refused -- doctor all does not walk the whole filesystem"
 
-# S2: a relative seam line is NORMALIZED against the cwd (realpath) --
-# it lands absolute, so the fragment gate's absolute-prefix assumption
-# holds; the absolute-only warn is the realpath-absent fallback (below)
+# S2 + C3: a relative seam line warns ON THE RAW SPELLING and is
+# skipped -- the absolute gate must be reachable on realpath-present
+# hosts too, or a hand-edited list silently scans a cwd-anchored tree
 ALLREL="$WORK/all-rel.txt"
 printf '%s\n' "relative-root" >"$ALLREL"
-rc_doctor_roots "b S2: relative root line normalized -> rc 2" 2 "$ALLREL" all
-grep_last_out "b S2: the warn names the RESOLVED absolute path" \
-    grep -qF "'$PWD/relative-root' is missing -- skipped"
+rc_doctor_roots "b S2+C3: relative root line refused loudly -> rc 2" 2 "$ALLREL" all
+grep_last_out "b S2+C3: the warn names the RAW relative line" \
+    grep -qF "'relative-root' is not an absolute path -- skipped"
+if printf '%s' "$_rd_out" | grep -qF "$PWD/relative-root"; then
+    fail "b S2+C3: no cwd-anchored scan of a relative line"
+else
+    pass "b S2+C3: no cwd-anchored scan of a relative line"
+fi
 
 # S3: symlinked seam root + failing realpath (the A1 stub pattern) --
 # -H is what follows the link then; the marker must be found. The same
@@ -1094,6 +1120,24 @@ rc_doctor "--dry-run without fix -> rc 64" 64 --dry-run
 rc_doctor "unknown flag in fix mode -> rc 64" 64 fix --bogus
 rc_doctor "two positionals in fix mode -> rc 64" 64 fix "$PROJ" extra
 
+# empty root argument (#370 a C6): a usage error, not walk-up
+# discovery -- scripted $ROOT-unset invocations must fail their
+# caller's contract instead of scanning the wrong tree
+rc_doctor "empty root argument -> rc 64" 64 ""
+grep_last_out "C6: empty-root refusal row" \
+    grep -qF "the project root must not be empty"
+
+# root argument with a newline (#370 a C7): command substitution in
+# the normalization strips a TRAILING newline -- doctor would operate
+# on a DIFFERENT tree than the argument named. Refuse loudly.
+# (printf '%s\nx' + strip-x: command substitution eats trailing
+# newlines, so the newline must ride behind a non-newline last char)
+C7ROOT="$(printf '%s\nx' "$PROJ")"
+C7ROOT="${C7ROOT%x}"
+rc_doctor "root argument with trailing newline -> rc 64" 64 "$C7ROOT"
+grep_last_out "C7: newline refusal row" \
+    grep -qF "the project root must not contain newlines"
+
 # control bytes in the project root: fix mode rejects loudly (the
 # candidate TSV round-trip would truncate the handover operand away
 # from the tree the prompt named, #348 a C3); scan mode has no OPERAND
@@ -1225,6 +1269,14 @@ printf 'y\n' >"$WORK/ans"
 rc_doctor_ans "fix, answer y, failing handover -> rc 1" 1 "$WORK/ans" fix "$PROJ"
 grep_last_out "handover failure row" grep -qF "handover failed for 'tree'"
 grep_last_out "re-check runs after failure too" grep -qF "re-check after handover"
+# (#370 a C5): the failure must survive the re-check's counter reset --
+# the header's rc contract promises rc 1 on a failed handover even when
+# the post-failure re-scan would read green. The bad row is the trace;
+# a green re-scan cannot swallow it (sandbox note at the stub block:
+# the rc-0-despite-failure variant needs a real ownership transition
+# and stays e2e territory -- this pin holds the row the rc gate keys on).
+grep_last_out "C5: failed-handover row survives the counter reset" \
+    grep -qF "a handover failed this run"
 
 # two candidates, y then n: fd-3 loop discipline (a loop reading stdin
 # would eat the answer lines as candidates) and per-tree prompts
@@ -1540,6 +1592,33 @@ chmod 755 "$PROJ"
         echo "        output: $_rd_out"
     }
 
+# unreadable mode of an EXISTING opk.json (#370 a C8): the stat failure
+# used to leave the mode variable empty -- chmod "" failed warn-only
+# and opk.json landed with mktemp's 0600. Fail loud instead (stat
+# shadowed on PATH; only doctor's mode read calls it in this run).
+NOSTAT="$WORK/nostat-bin"
+mkdir -p "$NOSTAT"
+printf '#!/bin/sh\nexit 1\n' >"$NOSTAT/stat"
+chmod +x "$NOSTAT/stat"
+detproj
+printf '{"containerTrees":[]}\n' >"$PROJ/opk.json"
+printf 'y\n' >"$WORK/ans"
+_rd_rc=0
+_rd_out="$(PATH="$NOSTAT:$PATH" OPK_INSTALL_CONF="$CONF_ME" OPK_DOCTOR_PROC_ROOT="$PROCFIX" \
+    OPK_DOCTOR_OPK="" NO_COLOR=1 setsid sh "$DOCTOR" detect "$PROJ" <"$WORK/ans" 2>&1)" || _rd_rc=$?
+if [ "$_rd_rc" = 1 ] &&
+    printf '%s' "$_rd_out" | grep -qF "cannot read the mode of the existing opk.json"; then
+    pass "C8: stat failure on existing opk.json -> loud rc 1"
+else
+    fail "C8: stat failure on existing opk.json -> loud rc 1 (rc $_rd_rc)"
+    echo "        output: $_rd_out"
+fi
+if printf '%s' "$_rd_out" | grep -qF "candidates above stay valid"; then
+    pass "C8: the refusal keeps the candidates recoverable"
+else
+    fail "C8: the refusal keeps the candidates recoverable"
+fi
+
 # git unavailable (broken stub): the ignore answers are gone, D evidence
 # cannot be verified -- warn row, not silence; S evidence would still
 # work (fixture A would find its candidates without any ignore answers)
@@ -1558,6 +1637,28 @@ _rd_out="$(PATH="$NOGIT:$PATH" OPK_INSTALL_CONF="$CONF_ME" OPK_DOCTOR_PROC_ROOT=
         fail "git unavailable -> warn row + consequence, rc 2 (rc $_rd_rc)"
         echo "        output: $_rd_out"
     }
+
+# git failing WITH a diagnosis (#370 a C2): check-ignore's stderr used
+# to land in an unread-back file -- dubious ownership's remedy never
+# reached the row. The first stderr line surfaces sanitized instead.
+DUBGIT="$WORK/dubious-bin"
+mkdir -p "$DUBGIT"
+{
+    echo '#!/bin/sh'
+    echo "printf 'fatal: detected dubious ownership in repository at %s\\n' \"\$2\" >&2"
+    echo 'exit 128'
+} >"$DUBGIT/git"
+chmod +x "$DUBGIT/git"
+_rd_rc=0
+_rd_out="$(PATH="$DUBGIT:$PATH" OPK_INSTALL_CONF="$CONF_ME" OPK_DOCTOR_PROC_ROOT="$PROCFIX" \
+    OPK_DOCTOR_OPK="" NO_COLOR=1 setsid sh "$DOCTOR" detect "$PROJ" </dev/null 2>&1)" || _rd_rc=$?
+if [ "$_rd_rc" = 2 ] &&
+    printf '%s' "$_rd_out" | grep -qF "git said: fatal: detected dubious ownership"; then
+    pass "C2: git's stderr diagnosis surfaces in the fallback row"
+else
+    fail "C2: git's stderr diagnosis surfaces in the fallback row (rc $_rd_rc)"
+    echo "        output: $_rd_out"
+fi
 
 # unusable path forms are dropped at classify time (charset belt): a
 # single-quote directory and a non-ASCII directory are evidence-class S

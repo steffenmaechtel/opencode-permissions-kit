@@ -72,12 +72,20 @@ esac
 HEADLESS=false
 _hr_first=true
 _hr_msg=false
+_hr_help=false
 for _hr_a in "$@"; do
     if [ "$_hr_first" = true ]; then
         _hr_first=false
         continue
     fi
     case "$_hr_a" in
+        # (#370 a E1): a help flag in the leading flag region (before
+        # the first message argument) is a help QUERY -- `run --help`
+        # from a non-project cwd used to hit the project-dir refusal
+        # below instead of help (the #91 any-dir path covered flags in
+        # $1 only). Past the first message argument a "--help" is
+        # message text, not a query -- the break keeps it unflagged.
+        -h | --help) _hr_help=true ;;
         -*) ;;
         *)
             _hr_msg=true
@@ -153,6 +161,13 @@ case "${1:-}" in
         exec /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode "$@"
         ;;
 esac
+# (#370 a E1): help in the leading flag region joins the any-dir path
+# above -- same rationale (help carries no project context and no kit
+# state), same exec. Checked AFTER the $1 case so that arm keeps
+# answering version probes unchanged.
+if [ "$_hr_help" = true ]; then
+    exec /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode "$@"
+fi
 
 if [ "$VALID" != true ] && [ "$HEADLESS" != true ]; then
     echo ""

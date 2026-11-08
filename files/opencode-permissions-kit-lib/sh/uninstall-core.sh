@@ -362,13 +362,18 @@ un_wsl_bridge_remove() {
     # uninstall 'opk' is gone — there is no cleanup command anymore). The
     # stand-in tree under the library always goes (it dies with the library).
     if [ "$DRY_RUN" = true ]; then
-        echo "  [DRY] ask: remove the kit-owned wsl.conf bridge block? (default: yes)"
+        echo "  [DRY] ask: remove the kit-owned wsl.conf bridge block? (default: no)"
         echo "  [DRY] sudo rm -rf /usr/local/lib/opencode-permissions-kit/wsl"
     else
         if grep -q '^# opencode permissions kit browser bridge -- begin$' /etc/wsl.conf 2>/dev/null ||
             grep -q '^\[opencode-permissions-kit\]$' /etc/wsl.conf 2>/dev/null; then
+            # (#370 a D1): default n — the conventions' direction for
+            # changes to system files (agent/conventions.md,
+            # "Interactive prompts"), and wsl.conf is THE user-owned
+            # system config the kit guards (AGENTS.md Rules). Consent
+            # stays explicit; --yes still assumes yes.
             if [ "$(prompt_yn "Remove the kit's wsl.conf bridge block? (""\
-kit-owned comments only; your own entries stay)" "y")" = "y" ]; then
+kit-owned lines only; your own entries stay)" "n")" = "y" ]; then
                 if browser_bridge_remove "/usr/local/lib/opencode-permissions-kit"; then
                     echo "WSL browser bridge removed (wsl.conf block + stand-in tree)."
                     log "wsl browser bridge removed (/etc/wsl.conf bridge block + library wsl/ tree, consented)"
@@ -380,8 +385,13 @@ kit-owned comments only; your own entries stay)" "y")" = "y" ]; then
                     # through here and names the real cause. A silent
                     # _bb_install_conf failure (no WARNING of its own) also
                     # lands here — the WARN below is then the only diagnostic.
-                    echo "WARN: could not remove the wsl.conf bridge block (helper failed)" >&2
-                    echo "      remove the marked lines yourself — the kit block is comment-only" >&2
+                    # (#370 a D2): the stderr reason and the log line name
+                    # the same arm; the by-hand hint names BOTH shapes the
+                    # gate serves — the comment block AND the legacy
+                    # [opencode-permissions-kit] section (not comment-only).
+                    echo "WARN: could not remove the wsl.conf bridge block (helper or staging mktemp failed)" >&2
+                    echo "      remove the marked lines yourself — the comment block, plus the legacy" >&2
+                    echo "      [opencode-permissions-kit] section through its root = line if present" >&2
                     log "wsl browser bridge removal FAILED (helper or staging mktemp failed)"
                 fi
             else
