@@ -839,8 +839,8 @@ fi
 # cover every op verb (#243 d Q3): find, both setfacl spellings and
 # chmod g-s.
 FOUT=$(_un_loop_out "" false 60000 60002 60001 "//etc /var/. .") || true
-if printf '%s' "$FOUT" | grep -qF 'Skipping malformed project path (dot or empty segment): //etc' &&
-    printf '%s' "$FOUT" | grep -qF 'Skipping malformed project path (dot or empty segment): /var/.' &&
+if printf '%s' "$FOUT" | grep -qF 'Skipping malformed project path (dot, empty segment, or whitespace): //etc' &&
+    printf '%s' "$FOUT" | grep -qF 'Skipping malformed project path (dot, empty segment, or whitespace): /var/.' &&
     printf '%s' "$FOUT" | grep -qF 'Skipping non-absolute project path: .' &&
     ! printf '%s' "$FOUT" | grep -qF 'sudo find //etc' &&
     ! printf '%s' "$FOUT" | grep -qF 'sudo setfacl -R -x g:60002 //etc' &&
@@ -854,6 +854,47 @@ if printf '%s' "$FOUT" | grep -qF 'Skipping malformed project path (dot or empty
     pass "malformed roots (//etc, /var/., .) skipped loudly, no root ops on them (#243 a X2)"
 else
     fail "malformed-root screening arms (out=$(_unarm_show "$FOUT")) (#243 a X2)"
+fi
+# Whitespace arm (#418 a A2 — the #247 mirror-or-scope resolution): a
+# spaced line naming an EXISTING directory used to pass every gate in
+# this loop (the #243 a X2 scope-out) and reach the root-run revert
+# ops while the docs claimed loud skips; the arm is mirrored now
+# (writer + update-core + config.sh refresh parity — the comment at
+# the case arm carries the full history). The spaced root must EXIST:
+# the [ ! -d ] gate sits before the form gates and would silently eat
+# a nonexistent one (the same ordering the files.md sentence names).
+mkdir -p "$WORK/has space"
+printf '%s\n/etc\n%s\n' "$WORK/fakeproj" "$WORK/has space" >"$WORK/unloop-ws.conf"
+: >"$WORK/unloop-ws-sudo.log"
+(
+    DRY_RUN=false
+    _un_partial=""
+    _un_revert_failed=0
+    UN_OC_UID=60000
+    UN_OC_GID=60002
+    UN_DEV_GROUP=devgroup
+    UN_DEV_GID=60001
+    DEFAULT_USER=devuser
+    OPENCODE_USER=untest-agent
+    un_opencode_user_gate
+    sudo() {
+        printf 'sudo %s\n' "$*" >>"$WORK/unloop-ws-sudo.log"
+        return 0
+    }
+    log() { echo "log: $*"; }
+    UNINSTALL_PROJECTS_CONF="$WORK/unloop-ws.conf"
+    un_projects_revert
+) >"$WORK/unloop-ws.log" 2>&1 || true
+FOUT=$(cat "$WORK/unloop-ws.log")
+if printf '%s' "$FOUT" | grep -qF "Skipping malformed project path (dot, empty segment, or whitespace): $WORK/has space" &&
+    ! grep -qF "sudo find $WORK/has space" "$WORK/unloop-ws-sudo.log" &&
+    ! grep -qF "sudo setfacl -R -x g:60002 $WORK/has space" "$WORK/unloop-ws-sudo.log" &&
+    ! grep -qF "sudo chmod g-s $WORK/has space" "$WORK/unloop-ws-sudo.log" &&
+    printf '%s' "$FOUT" | grep -qF 'Skipping system path: /etc' &&
+    printf '%s' "$FOUT" | grep -qF "log: project ownership reverted + kit ACL entries removed: $WORK/fakeproj"; then
+    pass "spaced existing root skipped loudly, no revert ops on it (#418 a A2)"
+else
+    fail "whitespace screening arm (out=$(_unarm_show "$FOUT")) (#418 a A2)"
 fi
 # _un_exist_roots <root...> — host-existence-filtered feed set (#243
 # c Q3): each feed form passes when its once-stripped form is an
@@ -933,7 +974,7 @@ done
 printf '%s' "$FOUT" | grep -q 'Skipping system path: /$' || _un_ts_ok=0
 printf '%s' "$FOUT" | grep -qE 'Reverting kit ownership in: *$' && _un_ts_ok=0
 printf '%s' "$FOUT" | grep -qF 'sudo find / !' && _un_ts_ok=0
-printf '%s' "$FOUT" | grep -qF 'Skipping malformed project path (dot or empty segment): /var//' || _un_ts_ok=0
+printf '%s' "$FOUT" | grep -qF 'Skipping malformed project path (dot, empty segment, or whitespace): /var//' || _un_ts_ok=0
 printf '%s' "$FOUT" | grep -qF 'sudo find /var// !' && _un_ts_ok=0
 printf '%s' "$FOUT" | grep -q 'sudo setfacl -R -x g:60002 /var//$' && _un_ts_ok=0
 printf '%s' "$FOUT" | grep -q 'sudo chmod g-s /var//$' && _un_ts_ok=0
@@ -1434,6 +1475,43 @@ if printf '%s' "$_f3fail" | grep -q 'WARN: sudoers removal failed' &&
     pass "sudoers section arms: failure WARNs, success echoes (pr-00263 a F3)"
 else
     fail "sudoers section arms (pr-00263 a F3, fail-out: $_f3fail / ok-out: $_f3ok)"
+fi
+
+# --- pairing guard (#413, the finding's own entry): skewed pairing dies loud --------
+# uninstall is fail-soft (no set -e) — an undefined section call does
+# NOT abort: it rc-127s, the removal is silently skipped and the run
+# still prints "Uninstall complete." (the #413 mechanism verbatim).
+# Both directions in fresh children + completeness rider.
+_pg_src="$(extract_func "$UNINSTALL" un_pairing_guard)"
+_pg_full=$(sh -c 'eval "$1"; . "$2"; un_pairing_guard; echo "rc=$?"' _ "$_pg_src" "$LIB" 2>&1)
+_pg_tr_rc=0
+_pg_tr_out="$(sh -c 'eval "$1"; un_pairing_guard' _ "$_pg_src" 2>&1)" || _pg_tr_rc=$?
+if printf '%s' "$_pg_full" | grep -q 'rc=0'; then
+    pass "pairing guard: real lib passes (every section defined) (#413)"
+else
+    fail "pairing guard must pass against the real lib (out=$_pg_full) (#413)"
+fi
+if [ "$_pg_tr_rc" -eq 1 ] &&
+    printf '%s' "$_pg_tr_out" | grep -qF "section 'un_context_load' missing from uninstall-core.sh" &&
+    printf '%s' "$_pg_tr_out" | grep -qF "version-skewed entry/lib pairing"; then
+    pass "pairing guard: truncated lib dies loud before the first prompt (#413)"
+else
+    fail "pairing guard must refuse a skewed pairing (rc=$_pg_tr_rc out=$_pg_tr_out) (#413)"
+fi
+if sed 's/^[[:space:]]*#.*$//' "$UNINSTALL" | grep -qF 'un_pairing_guard || exit 1'; then
+    pass "uninstall.sh wires the guard right after the resolver (#413)"
+else
+    fail "uninstall.sh must call the guard after sourcing uninstall-core.sh (#413)"
+fi
+_pg_missing=""
+for _fn in $(grep -oE '^[[:space:]]*(un_[a-z_0-9]+|prompt_yn)[[:space:]]*$' "$UNINSTALL" |
+    awk '{gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print}' | sort -u); do
+    printf '%s\n' "$_pg_src" | grep -qF "$_fn" || _pg_missing="$_pg_missing $_fn"
+done
+if [ -z "$_pg_missing" ]; then
+    pass "pairing guard list covers every core call the entry makes (#413)"
+else
+    fail "core calls in uninstall.sh but absent from the guard:$_pg_missing (#413)"
 fi
 
 if [ "$failures" -gt 0 ]; then

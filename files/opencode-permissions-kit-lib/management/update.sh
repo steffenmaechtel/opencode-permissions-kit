@@ -715,6 +715,33 @@ else
     exit 1
 fi
 
+# Pairing guard (#413, PR #412 round a S2): the resolver dies loud on a
+# missing FILE; this closes the missing-FUNCTION twin — a version-skewed
+# entry/lib pairing (a core missing one renamed or newly-added section)
+# makes the bare section calls below fail with rc 127, and under set -e
+# that aborts cryptically mid-update ("not found", no named cause) after
+# earlier sections already ran. The guard converts it into a diagnosed
+# abort BEFORE any section runs and pins the section list the entry
+# expects (a section added to the core without the entry calling it is
+# equally a wiring bug this list makes reviewable).
+update_pairing_guard() {
+    for _upg in update_redeploy_library update_redeploy_wsl_bridge \
+        update_redeploy_cli_links update_redeploy_xdg_shim \
+        update_redeploy_sudoers update_redeploy_umask \
+        update_redeploy_openchamber update_redeploy_shell_hooks \
+        update_redeploy_project_roots update_redeploy_git_safe \
+        update_redeploy_wsl_mntc update_binary_resecure \
+        update_binary_upgrade update_finalize_opencode_home \
+        update_finalize_default_config update_finalize_ddev_stamp \
+        update_finalize_install_conf update_finalize_tui_files; do
+        command -v "$_upg" >/dev/null 2>&1 || {
+            echo "error: section '$_upg' missing from update-core.sh — version-skewed entry/lib pairing, aborting" >&2
+            return 1
+        }
+    done
+}
+update_pairing_guard || exit 1
+
 # --- pre-flight ---------------------------------------------------------------
 
 banner

@@ -778,7 +778,8 @@ refresh() {
             # spelling would hand fs_baseline_root the invoking CWD
             # (measured, b X1). Absolute first, then dots/empty
             # segments, then whitespace — the writer's arm order
-            # (path-sane.sh); the system-path blocklist rides #247.
+            # (path-sane.sh); the system-path blocklist and the
+            # agent-home refusal ride below (#247).
             case "$p" in
                 /*) ;;
                 *)
@@ -794,6 +795,25 @@ refresh() {
             esac
             p="${p%/}"
             [ -n "$p" ] || continue
+            # Agent-home refusal (never a project root; #247, the
+            # uninstall-core reader's arm — review 0.0.39a S4): this
+            # loop re-runs the recursive group baseline AND the
+            # handover (chgrp -R, setfacl -R, chown) over every root —
+            # never over the directory that carries the agent's own
+            # config and state. Lexical on purpose, before the
+            # existence gates: the refusal holds even on a host where
+            # the user or its home does not exist. The compare takes
+            # the once-stripped form only (the `//` spellings are the
+            # dot gate's catch above, so at most one trailing slash
+            # was left to strip). getent alongside the literal
+            # spelling (pr-00263 a F10, the project_path_sane twin):
+            # a relocated agent home refuses too.
+            _rf_agent_home="$(getent passwd "$OPENCODE_USER" 2>/dev/null | cut -d: -f6 || true)"
+            if [ "$p" = "/home/$OPENCODE_USER" ] ||
+                { [ -n "$_rf_agent_home" ] && [ "$p" = "$_rf_agent_home" ]; }; then
+                ui_warn "skip $p (agent home — never a project root)"
+                continue
+            fi
             # Symlinked root gate (issue #245), before [ -d ] (review
             # a S3): a dangling link is a symlink first — [ -d ] would
             # swallow it silently under the green summary below.
@@ -802,6 +822,34 @@ refresh() {
                 continue
             fi
             [ -d "$p" ] || continue
+            # System-path blocklist — writer parity (#247, completing
+            # the #245 wave's reader gate): every system path
+            # project_path_sane refuses (sh/path-sane.sh), applied to
+            # the once-stripped form above exactly like the
+            # uninstaller's reader (uninstall-core.sh, #243 b X1), so a
+            # hand-edited conf cannot drive the root-run baseline +
+            # handover over system trees the sanctioned writer would
+            # never store. The writer's whitespace refusal is mirrored
+            # in the form gate above, as in every conf reader now — the
+            # uninstaller's #243 a X2 scope-out was resolved to MIRROR
+            # by #418 a A2 (every reader's form gate refuses the same
+            # spellings; a nonexistent line may still be eaten silently
+            # by an existence gate — docs/reference/files.md names the
+            # nuance). Deliberate divergence, pinned in
+            # the unit suite (the uninstaller's documented divergence):
+            # the scratch prefixes /tmp and /var/tmp stay processable —
+            # unit fixtures live there by sandbox policy, and no
+            # sanctioned writer ever stores them.
+            case "$p" in
+                / | /bin | /bin/* | /boot | /boot/* | /dev | /dev/* | /etc | /etc/* | /home | /lib* | \
+                    /media | /media/* | /mnt | /mnt/* | /opt | /opt/* | /proc | /proc/* | /root | /root/* | \
+                    /run | /run/* | /sbin | /sbin/* | /srv | /srv/* | /sys | /sys/* | /usr | /usr/* | \
+                    /var | /var/cache | /var/cache/* | /var/lib | /var/lib/* | /var/log | /var/log/* | \
+                    /var/mail | /var/mail/* | /var/spool | /var/spool/*)
+                    ui_warn "skip $p (system path — never a project root)"
+                    continue
+                    ;;
+            esac
             # Shared helper with live per-pass progress (issue #14).
             fs_baseline_root "$p" "$OPENCODE_GROUP" "$OPENCODE_USER"
             ddev_handover_root "$p" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"

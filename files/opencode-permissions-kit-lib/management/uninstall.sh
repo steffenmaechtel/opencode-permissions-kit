@@ -152,6 +152,31 @@ else
     exit 1
 fi
 
+# Pairing guard (#413, PR #412 round a S2 — this entry is the finding's
+# own example) — LOAD-BEARING here: uninstall is deliberately fail-soft
+# (no set -e; a failing op must not kill the remaining removals), so an
+# undefined section call does NOT abort — it prints "not found", returns
+# rc 127 and the run CONTINUES, skipping that removal silently and still
+# printing "Uninstall complete." at the end. A version-skewed entry/lib
+# pairing (a core missing one renamed or newly-added section — an
+# interrupted deploy, a manually mixed tree) is a wiring error, not an
+# op failure: refuse loud, before the first prompt, exit 1. prompt_yn
+# rides the list for the same reason (it lives in the core and gates
+# the consent the whole run hangs on).
+un_pairing_guard() {
+    for _npg in un_context_load prompt_yn un_sudoers_remove \
+        un_wrapper_remove un_cli_remove un_xdg_open_remove \
+        un_tui_plugins_remove un_wsl_bridge_remove un_library_remove \
+        un_umask_remove un_user_remove un_projects_revert \
+        un_config_dirs_remove un_audit_log_remove; do
+        command -v "$_npg" >/dev/null 2>&1 || {
+            echo "error: section '$_npg' missing from uninstall-core.sh — version-skewed entry/lib pairing, refusing to run" >&2
+            return 1
+        }
+    done
+}
+un_pairing_guard || exit 1
+
 # === Main ===
 # The uninstall as a linear section list; everything above is bootstrap,
 # helpers and the section-lib resolver (the definitions live in

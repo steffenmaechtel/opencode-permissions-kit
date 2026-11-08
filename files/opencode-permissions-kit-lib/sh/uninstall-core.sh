@@ -658,8 +658,8 @@ un_projects_revert() {
                 ;;
         esac
         case "$root" in
-            *..* | /./ | */./* | ./* | */. | *//*)
-                echo "  Skipping malformed project path (dot or empty segment): $root"
+            *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]*)
+                echo "  Skipping malformed project path (dot, empty segment, or whitespace): $root"
                 continue
                 ;;
         esac
@@ -686,13 +686,19 @@ un_projects_revert() {
         # refusal), so a hand-edited conf cannot drive the root-run
         # revert ops over system trees the sanctioned writer would
         # never store.
-        # Scope of "parity" (#243 d X1): the writer's whitespace
-        # refusal (sh/path-sane.sh `*[[:space:]]*` — a storage-format
-        # refusal, 0.0.39b C3) is deliberately NOT mirrored here
-        # (recorded a X2 disposition): a spaced path never lexically
-        # equals a system path, and [ ! -d ] plus full quoting defang
-        # it; the mirror-or-scope decision rides #247 with the other
-        # writer-side parity work.
+        # Scope of "parity" (#243 d X1, resolved by #418 a A2): the
+        # writer's whitespace refusal (sh/path-sane.sh
+        # `*[[:space:]]*` — a storage-format refusal, 0.0.39b C3) was
+        # scoped OUT here (#243 a X2 disposition: "a spaced path never
+        # lexically equals a system path, and [ ! -d ] plus full
+        # quoting defang it"). #247's reader-parity wave closed the
+        # pending mirror-or-scope decision the OTHER way: the arm is
+        # mirrored now (this case arm above), matching the update-core
+        # and config.sh refresh readers — every reader's FORM gate
+        # refuses the same spellings (an existence gate may still eat a
+        # NONEXISTENT line silently first; docs/reference/files.md
+        # names the nuance), and no consumer of a hand-edited conf
+        # processes an entry the writer would never store.
         # Deliberate divergence, pinned in the unit suite: the scratch
         # prefixes /tmp and /var/tmp stay processable (the sandbox
         # policy pins unit-fixture roots there, and a temp-prefix
