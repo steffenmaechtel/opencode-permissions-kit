@@ -251,7 +251,15 @@ ensure_local_file() {
     # file in place — it would be deployed with sudo cp further down
     # (review 0.0.39a S3). Fetch to a temp file, move in only when sound.
     local _elf_tmp
-    _elf_tmp="$(mktemp)"
+    # Named-cause guard (#376 B4, review #370 a B4): the #364 sweep
+    # guarded both fetch_kit mktemps with kit diagnostics but left this
+    # one bare — set -e aborts on the raw failure; the guard names the
+    # file that could not be re-fetched (same wording family as the
+    # fetch_kit siblings above).
+    if ! _elf_tmp="$(mktemp)"; then
+        echo "error: mktemp failed (is \$TMPDIR writable?) — cannot re-fetch $f" >&2
+        return 1
+    fi
     _tmp_track "$_elf_tmp"
     if ! curl -fsSL "$KIT_BASE_URL/files/$f" -o "$_elf_tmp" 2>/dev/null || [ ! -s "$_elf_tmp" ]; then
         rm -f "$_elf_tmp"
@@ -332,10 +340,34 @@ fi
 # The empty-output case is closed explicitly: sed "succeeding" with no
 # match would otherwise leave VERSION empty instead of "0.0.0"
 # (review 0.0.39b Q3).
-VERSION=$(cat "$FILES_ROOT/../VERSION" 2>/dev/null ||
-    sed -n 's/^VERSION=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1 ||
-    echo "0.0.0")
-[ -n "$VERSION" ] || VERSION="0.0.0"
+if [ "$_opk_binonly" != true ] && [ -f "$FILES_ROOT/../VERSION" ]; then
+    VERSION="$(cat "$FILES_ROOT/../VERSION" 2>/dev/null)"
+    # Shape gate (#376 B3, review #370 a B3): the fetched VERSION is
+    # remote-mirror content that ends up re-stamped into install.conf
+    # (sourced by root) — previously only non-empty was checked, while
+    # sh/update-check.sh gates the same remote file to exactly x.y.z.
+    # Fail closed on ANY deviation (empty, multi-line, suffixed, a
+    # mirror's HTML error body) BEFORE anything is fetched onward or
+    # deployed; the install.conf fallback below stays local,
+    # root-owned input. Newline reject FIRST (the update-check.sh
+    # two-step): grep -x alone would accept "1.2.3\njunk" — any single
+    # fully-matching line passes -q, interior garbage rides along.
+    _vsg_nl='
+'
+    case "$VERSION" in
+        *"$_vsg_nl"*)
+            echo "error: fetched VERSION file is malformed (multi-line, expected one x.y.z line) — aborting" >&2
+            exit 1
+            ;;
+    esac
+    if ! printf '%s\n' "$VERSION" | grep -qxE '[0-9]+\.[0-9]+\.[0-9]+'; then
+        echo "error: fetched VERSION file is malformed (expected x.y.z, got '${VERSION:-<empty>}') — aborting" >&2
+        exit 1
+    fi
+else
+    VERSION=$(sed -n 's/^VERSION=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1)
+    [ -n "$VERSION" ] || VERSION="0.0.0"
+fi
 LIBDIR="/usr/local/lib/opencode-permissions-kit"
 CONFDIR="/etc/opencode-permissions-kit"
 PROJECTS_CONF="$CONFDIR/projects.conf"

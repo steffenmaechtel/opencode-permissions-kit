@@ -262,6 +262,15 @@ for syspath in /var /home /libexec/x /opt/x /srv/x /media/x /mnt/x /var/log/x /v
         fail "screening rejects $syspath"
     fi
 done
+# #377 O1 (review #370 a O1): the completed /var families — behaviorally
+# here, as a set by the parity tripwire below.
+for syspath in /var/backups/x /var/opt/x /var/crash/x /var/local/x /var/lock/x; do
+    if screen "$syspath"; then
+        pass "screening rejects $syspath (#377)"
+    else
+        fail "screening rejects $syspath (#377)"
+    fi
+done
 if printf '%s' "$SCREEN_PATTERNS" | grep -q '/var/www'; then
     fail "screening patterns must not contain /var/www (legit project area)"
 else

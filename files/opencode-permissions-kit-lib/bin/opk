@@ -592,11 +592,16 @@ PYEOF
             # a legitimate ops action, and the baseline's reason to
             # refuse /tmp/* (project roots) does not apply here.
             case "$_ho_np" in
+                # #377 (review #370 a O1): /var families completed to the
+                # writer's arms — /var/backups, /var/opt, /var/crash,
+                # /var/local, /var/lock (path-sane.sh parity).
                 / | /bin | /bin/* | /boot | /boot/* | /dev | /dev/* | /etc | /etc/* | /home | /lib* | \
                     /media | /media/* | /mnt | /mnt/* | /opt | /opt/* | /proc | /proc/* | /root | /root/* | \
                     /run | /run/* | /sbin | /sbin/* | /srv | /srv/* | /sys | /sys/* | /tmp | /var/tmp/* | \
-                    /usr | /usr/* | /var | /var/tmp | /var/cache | /var/cache/* | /var/lib | /var/lib/* | \
-                    /var/log | /var/log/* | /var/mail | /var/mail/* | /var/spool | /var/spool/*)
+                    /usr | /usr/* | /var | /var/tmp | /var/backups | /var/backups/* | /var/cache | \
+                    /var/cache/* | /var/crash | /var/crash/* | /var/lib | /var/lib/* | /var/local | \
+                    /var/local/* | /var/lock | /var/lock/* | /var/log | /var/log/* | /var/mail | \
+                    /var/mail/* | /var/opt | /var/opt/* | /var/spool | /var/spool/*)
                     _ho_err "handover: refusing system path '$_ho_np'""\
  — hand over project trees, not system (sub)paths"
                     ;;

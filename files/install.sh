@@ -228,7 +228,30 @@ fi
 # prompt helpers must never fall back to reading it — they would consume
 # script bytes as the answer (review 0.0.39b C6). See _ui_read in ui.sh.
 if [ "$STREAMED" = true ]; then UI_NO_STDIN_FALLBACK=1; fi
-VERSION=$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo "0.0.0")
+# Shape gate (#376 B3 class sweep — update.sh's twin, same mirror file):
+# the streamed/fetched VERSION is remote-mirror content stamped into
+# install.conf (sourced by root); update.sh gates it to exactly x.y.z
+# while install accepted anything non-empty here. Fail closed on any
+# deviation (empty, multi-line, suffixed — the newline arm runs FIRST:
+# grep -x alone accepts "1.2.3\njunk"); a local checkout's VERSION is
+# always bare x.y.z, so the gate only ever bites a broken mirror.
+if [ -f "$SCRIPT_DIR/../VERSION" ]; then
+    VERSION="$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null)"
+    _vsg_nl='
+'
+    case "$VERSION" in
+        *"$_vsg_nl"*)
+            echo "error: fetched VERSION file is malformed (multi-line, expected one x.y.z line) — aborting" >&2
+            exit 1
+            ;;
+    esac
+    if ! printf '%s\n' "$VERSION" | grep -qxE '[0-9]+\.[0-9]+\.[0-9]+'; then
+        echo "error: fetched VERSION file is malformed (expected x.y.z, got '${VERSION:-<empty>}') — aborting" >&2
+        exit 1
+    fi
+else
+    VERSION="0.0.0"
+fi
 # Install target (deployed in Step 7). Defined early: steps before Step 7
 # (e.g. the container-backend fallback path) already need it.
 LIBDIR="/usr/local/lib/opencode-permissions-kit"

@@ -909,11 +909,16 @@ refresh() {
             # unit fixtures live there by sandbox policy, and no
             # sanctioned writer ever stores them.
             case "$p" in
+                # #377 (review #370 a O1): /var families completed to the
+                # writer's arms — /var/backups, /var/opt, /var/crash,
+                # /var/local, /var/lock (path-sane.sh parity).
                 / | /bin | /bin/* | /boot | /boot/* | /dev | /dev/* | /etc | /etc/* | /home | /lib* | \
                     /media | /media/* | /mnt | /mnt/* | /opt | /opt/* | /proc | /proc/* | /root | /root/* | \
                     /run | /run/* | /sbin | /sbin/* | /srv | /srv/* | /sys | /sys/* | /usr | /usr/* | \
-                    /var | /var/cache | /var/cache/* | /var/lib | /var/lib/* | /var/log | /var/log/* | \
-                    /var/mail | /var/mail/* | /var/spool | /var/spool/*)
+                    /var | /var/backups | /var/backups/* | /var/cache | /var/cache/* | /var/crash | \
+                    /var/crash/* | /var/lib | /var/lib/* | /var/local | /var/local/* | /var/lock | \
+                    /var/lock/* | /var/log | /var/log/* | /var/mail | /var/mail/* | /var/opt | \
+                    /var/opt/* | /var/spool | /var/spool/*)
                     ui_warn "skip $p (system path — never a project root)"
                     continue
                     ;;

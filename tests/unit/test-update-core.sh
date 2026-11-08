@@ -49,6 +49,7 @@ update_redeploy_cli_links update_redeploy_xdg_shim update_redeploy_sudoers
 update_redeploy_umask update_redeploy_openchamber update_redeploy_shell_hooks
 update_redeploy_project_roots update_redeploy_git_safe update_redeploy_wsl_mntc
 update_binary_resecure update_binary_upgrade
+update_ensure_backup_dir
 detect_target opencode_version_line install_binary version_major
 current_opencode_major resolve_latest_opencode_version fetch_opencode_version
 sync_tui_registration
@@ -61,7 +62,7 @@ for _fn in $_defs; do
         _missing="$_missing $_fn"
 done
 if [ -z "$_missing" ]; then
-    pass "all 26 phase/helper functions defined by sourcing"
+    pass "all 27 phase/helper functions defined by sourcing"
 else
     fail "functions missing after sourcing:$_missing"
 fi
@@ -87,16 +88,20 @@ _lib_run() {
     (
         FILES_ROOT="$WORK/froot"
         LIBDIR="$WORK/ldir"
+        UPD_BACKUP_ROOT="$WORK/updbackups"
         log() { echo "log: $*"; }
         ui_section() { echo "section: $*"; }
         ui_success() { echo "success: $*"; }
         ui_detail() { echo "detail: $*"; }
+        ui_warn() { echo "warn: $*"; }
         lib_deploy() { echo "LIB_DEPLOY: $*"; }
         sudo() { echo "SUDO: $*"; }
         . "$LIB"
         update_redeploy_library
     ) 2>&1
 }
+mkdir -p "$WORK/ldir" # the pre-update tree the B5 backup copies
+printf 'old-lib-marker\n' >"$WORK/ldir/marker.txt"
 _out=$(_lib_run || true)
 if printf '%s\n' "$_out" | grep -qF "LIB_DEPLOY: $WORK/froot $WORK/ldir" &&
     printf '%s\n' "$_out" | grep -qF 'section: Re-deploying library files' &&
@@ -105,6 +110,16 @@ if printf '%s\n' "$_out" | grep -qF "LIB_DEPLOY: $WORK/froot $WORK/ldir" &&
     pass "library section: deploys via the manifest from FILES_ROOT"
 else
     fail "library section broken (out=$_out)"
+fi
+# #376 B5: the deploy is preceded by a tree-level backup into the
+# durable update backup dir (sandbox: UPD_BACKUP_ROOT points the root
+# into scratch) — the marker file proves the copy is of the PRE-update
+# tree.
+_ulb_dir=$(find "$WORK/updbackups" -maxdepth 1 -name 'update-*' -type d 2>/dev/null | head -1)
+if [ -n "$_ulb_dir" ] && [ -f "$_ulb_dir/lib/marker.txt" ]; then
+    pass "library section: pre-update tree backed up before lib_deploy (#376 B5)"
+else
+    fail "library section: no pre-update lib backup under the update backup dir (#376 B5)"
 fi
 
 # --- 5. sudoers section: conservative skip + deploy arms --------------------------
@@ -345,6 +360,203 @@ if sed 's/^[[:space:]]*#.*$//' "$LIB" |
     pass "pre-upgrade binary backup failure aborts cause-loud (#371 A5 sweep)"
 else
     fail "pre-upgrade binary backup still bare or cause-less (#371 A5 sweep)"
+fi
+
+# --- 17. update_ensure_backup_dir (#376 B5/B3'): durable root, lazy, fail-loud ----
+# Behavioral: the helper creates the run's backup dir under
+# UPD_BACKUP_ROOT (sandbox override of /var/backups — the DDEV_MIG_
+# BACKUP_ROOT pattern), is idempotent within a run, and fails loud
+# (rc 1, no dir) when the root cannot be created.
+_UBW="$(work_new)"
+_ubd_out=$(
+    UPD_BACKUP_ROOT="$_UBW/root" sh -c '
+        log() { echo "log: $*"; }
+        . "$1"
+        update_ensure_backup_dir && echo "rc1=0 dir=$UPD_BACKUP_DIR"
+        update_ensure_backup_dir && echo "rc2=0 dir=$UPD_BACKUP_DIR"
+    ' _ "$LIB" 2>&1
+)
+_ubd_dir=$(printf '%s\n' "$_ubd_out" | sed -n 's/^rc1=0 dir=//p' | head -1)
+if [ -n "$_ubd_dir" ] && [ -d "$_ubd_dir" ] &&
+    [ "$(printf '%s\n' "$_ubd_out" | grep -c 'log: update backup dir created')" -eq 1 ] &&
+    printf '%s\n' "$_ubd_out" | grep -qF "rc2=0 dir=$_ubd_dir" &&
+    [ "$(stat -c '%a' "$_ubd_dir")" = 700 ]; then
+    pass "backup dir: created once per run, mode 700, path echoed (#376 B5)"
+else
+    fail "backup dir helper broken (out=$_ubd_out) (#376 B5)"
+fi
+mkdir -p "$_UBW/full"  # occupy the root path: mkdir -p ok, but the
+chmod 500 "$_UBW/full" # 700-dir create inside fails for non-root
+_ubd_fail=$(UPD_BACKUP_ROOT="$_UBW/full/nodir" sh -c '
+        log() { :; }
+        . "$1"
+        if update_ensure_backup_dir; then echo "BAD: rc 0"; else echo "rc1=$?"; fi
+    ' _ "$LIB" 2>&1)
+case "$_ubd_fail" in
+    rc1=1) pass "backup dir: unwritable root fails loud rc 1 (#376 B5)" ;;
+    *) fail "backup dir must refuse rc 1 on an unwritable root (got $_ubd_fail)" ;;
+esac
+chmod 700 "$_UBW/full"
+
+# --- 18. library rollback (#376 B5): failed lib_deploy restores the tree -----------
+# lib_deploy stubbed to rc 1 after half-planting a new file (the mixed
+# old/new state of the finding): the section must move the mixed tree
+# aside, restore the pre-update backup, and die — with real cp/mv (no
+# sudo in the rollback legs; scratch paths only).
+mkdir -p "$WORK/ldir2" # the pre-update tree the rollback restores
+printf 'old-lib-2\n' >"$WORK/ldir2/marker-old.txt"
+_lrb_out=$(
+    UPD_BACKUP_ROOT="$WORK/updbackups2" sh -c '
+        FILES_ROOT="$1/froot"
+        LIBDIR="$1/ldir2"
+        log() { echo "log: $*"; }
+        ui_section() { :; }
+        ui_success() { echo "success: $*"; }
+        ui_detail() { echo "detail: $*"; }
+        ui_warn() { echo "warn: $*"; }
+        die() { echo "die: $*"; exit 1; }
+        lib_deploy() { echo "new-lib" >"$LIBDIR/planted-new.txt"; return 1; }
+        sudo() { echo "SUDO: $*"; }
+        . "$2"
+        update_redeploy_library
+    ' _ "$WORK" "$LIB" 2>&1
+) || true
+if printf '%s\n' "$_lrb_out" | grep -qF 'warn: library re-deploy FAILED — previous library tree restored' &&
+    printf '%s\n' "$_lrb_out" | grep -qF 'die: library re-deploy failed — update aborted' &&
+    [ -f "$WORK/ldir2/marker-old.txt" ] &&
+    [ ! -f "$WORK/ldir2/planted-new.txt" ] &&
+    [ -n "$(find "$WORK/updbackups2" -maxdepth 2 -name 'lib-failed.*' -type d 2>/dev/null)" ] &&
+    [ -f "$(find "$WORK/updbackups2" -maxdepth 2 -name 'lib-failed.*' -type d 2>/dev/null | head -1)/planted-new.txt" ]; then
+    pass "failed lib_deploy: mixed tree moved aside, pre-update tree restored (#376 B5)"
+else
+    fail "failed lib_deploy must restore the pre-update tree (out=$_lrb_out) (#376 B5)"
+fi
+# The aborted run leaves the fresh backup dir with BOTH trees for
+# inspection — the recovery material survives the abort (the old
+# volatile-mktemp loss class is what #376 B3' closes).
+_lrb_bdir=$(find "$WORK/updbackups2" -maxdepth 1 -name 'update-*' -type d 2>/dev/null | head -1)
+if [ -f "$_lrb_bdir/lib/marker-old.txt" ]; then
+    pass "failed deploy keeps the pre-update copy as recovery material (#376 B5)"
+else
+    fail "recovery copy missing after failed deploy (#376 B5)"
+fi
+
+# --- 19. binary backup base is durable (#376 B3') ---------------------------------
+# Static + executed hybrid: no volatile mktemp may remain in the
+# upgrade path, the backup lands in $UPD_BACKUP_DIR/bin, and the
+# no-backup-dir arm skips the upgrade loudly instead of proceeding
+# unprotected (driven through update_binary_upgrade with the fetch
+# already resolved: SRC set, TMP/_BIN_TMP empty, install_binary
+# stubbed — the helper under test is the backup-base selection).
+_b3p_out=$(UPD_BACKUP_ROOT="/nonexistent-root-$$" sh -c '
+        SRC="/dev/null"
+        TMP=""
+        _BIN_TMP=""
+        UPD_BACKUP_ROOT="$UPD_BACKUP_ROOT"
+        export UPD_BACKUP_ROOT
+        log() { echo "log: $*"; }
+        ui_warn() { echo "warn: $*"; }
+        ui_detail() { :; }
+        ui_success() { :; }
+        die() { echo "die: $*"; exit 1; }
+        copy_binary_atomic() { echo "CBA: $*"; return 0; }
+        secure_binary() { return 0; }
+        current_opencode_major() { echo 1; }
+        install_binary() { echo "INSTALL_BIN"; return 0; }
+        sync_tui_registration() { :; }
+        rm() { echo "RM: $*"; command rm "$@"; }
+        . "$1"
+        update_binary_upgrade
+    ' _ "$LIB" 2>&1)
+if printf '%s\n' "$_b3p_out" | grep -qF 'warn: no durable backup dir available — opencode binary upgrade skipped (nothing changed)' &&
+    ! printf '%s\n' "$_b3p_out" | grep -qF 'INSTALL_BIN' &&
+    ! grep -q 'opencode-upgrade-backup' "$LIB"; then
+    pass "binary upgrade: no backup dir means no upgrade, volatile mktemp gone (#376 B3')"
+else
+    fail "binary upgrade backup base regression (out=$_b3p_out) (#376 B3)"
+fi
+check "binary upgrade backs up into the durable update dir (#377-less, #376 B3')" \
+    sh -c 'grep -qF "BACKUP_DIR=\"\$UPD_BACKUP_DIR/bin\"" "$1"' _ "$LIB"
+# B4 class sweep: the upgrade flow's OWN mktemp (the candidate download
+# staging dir) gets the named-cause guard — set -e would abort the whole
+# update on the raw error; the guard degrades to the best-effort skip
+# (binary untouched, warn + log). Driven with a pinned --version and an
+# uncreatable TMPDIR (uid-independent failure injection).
+_b4g_out=$(UPGRADE_VERSION=9.9.9 TMPDIR="/nonexistent-b4g-$$" sh -c '
+        ui_section() { :; }
+        ui_warn() { echo "warn: $*"; }
+        ui_detail() { :; }
+        ui_success() { :; }
+        log() { echo "log: $*"; }
+        install_binary() { echo "BAD: install_binary ran"; return 0; }
+        . "$1"
+        update_binary_upgrade
+    ' _ "$LIB" 2>&1)
+if printf '%s\n' "$_b4g_out" | grep -qF 'warn: mktemp failed (is $TMPDIR writable?) — opencode binary upgrade skipped, binary left untouched' &&
+    printf '%s\n' "$_b4g_out" | grep -qF 'log: opencode binary upgrade skipped: mktemp failed' &&
+    ! printf '%s\n' "$_b4g_out" | grep -qF 'BAD: install_binary ran'; then
+    pass "upgrade-flow mktemp failure degrades to the loud skip (#376 B4 sweep)"
+else
+    fail "upgrade-flow mktemp guard broken (out=$_b4g_out) (#376 B4 sweep)"
+fi
+
+# --- 20. shell-hook rc backups (#425): copy before edit, degrade loud --------------
+# The install-side rc invariant (PR #424) holds update-side: every rc
+# file touched by the hook loop gets a recovery copy in the update
+# backup dir FIRST; a failed copy degrades loudly and the edit still
+# runs (the #424 a S2 doctrine — the hooks are load-bearing heals).
+_RCB="$(work_new)"
+mkdir -p "$_RCB/home"
+printf 'export PATH="/usr/local/bin:$PATH"\n' >"$_RCB/home/.bashrc"
+# NOTE: the env assignments ride the sh -c PREFIX line — split lines
+# would leave them unexported in this shell and the child would see
+# only UPD_BACKUP_ROOT (the silent no-op arm of the function).
+_rcb_out=$(
+    DEFAULT_USER=rcdev DEFAULT_HOME="$_RCB/home" OPENCODE_USER=oc \
+        UPD_BACKUP_ROOT="$_RCB/backups" sh -c '
+        log() { echo "log: $*"; }
+        ui_warn() { echo "warn: $*"; }
+        ui_success() { echo "success: $*"; }
+        ui_detail() { :; }
+        sudo() { "$@"; }
+        . "$1"
+        update_redeploy_shell_hooks
+    ' _ "$LIB" 2>&1
+)
+_rcb_bdir=$(find "$_RCB/backups" -maxdepth 1 -name 'update-*' -type d 2>/dev/null | head -1)
+if [ -f "$_rcb_bdir/rc-.bashrc" ] &&
+    [ "$(cat "$_rcb_bdir/rc-.bashrc")" = 'export PATH="/usr/local/bin:$PATH"' ] &&
+    grep -qF 'opencode-permissions-kit/sh/shell-warn.sh' "$_RCB/home/.bashrc"; then
+    pass "shell hooks: rc file backed up before the edit (#425)"
+else
+    fail "shell hooks must back up the rc file before editing it (out=$_rcb_out) (#425)"
+fi
+# Degradation arm: the backup root cannot be created — the warn fires
+# and the hook is STILL appended (no recovery copy, never a silent or
+# missing hook).
+_RCB2="$(work_new)"
+mkdir -p "$_RCB2/home" "$_RCB2/full"
+chmod 500 "$_RCB2/full"
+printf 'x\n' >"$_RCB2/home/.profile"
+_rcb2_out=$(
+    DEFAULT_USER=rcdev DEFAULT_HOME="$_RCB2/home" OPENCODE_USER=oc \
+        UPD_BACKUP_ROOT="$_RCB2/full/nodir" sh -c '
+        log() { echo "log: $*"; }
+        ui_warn() { echo "warn: $*"; }
+        ui_success() { echo "success: $*"; }
+        ui_detail() { :; }
+        sudo() { "$@"; }
+        . "$1"
+        update_redeploy_shell_hooks
+    ' _ "$LIB" 2>&1
+)
+chmod 700 "$_RCB2/full"
+if printf '%s\n' "$_rcb2_out" | grep -qF 'warn: could not back up' &&
+    printf '%s\n' "$_rcb2_out" | grep -qF 'log: rc backup FAILED' &&
+    grep -qF 'opencode-permissions-kit/sh/shell-warn.sh' "$_RCB2/home/.profile"; then
+    pass "shell hooks: failed backup degrades loud, hook still applied (#425)"
+else
+    fail "failed rc backup must degrade loudly without skipping the hook (out=$_rcb2_out) (#425)"
 fi
 
 suite_done

@@ -1327,5 +1327,95 @@ grep -qF 'ui_detail "sudoers re-deploy skipped' "$UPDATE_CORE" &&
         failures=$((failures + 1))
     }
 
+# --- 10. fetched VERSION shape gate + ensure_local_file mktemp guard (#376 B3/B4) --
+# B3 behavioral: the VERSION-read fragment is extracted and executed —
+# a fetched VERSION (remote mirror content, later stamped into the
+# root-sourced install.conf) that is not EXACTLY x.y.z aborts before
+# anything is deployed; the good shape passes through; the local
+# fallback (no fetched file) keeps its 0.0.0 contract. Scratch under
+# $WORK (this suite owns a LOCAL trap — no work_* registry here).
+_VSG="$WORK/vsg"
+mkdir -p "$_VSG/froot"
+sed -n '/^if \[ "\$_opk_binonly" != true \] && \[ -f "\$FILES_ROOT\/\.\.\/VERSION" \]; then/,/^fi$/p' \
+    "$UPDATE" >"$_VSG/vergate.sh"
+if [ -s "$_VSG/vergate.sh" ]; then
+    pass "VERSION gate fragment extracted (#376 B3)"
+else
+    fail "VERSION gate fragment extraction failed (#376 B3)"
+fi
+printf 'not-a-version\n' >"$_VSG/VERSION"
+if _vsg_out=$(FILES_ROOT="$_VSG/froot" sh "$_VSG/vergate.sh" 2>&1); then
+    _vsg_rc=0
+else
+    _vsg_rc=$?
+fi
+if [ "$_vsg_rc" -eq 1 ] &&
+    printf '%s\n' "$_vsg_out" | grep -qF "error: fetched VERSION file is malformed (expected x.y.z, got 'not-a-version')"; then
+    pass "malformed fetched VERSION aborts loud, nothing deployed (#376 B3)"
+else
+    fail "malformed fetched VERSION must abort rc 1 (rc=$_vsg_rc out=$_vsg_out) (#376 B3)"
+fi
+printf '1.2.3\njunk-line\n' >"$_VSG/VERSION"
+if _vsg_ml=$(FILES_ROOT="$_VSG/froot" sh "$_VSG/vergate.sh" 2>&1); then
+    _vsg_mlrc=0
+else
+    _vsg_mlrc=$?
+fi
+if [ "$_vsg_mlrc" -eq 1 ]; then
+    pass "multi-line fetched VERSION refuses too (one x.y.z line, nothing else) (#376 B3)"
+else
+    fail "multi-line VERSION must abort (rc=$_vsg_mlrc out=$_vsg_ml) (#376 B3)"
+fi
+printf '0.1.2\n' >"$_VSG/VERSION"
+_vsg_ok=$(FILES_ROOT="$_VSG/froot" sh -c '. "$1" >/dev/null 2>&1; printf "V=%s\n" "$VERSION"' _ "$_VSG/vergate.sh")
+if [ "$_vsg_ok" = "V=0.1.2" ]; then
+    pass "well-shaped fetched VERSION passes the gate (#376 B3)"
+else
+    fail "well-shaped VERSION must pass (got $_vsg_ok) (#376 B3)"
+fi
+_vsg_fb=$(FILES_ROOT="$_VSG/froot" sh -c '_opk_binonly=true; . "$1" >/dev/null 2>&1; printf "V=%s\n" "$VERSION"' _ "$_VSG/vergate.sh")
+# Host-state tolerant: with a kit installed the fallback reads its
+# real stamp (this suite may run on an installed host — a READ of the
+# root-owned conf, no writes); without one it is 0.0.0. Either way the
+# fallback never aborts and always yields a bare x.y.z shape.
+if printf '%s\n' "$_vsg_fb" | grep -qxE 'V=[0-9]+\.[0-9]+\.[0-9]+'; then
+    pass "library fallback stays ungated, local, x.y.z-shaped (#376 B3)"
+else
+    fail "library fallback broken (got $_vsg_fb) (#376 B3)"
+fi
+
+# B4 behavioral: ensure_local_file with an uncreatable TMPDIR fails
+# with the NAMED cause (file + TMPDIR hint) instead of set -e's raw
+# mktemp diagnostic; the healthy arm re-fetches to the temp and moves
+# it in (fake curl on PATH — the suite's established pattern).
+mkdir -p "$_VSG/elfroot/sub" "$_VSG/tmp" "$_VSG/bin"
+sed -n '/^ensure_local_file() {/,/^}$/p' "$UPDATE" >"$_VSG/elf.sh"
+printf '#!/bin/sh\n_prev=\nwhile [ $# -gt 0 ]; do\n  if [ "$_prev" = "-o" ]; then printf "fetched-body\\n" >"$1"; exit 0; fi\n  _prev="$1"\n  shift\ndone\nexit 0\n' >"$_VSG/bin/curl"
+chmod +x "$_VSG/bin/curl"
+_elf_out=$(TMPDIR="$_VSG/nonexistent" FILES_ROOT="$_VSG/elfroot" sh -c '
+    _tmp_track() { :; }
+    . "$1"
+    if ensure_local_file "sub/missing.txt"; then echo "BAD rc0"; else echo "rc=$?"; fi
+' _ "$_VSG/elf.sh" 2>&1)
+case "$_elf_out" in
+    *"error: mktemp failed (is \$TMPDIR writable?) — cannot re-fetch sub/missing.txt"*rc=1*)
+        pass "ensure_local_file mktemp failure names file + cause (#376 B4)"
+        ;;
+    *)
+        fail "ensure_local_file mktemp guard missing (out=$_elf_out) (#376 B4)"
+        ;;
+esac
+_elf_ok=$(PATH="$_VSG/bin:$PATH" TMPDIR="$_VSG/tmp" FILES_ROOT="$_VSG/elfroot" sh -c '
+    _tmp_track() { :; }
+    . "$1"
+    ensure_local_file "sub/missing.txt" && echo "rc=0"
+' _ "$_VSG/elf.sh" 2>&1)
+if [ "$(cat "$_VSG/elfroot/sub/missing.txt" 2>/dev/null)" = "fetched-body" ] &&
+    printf '%s\n' "$_elf_ok" | grep -q 'rc=0'; then
+    pass "ensure_local_file healthy arm still fetches and moves in (#376 B4)"
+else
+    fail "ensure_local_file healthy arm broken (out=$_elf_ok) (#376 B4)"
+fi
+
 # --- Summary ----------------------------------------------------------------------
 suite_done "tests"

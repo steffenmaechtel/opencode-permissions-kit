@@ -583,5 +583,76 @@ else
     fail "tilde-home setup not consolidated (#340)"
 fi
 
+# --- #377 O2: agent-resources migration re-checks the operand at exec time
+# The entry gate classifies the destination chain ONCE; every operand is
+# agent-replaceable (/home/opencode belongs to the agent), so a leaf
+# swapped for a dir-symlink in the gate→op window would make the cp -a
+# write developer content THROUGH the link (live-verified, review #370
+# a O2). The exec-time recheck (the L5 rule, #267 shape) must trip
+# between mkdir and cp. Executed: the function is sed-extracted from
+# install-core.sh and run with stubbed sudo (no real /home writes —
+# sandbox policy) and a pass-once agent_home_sane that flips to refusal
+# on its second walk.
+_MIG_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/install-core.sh"
+_O372W="$(work_new)"
+mkdir -p "$_O372W/dev/.agents/skill-a"
+printf 'skill body\n' >"$_O372W/dev/.agents/skill-a/SKILL.md"
+sed -n '/^[[:space:]]*_opk_migrate_one() {/,/^[[:space:]]*}$/p' "$_MIG_CORE" |
+    sed 's/^[[:space:]]*//' >"$_O372W/migrate-one.sh"
+if [ -s "$_O372W/migrate-one.sh" ]; then
+    pass "migration helper extracted (#377 O2)"
+else
+    fail "migration helper extraction failed (#377 O2)"
+fi
+_O372_OUT=$(
+    DEV_HOME="$_O372W/dev" OPENCODE_USER=oc _opk_ag=c sh -c '
+        . "$1"
+        _ahs_calls=0
+        agent_home_sane() {
+            _ahs_calls=$((_ahs_calls + 1))
+            # first walk = entry gate (pass), second = exec-time recheck
+            [ "$_ahs_calls" -ge 2 ] && return 1
+            return 0
+        }
+        sudo() { echo "SUDO: $*"; }
+        ui_warn() { echo "warn: $*"; }
+        ui_success() { echo "success: $*"; }
+        ui_info() { :; }
+        ui_detail() { :; }
+        log() { echo "log: $*"; }
+        _opk_migrate_one .agents
+    ' _ "$_O372W/migrate-one.sh" 2>&1
+)
+if printf '%s\n' "$_O372_OUT" | grep -qF 'SUDO: mkdir -p /home/oc/.agents' &&
+    ! printf '%s\n' "$_O372_OUT" | grep -q 'SUDO: cp -a' &&
+    printf '%s\n' "$_O372_OUT" | grep -qF 'warn: agent resources not migrated: the chain to /home/oc/.agents turned into a symlink' &&
+    printf '%s\n' "$_O372_OUT" | grep -qF 'log: agents migration skipped: exec-time recheck tripped for /home/oc/.agents' &&
+    [ -f "$_O372W/dev/.agents/skill-a/SKILL.md" ]; then
+    pass "exec-time recheck trips between mkdir and cp: no copy, loud skip, source untouched (#377 O2)"
+else
+    fail "exec-time recheck must skip the copy loudly (out=$_O372_OUT) (#377 O2)"
+fi
+# Control arm: a gate that never trips runs the copy (the recheck must
+# not break the happy path) — agent_home_sane passes every walk.
+_O372C_OUT=$(
+    DEV_HOME="$_O372W/dev" OPENCODE_USER=oc _opk_ag=c sh -c '
+        . "$1"
+        agent_home_sane() { return 0; }
+        sudo() { echo "SUDO: $*"; }
+        ui_warn() { echo "warn: $*"; }
+        ui_success() { echo "success: $*"; }
+        ui_info() { :; }
+        ui_detail() { :; }
+        log() { echo "log: $*"; }
+        _opk_migrate_one .agents
+    ' _ "$_O372W/migrate-one.sh" 2>&1
+)
+if printf '%s\n' "$_O372C_OUT" | grep -qF 'SUDO: cp -a' &&
+    printf '%s\n' "$_O372C_OUT" | grep -qF 'success: agent resources COPIED: '; then
+    pass "control arm: recheck silent on the happy path, copy runs (#377 O2)"
+else
+    fail "happy path broken by the recheck (out=$_O372C_OUT) (#377 O2)"
+fi
+
 echo ""
 suite_done

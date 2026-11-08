@@ -344,6 +344,25 @@ else
     passed=$((passed + 1))
 fi
 
+# #377 O1 (review #370 a O1): the handover operand gate carries the
+# completed /var families (both the exact root and the subpath arm per
+# family — presence pin over the system-path case block; the set-level
+# writer-parity tripwire lives in test-project-paths.sh).
+_ho377_block=$(sed -n '/case "\$_ho_np" in/,/hand over project trees/p' "$KIT")
+_ho377_n=0
+for _ho377_fam in /var/backups /var/opt /var/crash /var/local /var/lock; do
+    printf '%s\n' "$_ho377_block" | grep -qF "$_ho377_fam |" &&
+        printf '%s\n' "$_ho377_block" | grep -qF "$_ho377_fam/*" &&
+        _ho377_n=$((_ho377_n + 1))
+done
+if [ "$_ho377_n" -eq 5 ]; then
+    echo "  ${GREEN}PASS${NC}  handover gate: all five completed /var families blocked (#377 O1)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  handover gate: only $_ho377_n/5 new /var families present (#377 O1)"
+    failures=$((failures + 1))
+fi
+
 # (#370 a E2): --dry-run is NOT an operand — `handover me --dry-run`
 # (a forgotten path) passed the arity gate ($#=2) and every consumer
 # loop skipped the flag: silent rc 0, nothing printed, a forgotten path

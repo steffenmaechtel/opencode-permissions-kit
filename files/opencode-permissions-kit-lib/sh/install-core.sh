@@ -1901,6 +1901,22 @@ do_deploy_phase() {
             return 0
         fi
         sudo mkdir -p "$_opk_dst"
+        # Exec-time recheck (#377, review #370 a O2 — the L5 rule, #267
+        # shape): the entry gate above classified the chain ONCE, and
+        # every operand below is agent-replaceable (/home/opencode
+        # belongs to the agent) — a leaf swapped for a dir-symlink in
+        # the gate->op window makes the cp -a write developer content
+        # THROUGH the link (live-verified in review #370). chown -R and
+        # the find walks stay bounded (coreutils -P never follows); cp
+        # -a is the dereferencing leg — re-run the gate immediately
+        # before it (it walks the chain again, covering a swapped
+        # parent too) and skip loudly on a trip.
+        if ! agent_home_sane "$OPENCODE_USER" "$_opk_dst"; then
+            ui_warn "agent resources not migrated: the chain to $_opk_dst turned into a symlink""\
+ before the copy (user-managed) — $_opk_src left untouched"
+            log "agents migration skipped: exec-time recheck tripped for $_opk_dst"
+            return 0
+        fi
         # cp -a (not mv): merges into the existing target and works when src
         # and dst would collide on a re-install.
         if sudo cp -a "$_opk_src/." "$_opk_dst/" 2>/dev/null; then

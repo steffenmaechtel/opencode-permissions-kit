@@ -70,7 +70,10 @@ check "mode: bin/opencode-as-opencode 755" mode_is "$LIBD/bin/opencode-as-openco
 check "mode: sh/staged-write.sh 644" mode_is "$LIBD/sh/staged-write.sh" 644
 check "mode: sh/sudoers-deploy.sh 644" mode_is "$LIBD/sh/sudoers-deploy.sh" 644
 check "mode: sh/deploy-lib.sh 644 (self-deploy)" mode_is "$LIBD/sh/deploy-lib.sh" 644
-check "mode: sh/log.sh 755" mode_is "$LIBD/sh/log.sh" 755
+check "mode: sh/log.sh 644 (sourced lib, #377 F2)" mode_is "$LIBD/sh/log.sh" 644
+check "mode: sh/ui.sh 644 (sourced lib, #377 F2)" mode_is "$LIBD/sh/ui.sh" 644
+check "mode: sh/advisories.sh 644 (sourced lib, #377 F2)" mode_is "$LIBD/sh/advisories.sh" 644
+check "mode: sh/shell-warn.sh 644 (sourced lib, #377 F2)" mode_is "$LIBD/sh/shell-warn.sh" 644
 check "mode: management/config.sh 755" mode_is "$LIBD/management/config.sh" 755
 check "mode: tui/tui.json 644" mode_is "$LIBD/tui/tui.json" 644
 check "mode: py/tui-register.py 755" mode_is "$LIBD/py/tui-register.py" 755

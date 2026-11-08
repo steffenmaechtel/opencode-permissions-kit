@@ -97,15 +97,37 @@ echo "-- install.sh wiring --"
 check "install.sh fetches shell-warn.sh" \
     grep -Fq 'opencode-permissions-kit-lib/sh/shell-warn.sh' "$INSTALL"
 check "install.sh deploys shell-warn.sh to LIBDIR (lib_deploy manifest)" \
-    sh -c 'grep -qF "opencode-permissions-kit-lib/sh/shell-warn.sh 755" "$2" \
+    sh -c 'grep -qF "opencode-permissions-kit-lib/sh/shell-warn.sh 644" "$2" \
         && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL_CORE" "$DEPLOYLIB"
-# #211 b W4: the 755-sourced-lib invariant needs a pin per lib —
+# #376 B3 class sweep — install.sh's twin of update.sh's VERSION gate
+# (behavioral, extraction-driven): the streamed/fetched VERSION is
+# remote-mirror content stamped into the root-sourced install.conf; a
+# malformed file aborts BEFORE the banner or any step runs.
+_BGW="$(mktemp -d)"
+sed -n '/^if \[ -f "\$SCRIPT_DIR\/\.\.\/VERSION" \]; then/,/^fi$/p' "$INSTALL" >"$_BGW/vergate.sh"
+mkdir -p "$_BGW/proj" # [ -f ] resolves THROUGH proj/.. — without it the gate never fires
+printf '0.0.59-suffix\n' >"$_BGW/VERSION"
+if _bgw_out=$(SCRIPT_DIR="$_BGW/proj" sh "$_BGW/vergate.sh" 2>&1); then
+    _bgw_rc=0
+else
+    _bgw_rc=$?
+fi
+if [ "$_bgw_rc" -ne 0 ] &&
+    printf '%s\n' "$_bgw_out" | grep -qF "error: fetched VERSION file is malformed (expected x.y.z, got '0.0.59-suffix')"; then
+    echo "  ${GREEN}PASS${NC}  install.sh gates its fetched VERSION to x.y.z (#376 B3 sweep)"
+else
+    echo "  ${RED}FAIL${NC}  install.sh VERSION gate missing (rc=$_bgw_rc out=$_bgw_out) (#376 B3 sweep)"
+fi
+# #211 b W4: the sourced-lib mode invariant needs a pin per lib —
 # shell-warn.sh was the only one here (log.sh via test-deploy-lib);
-# advisories.sh and ui.sh had no mode pin anywhere.
-check "install.sh deploys advisories.sh to LIBDIR (lib_deploy manifest, 755)" \
-    sh -c 'grep -qF "opencode-permissions-kit-lib/sh/advisories.sh 755" "$2"' _ "$INSTALL" "$DEPLOYLIB"
-check "install.sh deploys ui.sh to LIBDIR (lib_deploy manifest, 755)" \
-    sh -c 'grep -qF "opencode-permissions-kit-lib/sh/ui.sh 755" "$2"' _ "$INSTALL" "$DEPLOYLIB"
+# advisories.sh and ui.sh had no mode pin anywhere. Modes flipped 755 ->
+# 644 by #377 F2 (review #370 a F2): nothing executes them by path (the
+# git index has been 644 all along); the manifest's own "sourced libs
+# 644" rule now applies to them too.
+check "install.sh deploys advisories.sh to LIBDIR (lib_deploy manifest, 644)" \
+    sh -c 'grep -qF "opencode-permissions-kit-lib/sh/advisories.sh 644" "$2"' _ "$INSTALL" "$DEPLOYLIB"
+check "install.sh deploys ui.sh to LIBDIR (lib_deploy manifest, 644)" \
+    sh -c 'grep -qF "opencode-permissions-kit-lib/sh/ui.sh 644" "$2"' _ "$INSTALL" "$DEPLOYLIB"
 # The rc-hook emissions live in do_deploy_phase — install-core.sh since
 # #346 wave 3 (the fetch-list pins above stay on the entry).
 check "install.sh hooks shell-warn.sh into rc files" \
@@ -190,13 +212,15 @@ echo "-- update.sh wiring --"
 check "update.sh fetches shell-warn.sh" \
     grep -Fq 'opencode-permissions-kit-lib/sh/shell-warn.sh' "$UPDATE"
 check "update.sh deploys shell-warn.sh to LIBDIR (lib_deploy manifest)" \
-    sh -c 'grep -qF "opencode-permissions-kit-lib/sh/shell-warn.sh 755" "$2" \
+    sh -c 'grep -qF "opencode-permissions-kit-lib/sh/shell-warn.sh 644" "$2" \
         && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE_CORE" "$DEPLOYLIB"
-# #211 b W4: update twins of the advisories/ui mode pins above.
-check "update.sh deploys advisories.sh to LIBDIR (lib_deploy manifest, 755)" \
-    sh -c 'grep -qF "opencode-permissions-kit-lib/sh/advisories.sh 755" "$2"' _ "$UPDATE" "$DEPLOYLIB"
-check "update.sh deploys ui.sh to LIBDIR (lib_deploy manifest, 755)" \
-    sh -c 'grep -qF "opencode-permissions-kit-lib/sh/ui.sh 755" "$2"' _ "$UPDATE" "$DEPLOYLIB"
+# #211 b W4: update twins of the advisories/ui mode pins above
+# (755 -> 644 by #377 F2, review #370 a F2 — sourced libs, never
+# executed by path).
+check "update.sh deploys advisories.sh to LIBDIR (lib_deploy manifest, 644)" \
+    sh -c 'grep -qF "opencode-permissions-kit-lib/sh/advisories.sh 644" "$2"' _ "$UPDATE" "$DEPLOYLIB"
+check "update.sh deploys ui.sh to LIBDIR (lib_deploy manifest, 644)" \
+    sh -c 'grep -qF "opencode-permissions-kit-lib/sh/ui.sh 644" "$2"' _ "$UPDATE" "$DEPLOYLIB"
 check "update.sh hooks shell-warn.sh into rc files" \
     grep -Fq 'opencode-permissions-kit/sh/shell-warn.sh' "$UPDATE_CORE"
 # 0.0.49b C1 (update twin of the install pins above): the umask

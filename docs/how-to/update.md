@@ -108,7 +108,15 @@ Upgrades never cross majors silently: without `--major` / `--version` the
 latest release **of the installed major** is used (1.x resolves through
 GitHub releases, 2.x through npm). Binary upgrades are best-effort: a
 failure leaves the current binary in place, the previous one is kept in
-`/tmp/opencode-upgrade-backup-*`.
+`/var/backups/opencode-permissions-kit/update-*/bin/`.
+
+Every update run also writes its other recovery material under
+`/var/backups/opencode-permissions-kit/update-<timestamp>/`: a copy of the
+rc files before the shell-hook rewrites are applied, and — before the
+library is re-deployed — a full copy of the previous library tree. A
+failed library deploy is rolled back from that copy automatically; the
+directories accumulate (like the install backups) and are safe to delete
+once an update has proven itself.
 
 ## Security advisories
 
