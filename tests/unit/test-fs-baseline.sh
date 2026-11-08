@@ -915,7 +915,9 @@ fi
 # #247 arms at the tail: the classic system paths (/etc, /usr, /var and
 # the bare /home — the stripped-compare arm the writer's blocklist owes)
 # plus the agent home /home/toc (OPENCODE_USER=toc above; lexical, so
-# the nonexistent home still refuses). All four system entries EXIST on
+# the nonexistent home still refuses) and /var/backups (#377 O1: the
+# completed /var families, behaviorally — the arm exists on every
+# Debian-family host this suite runs on). All system entries EXIST on
 # every test host — the blocklist sits after [ -d ], a nonexistent
 # system path would be skipped silently by the existence gate before
 # the blocklist sees it (uninstall-core parity). The /tmp + /var/tmp
@@ -923,7 +925,7 @@ fi
 # this suite's scratch (TMPDIR territory) and their FSB/HO counts prove
 # those prefixes stay processable — the blocklist deliberately leaves
 # them open (the comments in update-core.sh / config.sh name why).
-printf '%s\n/\n%s\n%s/\n%s/.\n%s//\n%s\n%s\n.\nfoo\n/var/www/foo bar\n/etc\n/usr\n/var\n/home\n/home/toc\n/relocated/opencode\n' \
+printf '%s\n/\n%s\n%s/\n%s/.\n%s//\n%s\n%s\n.\nfoo\n/var/www/foo bar\n/etc\n/usr\n/var\n/home\n/var/backups\n/home/toc\n/relocated/opencode\n' \
     "$S245/real" "$S245/link" "$S245/link" "$S245/link" "$S245/link" \
     "$S245/dangling" "$S245/real2" >"$S245/conf"
 # getent stub (L1 rider for the agent-home arm): toc's RELOCATED home —
@@ -949,8 +951,9 @@ if [ "$(printf '%s\n' "$S245R_OUT" | grep -c '^FSB: ')" -eq 2 ] &&
     [ "$(printf '%s\n' "$S245R_OUT" | grep -cF 'ui_warn: skip . (not an absolute project path)')" -eq 1 ] &&
     [ "$(printf '%s\n' "$S245R_OUT" | grep -cF 'ui_warn: skip foo (not an absolute project path)')" -eq 1 ] &&
     [ "$(printf '%s\n' "$S245R_OUT" | grep -cF 'ui_warn: skip /var/www/foo bar (malformed')" -eq 1 ] &&
-    [ "$(printf '%s\n' "$S245R_OUT" | grep -cF '(system path — never a project root)')" -eq 4 ] &&
+    [ "$(printf '%s\n' "$S245R_OUT" | grep -cF '(system path — never a project root)')" -eq 5 ] &&
     [ "$(printf '%s\n' "$S245R_OUT" | grep -cF 'ui_warn: skip /etc (system path')" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245R_OUT" | grep -cF 'ui_warn: skip /var/backups (system path')" -eq 1 ] &&
     [ "$(printf '%s\n' "$S245R_OUT" | grep -cF 'ui_warn: skip /home (system path')" -eq 1 ] &&
     [ "$(printf '%s\n' "$S245R_OUT" | grep -cF '(agent home — never a project root)')" -eq 2 ] &&
     [ "$(printf '%s\n' "$S245R_OUT" | grep -cF 'ui_warn: skip /home/toc (agent home')" -eq 1 ] &&
@@ -995,8 +998,9 @@ if [ "$(printf '%s\n' "$S245U_OUT" | grep -c '^FSB: ')" -eq 2 ] &&
     [ "$(printf '%s\n' "$S245U_OUT" | grep -cF 'ui_warn: skip . (not an absolute project path)')" -eq 1 ] &&
     [ "$(printf '%s\n' "$S245U_OUT" | grep -cF 'ui_warn: skip foo (not an absolute project path)')" -eq 1 ] &&
     [ "$(printf '%s\n' "$S245U_OUT" | grep -cF 'ui_warn: skip /var/www/foo bar (malformed')" -eq 1 ] &&
-    [ "$(printf '%s\n' "$S245U_OUT" | grep -cF '(system path — never a project root)')" -eq 4 ] &&
+    [ "$(printf '%s\n' "$S245U_OUT" | grep -cF '(system path — never a project root)')" -eq 5 ] &&
     [ "$(printf '%s\n' "$S245U_OUT" | grep -cF 'ui_warn: skip /etc (system path')" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245U_OUT" | grep -cF 'ui_warn: skip /var/backups (system path')" -eq 1 ] &&
     [ "$(printf '%s\n' "$S245U_OUT" | grep -cF 'ui_warn: skip /home (system path')" -eq 1 ] &&
     [ "$(printf '%s\n' "$S245U_OUT" | grep -cF '(agent home — never a project root)')" -eq 2 ] &&
     [ "$(printf '%s\n' "$S245U_OUT" | grep -cF 'ui_warn: skip /home/toc (agent home')" -eq 1 ] &&

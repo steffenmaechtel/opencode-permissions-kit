@@ -61,9 +61,12 @@ tests/unit/test-install-args.sh|/var/www/vhosts
 tests/unit/test-install-args.sh|/var/www/vhosts/
 # project_path_sane screening inputs + expected-verdict call fixtures
 # (ACCEPT list carries the bare and trailing-slash form, :147 the
-# space-suffixed client form)
+# space-suffixed client form; the #377 F1 rows add the multi-slash
+# normalization inputs)
 tests/unit/test-project-paths.sh|/var/www/vhosts
 tests/unit/test-project-paths.sh|/var/www/vhosts/
+tests/unit/test-project-paths.sh|/var/www/vhosts//
+tests/unit/test-project-paths.sh|/var/www/vhosts/////
 tests/unit/test-project-paths.sh|/var/www/vhosts/client
 tests/unit/test-project-paths.sh|/var/www/vhosts/client1
 # screening-pattern loop values fed to greps against the uninstall

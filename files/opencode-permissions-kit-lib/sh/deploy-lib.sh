@@ -112,7 +112,10 @@ opencode-permissions-kit-lib/py/tui-register.py 755
 # wrapper (local check on every start) and status.sh (upstream diff).
 # wsl-browser-bridge.sh: the deploy helper; the stand-in tree + the
 # wsl.conf carrier are (re)applied by the CALLER after this deploy.
-opencode-permissions-kit-lib/sh/advisories.sh 755
+# Sourced-only libs ship 644 (#377 F2, review #370 a F2): advisories,
+# log, shell-warn and ui were 755 against this rule's own wording —
+# nothing executes them by path (git index 644; sourced everywhere).
+opencode-permissions-kit-lib/sh/advisories.sh 644
 opencode-permissions-kit-lib/sh/ddev-handover.sh 644
 opencode-permissions-kit-lib/sh/ddev-hosts.sh 644
 opencode-permissions-kit-lib/sh/ddev-migrate.sh 644
@@ -120,7 +123,7 @@ opencode-permissions-kit-lib/sh/ddev-terminal.sh 644
 opencode-permissions-kit-lib/sh/deploy-lib.sh 644
 opencode-permissions-kit-lib/sh/fs-baseline.sh 644
 opencode-permissions-kit-lib/sh/git-check.sh 644
-opencode-permissions-kit-lib/sh/log.sh 755
+opencode-permissions-kit-lib/sh/log.sh 644
 # path-sane.sh: the project-root policy gate (issue #216) — bounds the
 # recursive group baseline; sourced by install.sh and config.sh with
 # fail-closed stubs.
@@ -135,14 +138,14 @@ opencode-permissions-kit-lib/sh/install-core.sh 644
 opencode-permissions-kit-lib/sh/uninstall-core.sh 644
 opencode-permissions-kit-lib/sh/render-agent-config.sh 644
 opencode-permissions-kit-lib/sh/secure-binary.sh 644
-opencode-permissions-kit-lib/sh/shell-warn.sh 755
+opencode-permissions-kit-lib/sh/shell-warn.sh 644
 opencode-permissions-kit-lib/sh/staged-write.sh 644
 # status-core.sh: the status report's section functions (issue #346),
 # sourced checkout-first by management/status.sh
 opencode-permissions-kit-lib/sh/status-core.sh 644
 opencode-permissions-kit-lib/sh/sudoers-deploy.sh 644
 opencode-permissions-kit-lib/sh/tui-plugin.sh 644
-opencode-permissions-kit-lib/sh/ui.sh 755
+opencode-permissions-kit-lib/sh/ui.sh 644
 # update-check.sh: kit update probes (issue #358), sourced by the
 # wrapper (daily banner note) and status.sh (live Core row)
 opencode-permissions-kit-lib/sh/update-check.sh 644

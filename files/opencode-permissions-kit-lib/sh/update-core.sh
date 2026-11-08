@@ -4,7 +4,12 @@
 # The update run's phase logic (issue #346, wave 2): every phase section
 # of management/update.sh as a function — pure code movement, output
 # byte-identical. Sourced (never executed) by update.sh, checkout-first;
-# POSIX sh, no top-level side effects (definitions and comments only).
+# POSIX sh, no top-level side effects beyond definitions, comments and
+# two variable defaults (UPD_BACKUP_ROOT/UPD_BACKUP_DIR — pr-00429 a
+# C6: assignments into the caller's namespace, no output, no
+# filesystem ops; the "definitions only" wording of the sourcing
+# purity pin covers output/rc and these defaults are its documented
+# exception).
 # The functions run in the CALLER's shell under its `set -eu`: they read
 # the globals update.sh's main flow sets (YES, REFRESH, BINARY_UPDATE,
 # ONLY_BINARY, BINARY_PATH, UPGRADE_MAJOR, UPGRADE_VERSION, VERSION,
@@ -22,17 +27,80 @@
 
 # --- kit re-deploy sections (update.sh skips this whole area under --only-binary)
 
+# update_backup_dir: durable recovery-material root for THIS update run
+# (#376 B5 + the round-b B3 rider; the #370 a I1 loss class): everything
+# the update may need to undo itself lives under
+# /var/backups/opencode-permissions-kit/update-<ts> — the old binary
+# backup was a volatile mktemp under /tmp (reboot/tmpfs wipe destroyed
+# the only restore material of a FAILED upgrade), and the library
+# re-deploy had no tree-level rollback at all. The shared base root
+# follows install-core's #370 a I1 doctrine (readable timestamp, umask
+# mode); the update-<ts> LEAF is created mode 700 — it gates the
+# recovery material. UPD_BACKUP_ROOT is an env override for the unit
+# sandbox (the DDEV_MIG_BACKUP_ROOT pattern — suites cannot create
+# under /var/backups); created lazily on first use; a same-second
+# rerun gets a PID suffix instead of clobbering.
+UPD_BACKUP_ROOT="${UPD_BACKUP_ROOT:-/var/backups/opencode-permissions-kit}"
+UPD_BACKUP_DIR=""
+update_ensure_backup_dir() {
+    [ -n "$UPD_BACKUP_DIR" ] && return 0
+    mkdir -p "$UPD_BACKUP_ROOT" 2>/dev/null || return 1
+    _ubd_dir="$UPD_BACKUP_ROOT/update-$(date +%Y%m%d-%H%M%S)"
+    [ -e "$_ubd_dir" ] && _ubd_dir="$_ubd_dir.$$"
+    # The idempotence flag is assigned only once the dir exists
+    # (pr-00429 a B3): a transient mkdir failure must not poison later
+    # same-run calls into rc 0 over a nonexistent dir (the binary arm's
+    # mkdir -p would then resurrect intermediates at umask mode).
+    mkdir -m 700 "$_ubd_dir" 2>/dev/null || return 1
+    UPD_BACKUP_DIR="$_ubd_dir"
+    log "update backup dir created: $UPD_BACKUP_DIR"
+    return 0
+}
+
 update_redeploy_library() {
     # --- re-deploy library files (skipped by --only-binary) ------------------------
 
     ui_section "Re-deploying library files"
 
+    # Tree-level rollback (#376 B5, review #370 a B5): lib_deploy is
+    # atomic PER ENTRY only — a failed or interrupted deploy leaves a
+    # mixed old/new library set behind, previously healed solely by
+    # re-running update (the binary path has had backup+restore since
+    # #370). Back the whole deployed tree up first (durable — see
+    # update_ensure_backup_dir); a backup that cannot be produced
+    # aborts BEFORE anything is touched (fail-closed, the binary
+    # path's pre-upgrade-backup doctrine at work below). On a FAILED
+    # deploy the mixed tree is moved aside (kept for inspection, no
+    # rm -rf of a live path) and the pre-update tree is restored.
+    if ! update_ensure_backup_dir ||
+        { [ -d "$LIBDIR" ] && ! cp -a "$LIBDIR" "$UPD_BACKUP_DIR/lib"; }; then
+        die "cannot back up the current library tree ($LIBDIR) before re-deploying — update aborted, nothing changed"
+    fi
     # Deploy via the shared manifest (sh/deploy-lib.sh): the single source
     # of truth for what ships into $LIBDIR — layout, file set and modes
     # live there, enforced against the fetch lists by test-kit-files. The
     # browser-bridge stand-in tree + wsl.conf carrier are re-applied below,
     # after the library is in place.
-    lib_deploy "$FILES_ROOT" "$LIBDIR"
+    if ! lib_deploy "$FILES_ROOT" "$LIBDIR"; then
+        if [ -d "$UPD_BACKUP_DIR/lib" ]; then
+            _ulb_failed="$UPD_BACKUP_DIR/lib-failed.$$"
+            if mv "$LIBDIR" "$_ulb_failed" 2>/dev/null &&
+                cp -a "$UPD_BACKUP_DIR/lib" "$LIBDIR"; then
+                ui_warn "library re-deploy FAILED — previous library tree restored"
+                ui_detail "the mixed tree is kept for inspection: $_ulb_failed"
+                log "lib_deploy failed; library tree restored from $UPD_BACKUP_DIR/lib (mixed state: $_ulb_failed)"
+            else
+                ui_warn "library re-deploy FAILED and the automatic restore did not complete"
+                ui_warn "the pre-update tree is recoverable at $UPD_BACKUP_DIR/lib — restore manually:"
+                ui_warn "  sudo cp -a $UPD_BACKUP_DIR/lib/. $LIBDIR/"
+                log "lib_deploy failed; AUTOMATIC RESTORE INCOMPLETE, manual material: $UPD_BACKUP_DIR/lib"
+            fi
+        else
+            ui_warn "library re-deploy FAILED — no pre-update backup existed (fresh deploy)"
+            log "lib_deploy failed; no rollback material existed"
+        fi
+        die "library re-deploy failed — update aborted"
+    fi
 
     # --- old-layout cleanup (0.0.29 streamline, internal/records/streamline.md §5) --------
     # Remove the union of pre-0.0.29 deployed paths after the new layout is in
@@ -261,6 +329,22 @@ update_redeploy_shell_hooks() {
         elif [ -d "$DEFAULT_HOME" ]; then
             for cf in "$DEFAULT_HOME/.bashrc" "$DEFAULT_HOME/.zshrc" "$DEFAULT_HOME/.profile"; do
                 [ -f "$cf" ] || continue
+                # Backup before any edit (#425, review #424 a S3): the
+                # install flow's rc invariant — recovery material for
+                # every pre-change copy — now holds update-side too.
+                # This loop rewrites kit lines (sed -i) and appends
+                # grep-guarded hooks (tee -a) to the same user-owned rc
+                # files the install edits, and previously did so with
+                # zero recovery material. When the copy fails the edit
+                # proceeds anyway (the install-side doctrine, #424 a S2:
+                # the rewrites heal load-bearing hooks and must not be
+                # skipped over a missing recovery copy) — the
+                # degradation is announced, never silent.
+                if ! update_ensure_backup_dir ||
+                    ! sudo cp "$cf" "$UPD_BACKUP_DIR/rc-$(basename "$cf")" 2>/dev/null; then
+                    ui_warn "could not back up $cf before editing it — the rc edits below have no recovery copy"
+                    log "rc backup FAILED for $cf (edited without recovery copy, #425 degradation)"
+                fi
                 if sudo grep -q 'opencode-permissions-kit/sh/shell-warn.sh\|opencode-permissions-kit/shell-warn.sh' \
                     "$cf" 2>/dev/null; then
                     sudo sed -i "s|/usr/local/lib/opencode-permissions-kit/shell-warn\.sh""\
@@ -442,11 +526,16 @@ update_redeploy_project_roots() {
             # the blocklist allows is creatable in a unit sandbox),
             # and no sanctioned writer ever stores them.
             case "$root" in
+                # #377 (review #370 a O1) + pr-00429 a A1: FHS-complete
+                # /var families — path-sane.sh parity.
                 / | /bin | /bin/* | /boot | /boot/* | /dev | /dev/* | /etc | /etc/* | /home | /lib* | \
                     /media | /media/* | /mnt | /mnt/* | /opt | /opt/* | /proc | /proc/* | /root | /root/* | \
                     /run | /run/* | /sbin | /sbin/* | /srv | /srv/* | /sys | /sys/* | /usr | /usr/* | \
-                    /var | /var/cache | /var/cache/* | /var/lib | /var/lib/* | /var/log | /var/log/* | \
-                    /var/mail | /var/mail/* | /var/spool | /var/spool/*)
+                    /var | /var/account | /var/account/* | /var/backups | /var/backups/* | /var/cache | \
+                    /var/cache/* | /var/crash | /var/crash/* | /var/games | /var/games/* | /var/lib | \
+                    /var/lib/* | /var/local | /var/local/* | /var/lock | /var/lock/* | /var/log | \
+                    /var/log/* | /var/mail | /var/mail/* | /var/opt | /var/opt/* | /var/run | \
+                    /var/run/* | /var/spool | /var/spool/* | /var/yp | /var/yp/*)
                     ui_warn "skip $root (system path — never a project root)"
                     continue
                     ;;
@@ -868,12 +957,23 @@ update_binary_upgrade() {
             fi
         fi
         if [ -n "$_up_ver" ]; then
-            TMP="$(mktemp -d)"
-            _BIN_TMP="$TMP"
-            if ! SRC=$(fetch_opencode_version "$TMP" "$_up_ver"); then
-                ui_warn "download of opencode $_up_ver failed — binary left untouched"
-                log "opencode binary upgrade skipped: download of $_up_ver failed"
-                rm -rf "$TMP"
+            # Named-cause mktemp guard (#376 B4 class sweep — the
+            # fetch_kit/ensure_local_file shape): set -e would abort the
+            # whole update on the raw error; the guard degrades to the
+            # skip shape below (best-effort, binary left untouched).
+            if TMP="$(mktemp -d)"; then
+                _BIN_TMP="$TMP"
+                if ! SRC=$(fetch_opencode_version "$TMP" "$_up_ver"); then
+                    ui_warn "download of opencode $_up_ver failed — binary left untouched"
+                    log "opencode binary upgrade skipped: download of $_up_ver failed"
+                    rm -rf "$TMP"
+                    TMP=""
+                    _BIN_TMP=""
+                    SRC=""
+                fi
+            else
+                ui_warn "mktemp failed (is \$TMPDIR writable?) — opencode binary upgrade skipped, binary left untouched"
+                log "opencode binary upgrade skipped: mktemp failed"
                 TMP=""
                 _BIN_TMP=""
                 SRC=""
@@ -881,7 +981,27 @@ update_binary_upgrade() {
         fi
     fi
     if [ -n "$SRC" ]; then
-        BACKUP_DIR="$(mktemp -d /tmp/opencode-upgrade-backup.XXXXXX)"
+        # Durable backup base (#376, the round-b B3 rider — the #370 a I1
+        # loss class): the old volatile mktemp under /tmp died with a
+        # reboot (tmpfs wipe, systemd-tmpfiles age-out) — and it held the
+        # only restore material exactly when an upgrade FAILED. Same
+        # durable root as the lib-tree rollback (see
+        # update_ensure_backup_dir); the previous binary lands in bin/.
+        # No backup dir, no upgrade (best-effort doctrine: skip loud,
+        # binary left untouched — the download-failure shape above).
+        BACKUP_DIR=""
+        if update_ensure_backup_dir && mkdir -p "$UPD_BACKUP_DIR/bin" 2>/dev/null; then
+            BACKUP_DIR="$UPD_BACKUP_DIR/bin"
+        else
+            ui_warn "no durable backup dir available — opencode binary upgrade skipped (nothing changed)"
+            log "opencode binary upgrade skipped: update backup dir unavailable"
+            rm -rf "$TMP"
+            TMP=""
+            _BIN_TMP=""
+            SRC=""
+        fi
+    fi
+    if [ -n "$SRC" ] && [ -n "$BACKUP_DIR" ]; then
         if [ -x "$SYSTEM_BIN" ]; then
             # Fail-loud (issue #371 A5 class sweep from install.sh): the
             # bare call aborted the whole update with only the raw tool

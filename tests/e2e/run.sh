@@ -668,8 +668,10 @@ E 'sudo sha256sum /usr/local/lib/opencode-permissions-kit/bin/opencode | cut -d"
 E 'cat /etc/opencode-permissions-kit/projects.conf > /tmp/projects.conf.before'
 # Create a copy of the repo files with a sentinel VERSION so we can observe the bump.
 # We can't overwrite the bind-mounted VERSION reliably, so we copy update.sh + a
-# sentinel VERSION into a temp dir and run it from there.
-E 'rm -rf /tmp/update-test && mkdir -p /tmp/update-test/files && cp -r /home/dev/repo/files/* /tmp/update-test/files/ && echo "9.9.9-sentinel" > /tmp/update-test/VERSION'
+# sentinel VERSION into a temp dir and run it from there. The sentinel is a
+# BARE x.y.z (#376 B3): update.sh's shape gate aborts on anything else, and
+# the kit's VERSION discipline is bare-only anyway (AGENTS.md Rules).
+E 'rm -rf /tmp/update-test && mkdir -p /tmp/update-test/files && cp -r /home/dev/repo/files/* /tmp/update-test/files/ && echo "9.9.9" > /tmp/update-test/VERSION'
 E 'sudo bash /tmp/update-test/files/opencode-permissions-kit-lib/management/update.sh --yes' &&
     echo "  ${GREEN}OK${NC}  update.sh completed without prompts"
 check "Wrapper still present after update" E 'test -x /usr/local/bin/opencode'
@@ -688,7 +690,7 @@ check "binary byte-identical (sha256 unchanged)" \
 check "projects.conf content unchanged" \
     E 'test "$(cat /etc/opencode-permissions-kit/projects.conf)" = "$(cat /tmp/projects.conf.before)"'
 check "install.conf VERSION bumped to sentinel" \
-    E 'grep -q "VERSION=9.9.9-sentinel" /etc/opencode-permissions-kit/install.conf'
+    E 'grep -qx "VERSION=9.9.9" /etc/opencode-permissions-kit/install.conf'
 E 'rm -rf /tmp/update-test'
 
 echo ""
@@ -702,7 +704,7 @@ E 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode service
 # Binary-only mode: kit steps skipped (marker in LIBDIR survives, the
 # install.conf version stays at section 11's sentinel), the binary is
 # actually replaced by the given stub.
-E 'rm -rf /tmp/update-test && mkdir -p /tmp/update-test/files && cp -r /home/dev/repo/files/* /tmp/update-test/files/ && echo "8.8.8-onlybinary" > /tmp/update-test/VERSION'
+E 'rm -rf /tmp/update-test && mkdir -p /tmp/update-test/files && cp -r /home/dev/repo/files/* /tmp/update-test/files/ && echo "8.8.8" > /tmp/update-test/VERSION'
 E 'sudo sh -c "echo marker > /usr/local/lib/opencode-permissions-kit/.only-binary-marker"'
 E 'printf "#!/bin/sh\necho \"opencode version 9.9.9-onlybinary\"\n" > /tmp/stub-opencode && chmod +x /tmp/stub-opencode'
 E 'sudo bash /tmp/update-test/files/opencode-permissions-kit-lib/management/update.sh --yes --only-binary --binary-path /tmp/stub-opencode' &&
@@ -712,7 +714,7 @@ check "11b: binary replaced by the stub (--only-binary)" \
 check "11b: kit re-deploy skipped (marker survived)" \
     E 'test "$(sudo cat /usr/local/lib/opencode-permissions-kit/.only-binary-marker)" = "marker"'
 check "11b: install.conf version NOT re-stamped (still section 11's sentinel)" \
-    E 'grep -q "VERSION=9.9.9-sentinel" /etc/opencode-permissions-kit/install.conf && ! grep -q "VERSION=8.8.8-onlybinary" /etc/opencode-permissions-kit/install.conf'
+    E 'grep -qx "VERSION=9.9.9" /etc/opencode-permissions-kit/install.conf && ! grep -qx "VERSION=8.8.8" /etc/opencode-permissions-kit/install.conf'
 # top-level shorthand (issue #24): kit CLI maps upgrade-opencode onto
 # update.sh --yes --only-binary, flags pass through
 E 'printf "#!/bin/sh\necho \"opencode version 7.7.7-shorthand\"\n" > /tmp/stub-opencode2 && chmod +x /tmp/stub-opencode2'
@@ -1270,7 +1272,7 @@ E 'rm -f /home/dev/.opencode/bin/opencode'
 # checkout instead of fetching upstream).
 E 'rm -rf /tmp/oc-update-test && mkdir -p /tmp/oc-update-test/files \
     && cp -r /home/dev/repo/files/* /tmp/oc-update-test/files/ \
-    && echo "9.9.8-oc-test" > /tmp/oc-update-test/VERSION \
+    && echo "9.9.8" > /tmp/oc-update-test/VERSION \
     && sudo rm /etc/openchamber/policy.json \
     && sudo bash /tmp/oc-update-test/files/opencode-permissions-kit-lib/management/update.sh --yes'
 check "12k: opk update re-applies the policy pin (opt-in recorded)" \

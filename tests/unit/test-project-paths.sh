@@ -123,9 +123,13 @@ REJECT="/ /usr /etc /home /root /var /tmp /tmp/build-dir /bin /sbin /lib /lib64 
 /mnt /mnt/c /media /media/usb /proc /sys /dev /run /boot /var/tmp \
 /var/log /var/log/nginx /var/lib /var/lib/docker /var/spool /var/spool/cron \
 /var/cache /var/mail /var/mail/root \
+/var/backups /var/backups/dpkg /var/opt /var/opt/vendor-app /var/crash /var/crash/kernel \
+/var/local /var/local/proj /var/lock /var/lock/lck \
+/var/account /var/account/pacct /var/games /var/games/highscores /var/run /var/run/screen \
+/var/yp /var/yp/binding \
 /usr/share /etc/nginx /root/projects /home/../etc /./etc /etc/ /usr/ \
 relative/path ../etc ./here subdir \
-/home/opencode"
+/home/opencode ///"
 
 # must ACCEPT (dedicated project folders)
 ACCEPT="/var/www/vhosts /var/www /var/www/vhosts/client1 /home/dev/projects \
@@ -145,6 +149,80 @@ for p in $ACCEPT; do
         pass "accepts project path: $p"
     else
         fail "accepts project path: $p"
+    fi
+done
+
+# --- #377 F1: EVERY trailing slash is stripped, not just one ----------
+# ${1%/} removed only one: "/foo//" passed the form arms (no interior
+# // after the strip) and was stored/displayed verbatim with a trailing
+# slash in _PP_NORM. The loop normalizes all of them; "///" strips to
+# empty and refuses (it rides the REJECT table above).
+_pp377=""
+if project_path_sane "/var/www/vhosts//" && [ "$_PP_NORM" = "/var/www/vhosts" ]; then
+    pass "double trailing slash normalizes away: _PP_NORM clean (#377 F1)"
+else
+    fail "double trailing slash must normalize out of _PP_NORM (got '$_PP_NORM') (#377 F1)"
+fi
+if project_path_sane "/var/www/vhosts/////" && [ "$_PP_NORM" = "/var/www/vhosts" ]; then
+    pass "five trailing slashes normalize away: _PP_NORM clean (#377 F1)"
+else
+    fail "all trailing slashes must normalize out of _PP_NORM (got '$_PP_NORM') (#377 F1)"
+fi
+
+# --- #377 O1: every reader mirror carries the completed /var families --
+# Static set tripwires (the uninstall-core twin lives in its own suite,
+# #243 b X1): each reader's blocklist must equal the writer's set minus
+# its PINNED temp divergence — writer/reader drift redds here instead of
+# silently diverging (the O1 gap itself was exactly this drift: five
+# /var families present in none of them). update-core's root loop and
+# config's refresh process /tmp and /var/tmp (unit-fixture roots, the
+# documented #418 divergence); opk's handover additionally leaves /tmp
+# SUBpaths open (a temp build tree is a legitimate handover operand)
+# while keeping /tmp itself and /var/tmp blocked.
+_LIBDIR="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib"
+_pp377_fn() { sed -n "/^$2() {/,/^}/p" "$1"; }
+_pp377_arms() {
+    # '/'-leading lines minus a lone '/*)' arm (the relative-path
+    # reject), line-continuations joined, then '|'-split tokens.
+    _pp377_fn "$1" "$2" | grep -E '^[[:space:]]*/' | grep -vE '^[[:space:]]*/\*\)' |
+        sed -e 's/\\$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/)$//' | tr '\n' '|'
+}
+_pp377_tokens() {
+    printf '%s\n' "$1" | tr '|' '\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^$/d' | sort -u
+}
+_PP377_WRITER=$(_pp377_arms "$PATH_SANE" project_path_sane)
+for _pp377_site in \
+    "sh/update-core.sh:update_redeploy_project_roots:/tmp /tmp/* /var/tmp /var/tmp/*" \
+    "management/config.sh:refresh:/tmp /tmp/* /var/tmp /var/tmp/*" \
+    "bin/opk:_ho_np:/tmp/*"; do
+    _pp377_file=${_pp377_site%%:*}
+    _pp377_rest=${_pp377_site#*:}
+    _pp377_fnname=${_pp377_rest%%:*}
+    _pp377_div=${_pp377_rest#*:}
+    if [ "$_pp377_file" = bin/opk ]; then
+        # the handover gate is an inline block, not a function: the awk
+        # range covers realpath → the FIRST esac (the system-path case;
+        # the whole-home case after it starts with /home/* and must
+        # stay out of the set)
+        _pp377_raw=$(awk '/_ho_np=\$\(realpath/,/esac/' "$_LIBDIR/$_pp377_file" |
+            grep -E '^[[:space:]]*/' | sed -e 's/\\$//' -e 's/^[[:space:]]*//' \
+            -e 's/[[:space:]]*$//' -e 's/)$//' | tr '\n' '|')
+    else
+        _pp377_raw=$(_pp377_arms "$_LIBDIR/$_pp377_file" "$_pp377_fnname")
+    fi
+    _pp377_wset=$(_pp377_tokens "$_PP377_WRITER")
+    # set -f around the loop: the divergence list contains glob-shaped
+    # arms (/tmp/*) that must stay LITERAL — unquoted splitting would
+    # expand them against the host filesystem.
+    set -f
+    for _pp377_d in $_pp377_div; do
+        _pp377_wset=$(printf '%s\n' "$_pp377_wset" | grep -vxF "$_pp377_d" || true)
+    done
+    set +f
+    if [ -n "$_pp377_raw" ] && [ "$(_pp377_tokens "$_pp377_raw")" = "$_pp377_wset" ]; then
+        pass "reader blocklist at writer parity: $_pp377_file (#377 O1)"
+    else
+        fail "reader blocklist drift in $_pp377_file (expected writer set minus ${_pp377_div}) (#377 O1)"
     fi
 done
 

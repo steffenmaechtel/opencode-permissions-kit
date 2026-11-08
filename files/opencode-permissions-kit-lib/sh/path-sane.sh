@@ -78,7 +78,18 @@ path_sane_tilde_home() {
 # "~" is expanded to $HOME; the normalized path is returned in
 # _PP_NORM for the caller.
 project_path_sane() {
+    # Strip EVERY trailing slash (#377 F1): ${1%/} removed only one, so
+    # "/foo//" entered the checks as "/foo/" — not caught by the *//* arm
+    # (no interior // left) and stored/displayed verbatim in _PP_NORM.
+    # POSIX loop (no extglob in sh); "/" itself strips to empty and is
+    # refused by the [ -n ] guard below (same rc 1 the blocklist gives).
     _pp="${1%/}"
+    while [ -n "$_pp" ]; do
+        case "$_pp" in
+            */) _pp="${_pp%/}" ;;
+            *) break ;;
+        esac
+    done
     [ -n "$_pp" ] || return 1
     # expand ~ / ~/... / ~name is rejected (no user lookup). Note: the ~ in
     # the pattern must be escaped (\~) or it tilde-expands and never matches.
@@ -121,11 +132,28 @@ project_path_sane() {
         return 1
     fi
     case "$_pp" in
+        # /var subprefixes are enumerated, not /var/*: /var/www stays the
+        # documented project-home. The named families were completed for
+        # #377 (review #370 a O1): /var/backups (dpkg passwd/shadow
+        # backups), /var/opt, /var/crash, /var/local and /var/lock had
+        # slipped past the "everything else system-ish" claim — and
+        # pr-00429 a A1 closed the remaining FHS set (/var/account,
+        # /var/games, /var/run — real-dir layouts expose /var/run where
+        # mainstream symlinks it to /run); pr-00429 b D2 added /var/yp
+        # (the FHS NIS dir). The list is FHS-complete for
+        # /var now; non-FHS distro-specific dirs (/var/empty and
+        # friends) are an accepted residual — no sanctioned layout
+        # registers them as project homes. The same arms ship in every
+        # reader mirror (uninstall-core, update-core, config.sh
+        # refresh, bin/opk handover).
         / | /bin | /bin/* | /boot | /boot/* | /dev | /dev/* | /etc | /etc/* | /home | /lib* | \
             /media | /media/* | /mnt | /mnt/* | /opt | /opt/* | /proc | /proc/* | /root | /root/* | \
             /run | /run/* | /sbin | /sbin/* | /srv | /srv/* | /sys | /sys/* | /tmp | /tmp/* | /var/tmp/* | \
-            /usr | /usr/* | /var | /var/tmp | /var/cache | /var/cache/* | /var/lib | /var/lib/* | \
-            /var/log | /var/log/* | /var/mail | /var/mail/* | /var/spool | /var/spool/*)
+            /usr | /usr/* | /var | /var/tmp | /var/account | /var/account/* | /var/backups | \
+            /var/backups/* | /var/cache | /var/cache/* | /var/crash | /var/crash/* | /var/games | \
+            /var/games/* | /var/lib | /var/lib/* | /var/local | /var/local/* | /var/lock | \
+            /var/lock/* | /var/log | /var/log/* | /var/mail | /var/mail/* | /var/opt | \
+            /var/opt/* | /var/run | /var/run/* | /var/spool | /var/spool/* | /var/yp | /var/yp/*)
             return 1
             ;;
     esac

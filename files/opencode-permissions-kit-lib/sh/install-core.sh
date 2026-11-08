@@ -1842,28 +1842,45 @@ do_deploy_phase() {
     # it would plant a root-owned dir in the link target.
     if agent_home_sane "$OPENCODE_USER" /home/opencode/.config; then
         sudo mkdir -p /home/opencode/.config
-        sudo chown -R "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode/.config
-        sudo chmod 2775 /home/opencode/.config
+        # Exec-time recheck (pr-00429 a C3, the _opk_migrate_one twin —
+        # the #267 L5 shape): chown -R/chmod dereference the OPERAND
+        # (chmod has no -P; measured), and the operand is
+        # agent-replaceable — re-walk before acting. Same for the two
+        # blocks below (.config/opencode, .agents).
+        if agent_home_sane "$OPENCODE_USER" /home/opencode/.config; then
+            sudo chown -R "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode/.config
+            sudo chmod 2775 /home/opencode/.config
+        else
+            log "agent config dir baseline skipped: /home/opencode/.config turned into a symlink mid-step (user-managed)"
+        fi
     else
         log "agent config dir skipped: /home/opencode/.config is (below) a symlink (user-managed)"
     fi
     if agent_home_sane "$OPENCODE_USER" /home/opencode/.config/opencode; then
         sudo mkdir -p /home/opencode/.config/opencode
-        # Own chown -R (0.0.39j F1): gate 1's `chown -R .config` runs BEFORE
-        # this leaf exists on a fresh install — without this chown the dir
-        # ends root-owned (live-verified). Write access would survive via the
-        # setgid-inherited sharing group (the agent's own primary group,
-        # 0.0.39k wording fix), but the agent's config dir must be OWNED by
-        # the agent user — like .config and .agents.
-        sudo chown -R "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode/.config/opencode
-        sudo chmod 2775 /home/opencode/.config/opencode
+        if agent_home_sane "$OPENCODE_USER" /home/opencode/.config/opencode; then
+            # Own chown -R (0.0.39j F1): gate 1's `chown -R .config` runs BEFORE
+            # this leaf exists on a fresh install — without this chown the dir
+            # ends root-owned (live-verified). Write access would survive via the
+            # setgid-inherited sharing group (the agent's own primary group,
+            # 0.0.39k wording fix), but the agent's config dir must be OWNED by
+            # the agent user — like .config and .agents.
+            sudo chown -R "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode/.config/opencode
+            sudo chmod 2775 /home/opencode/.config/opencode
+        else
+            log "agent config dir baseline skipped: /home/opencode/.config/opencode turned into a symlink mid-step (user-managed)"
+        fi
     else
         log "agent config dir skipped: /home/opencode/.config/opencode is (below) a symlink (user-managed)"
     fi
     if agent_home_sane "$OPENCODE_USER" /home/opencode/.agents; then
         sudo mkdir -p /home/opencode/.agents
-        sudo chown -R "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode/.agents
-        sudo chmod 2775 /home/opencode/.agents
+        if agent_home_sane "$OPENCODE_USER" /home/opencode/.agents; then
+            sudo chown -R "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode/.agents
+            sudo chmod 2775 /home/opencode/.agents
+        else
+            log "agent skills dir baseline skipped: /home/opencode/.agents turned into a symlink mid-step (user-managed)"
+        fi
     else
         log "agent skills dir skipped: /home/opencode/.agents is (below) a symlink (user-managed)"
     fi
@@ -1901,39 +1918,83 @@ do_deploy_phase() {
             return 0
         fi
         sudo mkdir -p "$_opk_dst"
+        # Exec-time recheck (#377, review #370 a O2 — the L5 rule, #267
+        # shape): the entry gate above classified the chain ONCE, and
+        # every operand below is agent-replaceable (/home/opencode
+        # belongs to the agent) — a leaf swapped for a dir-symlink in
+        # the gate->op window makes the copy write developer content
+        # THROUGH the link (live-verified in review #370). Which legs
+        # dereference: cp -a AND the chmod OPERANDS (chmod follows a
+        # symlink command-line operand — no -P exists; measured,
+        # pr-00429 a C2); the find walks stay inside (find never
+        # descends a symlinked intermediate), chown -R stays bounded on
+        # current coreutils (-P default). Re-run the gate immediately
+        # before the copy (it walks the chain again, covering a swapped
+        # parent too) and skip loudly on a trip. Accepted residual
+        # (pr-00429 a A5, the #267-accepted window class): the mkdir
+        # above runs un-rechecked — a parent swapped between the entry
+        # gate and it plants one EMPTY root-owned dir in the link
+        # target (no content, agent-removable, no escalation).
+        if ! agent_home_sane "$OPENCODE_USER" "$_opk_dst"; then
+            ui_warn "agent resources not migrated: the chain to $_opk_dst turned into a symlink""\
+ before the copy (user-managed) — $_opk_src left untouched"
+            log "agents migration skipped: exec-time recheck tripped for $_opk_dst"
+            return 0
+        fi
         # cp -a (not mv): merges into the existing target and works when src
         # and dst would collide on a re-install.
         if sudo cp -a "$_opk_src/." "$_opk_dst/" 2>/dev/null; then
-            [ "$_opk_ag" = m ] && sudo rm -rf "$_opk_src"
-            # Sharing baseline: opencode owns, the developer keeps rw
-            # through the group (dirs setgid so new files inherit it). The
-            # top dir gets the explicit 2775 — mkdir's mode depends on the
-            # process umask. Sub-path migrations (.claude/skills) also
-            # normalize the parent the kit just created (mkdir -p leaves it
-            # root-owned otherwise) — never /home/opencode itself, whose
-            # mode 2750 (no world bit) is by design.
-            # ORDER (0.0.45e W1, the 0.0.45c S4 class): the chmod walks
-            # run FIRST, while the copied-in tree is still dev-owned —
-            # chown-first would walk a just-re-owned, fully agent-writable
-            # tree (re-install over a live agent: scan-then-act for a
-            # racing agent); chown -R hands over LAST.
-            sudo find "$_opk_dst" -type d -exec chmod g+rwxs {} + 2>/dev/null || true
-            sudo find "$_opk_dst" -type f -exec chmod g+rw {} + 2>/dev/null || true
-            sudo chown -R "$OPENCODE_USER:$OPENCODE_GROUP" "$_opk_dst"
-            sudo chmod 2775 "$_opk_dst"
-            case "$1" in
-                */*)
-                    _opk_parent="$(dirname "$_opk_dst")"
-                    sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" "$_opk_parent" 2>/dev/null || true
-                    sudo chmod 2775 "$_opk_parent" 2>/dev/null || true
-                    ;;
-            esac
-            if [ "$_opk_ag" = m ]; then
-                ui_success "agent resources MOVED: $_opk_src -> $_opk_dst (group $OPENCODE_GROUP: both sides read/write)"
-                log "agents migration: moved $_opk_src -> $_opk_dst"
+            # SECOND exec-time recheck (pr-00429 a C2): the baseline legs
+            # below end in chmod OPERANDS that dereference a swapped leaf
+            # (the find walks themselves stay inside). A trip skips the
+            # baseline loudly — and move mode's source removal waits for
+            # the pass arm (pr-00429 b D1): the dev's original survives
+            # as recovery, so the re-run remedy below holds for BOTH
+            # modes (the entry gate skips a vanished source, and no
+            # other code path baselines .claude/skills).
+            if ! agent_home_sane "$OPENCODE_USER" "$_opk_dst"; then
+                ui_warn "agent resources copied but the sharing baseline was NOT applied:""\
+ the chain to $_opk_dst turned into a symlink mid-step (user-managed)"
+                ui_warn "the original at $_opk_src is untouched — re-run the install to normalize""\
+ $_opk_dst"
+                log "agents migration: exec-time recheck tripped before the baseline legs for $_opk_dst (source kept)"
             else
-                ui_success "agent resources COPIED: $_opk_src -> $_opk_dst (group $OPENCODE_GROUP: both sides read/write)"
-                log "agents migration: copied $_opk_src -> $_opk_dst"
+                # Sharing baseline: opencode owns, the developer keeps rw
+                # through the group (dirs setgid so new files inherit it). The
+                # top dir gets the explicit 2775 — mkdir's mode depends on the
+                # process umask. Sub-path migrations (.claude/skills) also
+                # normalize the parent the kit just created (mkdir -p leaves it
+                # root-owned otherwise) — never /home/opencode itself, whose
+                # mode 2750 (no world bit) is by design. The parent legs are
+                # covered by the recheck above: the walk includes every
+                # component of $_opk_dst's chain, $_opk_parent included.
+                # ORDER (0.0.45e W1, the 0.0.45c S4 class): the chmod walks
+                # run FIRST, while the copied-in tree is still dev-owned —
+                # chown-first would walk a just-re-owned, fully agent-writable
+                # tree (re-install over a live agent: scan-then-act for a
+                # racing agent); chown -R hands over LAST.
+                sudo find "$_opk_dst" -type d -exec chmod g+rwxs {} + 2>/dev/null || true
+                sudo find "$_opk_dst" -type f -exec chmod g+rw {} + 2>/dev/null || true
+                sudo chown -R "$OPENCODE_USER:$OPENCODE_GROUP" "$_opk_dst"
+                sudo chmod 2775 "$_opk_dst"
+                case "$1" in
+                    */*)
+                        _opk_parent="$(dirname "$_opk_dst")"
+                        sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" "$_opk_parent" 2>/dev/null || true
+                        sudo chmod 2775 "$_opk_parent" 2>/dev/null || true
+                        ;;
+                esac
+                # Move-mode source removal runs LAST, after copy AND
+                # baseline both succeeded (pr-00429 b D1) — a trip above
+                # keeps the dev's original as recovery material.
+                [ "$_opk_ag" = m ] && sudo rm -rf "$_opk_src"
+                if [ "$_opk_ag" = m ]; then
+                    ui_success "agent resources MOVED: $_opk_src -> $_opk_dst (group $OPENCODE_GROUP: both sides read/write)"
+                    log "agents migration: moved $_opk_src -> $_opk_dst"
+                else
+                    ui_success "agent resources COPIED: $_opk_src -> $_opk_dst (group $OPENCODE_GROUP: both sides read/write)"
+                    log "agents migration: copied $_opk_src -> $_opk_dst"
+                fi
             fi
         else
             # _opk_ag may be a flag-given word (move|copy) or the interactive
