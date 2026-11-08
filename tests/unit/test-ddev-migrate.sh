@@ -230,6 +230,21 @@ if [ "$1" = "export-db" ] && [ "$2" = "nodbrt" ]; then
     echo "Error: failed to export database for nodbrt: unable to export db: service db does not exist in project nodbrt (state=doesnotexist)" >&2
     exit 1
 fi
+# DDEV_FAKE_SWAP=<project>:<target> (#264): simulates a mid-export
+# operand swap in the gate->export window — export-db writes the dump
+# FIRST, then the operand is replaced by a symlink to <target> (what a
+# live agent can do between the loop-top gate and ddev opening the
+# file). The victim is never written through: only the dump the stub
+# just wrote is unlinked.
+if [ -n "${DDEV_FAKE_SWAP:-}" ] && [ "$1" = "export-db" ] &&
+    [ "$2" = "${DDEV_FAKE_SWAP%%:*}" ]; then
+    _sw_tgt=${DDEV_FAKE_SWAP#*:}
+    for a in "$@"; do
+        case "$a" in
+            --file=*) rm -f "${a#--file=}"; ln -s "$_sw_tgt" "${a#--file=}" ;;
+        esac
+    done
+fi
 exit 0
 FAKE
 chmod +x "$WORK/bin/ddev"
@@ -381,6 +396,139 @@ grep -q 'mkdir -m 700 "\$DM_STAGE"' "$MIG" &&
     check "stage is created mode 700 in one step (no default-mode window, W1)" false
 check_fail "the root staging dir is removed before finalize hands the tree over" \
     test -e "$DUMP_DIR/.root-stage"
+
+# --- 4c2. the dump operand itself: a planted link at the loop top is REFUSED (#264) ----
+# The dump dir is agent-group-writable for the whole wave; ddev
+# export-db opens --file for WRITING as the dev user, and the resume
+# probe's [ -s ] FOLLOWS a link — a planted non-empty alpha.sql.gz plus
+# the OK line run 4b left behind would resume-mark the project off the
+# plant. The gate must refuse BEFORE the resume probe: no start, no
+# export-db, victim intact, FAIL entry, the stale OK line replaced
+# (single entry), and the remaining projects still processed
+# (per-project refusal, no abort).
+mv "$WORK/ddev.log" "$WORK/ddev-4c2-pre.log"
+printf 'VICTIM-GATE-CONTENT\n' >"$WORK/victim-gate.conf"
+rm -f "${DUMP_DIR:?}/alpha.sql.gz"
+ln -s "$WORK/victim-gate.conf" "$DUMP_DIR/alpha.sql.gz"
+# A8 discriminator (#420 a): alpha is FIRST in the registry — a
+# `continue` must still reach the LATER projects in the SAME run.
+# gamma's dump is removed so gamma must actually EXPORT in this run
+# (resumed projects log nothing); a break at alpha's refusal leaves the
+# log without gamma's export and this pin red.
+rm -f "${DUMP_DIR:?}/gamma.sql.gz"
+OUTG=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev.log" \
+    DDEV_MIG_DEV_HOME="$WORK/devhome" \
+    PATH="$WORK/bin:$PATH" \
+    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null 2>&1) || true
+case "$OUTG" in
+    *"REFUSED: $DUMP_DIR/alpha.sql.gz is a symlink"*)
+        pass "planted dump operand refused loudly, before the resume probe (#264)"
+        ;;
+    *) fail "planted dump operand must be refused loudly (got: $OUTG) (#264)" ;;
+esac
+check "refused operand: the project is never started" \
+    sh -c "! grep -q 'ddev:start alpha' \"\$1\"" _ "$WORK/ddev.log"
+check "refused operand: export-db never opens the link" \
+    sh -c "! grep -q 'ddev:export-db alpha' \"\$1\"" _ "$WORK/ddev.log"
+check "refused operand: the victim behind the link keeps its content" \
+    sh -c "test \"\$(cat \"\$1\")\" = VICTIM-GATE-CONTENT" _ "$WORK/victim-gate.conf"
+check "refused operand: FAIL entry lands in the manifest" \
+    sh -c "grep -q '^FAIL|alpha|' \"\$1\"" _ "$DUMP_DIR/manifest.conf"
+check_fail "the stale OK line is replaced by the refusal (single entry)" \
+    sh -c "grep -q '^OK|alpha|' \"\$1\"" _ "$DUMP_DIR/manifest.conf"
+assert_eq "refused run: SKIP projects still processed after the refusal" \
+    "2" "$(grep -c '^SKIP|' "$DUMP_DIR/manifest.conf")"
+check "refused run: the loop CONTINUES past the refused project (gamma exports, #420 a A8)" \
+    sh -c "grep -q 'ddev:export-db gamma' \"\$1\"" _ "$WORK/ddev.log"
+check "refused run: the wave still finishes (poweroff ran, no abort)" \
+    sh -c "grep -q 'ddev:poweroff' \"\$1\"" _ "$WORK/ddev.log"
+check "the refused link stays in place — it is evidence for the operator (#420 a A9)" \
+    sh -c "test -L \"\$1\"" _ "$DUMP_DIR/alpha.sql.gz"
+# Operator path: remove the tampering link, re-run — the refused
+# project exports again and the manifest returns to single OK entries
+# (sections 4d+ see the pre-4c2 state).
+rm -f "${DUMP_DIR:?}/alpha.sql.gz"
+OUTG2=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev-run-g2.log" \
+    DDEV_MIG_DEV_HOME="$WORK/devhome" \
+    PATH="$WORK/bin:$PATH" \
+    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null 2>&1) || true
+check "after link removal the refused project exports again" \
+    sh -c "grep -q 'ddev:export-db alpha' \"\$1\"" _ "$WORK/ddev-run-g2.log"
+check "manifest back to one OK line for the project, FAIL gone" \
+    sh -c "grep -q '^OK|alpha|' \"\$1\" && ! grep -q '^FAIL|alpha|' \"\$1\"" _ "$DUMP_DIR/manifest.conf"
+
+# --- 4c2b. a FIFO at the dump operand is refused too (#420 a A6) ---------------------
+# [ -L ] alone admits a FIFO or device node — and ddev export-db's
+# open/write on a FIFO blocks indefinitely (verified from the ddev
+# source: open-blocks at ddev HEAD, write-blocks after the pipe buffer
+# at v1.25.3), hanging the dev-side export the root installer waits on.
+# The manifest path closed this class with find -type f (0.0.44c C2);
+# the operand gate now refuses every NOT-REGULAR entry the same way.
+if command -v mkfifo >/dev/null 2>&1; then
+    mv "$WORK/ddev.log" "$WORK/ddev-4c2b-pre.log"
+    rm -f "${DUMP_DIR:?}/alpha.sql.gz"
+    mkfifo "$DUMP_DIR/alpha.sql.gz"
+    OUTGF=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev.log" \
+        DDEV_MIG_DEV_HOME="$WORK/devhome" \
+        PATH="$WORK/bin:$PATH" \
+        sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null 2>&1) || true
+    case "$OUTGF" in
+        *"REFUSED: $DUMP_DIR/alpha.sql.gz is not a regular file"*)
+            pass "FIFO dump operand refused loudly as not-regular (#420 a A6)"
+            ;;
+        *) fail "FIFO dump operand must be refused as not-regular (got: $OUTGF) (#420 a A6)" ;;
+    esac
+    check "FIFO operand: export-db never opens it (no hang)" \
+        sh -c "test -f \"\$1\" && ! grep -q 'ddev:export-db alpha' \"\$1\"" _ "$WORK/ddev.log"
+    check "FIFO operand counts FAIL like the symlink refusal" \
+        sh -c "grep -q '^FAIL|alpha|' \"\$1\" && ! grep -q '^OK|alpha|' \"\$1\"" _ "$DUMP_DIR/manifest.conf"
+    # restore: remove the FIFO (rm never blocks on a fifo inode), alpha
+    # re-exports on the next section's runs (4c3 rm's the operand again
+    # anyway — state converges regardless).
+    rm -f "${DUMP_DIR:?}/alpha.sql.gz"
+else
+    echo "SKIP  4c2b FIFO operand refusal (mkfifo unavailable on this host)"
+fi
+
+# --- 4c3. a swap INSIDE the gate->export window fails the export, never OKs (#264) -----
+# The loop-top gate re-checks the operand, but the window until ddev
+# opens the file stays agent-writable: the fake ddev (DDEV_FAKE_SWAP)
+# writes the dump, then replaces the operand with a symlink — the
+# success probe must refuse the LINK ([ -s ] alone follows it; with an
+# OK line the resume would skip the project forever). The failure arm
+# unlinks the LINK only; the victim is never written through.
+rm -f "${DUMP_DIR:?}/alpha.sql.gz"
+printf 'VICTIM-SWAP-CONTENT\n' >"$WORK/victim-swap.conf"
+OUTGS=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev-run-gs.log" \
+    DDEV_MIG_DEV_HOME="$WORK/devhome" DDEV_FAKE_SWAP="alpha:$WORK/victim-swap.conf" \
+    PATH="$WORK/bin:$PATH" \
+    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null 2>&1) || true
+check "swapped operand: the export counts as FAILED, never OK" \
+    sh -c "grep -q '^FAIL|alpha|' \"\$1\" && ! grep -q '^OK|alpha|' \"\$1\"" _ "$DUMP_DIR/manifest.conf"
+check "swapped operand: the failure arm unlinks the planted link" \
+    sh -c "test ! -e \"\$1\" && test ! -L \"\$1\"" _ "$DUMP_DIR/alpha.sql.gz"
+# Seam-sanity leg, NOT gate evidence (#420 a A10): the fake ddev writes
+# the dump FIRST and swaps after — nothing in the stub ever writes
+# through the link, so this pin stays green under ANY mutation of the
+# [ ! -L ] recheck. It guards the stub contract (the rm -f arm never
+# follows the link) only; the gate's discriminators are the FAIL-never-
+# OK and link-unlinked legs above.
+check "swapped operand: stub sanity — the victim's content is untouched by the arm's rm -f" \
+    sh -c "test \"\$(cat \"\$1\")\" = VICTIM-SWAP-CONTENT" _ "$WORK/victim-swap.conf"
+case "$OUTGS" in
+    *"FAILED: ddev export-db — no dump for alpha"*)
+        pass "swapped operand: the FAILED line names the project (#264)"
+        ;;
+    *) fail "swapped operand: expected the FAILED export line (got: $OUTGS) (#264)" ;;
+esac
+# restore: alpha exports normally again (state identical to pre-4c2)
+OUTG3=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev-run-g3.log" \
+    DDEV_MIG_DEV_HOME="$WORK/devhome" \
+    PATH="$WORK/bin:$PATH" \
+    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null 2>&1) || true
+check "after the failed swap export the project exports cleanly" \
+    sh -c "grep -q 'ddev:export-db alpha' \"\$1\" && grep -q '^OK|alpha|' \"\$2\"" \
+    _ "$WORK/ddev-run-g3.log" "$DUMP_DIR/manifest.conf"
 
 # --- 4d. a linked manifest at export START is refused, never read (0.0.44b W2) -------
 # The authoritative copy seeds from the dump-dir manifest only when it is
@@ -943,6 +1091,47 @@ case "$_w5_out" in
         ;;
 esac
 rm -rf "${_w5dir:?}"
+
+# --- #264's import twin: a symlinked dump operand is refused, never read through ------
+# The finalized dump dir is agent-owned — a dump swapped for a symlink
+# in the export->import gap must fail BEFORE the first sudo hop
+# (import-db would pour an agent-chosen file's content into a project
+# database). id shim + _ddev_migrate_bin override keep the drive
+# hermetic (the run-export.sh override pattern); the gate fires before
+# any ddev call, so no ddev is needed on the host.
+_w5i="$(work_new)"
+mkdir -p "$_w5i/bin" "$_w5i/dump"
+printf '#!/bin/sh\necho 0\n' >"$_w5i/bin/id"
+chmod +x "$_w5i/bin/id"
+printf 'OK|alpha|/roots/alpha|alpha.sql.gz\n' >"$_w5i/dump/manifest.conf"
+printf 'VICTIM-IMPORT-CONTENT\n' >"$_w5i/victim.conf"
+ln -s "$_w5i/victim.conf" "$_w5i/dump/alpha.sql.gz"
+_w5i_out=$(PATH="$_w5i/bin:$PATH" sh -c \
+    '. "$1" && _ddev_migrate_bin() { echo /usr/bin/true; } && ddev_migrate_import "$2"' \
+    _ "$MIG" "$_w5i/dump" 2>&1) || true
+case "$_w5i_out" in
+    *"REFUSED — dump operand is a symlink"*)
+        pass "import: a symlinked dump operand is refused loudly (#264)"
+        ;;
+    *)
+        fail "import: a symlinked dump operand must be refused (got: $_w5i_out) (#264)"
+        ;;
+esac
+case "$_w5i_out" in
+    *"failed: alpha"*)
+        pass "import: the refused project lands in the failed list, rc degrades (#264)"
+        ;;
+    *)
+        fail "import: the refused project must land in the failed list (got: $_w5i_out) (#264)"
+        ;;
+esac
+# Seam-sanity leg, NOT gate evidence (#420 a A10): the drive's ddev is
+# /usr/bin/true — nothing ever opens the link's target, with or without
+# the gate. The drive's discriminators are the REFUSED and failed-list
+# legs above.
+check "import: stub sanity — the victim's content is untouched (#264)" \
+    sh -c "test \"\$(cat \"\$1\")\" = VICTIM-IMPORT-CONTENT" _ "$_w5i/victim.conf"
+rm -rf "${_w5i:?}"
 
 # static: the import loop builds HOME via getent and rides conditional
 # backend vars as single quoted arguments (0.0.43a F6/F12).

@@ -393,7 +393,7 @@ ddev_rootless_bindmounts() {
     return 0
 }
 
-# ddev_handover_project_root <project-dir> <oc-user> <group> [dev-user]
+# ddev_handover_project_root <project-dir> <oc-user> <group> [dev-user] [scan-root]
 # Manages the project's ROOT DIRECTORY (the inode only, never its
 # contents) for the TYPO3 bootstrap case and the root-file types.
 #
@@ -438,10 +438,23 @@ ddev_handover_project_root() {
     dhq_user="${2:-}"
     dhq_group="${3:-}"
     dhq_dev="${4:-}"
+    dhq_scan="${5:-}"
     [ -n "$dhq_proj" ] && [ -d "$dhq_proj" ] || return 0
     # [ -L ] gate (0.0.39g S2 class): chown/chmod/stat below dereference a
     # symlink operand — a linked project root is never handed over/back.
     [ -L "$dhq_proj" ] && return 0
+    # Exec-time component re-walk (#266, #420 a A2): a parent swapped
+    # since the iteration-head walk resolves this operand into an
+    # out-of-tree inode and the single-inode chown/chmod below would act
+    # on it — the leaf gate above cannot see that. Skip loud (the .ddev
+    # pair discipline; find never printed through a link between the
+    # scan root and this operand, so a symlinked component on that chain
+    # can only be a swap).
+    if [ -n "$dhq_scan" ] && ! _ddev_components_sane "$dhq_scan" "$dhq_proj"; then
+        printf '%s\n' "  warn: skipping project-root handover for $dhq_proj — a path""\
+ component (parent or operand) is a symlink (swapped mid-scan?)" >&2
+        return 0
+    fi
     [ -f "$dhq_proj/.ddev/config.yaml" ] || return 0
     dhq_type=$(sed -n 's/^type:[[:space:]]*//p' "$dhq_proj/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\r\"'")
     dhq_docroot=$(sed -n 's/^docroot:[[:space:]]*//p' "$dhq_proj/.ddev/config.yaml" 2>/dev/null |
@@ -715,27 +728,35 @@ ddev_handover_root() {
             ddev_devowned_flag "$dhr_p"
         fi
         if ddev_devowned_flagged "$dhr_p"; then
-            ddev_handover_project_back "$dhr_p" "$dhr_user" "$dhr_group" "$dhr_dev"
+            ddev_handover_project_back "$dhr_p" "$dhr_user" "$dhr_group" "$dhr_dev" "$dhr_root"
         else
-            ddev_handover_project "$dhr_p" "$dhr_user" "$dhr_group"
-            ddev_handover_project_root "$dhr_p" "$dhr_user" "$dhr_group" "$dhr_dev"
+            # The scan root rides along as the optional last argument
+            # (#266): the settings pairs AND the single-inode root ops
+            # re-run the component walk per operand against it — see
+            # their gates (#420 a A2 closed the root ops' gap).
+            ddev_handover_project "$dhr_p" "$dhr_user" "$dhr_group" "$dhr_root"
+            ddev_handover_project_root "$dhr_p" "$dhr_user" "$dhr_group" "$dhr_dev" "$dhr_root"
         fi
     done
     return 0
 }
 
-# ddev_handover_project_back <project-dir> <oc-user> <group> <dev-user>
+# ddev_handover_project_back <project-dir> <oc-user> <group> <dev-user> [scan-root]
 # Dev-owned counterpart of the handovers: for a FLAGGED project (ddev
 # settings management off — ddev never chmods outside .ddev/), the
 # settings dirs and the project root belong to the DEVELOPER
 # permanently. Repairs trees that went through the handover model
 # before the flag existed (migration) and keeps fresh clones dev-owned
 # (then these are structural no-ops: the dirs never left the developer).
+# The optional <scan-root> (ddev_handover_root passes its own root)
+# arms the per-pair exec-time component re-walk (#266) — without it the
+# leaf gate + resolved containment below remain the caller's protection.
 ddev_handover_project_back() {
     dhb_proj="${1:-}"
     dhb_user="${2:-}"
     dhb_group="${3:-}"
     dhb_dev="${4:-}"
+    dhb_scan="${5:-}"
     [ -n "$dhb_proj" ] && [ -d "$dhb_proj/.ddev" ] || return 0
     [ -f "$dhb_proj/.ddev/config.yaml" ] || return 0
     [ -n "$dhb_dev" ] || return 0
@@ -766,6 +787,27 @@ ddev_handover_project_back() {
         if _ddev_tree_conforms "$dhb_proj/$dhb_d" "$dhb_dev" "$dhb_group"; then
             :
         else
+            # Exec-time component re-walk (#266, the #215 unswept
+            # sibling): the .ddev iteration's walk ran BEFORE the .ddev
+            # pair — this operand's path adds components (config,
+            # system, ...) no find ever classified, and a parent swapped
+            # since resolves through every gate above: the leaf [ -L ]
+            # sees a real dir inside the target, and the resolved
+            # containment canonicalizes BOTH sides through the swapped
+            # parent (the victim stays "contained"). Re-walk against the
+            # scan root immediately before the pair. A hit skips loud —
+            # deliberately conservative: between the scan root and .ddev
+            # a symlinked component can only be a swap (find never
+            # printed through a link), but BELOW .ddev a STATIC, legit
+            # symlink (docroot relocated inside the project) also trips
+            # the walk — never acting through a link is the safe
+            # direction either way, and the warn names the suspicion,
+            # not a verdict.
+            if [ -n "$dhb_scan" ] && ! _ddev_components_sane "$dhb_scan" "$dhb_proj/$dhb_d"; then
+                printf '%s\n' "  warn: skipping settings dir '$dhb_d' — a path""\
+ component (parent or operand) is a symlink (static plant or swapped mid-scan?)" >&2
+                continue
+            fi
             # ORDER is direction-dependent (0.0.45e W1): agent->dev
             # chowns FIRST — after chown -R no entry is agent-owned, so
             # the chmod pass races no one on trees the agent held
@@ -788,7 +830,14 @@ ddev_handover_project_back() {
     # Root inode: hand it back only when a previous handover model run
     # gave it to the kit user (never touches developer-owned roots). The
     # [ -L ] gate: stat/chown follow a symlink operand (0.0.39g S2 class).
-    if [ ! -L "$dhb_proj" ] && [ "$(stat -c %U "$dhb_proj" 2>/dev/null)" = "$dhb_user" ]; then
+    # Exec-time component re-walk (#266, #420 a A2): a swapped PARENT
+    # resolves the leaf gate AND the stat prefilter below through to an
+    # out-of-tree inode — re-walk before the single-inode ops like the
+    # settings pairs above; skip loud (never act through a swapped chain).
+    if [ -n "$dhb_scan" ] && ! _ddev_components_sane "$dhb_scan" "$dhb_proj"; then
+        printf '%s\n' "  warn: skipping root-inode handback for $dhb_proj — a path""\
+ component (parent or operand) is a symlink (swapped mid-scan?)" >&2
+    elif [ ! -L "$dhb_proj" ] && [ "$(stat -c %U "$dhb_proj" 2>/dev/null)" = "$dhb_user" ]; then
         # Single-inode sibling of the recursive pair above (#211 b W9):
         # best-effort stays, the line stops claiming success.
         _dhb_ok=true
@@ -804,17 +853,20 @@ ddev_handover_project_back() {
     return 0
 }
 
-# ddev_handover_project <project-dir> <user> <group>
+# ddev_handover_project <project-dir> <user> <group> [scan-root]
 # Hands the settings directories ddev chmods for the detected app type
 # over to <user>:<group> with g+w. Projects without .ddev/config.yaml or
 # with an unknown/unsupported type are skipped (wordpress manages a file
 # at the project root — see docs/concepts/ddev-integration.md). Only for
 # UNFLAGGED projects — flagged (dev-owned) ones use
-# ddev_handover_project_back instead.
+# ddev_handover_project_back instead. The optional <scan-root>
+# (ddev_handover_root passes its own root) arms the per-pair exec-time
+# component re-walk (#266) — see the gate at the pair.
 ddev_handover_project() {
     dhp_proj="${1:-}"
     dhp_user="${2:-}"
     dhp_group="${3:-}"
+    dhp_scan="${4:-}"
     [ -n "$dhp_proj" ] && [ -d "$dhp_proj/.ddev" ] || return 0
     [ -f "$dhp_proj/.ddev/config.yaml" ] || return 0
     for dhp_d in $(ddev_type_settings_dirs "$dhp_proj"); do
@@ -847,6 +899,20 @@ ddev_handover_project() {
         if _ddev_tree_conforms "$dhp_proj/$dhp_d" "$dhp_user" "$dhp_group"; then
             :
         else
+            # Exec-time component re-walk (#266 — the forward twin of
+            # ddev_handover_project_back's gate, same rationale): the
+            # .ddev iteration's walk ran before the .ddev pair; this
+            # operand's un-classified components (config, system, ...)
+            # and any parent swapped since resolve through the leaf gate
+            # and the resolved containment above. Re-walk against the
+            # scan root immediately before the pair; skip loud on a hit
+            # (static legit symlink or mid-scan swap — conservative
+            # either way, never act through a link).
+            if [ -n "$dhp_scan" ] && ! _ddev_components_sane "$dhp_scan" "$dhp_proj/$dhp_d"; then
+                printf '%s\n' "  warn: skipping settings dir '$dhp_d' — a path""\
+ component (parent or operand) is a symlink (static plant or swapped mid-scan?)" >&2
+                continue
+            fi
             # ORDER (0.0.45e W1, same direction argument as
             # ddev_handover_root's pair): dev->agent chmods FIRST while
             # the tree is still dev-owned, chown -R hands over LAST —

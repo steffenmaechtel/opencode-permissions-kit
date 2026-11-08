@@ -510,20 +510,22 @@ if printf '%s' "$LOOP_OUT" | grep -qF "find $WORK/fakeproj" &&
     ! printf '%s' "$LOOP_OUT" | grep -qF ' -xdev ' &&
     printf '%s' "$LOOP_OUT" | grep -qF -- '-uid 60000' &&
     printf '%s' "$LOOP_OUT" | grep -qF -- '-gid 60002' &&
-    printf '%s' "$LOOP_OUT" | grep -qF -- '-exec chown devuser:devgroup {} +' &&
+    printf '%s' "$LOOP_OUT" | grep -qF -- '-print0' &&
+    printf '%s' "$LOOP_OUT" | grep -qF 'xargs -0' &&
+    printf '%s' "$LOOP_OUT" | grep -qF 'un-revert-chown' &&
+    printf '%s' "$LOOP_OUT" | grep -qF 'devuser:devgroup' &&
     printf '%s' "$LOOP_OUT" | grep -qF -- '! -type l'; then
     pass "ownership revert: uid/gid-matched chown to the developer per root (issue #74)"
 else
     fail "ownership revert loop (out=$(printf '%s' "$LOOP_OUT" | head -5))"
 fi
-# ! -type l (0.0.42e S1): chown follows a symlink operand — without the
-# exclusion, an opencode-planted link inside a project makes the root-run
-# revert chown an arbitrary file OUTSIDE the project to the developer.
-if printf '%s' "$LOOP_OUT" | grep -qF -- '! -type l'; then
-    pass "ownership revert: symlinks excluded from the chown find (0.0.42e S1)"
-else
-    fail "ownership revert: chown find must exclude symlinks (0.0.42e S1)"
-fi
+# ! -type l (0.0.42e S1) is the SCAN-time half: it keeps statically
+# planted links out of the operand stream — chown follows a symlink
+# operand, so an agent-planted link in the project must never make the
+# root-run revert chown an arbitrary file OUTSIDE the project. The
+# exec-time half (per-operand leaf recheck + component walk inside the
+# xargs worker, #267 — `! -type l` classifies at scan time only) is
+# pinned functionally in 4b2 below.
 # -xdev would stop at mount boundaries — project roots are regularly
 # separate mounts (bind mounts, NFS): the revert must follow, like the
 # setfacl -R calls in the same loop (checked above via the -xdev grep).
@@ -532,6 +534,118 @@ if printf '%s' "$LOOP_OUT" | grep -qF "find \"/etc\""; then
 else
     pass "ownership revert: system paths are never chowned (screened)"
 fi
+
+# --- 4b2. find-chown worker: exec-time operand recheck (#267) ----------------------
+# Functional drive of _un_revert_chown: pass-through sudo stub, PATH-
+# stubbed find (streams the NUL operands the scan "found" — all
+# classified regular at scan time by the real find's ! -type l, the
+# drive's premise) and a logging chown stub. A leaf swapped for a link
+# since the scan and an operand whose PARENT is a link NOW must never
+# reach chown — and the pass must FAIL on them: entries left behind
+# degrade the closing log to PARTIALLY via un_rc_q (the #211 a F14
+# honesty class), never a green "ownership reverted".
+UNR="$(work_new)"
+UNRS="$(work_new)"
+mkdir -p "$UNR/root/sub" "$UNR/victim" "$UNRS/bin"
+printf 'victim-content\n' >"$UNR/victim/target.conf"
+touch "$UNR/root/regular.conf"
+ln -s "$UNR/victim/target.conf" "$UNR/root/leaf-link"
+ln -s "$UNR/victim" "$UNR/root/sub/link-parent"
+cat >"$UNRS/bin/find" <<EOF
+#!/bin/sh
+# fake find: ignores the expression, streams the three "scanned" NUL
+# operands into the helper's temp stream.
+printf '%s\\0%s\\0%s\\0' "$UNR/root/regular.conf" "$UNR/root/leaf-link" \\
+    "$UNR/root/sub/link-parent/inside.conf"
+exit 0
+EOF
+cat >"$UNRS/bin/chown" <<'EOF'
+#!/bin/sh
+echo "chown $*" >>"$CHOWN_LOG"
+exit 0
+EOF
+chmod +x "$UNRS/bin/find" "$UNRS/bin/chown"
+: >"$WORK/unr-chown.log"
+UNR_RC=0
+UNR_OUT=$(PATH="$UNRS/bin:$PATH" CHOWN_LOG="$WORK/unr-chown.log" sh -c '
+    . "$1"
+    sudo() { "$@"; }
+    UN_OC_UID=60000
+    UN_OC_GID=60002
+    DEFAULT_USER=devuser
+    UN_DEV_GROUP=devgroup
+    _un_revert_chown "$2"
+' _ "$LIB" "$UNR/root" 2>&1) || UNR_RC=$?
+assert_eq "worker: only the regular operand reaches chown (#267)" \
+    "chown devuser:devgroup $UNR/root/regular.conf" "$(cat "$WORK/unr-chown.log")"
+check "worker: a swapped leaf link never reaches chown (#267)" \
+    sh -c "! grep -q leaf-link \"\$1\"" _ "$WORK/unr-chown.log"
+check "worker: an operand behind a symlinked parent never reaches chown (#267)" \
+    sh -c "! grep -q link-parent \"\$1\"" _ "$WORK/unr-chown.log"
+check "worker: skipped swaps fail the pass — PARTIALLY via un_rc_q, never green (#267)" \
+    sh -c "[ \"\$1\" -ne 0 ]" _ "$UNR_RC"
+
+# mktemp failure is loud (the fail-loud pin for the || return 1 arm,
+# #420 a A3): the DISTINCT message (not just rc 1 — a silent arm is
+# indistinguishable from the find failure below) + rc 1 + find never
+# runs. The message is the discriminator: deleting the loud arm leaves
+# an accidental rc 1 (the empty redirect fails the find condition) but
+# no message — this pin is what reddens.
+UNRM="$(work_new)"
+mkdir -p "$UNRM/bin"
+cat >"$UNRM/bin/mktemp" <<'EOF'
+#!/bin/sh
+exit 1
+EOF
+chmod +x "$UNRM/bin/mktemp"
+: >"$WORK/unr-find.log"
+UNRM_RC=0
+UNRM_OUT=$(PATH="$UNRM/bin:$PATH" sh -c '
+    . "$1"
+    _unrm_log="$2"
+    sudo() { echo "sudo $*" >>"$_unrm_log"; }
+    UN_OC_UID=60000
+    UN_OC_GID=60002
+    DEFAULT_USER=devuser
+    UN_DEV_GROUP=devgroup
+    _un_revert_chown "$3"
+' _ "$LIB" "$WORK/unr-find.log" "$UNR/root" 2>&1) || UNRM_RC=$?
+case "$UNRM_OUT" in
+    *"cannot stage the revert operand stream (mktemp failed)"*)
+        pass "worker: mktemp failure announces itself with its own cause (#267, #420 a A3)"
+        ;;
+    *) fail "worker: mktemp failure must announce its cause (got: $UNRM_OUT) (#267, #420 a A3)" ;;
+esac
+assert_eq "worker: mktemp failure refuses loud (rc 1, #267)" "1" "$UNRM_RC"
+check "worker: mktemp failure runs no find at all (#267)" \
+    sh -c "! grep -q find \"\$1\"" _ "$WORK/unr-find.log"
+# find's own death fails the pass (0.0.43b W4 shape — a wholesale find
+# death never counts as a green revert over a half-walked tree): rc 1
+# and xargs never runs. Logging pass-through sudo so the absence of the
+# xargs line is OBSERVED, not assumed.
+UNRF="$(work_new)"
+mkdir -p "$UNRF/bin"
+cat >"$UNRF/bin/find" <<'EOF'
+#!/bin/sh
+exit 1
+EOF
+chmod +x "$UNRF/bin/find"
+: >"$WORK/unr-find2.log"
+UNRF_RC=0
+UNRF_OUT=$(PATH="$UNRF/bin:$PATH" sh -c '
+    . "$1"
+    _unrf_log="$2"
+    sudo() { echo "sudo $*" >>"$_unrf_log"; "$@"; }
+    UN_OC_UID=60000
+    UN_OC_GID=60002
+    DEFAULT_USER=devuser
+    UN_DEV_GROUP=devgroup
+    _un_revert_chown "$3"
+' _ "$LIB" "$WORK/unr-find2.log" "$UNR/root" 2>&1) || UNRF_RC=$?
+assert_eq "worker: a dead find fails the pass (rc 1, no green revert — 0.0.43b W4 shape)" "1" "$UNRF_RC"
+check "worker: a dead find never reaches xargs (#267)" \
+    sh -c "! grep -q xargs \"\$1\"" _ "$WORK/unr-find2.log"
+rm -rf "${UNR:?}" "${UNRS:?}" "${UNRM:?}" "${UNRF:?}"
 
 # --- issue #245: a symlinked conf root is skipped, never operated on ----
 # Measured (issue #245 comment, ext4 + overlayfs): a projects.conf entry

@@ -605,6 +605,103 @@ un_user_remove() {
     fi
 }
 
+# _un_revert_chown <root>: the revert loop's chown pass with the
+# exec-time operand recheck (#267 — the _fsb_pass per-entry shape,
+# fs-baseline.sh #211 a F1). The old one-shot
+#   find <root> ! -type l ( -uid .. -o -gid .. ) -exec chown .. {} +
+# classified every operand at SCAN time and never re-verified it at exec
+# time — and the reverted trees are agent-group-writable (the baseline
+# pattern), so a scanned regular file swapped for a symlink mid-walk
+# made the root-run chown follow it and retarget an arbitrary
+# out-of-tree path (ownership corruption). The userdel-before-loop
+# mitigation fails exactly when userdel refuses on a live straggler
+# process — WARN-and-continue — so the adversary can be live in the
+# window. Shape: find streams NUL-separated operands into a temp file;
+# an xargs worker then re-tests each LEAF with [ -L ] and re-walks every
+# component between <root> and the operand immediately before the chown
+# (chain-walker, #211 a F1). Anything that is a symlink NOW is a
+# mid-walk swap (find ! -type l never emitted links) — skipped AND
+# failed: entries left behind must degrade the closing log (the #211
+# a F14 honesty class; un_rc_q turns rc nonzero into PARTIALLY + WARN).
+# Swap-skips and genuine chown errors share the "find-chown failed"
+# label deliberately: both mean "entries stayed behind — inspect the
+# tree", and a per-cause channel through xargs is not worth the
+# machinery (the fs-baseline twin logs the same way). Residual windows
+# (#420 a A4/A5, recorded here): the per-operand recheck->chown gap is
+# microsecond-scale and undetectable (same accepted shape as the
+# handover pair's gate->op residual and _fsb_pass's); and the walk
+# starts BELOW the scan root — the ROOT itself swapped between find and
+# the worker still redirects the batch (the pre-existing _fsb_pass
+# shape, :364 there; closing it is a two-worker class sweep, work order
+# proposed in this PR's review).
+_un_revert_chown() { # <root>; UN_OC_UID/UN_OC_GID select, DEFAULT_USER/
+    #                  UN_DEV_GROUP are the chown target
+    _unr_root="$1"
+    # Fail LOUD with a distinct message (#420 a A3): a silent || return 1
+    # here is indistinguishable from the later find failure — the message
+    # is what the pin (and the operator) discriminates on.
+    _unr_nul="$(mktemp "${TMPDIR:-/tmp}/opk-un-revert.XXXXXXXX")" || {
+        echo "  WARN: cannot stage the revert operand stream (mktemp failed) — chown pass refused" >&2
+        return 1
+    }
+    if command -v _tmp_track >/dev/null 2>&1; then
+        _tmp_track "$_unr_nul"
+    fi
+    # find's rc must survive (0.0.43b W4 shape): a wholesale find death
+    # never counts as a green revert over a half-walked tree.
+    # shellcheck disable=SC2024  # deliberate: the redirect is the
+    # CALLER's (the dev-owned mktemp temp — dev can write it); sudo only
+    # elevates find, whose stdout flows through the inherited fd — the
+    # same capture _fsb_pass does via its _fsb_sudo variable.
+    if ! sudo find "$_unr_root" ! -type l \( -uid "$UN_OC_UID" -o -gid "$UN_OC_GID" \) \
+        -print0 >"$_unr_nul"; then
+        rm -f "$_unr_nul"
+        return 1
+    fi
+    _unr_rc=0
+    sudo xargs -0 -r sh -c '
+        # $1 = scan root (the component walk bound), $2 = the chown
+        # target, then the batch of NUL-separated operands xargs
+        # appended. _fail accumulates across the WHOLE batch (0.0.44a
+        # V9 shape): a for-loop status alone is the LAST command.
+        _root=$1; shift
+        _own=$1; shift
+        _fail=0
+        for _p in "$@"; do
+            if [ -L "$_p" ]; then
+                _fail=1
+                continue
+            fi
+            # Parent-component recheck (#211 a F1): skip operands whose
+            # path crosses a symlinked DIRECTORY below the scan root —
+            # the leaf gate alone misses a parent swapped in the
+            # scan->act window. String ops only: spaced paths survive.
+            case "$_p" in
+            "$_root"/*)
+                _pre="$_root"
+                _rest="${_p#"$_root"/}"
+                while [ -n "$_rest" ]; do
+                    case "$_rest" in
+                        */*) _pre="$_pre/${_rest%%/*}"
+                             _rest="${_rest#*/}" ;;
+                        *)   _pre="$_p"; _rest="" ;;
+                    esac
+                    if [ -L "$_pre" ]; then
+                        _fail=1
+                        continue 2
+                    fi
+                done
+                ;;
+            esac
+            chown "$_own" "$_p" || _fail=1
+        done
+        [ "$_fail" -eq 0 ]
+      ' un-revert-chown "$_unr_root" "$DEFAULT_USER:$UN_DEV_GROUP" <"$_unr_nul" ||
+        _unr_rc=$?
+    rm -f "$_unr_nul"
+    [ "$_unr_rc" -eq 0 ]
+}
+
 # Issue #74: the kit hands .ddev/ trees, app-type settings dirs and (typo3
 # bootstrap) project roots over to the opencode user, and everything the
 # agent/ddev created while running as opencode is opencode-owned too. Left
@@ -743,11 +840,22 @@ un_projects_revert() {
             # No -xdev on purpose: project roots are often separate mounts
             # (the e2e bind-mounts them; NFS/overlay in the wild) — the
             # revert must follow, exactly like the setfacl -R below.
-            # ! -type l (0.0.42e S1): chown on a symlink operand FOLLOWS
-            # it — an agent-planted link in the project must not make the
-            # root-run revert chown an arbitrary target outside it.
-            un_rc_q "find-chown" sudo find "$root" ! -type l \( -uid "$UN_OC_UID" -o -gid "$UN_OC_GID" \) \
-                -exec chown "$DEFAULT_USER:$UN_DEV_GROUP" {} +
+            # ! -type l (0.0.42e S1) is the SCAN-time half: it keeps
+            # statically planted links out of the operand stream; the
+            # exec-time half — per-operand leaf recheck + component walk
+            # immediately before each chown — lives in _un_revert_chown
+            # (#267, the _fsb_pass shape; leaf and mid-walk parent swaps
+            # never retarget the chown — a swap of the ROOT itself
+            # between scan and worker remains, the recorded _fsb_pass
+            # residual, see the helper's header).
+            # DRY names the real command shape, not the helper (the
+            # un_rc_q [DRY] echo would print "_un_revert_chown <root>").
+            if [ "$DRY_RUN" = true ]; then
+                echo "  [DRY] sudo find $root ! -type l \( -uid $UN_OC_UID -o -gid $UN_OC_GID \)""\
+ -print0 | exec-time recheck + chown $DEFAULT_USER:$UN_DEV_GROUP"
+            else
+                un_rc_q "find-chown" _un_revert_chown "$root"
+            fi
         else
             _un_partial="${_un_partial:+$_un_partial, }opencode user unknown (chown skipped)"
             echo "    opencode user unknown — skipped (chown manually if files are locked)"

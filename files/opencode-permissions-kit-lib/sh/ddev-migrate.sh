@@ -428,6 +428,22 @@ ddev_migrate_export() {
         cat "$DM_STAGE/manifest.auth" >"$_dma_pub"
         mv -f "$_dma_pub" "$DD_MIG_DUMP_DIR/manifest.conf"
     }
+    # _dm_manifest_drop <project>: remove this project's OK/FAIL/SKIP
+    # lines from the authoritative copy and publish the rewrite (same
+    # build-new + rename discipline as _dm_manifest_add). Both entry
+    # REPLACEMENT sites use it — the retry path below and the #264 dump
+    # refusal — so a project never carries two lines: a stale FAIL would
+    # re-arm the installer's abort question per re-run, and a stale OK
+    # would keep counting DD_MIG_OK over a project that no longer has a
+    # dump.
+    _dm_manifest_drop() {
+        grep -v -F -e "OK|$1|" -e "FAIL|$1|" -e "SKIP|$1|" \
+            "$DM_STAGE/manifest.auth" >"$DM_STAGE/manifest.next" || true
+        mv -f "$DM_STAGE/manifest.next" "$DM_STAGE/manifest.auth"
+        _dma_pub="$DM_STAGE/manifest.$$"
+        cat "$DM_STAGE/manifest.auth" >"$_dma_pub"
+        mv -f "$_dma_pub" "$DD_MIG_DUMP_DIR/manifest.conf"
+    }
 
     # NOTE on loop hygiene: this loop's stdin IS the project list (the
     # printf pipe), and ddev reads stdin (prompt/TUI probing) — without
@@ -437,6 +453,37 @@ ddev_migrate_export() {
     # dump per export invocation, resume picked up the next each time).
     printf '%s\n' "$dm_list" | while IFS='|' read -r dm_n dm_ar; do
         echo "  exporting $dm_n ($dm_ar) ..."
+        # Dump-operand gates (#264 + #420 a A6): the dump dir is
+        # agent-group-writable for the whole minutes-long loop (3770
+        # above), and ddev export-db opens --file for WRITING as the dev
+        # user — a planted $dm_n.sql.gz link would be truncated THROUGH,
+        # clobbering an arbitrary dev-writable path with dump content.
+        # The resume probe below cannot catch it: its [ -s ] FOLLOWS the
+        # link, so a non-empty target plus an old OK line would
+        # resume-mark the project off the plant (and the post-export
+        # check comes too late — the write already happened). A6 rounds
+        # the gate to NOT-REGULAR (not just links): a FIFO or device
+        # node passes [ -L ] and blocks export-db's open/write
+        # indefinitely — the dev-side hang this file already closed on
+        # the manifest path (find -type f, 0.0.44c C2). REFUSED, never
+        # unlinked by the kit: the entry is evidence of tampering, the
+        # operator removes it and re-runs. Drop-then-FAIL keeps the
+        # manifest single-entry. Per-project continue, not an abort: the
+        # loop body is a piped subshell (return cannot exit the
+        # function) and the other projects' exports are independent of
+        # this operand.
+        dm_refuse=""
+        [ -L "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" ] && dm_refuse="a symlink"
+        if [ -z "$dm_refuse" ] && [ -e "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" ] &&
+            [ ! -f "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" ]; then
+            dm_refuse="not a regular file"
+        fi
+        if [ -n "$dm_refuse" ]; then
+            echo "    REFUSED: $DD_MIG_DUMP_DIR/$dm_n.sql.gz is $dm_refuse — tampering? Remove it and re-run" >&2
+            _dm_manifest_drop "$dm_n"
+            _dm_manifest_add "FAIL|$dm_n|$dm_ar|"
+            continue
+        fi
         # Resume: intact dump + OK entry in THIS directory — skip the
         # start/export/stop cycle and keep the existing dump. Reads the
         # AUTHORITATIVE stage copy (0.0.44b W2), never the dump-dir file.
@@ -452,13 +499,7 @@ ddev_migrate_export() {
         # counts FAIL entries and would re-ask the abort question).
         # Same authoritative-copy discipline (0.0.44b W2) and fixed
         # strings (V23): rewrite auth, publish via rename.
-        grep -v -F -e "OK|$dm_n|" -e "FAIL|$dm_n|" -e "SKIP|$dm_n|" \
-            "$DM_STAGE/manifest.auth" >"$DM_STAGE/manifest.next" || true
-        mv -f "$DM_STAGE/manifest.next" "$DM_STAGE/manifest.auth"
-        # publish the rewrite (same build-new + rename as _dm_manifest_add)
-        _dma_pub="$DM_STAGE/manifest.$$"
-        cat "$DM_STAGE/manifest.auth" >"$_dma_pub"
-        mv -f "$_dma_pub" "$DD_MIG_DUMP_DIR/manifest.conf"
+        _dm_manifest_drop "$dm_n"
         # Already handed over? dev-side ddev cannot start it anymore.
         if [ -d "$dm_ar/.ddev" ] && [ "$(stat -c %U "$dm_ar/.ddev" 2>/dev/null)" = "$dm_oc" ]; then
             echo "    SKIP: .ddev already owned by '$dm_oc' (handover done) — dev-side export"
@@ -482,8 +523,16 @@ ddev_migrate_export() {
         # itself is agent-writable — a planted .export-<name>.err link
         # there would be truncated THROUGH by this very redirect.
         dm_err="$DM_STAGE/export-$dm_n.err"
+        # [ ! -L ] (#264): the loop-top gate re-checked the operand, but
+        # the gate->export window is agent-writable — a link planted
+        # there makes export-db write THROUGH it above, and the old
+        # success probe ([ -s ] alone) FOLLOWS the link: with an OK line
+        # added, the resume would skip the project off the plant forever.
+        # The rm -f in the failure arms below unlinks the LINK, never
+        # its target.
         if _ddev_migrate_run_as "$dm_dev" "$dm_bin" export-db "$dm_n" \
             --file="$DD_MIG_DUMP_DIR/$dm_n.sql.gz" </dev/null >"$dm_err" 2>&1 &&
+            [ ! -L "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" ] &&
             [ -s "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" ]; then
             echo "    dump: $DD_MIG_DUMP_DIR/$dm_n.sql.gz"
             _dm_manifest_add "OK|$dm_n|$dm_ar|$dm_n.sql.gz"
@@ -672,6 +721,22 @@ ddev_migrate_import() {
     dm_failed=""
     while IFS='|' read -r dm_st dm_n dm_ar dm_f; do
         [ "$dm_st" = "OK" ] && [ -n "$dm_n" ] && [ -n "$dm_ar" ] && [ -n "$dm_f" ] || continue
+        # Operand gate (#264's import twin): the finalized dump dir is
+        # agent-owned (750 since finalize, no sticky) — a dump swapped
+        # for a symlink in the export->import gap must never be imported
+        # THROUGH: [ -f ] follows links, and import-db would read an
+        # agent-chosen OUT-OF-DIR file into a project database. Honest
+        # scope (#420 a A11): this is a tamper-refusal, not a
+        # content-integrity boundary — the agent owns the dir outright
+        # and can rewrite any REGULAR dump's content directly; the gate
+        # removes the out-of-dir redirection, nothing more. Refuse
+        # loudly and count the project failed; the operator removes the
+        # link and re-imports.
+        if [ -L "$dm_dir/$dm_f" ]; then
+            echo "  $dm_n: REFUSED — dump operand is a symlink ($dm_dir/$dm_f) — tampering? Remove it and re-run"
+            dm_failed="$dm_failed $dm_n"
+            continue
+        fi
         [ -f "$dm_dir/$dm_f" ] ||
             {
                 echo "  $dm_n: dump missing ($dm_dir/$dm_f)"
