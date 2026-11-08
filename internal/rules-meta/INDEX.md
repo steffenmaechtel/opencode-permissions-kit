@@ -147,7 +147,7 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0126](0/1/2/RM-0126.md) | Curation: a fast-tier | active | approved | 1m | 2026-11-28 |
+| [RM-0126](0/1/2/RM-0126.md) | Curation: the MAIN | active | approved | 1m | 2026-11-28 |
 | [RM-0127](0/1/2/RM-0127.md) | Verification: every curated | active | approved | 1m | 2026-11-28 |
 
 ### Reviewer freshness

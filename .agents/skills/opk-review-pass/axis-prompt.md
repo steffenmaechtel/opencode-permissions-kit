@@ -6,7 +6,7 @@ are fresh contexts and read nothing by default except what the prompt
 names. Keep the output-contract block verbatim.
 
 The same contract block (with the role's status-line shape) belongs in
-EVERY file-producing subagent prompt — curator and verifier prompts
+EVERY file-producing subagent prompt — verifier prompts
 carry it too (the subagent output contract; roles and allowed
 responses: agent/review-concept.md, "Parallel reviewer agents").
 
@@ -66,7 +66,8 @@ agent/review-concept.md, "Parallel reviewer agents").
 ## Output contract (verbatim requirements)
 
 Report findings ONLY — no fixes, no rewrites. Your checkpoint file is
-the deliverable; the curator and verifiers read it, never your final
+the deliverable; the main session and the verifiers read it, never
+your final
 message. Your reported findings must:
 
 - Carry stable finding IDs: `<LETTER><NUMBER>` in your axis letter
@@ -91,7 +92,8 @@ message. Your reported findings must:
   say what you could not verify rather than flagging it as definite.
 
 Do not reason from sandbox assumptions ("this is only a test path, not
-a finding") — the curator and verifiers verify and dispose; report what
+a finding") — the main session and the verifiers verify and dispose;
+report what
 the code says (the skill-bias lesson:
 [review-calibration.md](../../../internal/records/review-calibration.md),
 "Skill-bias origin").
