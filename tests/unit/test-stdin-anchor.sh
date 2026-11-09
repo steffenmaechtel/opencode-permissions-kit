@@ -208,12 +208,15 @@ assert_eq "fallback arm: /proc-less stdin shape still pins from a clean cwd (#43
     "SET" "$(_fall "$WORK/clean" "$_fbk")"
 assert_eq "fallback residual: the /proc-less probe stays defeatable by the interpreter-named cwd file (accepted, #433)" \
     "UNSET" "$(_fall "$WORK/cwd" "$_fbk")"
-# The A2 noise pin (#437 a A2): the reordered redirections (2>/dev/null
-# BEFORE the < read) must silence the open error on /proc-less hosts —
-# the pre-fix spelling leaked one "cannot open" line per anchor.
+# The A2 noise pin (#437 a A2, hardened b D1): the reordered
+# redirections (2>/dev/null BEFORE the < read) must silence the open
+# error on /proc-less hosts. The needle is the swapped PATH fragment —
+# both dash ("cannot open /proc/.../cmdline-absent") and bash-as-sh
+# (".../cmdline-absent: No such file or directory") print it, so the
+# pin discriminates the old spelling under either shell.
 _fbn="$(cd "$WORK/clean" && PATH="$_FBBIN" "$_SH_BIN" -c 'eval "$1" >/dev/null' sh "$_fbk" 2>&1)"
 case "$_fbn" in
-    *"cannot open"*)
+    *cmdline-absent*)
         fail "fallback arm stays silent on /proc-less hosts (#437 a A2)"
         ;;
     *)

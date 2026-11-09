@@ -271,6 +271,11 @@ ensure_local_file() {
     mv "$_elf_tmp" "$FILES_ROOT/$f"
 }
 
+# The readlink fallback (#437 a B1) keeps a degraded readlink from
+# resolving the dir to the invoking cwd; a $0 whose target path is
+# broken (dangling symlink) fails LOUD via the cd under set -e —
+# deliberate (#437 b D2): the old spelling degraded silently to cwd
+# trust, the exact hole the anchor exists to close.
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")")" && pwd)"
 # Streamed stdin runs (curl ... | sudo bash, issue #405): $0 is the
 # interpreter, not this script — readlink resolves it against the

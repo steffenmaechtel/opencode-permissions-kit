@@ -211,6 +211,11 @@ fetch_kit() {
     _FK_DIR="$dir"
 }
 
+# The readlink fallback (#437 a B1) keeps a degraded readlink from
+# resolving the dir to the invoking cwd; a $0 whose target path is
+# broken (dangling symlink) fails LOUD via the cd under set -e —
+# deliberate (#437 b D2): the old spelling degraded silently to cwd
+# trust, the exact hole the anchor exists to close.
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")")" && pwd)"
 STREAMED=false
 # Stdin runs (curl ... | sudo bash) never trust the cwd-derived checkout

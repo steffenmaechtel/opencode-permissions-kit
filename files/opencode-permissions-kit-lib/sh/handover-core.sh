@@ -5,7 +5,9 @@
 # ride-along): the former case arm of bin/opk, moved verbatim. The
 # MOVEMENT is pure code movement -- the normalized body equals the old
 # arm (re-verified by PR #437 review a's structural diff: verbatim
-# modulo indent, only the two #422 insertions below differ), and the
+# modulo indent; in CODE only the two #422 insertions below differ,
+# and the old arm's lead comment was hoisted into this header --
+# behaviorally invisible), and the
 # dispatcher sources this lib and calls handover_core with the args
 # after the subcommand. #422 IS this file's one behavioral delta vs
 # the old arm: operands whose path chain crosses a symlinked component
