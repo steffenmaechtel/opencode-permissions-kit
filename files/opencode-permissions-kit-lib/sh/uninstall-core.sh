@@ -563,10 +563,54 @@ un_user_remove() {
                 if [ -n "$_un_ag_ls" ]; then
                     _un_ag_stamp="$(date +%Y%m%d-%H%M%S)"
                     _un_ag_dir="/var/backups/opencode-permissions-kit/$_un_ag_dirname-backup-$_un_ag_stamp"
+                    # The leaf follows the -m 700 doctrine of the shared
+                    # backup root (#430): install-core.sh and update-core.sh
+                    # create their leaves 700 — a plain `mkdir -p` leaf
+                    # (755 under root umask) was the one world-traversable
+                    # copy of the agent home on this root. The root itself
+                    # stays at umask on purpose: world-traversable is what
+                    # lets the DEFAULT_USER reach their own chowned 700
+                    # leaf. The chmod re-assert comes AFTER the copy AND
+                    # the ownership handover, both measured as root in a
+                    # container: `cp -a src/. dst/` propagates the SOURCE
+                    # dir's own mode AND owner onto the leaf (a 777
+                    # agent-owned .agents produced a 777 agent-owned leaf
+                    # past the mkdir -m 700) — an earlier chmod leaves an
+                    # agent-owned window the mode must outlive, and
+                    # chown -R never resets modes. After the handover the
+                    # agent owns nothing on the path and 700 sticks.
+                    # Loud-degrade, not arm-failing: the backup already
+                    # exists here, "could not back up" would be the false
+                    # claim.
                     if [ "$DRY_RUN" = true ]; then
-                        echo "  [DRY] sudo mkdir -p '$_un_ag_dir' && sudo cp -a '$_un_ag_src/.' '$_un_ag_dir/'"
-                    elif sudo mkdir -p "$_un_ag_dir" && sudo cp -a "$_un_ag_src/." "$_un_ag_dir/" 2>/dev/null; then
-                        id "$DEFAULT_USER" >/dev/null 2>&1 && sudo chown -R "$DEFAULT_USER" "$_un_ag_dir"
+                        echo "  [DRY] sudo mkdir -p '/var/backups/opencode-permissions-kit' &&""\
+ sudo mkdir -m 700 '$_un_ag_dir' && sudo cp -a '$_un_ag_src/.' '$_un_ag_dir/' &&""\
+ sudo chmod 700 '$_un_ag_dir'"
+                    elif sudo mkdir -p "/var/backups/opencode-permissions-kit" 2>/dev/null &&
+                        sudo mkdir -m 700 "$_un_ag_dir" &&
+                        sudo cp -a "$_un_ag_src/." "$_un_ag_dir/" 2>/dev/null; then
+                        # (#438 a A2): the handover skip used to be silent —
+                        # the success echo below promised a restore the
+                        # stated audience could not read once the leaf is
+                        # 700 and not their uid. Loud if/else now.
+                        if id "$DEFAULT_USER" >/dev/null 2>&1; then
+                            # (#438 b B1): the FAILURE corner of the handover
+                            # was silent too — NFS root_squash on /var/backups,
+                            # quota, an immutable leaf leave the backup
+                            # undeliverable while the success echo below
+                            # promised a restore. Loud like the chmod arm.
+                            if ! sudo chown -R "$DEFAULT_USER" "$_un_ag_dir"; then
+                                echo "WARNING: could not hand the backup to '$DEFAULT_USER' — restoring needs sudo."
+                                log "agents backup owner handover failed: $_un_ag_dir"
+                            fi
+                        else
+                            echo "WARNING: developer '$DEFAULT_USER' not found — backup stays agent/root-owned, restoring needs sudo."
+                            log "agents backup owner handover skipped: DEFAULT_USER '$DEFAULT_USER' missing"
+                        fi
+                        if ! sudo chmod 700 "$_un_ag_dir"; then
+                            echo "WARNING: could not enforce mode 700 on $_un_ag_dir — check it before restoring from there."
+                            log "agents backup mode assert failed: $_un_ag_dir"
+                        fi
                         echo "Agent resources backed up: $_un_ag_dir (restore with: cp -a $_un_ag_dir/. ~/$_un_ag_dirname/)"
                         log "agents backup before userdel: $_un_ag_dir"
                     else

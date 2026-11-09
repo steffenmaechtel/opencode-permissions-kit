@@ -761,5 +761,22 @@ else
     fail "install must gate the shim deploy on xdg_shim_needed_for (#257)"
 fi
 
+# --- LOWS-6 (#428 disposition): the re-configure ask stays default-y -------------
+# The PR-#426 decline rationale, pinned so an accidental flip to n
+# reddens: install.sh reaching this gate is an explicit invocation
+# whose yes is the purpose; the prompt is INTERACTIVE-gated (the
+# curl|bash path never sees it), the re-configure keeps user config,
+# and "no" just points at opk update and exits 0 — the conventions'
+# carve-out (agent/conventions.md "Interactive prompts"). Comment-
+# stripped grep for the default itself; the rationale comment must
+# exist at the site too.
+if sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    grep -qF '"Re-configure the existing installation with install.sh?" "y"' &&
+    grep -qF '#428 disposition' "$LIB"; then
+    pass "re-configure ask stays default-y, disposition documented (#428)"
+else
+    fail "re-configure ask default flipped or undocumented (#428)"
+fi
+
 echo ""
 suite_done

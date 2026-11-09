@@ -327,7 +327,19 @@ _fsb_pass() {
     # pipeline member (a fork) — only here does the once-per-run cache
     # stick across the four passes.
     _fsb_py_probe
-    _fsbp_nul="$(mktemp "${TMPDIR:-/tmp}/opk-fsb-pass.XXXXXXXX")"
+    # Named-cause mktemp guard (#431, the #429 B4 class beyond the
+    # update scope): every shipped caller (config.sh, update.sh,
+    # install.sh) runs set -eu — a raw failure aborted the pass
+    # mid-run with only mktemp's own diagnostic. Counted like a
+    # failed pass (the 0.0.43a F10 bookkeeping below): the summary
+    # in fs_baseline_root fails the whole baseline loud instead of
+    # letting the callers print "applied".
+    _fsbp_nul="$(mktemp "${TMPDIR:-/tmp}/opk-fsb-pass.XXXXXXXX")" || {
+        printf '  error: mktemp failed (is $TMPDIR writable?) — baseline pass "%s" under %s cannot run\n' \
+            "$_fsbp_label" "$_fsbp_root" >&2
+        _FSB_ERRORS=$((_FSB_ERRORS + 1))
+        return 0
+    }
     # Scratch registered with the caller's cleanup trap (#211 a F12,
     # staged-write.sh:44 shape): an aborted pass (Ctrl-C on a large
     # tree, minutes per pass) used to leave the root-owned NUL file
