@@ -64,10 +64,12 @@ files, 1979/3732 = 53.0% (the post-lift CI comparator, superseding the
    scripts/coverage.sh-era spike, `internal/records/` — 3 blocks in
    tests/unit/test-install-args.sh). Fix: one shield line `PS4="+ "` as
    the block's first line — semantics unchanged, that block simply stops
-   being attributed (fine for a report). Any future `bash -c 'set -eu'`
-   test block needs the same shield; the failure is loud (suite red), and
-   tests/unit/test-coverage.sh pins shields == set -u -c blocks across
-   every suite and every -c form (#369; originally install-args-only).
+   being attributed (fine for a report). Any future `sh -c`/`bash -c`
+   body that sets -u — any quoting form, any suite — needs the same
+   shield; the failure is loud (suite red), and
+   tests/unit/test-coverage.sh pins the exact baseline across every
+   suite and every -c form: 6 set-u blocks = 6 first-line shields = 6
+   shield lines (#369; originally install-args-only).
 
 ## Dead ends (do not re-try without new information)
 

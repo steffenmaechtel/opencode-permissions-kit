@@ -284,16 +284,21 @@ echo "-- status.sh wiring (section rows live in sh/status-core.sh, #346 wave 1) 
 # "...rootless backend:") — and 'docker-rootless|podman-rootless' only the
 # hint's install command, so deleting every real backend row kept both
 # pins green. The pins bind the ui_kv rows and the case arms; the
-# per-backend BEHAVIOR (known/unknown/empty CONTAINER_BACKEND, socket
-# probes) is driven by test-status.sh's run_case sourcing pins.
+# per-backend BEHAVIOR is driven by test-status.sh's run_case sourcing
+# pins for kubernetes/empty/docker-rootless only — the podman arm is
+# pinned structurally here (rows + dispatch), and behavioral podman
+# coverage is a recorded deferred work order (#439 a S2). Strip riders
+# on the presence legs (#439 a C3): a row commented out during
+# debugging and committed must not keep a pin green — the #261/#244 g
+# W1 survivor trap, presence form.
 check "status.sh backend row: docker-rootless" \
-    grep -Fq 'ui_kv_ok "backend" "docker-rootless"' "$STATUS_CORE"
+    sh -c 'sed "s/^[[:space:]]*#.*\$//" "$1" | grep -Fq -- "$2"' _ "$STATUS_CORE" 'ui_kv_ok "backend" "docker-rootless"'
 check "status.sh backend row: podman-rootless" \
-    grep -Fq 'ui_kv_ok "backend" "podman-rootless"' "$STATUS_CORE"
+    sh -c 'sed "s/^[[:space:]]*#.*\$//" "$1" | grep -Fq -- "$2"' _ "$STATUS_CORE" 'ui_kv_ok "backend" "podman-rootless"'
 check "status.sh backend row: unknown backend flagged bad" \
-    grep -Fq 'ui_kv_bad "backend" "unknown' "$STATUS_CORE"
+    sh -c 'sed "s/^[[:space:]]*#.*\$//" "$1" | grep -Fq -- "$2"' _ "$STATUS_CORE" 'ui_kv_bad "backend" "unknown'
 check "status.sh backend dispatch: rootless case arms" \
-    sh -c 'grep -Fq "docker-rootless)" "$1" && grep -Fq "podman-rootless)" "$1"' _ "$STATUS_CORE"
+    sh -c 'sed "s/^[[:space:]]*#.*\$//" "$1" | grep -Fq -- "$2" && sed "s/^[[:space:]]*#.*\$//" "$1" | grep -Fq -- "$3"' _ "$STATUS_CORE" 'docker-rootless)' 'podman-rootless)'
 check "status.sh reports socket reachability" \
     grep -Fq 'NOT reachable' "$STATUS_CORE"
 check "status.sh has no migration-stamp section (legacy cleanup)" \

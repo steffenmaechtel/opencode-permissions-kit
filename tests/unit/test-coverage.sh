@@ -103,18 +103,32 @@ fi
 #
 # Sweep record (#369, the class-sweep rule — reproduce before trusting
 # a no-siblings claim): enumeration via this scanner plus
-# `grep -nE "(bash|sh) +-c" tests/unit/*.sh` (947 opener lines).
-# Checked and out of class: set -e-only bodies (test-ddev-migrate.sh
-# :835, test-kit-cli.sh :1123, test-project-paths.sh :506/:508 — no
-# -u); variable-interpreted bodies sh -c "$body" (test-fs-baseline.sh
-# :236-243 — the extracted fs-baseline.sh batch body sets no -u;
-# test-kit-cli.sh :499/:570 — printf + extract_func payloads, no -u);
-# ~18 subshell `( set -u ... )` sites in test-status.sh (BASH_SOURCE
-# always defined there); no `set -o nounset` and no `'"'"'` -c idiom.
-# Scanner limits (accepted): one opener per line; no $()-nested quote
-# tracking (a -c body whose quotes span a $() may close early and
-# undercount) — none in today's tree, cross-checked with a perl scan
-# over the same first-closing-quote rule.
+# `sed 's/^[[:space:]]*#.*$//' tests/unit/*.sh | grep -cE "(bash|sh) +-c"`
+# (947 opener lines comment-stripped; the bare grep over the raw files
+# counts 958 — #439 a Q1). Checked and out of class: set -e-only bodies
+# (test-ddev-migrate.sh :835, test-kit-cli.sh :1123,
+# test-project-paths.sh :506/:508 — no -u); variable-interpreted bodies
+# sh -c "$body" (test-fs-baseline.sh :236-243 — the extracted
+# fs-baseline.sh batch body sets no -u; test-kit-cli.sh :499/:570 —
+# printf + extract_func payloads, no -u); ~18 subshell
+# `( set -u ... )` sites in test-status.sh (BASH_SOURCE always defined
+# there); `set -o nounset` appears in code nowhere (this comment is the
+# only tree hit).
+#
+# Scanner limits (accepted, #439 a C1/Q2 — each named with its sites
+# and its miscount direction): ONE opener per line; no $()-nested quote
+# tracking — test-kit-cli.sh :499/:570 ARE $()-spanning -c bodies where
+# the scanner closes at the first inner unescaped quote (verified
+# harmless: no set -u in those payloads); and the `'"'"'` idiom —
+# test-container-backend.sh :248 embeds it in a real -c body and the
+# first-closing-quote rule truncates it (verified harmless today: no
+# set -u; test-sandbox-policy.sh :682 is the trap-string variant). A
+# future set -u/-eu body written in either form is INVISIBLE to the
+# scanner (false green, no UNSHIELDED line) — house style for new
+# shielded blocks is the multiline single-quoted body, which the
+# scanner reads exactly. Cross-checked against an independent perl
+# scan over the same first-closing-quote rule (same limits by
+# construction).
 _sh_b=0
 _sh_ok=0
 _sh_lines=0
@@ -136,10 +150,22 @@ function dqclose(s, pos, i, j, bs) {
     }
     return 0
 }
+function shielded_at_start(s, i, c) {
+    # first non-blank body char must begin the shield literal (#439 a C2:
+    # "shield anywhere in a single-line body" passed the old firstline
+    # check; the anchor enforces the FIRST-body-line contract for inline
+    # bodies too)
+    for (i = 1; i <= length(s); i++) {
+        c = substr(s, i, 1)
+        if (c == " " || c == "\t" || c == "\n") continue
+        return (substr(s, i, 8) == "PS4=\"+ \"")
+    }
+    return 0
+}
 function judge() {
     if (body ~ /(^|[^A-Za-z0-9_])set[ \t]+-[A-Za-z]*u/) {
         blocks++
-        if (firstline ~ /PS4="\+ "/) ok++
+        if (shielded_at_start(body)) ok++
         else printf "UNSHIELDED %s line %d\n", FILENAME, opline
     }
 }
@@ -147,17 +173,14 @@ function startbody(seg, q, op, p) {
     collect = 1
     bq = q
     opline = op
-    firstline = ""
     if (q == SQ) p = index(seg, SQ)
     else p = dqclose(seg)
     if (p > 0) {
         body = substr(seg, 1, p - 1)
         collect = 0
-        firstline = body
         judge()
     } else {
         body = seg
-        if (seg ~ /[^ \t]/) firstline = seg
     }
 }
 /^[ \t]*#/ { next }
@@ -167,8 +190,6 @@ function startbody(seg, q, op, p) {
             p = index($0, SQ)
             if (p > 0) {
                 body = body "\n" substr($0, 1, p - 1)
-                if (firstline == "" && substr($0, 1, p - 1) ~ /[^ \t]/)
-                    firstline = substr($0, 1, p - 1)
                 collect = 0
                 judge()
                 next
@@ -177,15 +198,12 @@ function startbody(seg, q, op, p) {
             p = dqclose($0)
             if (p > 0) {
                 body = body "\n" substr($0, 1, p - 1)
-                if (firstline == "" && substr($0, 1, p - 1) ~ /[^ \t]/)
-                    firstline = substr($0, 1, p - 1)
                 collect = 0
                 judge()
                 next
             }
         }
         body = body "\n" $0
-        if (firstline == "" && $0 ~ /[^ \t]/) firstline = $0
         next
     }
     if (awaitq) {
