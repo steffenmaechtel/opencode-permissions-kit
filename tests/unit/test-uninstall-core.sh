@@ -815,6 +815,11 @@ _un_w2_gate() {
     cat "$_un_w2/log" 2>/dev/null || true
 }
 chmod 000 "$_un_w2/fake-home/opencodeux2"
+# #430 mode pin prep: the source .agents gets the WORST agent-settable
+# mode (777) — `cp -a src/. dst/` propagates it onto the leaf (observed:
+# the mkdir -m 700 alone left a 775 leaf past the copy), so the leaf
+# pin below discriminates the trailing chmod, not just the mkdir -m.
+chmod 777 "$_un_w2/fake-home/opencodeux/.agents"
 _un_w2_log="$(_un_w2_gate opencodeux2 devuser)"
 if printf '%s\n' "$_un_w2_log" | grep -q '^sudo test -d '; then
     pass "agents-backup gate: privileged existence probe issued despite unreadable home (W2)"
@@ -824,11 +829,27 @@ fi
 _un_w2_log="$(_un_w2_gate opencodeux devuser)"
 if printf '%s\n' "$_un_w2_log" | grep -q '^sudo test -d .*agents$' &&
     printf '%s\n' "$_un_w2_log" | grep -q '^sudo ls -A .*agents$' &&
-    printf '%s\n' "$_un_w2_log" | grep -q '^sudo mkdir -p .*agents-backup-' &&
-    printf '%s\n' "$_un_w2_log" | grep -q '^sudo cp -a .*agents'; then
+    printf '%s\n' "$_un_w2_log" | grep -q '^sudo mkdir -p .*backups$' &&
+    printf '%s\n' "$_un_w2_log" | grep -q '^sudo mkdir -m 700 .*agents-backup-' &&
+    printf '%s\n' "$_un_w2_log" | grep -q '^sudo cp -a .*agents' &&
+    printf '%s\n' "$_un_w2_log" | grep -q '^sudo chmod 700 .*agents-backup-'; then
     pass "agents-backup gate: readable .agents arms the backup branch (W2)"
 else
     fail "agents-backup gate: readable .agents must issue test-d/ls-A/mkdir/cp (W2 log: $_un_w2_log)"
+fi
+# LOWS-6 (#430): the leaf on the shared backup root follows the -m 700
+# doctrine (install-core.sh / update-core.sh siblings) — the W2 gate's
+# sudo stub EXECs, so the leaf is a REAL dir here: pin its mode. The
+# 777 source (prep above) makes this discriminate BOTH guards: the
+# mkdir -m 700 AND the post-copy chmod that re-asserts it past
+# `cp -a src/.` mode propagation. The root stays at umask
+# (world-traversable by design — the DEFAULT_USER must reach their own
+# chowned leaf).
+_un_w2_leaf=$(ls -d "$_un_w2/backups/.agents-backup-"* 2>/dev/null | head -n 1)
+if [ -n "$_un_w2_leaf" ] && [ "$(stat -c %a "$_un_w2_leaf" 2>/dev/null)" = "700" ]; then
+    pass "agents-backup leaf dir is 700 despite a 777 source (#430)"
+else
+    fail "agents-backup leaf not 700 (leaf=${_un_w2_leaf:-none} mode=$(stat -c %a "$_un_w2_leaf" 2>/dev/null)) (#430)"
 fi
 _un_w2_log="$(_un_w2_gate opencodeux-missing devuser)"
 if ! printf '%s\n' "$_un_w2_log" | grep -q 'mkdir -p' &&
@@ -1644,6 +1665,7 @@ if [ -n "$_f2_bak_block" ]; then
                         return 0
                         ;;
                     mkdir | cp) return "${F2BAKRC:-1}" ;;
+                    chmod) return "${F2CHMODRC:-0}" ;;
                     *) return 0 ;;
                 esac
             }
@@ -1661,6 +1683,23 @@ if [ -n "$_f2_bak_block" ]; then
         pass "backup failure: warning names mkdir/cp, no false backed-up (#211 f W2)"
     else
         fail "backup failure arm (got: $_out) (#211 f W2)"
+    fi
+    # LOWS-6 (#430): the mode re-assert sits in the THEN body, after the
+    # ownership handover — its failure must degrade LOUD without
+    # falsifying the backup claim (the copy already succeeded; routing
+    # it to the "could not back up" arm would be the false claim, and
+    # set -e would abort the whole uninstall past a made backup).
+    # Drive: mkdir/cp succeed (F2BAKRC=0), chmod fails (F2CHMODRC=1).
+    _out=$(F2BAKRC=0 F2CHMODRC=1 _f2_bak_run 2>&1) || true
+    _f2_ok=0
+    case "$_out" in *"WARNING: could not enforce mode 700 on "*) ;; *) _f2_ok=1 ;; esac
+    case "$_out" in *"log: agents backup mode assert failed: "*) ;; *) _f2_ok=1 ;; esac
+    case "$_out" in *"Agent resources backed up:"*) ;; *) _f2_ok=1 ;; esac
+    case "$_out" in *"could not back up"*) _f2_ok=1 ;; esac
+    if [ "$_f2_ok" -eq 0 ]; then
+        pass "mode-assert failure degrades loud, backup claim stays true (#430)"
+    else
+        fail "mode-assert failure arm (got: $_out) (#430)"
     fi
 else
     fail "agents-backup loop extractable (#211 f W2)"

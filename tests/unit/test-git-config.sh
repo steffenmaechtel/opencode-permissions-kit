@@ -402,6 +402,48 @@ acr_out=$(
 case "$acr_out" in *rc=1*) pass "render: unknown mode rejected (rc=1)" ;; *) fail "render: unknown mode (got [$acr_out])" ;; esac
 [ ! -e "$ACRWORK/bad.jsonc" ] && pass "render: nothing written on rejection" || fail "render: file written on rejection"
 
+# --- LOWS-6 (#431): dead TMPDIR dies with the named cause, nothing written -----
+# The #429 B4 class beyond the update scope: config.sh runs set -eu —
+# a raw mktemp failure aborted the whole `opk config git-config` run
+# with only mktemp's own diagnostic (after the backup leg). Extract
+# the real git_config_apply, inject an uncreatable TMPDIR
+# (uid-independent failure injection), stub the collaborators: die
+# fires in the family wording BEFORE any render/write/track runs.
+_gcag_block="$(sed -n '/^git_config_apply() {/,/^}/p' "$CONFIG")"
+if [ -n "$_gcag_block" ]; then
+    pass "git_config_apply extractable (#431)"
+    _gcag_rc=0
+    _gcag_out=$(TMPDIR="/nonexistent-431-gca-$$" sh -c '
+        die() { echo "die: $*"; exit 1; }
+        ui_kv() { echo "BAD-KV: $*"; }
+        ui_detail() { :; }
+        ui_warn() { :; }
+        log() { :; }
+        sudo() { return 1; }
+        _tmp_track() { echo "BAD-TRACK: $*"; }
+        agent_home_sane() { return 0; }
+        staged_write() { echo "BAD-WRITE: $*"; return 0; }
+        agent_config_render() { echo "BAD-RENDER: $*"; return 0; }
+        SCRIPT_DIR="$1"
+        LIBDIR="$2"
+        OPENCODE_USER=oc
+        OPENCODE_GROUP=ocg
+        eval "$3"
+        git_config_apply on
+        echo "BAD-RETURNED"
+    ' _ "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management" \
+        "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib" "$_gcag_block" 2>&1) || _gcag_rc=$?
+    if [ "$_gcag_rc" -ne 0 ] &&
+        printf '%s\n' "$_gcag_out" | grep -qF 'die: mktemp failed (is $TMPDIR writable?) — git-config on NOT applied' &&
+        ! printf '%s\n' "$_gcag_out" | grep -q 'BAD-'; then
+        pass "dead TMPDIR: toggle dies named, no render/write/track ran (#431)"
+    else
+        fail "dead TMPDIR guard broken (rc=$_gcag_rc out=$_gcag_out) (#431)"
+    fi
+else
+    fail "git_config_apply extractable (#431)"
+fi
+
 # --- Summary ---
 echo ""
 echo "===================================="

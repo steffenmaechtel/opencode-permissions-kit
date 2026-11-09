@@ -790,6 +790,16 @@ die() {
 confirm() {
     # Convention: agent/conventions.md — [Y/n] default capital,
     # Enter accepts it, y/yes/n/no case-insensitive.
+    # The y default is deliberate (#428 disposition, uniform with
+    # install-core.sh's re-configure ask): `opk update` is an explicit
+    # invocation whose yes IS the command's purpose — this prompt is
+    # its final confirmation, so "no" is the surprising answer (it
+    # leaves the declared intent half-done). The conventions' carve-
+    # out applies ("y only where no is the surprising/riskier
+    # answer", agent/conventions.md "Interactive prompts", like the
+    # audit-log deletion): the action touches kit-owned files only —
+    # the message itself promises configs stay untouched — and
+    # unattended runs pass --yes and never see it.
     [ "$YES" = true ] && return 0
     ui_confirm "$1" "y"
 }

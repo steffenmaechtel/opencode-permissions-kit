@@ -1526,5 +1526,22 @@ case "$_pg_list" in
         ;;
 esac
 
+# --- LOWS-6 (#428 disposition): the re-deploy confirm stays default-y ------------
+# The PR-#426 decline rationale, pinned so an accidental flip to n
+# reddens: the y IS the command's purpose (explicit `opk update`
+# invocation, this prompt is its final confirmation; "no" leaves the
+# declared intent half-done), the action touches kit-owned files only
+# (the message promises configs stay untouched) and --yes covers
+# unattended runs — the conventions' carve-out ("y only where no is
+# the surprising/riskier answer", agent/conventions.md "Interactive
+# prompts"). Comment-stripped grep for the default itself; the
+# rationale comment must exist at the site too.
+if sed 's/^[[:space:]]*#.*$//' "$UPDATE" | grep -qF 'ui_confirm "$1" "y"' &&
+    grep -qF '#428 disposition' "$UPDATE"; then
+    pass "re-deploy confirm stays default-y, disposition documented (#428)"
+else
+    fail "re-deploy confirm default flipped or undocumented (#428)"
+fi
+
 # --- Summary ----------------------------------------------------------------------
 suite_done "tests"

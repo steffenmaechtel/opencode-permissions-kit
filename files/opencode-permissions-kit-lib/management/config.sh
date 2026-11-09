@@ -635,7 +635,13 @@ git_config_apply() {
     # agent-owned destination; a link swapped between the two would
     # disclose a root-readable file into the agent config. The render
     # itself is the shared agent_config_render helper.
-    _gca_tmp=$(mktemp)
+    # Named-cause mktemp guard (#431, the #429 B4 class beyond the
+    # update scope): config.sh runs set -eu — a raw mktemp failure
+    # (dead TMPDIR, full /tmp) used to abort the whole `opk config`
+    # run with only mktemp's own diagnostic, after the backup above
+    # was already written. Die names the interrupted toggle in the
+    # family wording.
+    _gca_tmp=$(mktemp) || die "mktemp failed (is \$TMPDIR writable?) — git-config $enable NOT applied"
     _tmp_track "$_gca_tmp"
     if ! agent_config_render "$template" "$_gca_tmp" "$enable"; then
         rm -f "$_gca_tmp"

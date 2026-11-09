@@ -570,6 +570,33 @@ else
 fi
 rm -rf "$F12S"
 
+# --- 10b. dead TMPDIR: named-cause error, pass counted, nothing applied (#431) --
+# The #429 B4 class beyond the update scope: every shipped caller of
+# _fsb_pass runs set -eu — a raw mktemp failure aborted the pass
+# mid-run with only mktemp's own diagnostic. The guard names the
+# interrupted pass in the family wording and books it like a failed
+# pass (F10 counting) so fs_baseline_root's summary fails the whole
+# baseline loud. Inject an uncreatable TMPDIR (uid-independent);
+# assert the message, the _FSB_ERRORS bookkeeping and that the chmod
+# operand stayed UNTOUCHED (no partial application).
+F13S=$(mktemp -d)
+mkdir -p "$F13S/root"
+printf 'x\n' >"$F13S/root/f"
+chmod 644 "$F13S/root/f"
+F13RC=0
+F13OUT=$(FS_SUDO="" _FSB_ERRORS=0 TMPDIR="/nonexistent-431-fsb-$$" \
+    sh -c '. "$1" && _fsb_pass "f13" "$2" -type f -- chmod g+w; echo "ERRS=$_FSB_ERRORS"' \
+    _ "$LIB" "$F13S/root" 2>&1) || F13RC=$?
+if printf '%s\n' "$F13OUT" | grep -qF 'error: mktemp failed (is $TMPDIR writable?) — baseline pass "f13"' &&
+    printf '%s\n' "$F13OUT" | grep -qF 'cannot run' &&
+    printf '%s\n' "$F13OUT" | grep -q '^ERRS=1$' &&
+    [ "$(stat -c %a "$F13S/root/f" 2>/dev/null)" = "644" ]; then
+    pass "dead TMPDIR: pass error named + counted, operand untouched (#431)"
+else
+    fail "dead TMPDIR pass guard (rc=$F13RC out=$F13OUT mode=$(stat -c %a "$F13S/root/f" 2>/dev/null)) (#431)"
+fi
+rm -rf "$F13S"
+
 # --- 11. python3 health gate (#223, #221 a W3 shape) ----------------------------------
 # _fsb_count_tee sits in the DATA pipeline of a MUTATING pass: an
 # ungated missing-or-broken python3 killed the tee at startup, xargs -r
