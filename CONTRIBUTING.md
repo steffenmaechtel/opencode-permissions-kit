@@ -112,12 +112,14 @@ make coverage          # kcov line-coverage report over the unit suites (report 
   echo "e2e=$R1 e2e-rootless=$R2 e2e-ddev=$R3"
   ```
 
-- Same-suite runs from **two worktrees of one workspace** are hermetic
-  (issue #366): every runner suffixes the container-name base with a slug
-  of the checkout's absolute path (`opencode-e2e-test-…-repo-kasantra`),
-  so concurrent worktree runs each own their container — the second start
-  no longer `rm -f`s the first run's container mid-suite. Image tags stay
-  shared on purpose (a retag never affects a running container): the layer
+- Same-suite runs from **two worktrees of one workspace** are hermetic at
+  the container-name level (issue #366): every runner suffixes the
+  container-name base with a slug of the checkout's absolute path
+  (`opencode-e2e-test-…-repo-kasantra`), so concurrent worktree runs each
+  own their container — the second start no longer `rm -f`s the first
+  run's container mid-suite. Image tags stay shared on purpose (a retag
+  never affects a running container — only the other run's next container
+  start or image probe could see a divergent worktree's build): the layer
   cache and the ddev golden image keep their cross-worktree value. An
   exported `E2E_CONTAINER` now really overrides the base name (it composes
   with the suffix). Two concurrent runs **inside the same checkout** still

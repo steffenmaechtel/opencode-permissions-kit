@@ -1,8 +1,9 @@
 #!/bin/sh
 # tests/e2e/lib.sh — shared scaffolding for the e2e suites.
-# Sourced (not executed) by run.sh and run-docker-rootless.sh. The runners set
-# the E2E_* knobs, then call the helpers below. Kept in one file so the two
-# suites cannot drift apart in their build/cache/check plumbing.
+# Sourced (not executed) by run.sh, run-docker-rootless.sh and run-ddev.sh.
+# The runners set the E2E_* knobs, then call the helpers below. Kept in one
+# file so the three suites cannot drift apart in their build/cache/check
+# plumbing.
 #
 # Knobs (set BEFORE sourcing):
 #   E2E_IMAGE        docker image tag           (default: opencode-e2e)
