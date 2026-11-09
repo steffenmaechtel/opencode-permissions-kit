@@ -23,6 +23,8 @@ archive).
 | [restructure-docs.md](restructure-docs.md) | docs restructure: two-world split, birth-PR review cases | IMPLEMENTED |
 | [rootless-backend.md](rootless-backend.md) | rootless backends: provisioning + selection reference | CURRENT |
 | [opencode-2x.md](opencode-2x.md) | opencode 2.x compatibility: model, detection, open items | CURRENT |
+| [opencode-permission-matching.md](opencode-permission-matching.md) | opencode permission matching (#391) | CURRENT |
+<!-- row above kept <=120 cols: the line-length ratchet budgets README's long table rows -->
 | [security-advisories.md](security-advisories.md) | advisory warnings: database, upstream watch, curation | CURRENT |
 | [review-independence.md](review-independence.md) | redundancy context: external reviewer checkout | CURRENT |
 | [rules-meta.md](rules-meta.md) | rule-rationale system: metas, revisit ladder, audit invariants | CURRENT |

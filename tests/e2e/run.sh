@@ -242,6 +242,68 @@ check "default user can execute the binary by absolute path (group member; deny-
     E '/usr/local/lib/opencode-permissions-kit/bin/opencode --version'
 check "opencode user can execute the binary" \
     E 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode --version'
+
+# --- 3b. Deployed-template permission evaluation (issue #391) ------------
+# The real binary evaluates resources against the DEPLOYED agent config:
+# opencode v2's session.permission.create HTTP route runs the full real
+# pipeline (config load, v1->v2 migration, agent permission merge,
+# wildcard matcher) and returns the effect — no LLM, no TUI involved.
+# The unit suite (test-template-bash-rules.sh) pins the rule shapes
+# against a matcher replica; this probe is the fidelity check that the
+# REAL evaluator agrees with it. Route verified in opencode v2.2.6;
+# older version pins skip the probe (the suite resolves latest).
+echo ""
+echo "--- 3b. Deployed-template permission evaluation (issue #391) ---"
+if [ "$(printf '%s\n2.2.6\n' "$OC_VERSION" | sort -V | tail -n 1)" = "$OC_VERSION" ]; then
+    docker exec -u opencode \
+        -e OPK_UPDATE_CHECK=0 \
+        -e OPENCODE_PASSWORD=e2e-probe-pw \
+        -e OPENCODE_DISABLE_MODELS_FETCH=1 \
+        "$E2E_CONTAINER" \
+        sh -c 'cd /tmp && exec /usr/local/lib/opencode-permissions-kit/bin/opencode serve --port 4789 --hostname 127.0.0.1' \
+        >/dev/null 2>&1 &
+    E2E_SERVE_JOB=$!
+    # Readiness is SEMANTIC, not just "port answers": the HTTP listener
+    # comes up ~1s before the agent registry finishes mounting the config
+    # rules (measured on 2.2.6: asks in that window evaluate against the
+    # default agent's allow-all and wrongly return allow). Poll until a
+    # NEUTRAL warmup resource evaluates "ask" — the template's "*": "ask"
+    # catch-all being live in evaluation proves the registry settled,
+    # without pre-asserting any deny shape the checks below own.
+    _probe_up=""
+    for _ in $(seq 1 30); do
+        _eff="$(E 'SID=$(curl -sf -u opencode:e2e-probe-pw -X POST -H "content-type: application/json" -d "{}" http://127.0.0.1:4789/api/session 2>/dev/null | grep -o "\"id\":\"[^\"]*\"" | head -1 | cut -d\" -f4); if [ -n "$SID" ]; then printf "%s" "$SID" > /tmp/e2e-probe-sid; curl -sf -u opencode:e2e-probe-pw -X POST -H "content-type: application/json" -d "{\"action\":\"shell\",\"resources\":[\"echo x > /tmp/e2e-warmup\"]}" "http://127.0.0.1:4789/api/session/$SID/permission" 2>/dev/null | grep -o "\"effect\":\"[a-z]*\""; fi' || true)"
+        if [ "$_eff" = '"effect":"ask"' ]; then
+            _probe_up=1
+            break
+        fi
+        sleep 1
+    done
+    if [ -z "$_probe_up" ]; then
+        echo "  ${RED}WARN${NC}  opencode serve did not settle within 30s — probes will fail"
+    fi
+    check "probe: session created on the real server" \
+        E 'test -s /tmp/e2e-probe-sid'
+    check "probe: spaced disk redirect denied (echo x > /dev/sda)" \
+        E 'curl -sf -u opencode:e2e-probe-pw -X POST -H "content-type: application/json" -d "{\"action\":\"shell\",\"resources\":[\"echo x > /dev/sda\"]}" "http://127.0.0.1:4789/api/session/$(cat /tmp/e2e-probe-sid)/permission" | grep -q "\"effect\":\"deny\""'
+    check "probe: glued NVMe redirect denied (echo x >/dev/nvme0n1)" \
+        E 'curl -sf -u opencode:e2e-probe-pw -X POST -H "content-type: application/json" -d "{\"action\":\"shell\",\"resources\":[\"echo x >/dev/nvme0n1\"]}" "http://127.0.0.1:4789/api/session/$(cat /tmp/e2e-probe-sid)/permission" | grep -q "\"effect\":\"deny\""'
+    check "probe: sudo dd to eMMC denied (sudo dd if=/dev/zero of=/dev/mmcblk0)" \
+        E 'curl -sf -u opencode:e2e-probe-pw -X POST -H "content-type: application/json" -d "{\"action\":\"shell\",\"resources\":[\"sudo dd if=/dev/zero of=/dev/mmcblk0\"]}" "http://127.0.0.1:4789/api/session/$(cat /tmp/e2e-probe-sid)/permission" | grep -q "\"effect\":\"deny\""'
+    check "probe: /etc redirect denied (echo x > /etc/passwd)" \
+        E 'curl -sf -u opencode:e2e-probe-pw -X POST -H "content-type: application/json" -d "{\"action\":\"shell\",\"resources\":[\"echo x > /etc/passwd\"]}" "http://127.0.0.1:4789/api/session/$(cat /tmp/e2e-probe-sid)/permission" | grep -q "\"effect\":\"deny\""'
+    check "probe: /dev/null sink stays ask, not denied (echo x > /dev/null)" \
+        E 'curl -sf -u opencode:e2e-probe-pw -X POST -H "content-type: application/json" -d "{\"action\":\"shell\",\"resources\":[\"echo x > /dev/null\"]}" "http://127.0.0.1:4789/api/session/$(cat /tmp/e2e-probe-sid)/permission" | grep -q "\"effect\":\"ask\""'
+    check "probe: allowlisted command evaluates allow (ls -la)" \
+        E 'curl -sf -u opencode:e2e-probe-pw -X POST -H "content-type: application/json" -d "{\"action\":\"shell\",\"resources\":[\"ls -la\"]}" "http://127.0.0.1:4789/api/session/$(cat /tmp/e2e-probe-sid)/permission" | grep -q "\"effect\":\"allow\""'
+    # Teardown: killing the docker-exec client ends the exec session (the
+    # container removal at suite end would reap any survivor anyway —
+    # the image ships no procps, so no in-container pkill exists).
+    kill "$E2E_SERVE_JOB" 2>/dev/null || true
+else
+    echo "  skipped: opencode $OC_VERSION < 2.2.6 (permission route unverified there)"
+fi
+
 check "Wrapper is first in PATH" \
     E 'test "$(which opencode)" = "/usr/local/bin/opencode"'
 check "Uninstall script deployed" \
