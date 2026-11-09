@@ -287,7 +287,8 @@ echo "-- status.sh wiring (section rows live in sh/status-core.sh, #346 wave 1) 
 # per-backend BEHAVIOR is driven by test-status.sh's run_case sourcing
 # pins for kubernetes/empty/docker-rootless only — the podman arm is
 # pinned structurally here (rows + dispatch), and behavioral podman
-# coverage is a recorded deferred work order (#439 a S2). Strip riders
+# coverage is a deferred work order recorded in this PR's round-a loop
+# status (#439 a S2; the PR thread is the case record). Strip riders
 # on the presence legs (#439 a C3): a row commented out during
 # debugging and committed must not keep a pin green — the #261/#244 g
 # W1 survivor trap, presence form.

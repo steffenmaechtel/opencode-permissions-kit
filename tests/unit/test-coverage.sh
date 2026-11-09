@@ -104,8 +104,9 @@ fi
 # Sweep record (#369, the class-sweep rule — reproduce before trusting
 # a no-siblings claim): enumeration via this scanner plus
 # `sed 's/^[[:space:]]*#.*$//' tests/unit/*.sh | grep -cE "(bash|sh) +-c"`
-# (947 opener lines comment-stripped; the bare grep over the raw files
-# counts 958 — #439 a Q1). Checked and out of class: set -e-only bodies
+# (measured 950 opener lines comment-stripped / 961 bare at 82389230 —
+# the counts drift with the tree, re-derive them; the stripped-vs-bare
+# distinction is the point — #439 a Q1, corrected by #439 b B1). Checked and out of class: set -e-only bodies
 # (test-ddev-migrate.sh :835, test-kit-cli.sh :1123,
 # test-project-paths.sh :506/:508 — no -u); variable-interpreted bodies
 # sh -c "$body" (test-fs-baseline.sh :236-243 — the extracted
