@@ -594,7 +594,15 @@ un_user_remove() {
                         # stated audience could not read once the leaf is
                         # 700 and not their uid. Loud if/else now.
                         if id "$DEFAULT_USER" >/dev/null 2>&1; then
-                            sudo chown -R "$DEFAULT_USER" "$_un_ag_dir"
+                            # (#438 b B1): the FAILURE corner of the handover
+                            # was silent too — NFS root_squash on /var/backups,
+                            # quota, an immutable leaf leave the backup
+                            # undeliverable while the success echo below
+                            # promised a restore. Loud like the chmod arm.
+                            if ! sudo chown -R "$DEFAULT_USER" "$_un_ag_dir"; then
+                                echo "WARNING: could not hand the backup to '$DEFAULT_USER' — restoring needs sudo."
+                                log "agents backup owner handover failed: $_un_ag_dir"
+                            fi
                         else
                             echo "WARNING: developer '$DEFAULT_USER' not found — backup stays agent/root-owned, restoring needs sudo."
                             log "agents backup owner handover skipped: DEFAULT_USER '$DEFAULT_USER' missing"

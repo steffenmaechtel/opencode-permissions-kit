@@ -1719,6 +1719,10 @@ if [ -n "$_f2_bak_block" ]; then
             sudo() {
                 case "$1" in
                     ls) echo "agent-resource" ;;
+                    chown)
+                        echo "sudo $*"
+                        return "${F2CHOWNRC:-0}"
+                        ;;
                     *) echo "sudo $*" ;;
                 esac
                 return 0
@@ -1744,10 +1748,28 @@ if [ -n "$_f2_bak_block" ]; then
     case "$_f2ord_out" in *"log: agents backup owner handover skipped: DEFAULT_USER 'dev' missing"*) ;; *) _f2_ok=1 ;; esac
     case "$_f2ord_out" in *"Agent resources backed up:"*) ;; *) _f2_ok=1 ;; esac
     case "$_f2ord_out" in *"could not back up"*) _f2_ok=1 ;; esac
+    # (#438 b B2): the negative leg — an always-chown regression (chown
+    # run despite the failed id) must redden, not just the WARNING texts.
+    printf '%s\n' "$_f2ord_out" | grep -q 'sudo chown' && _f2_ok=1
     if [ "$_f2_ok" -eq 0 ]; then
         pass "chown-skip is loud, restore hint names sudo, backup claim stays true (#438 a A2)"
     else
         fail "chown-skip arm (got: $_f2ord_out) (#438 a A2)"
+    fi
+    # (#438 b B1): the handover FAILURE corner — id resolves, chown fails
+    # (root_squash/quota/immutable). Loud like the chmod arm: WARNING +
+    # log, backup claim stays true (the copy exists; no false
+    # could-not-back-up, no silent undeliverable backup).
+    _f2ord_out=$(F2ORDID=0 F2CHOWNRC=1 _f2ord_run 2>&1) || true
+    _f2_ok=0
+    case "$_f2ord_out" in *"WARNING: could not hand the backup to 'dev' — restoring needs sudo."*) ;; *) _f2_ok=1 ;; esac
+    case "$_f2ord_out" in *"log: agents backup owner handover failed: "*) ;; *) _f2_ok=1 ;; esac
+    case "$_f2ord_out" in *"Agent resources backed up:"*) ;; *) _f2_ok=1 ;; esac
+    case "$_f2ord_out" in *"could not back up"*) _f2_ok=1 ;; esac
+    if [ "$_f2_ok" -eq 0 ]; then
+        pass "handover failure is loud, backup claim stays true (#438 b B1)"
+    else
+        fail "handover failure arm (got: $_f2ord_out) (#438 b B1)"
     fi
 else
     fail "agents-backup loop extractable (#211 f W2)"
