@@ -272,10 +272,12 @@ ensure_local_file() {
 }
 
 # The readlink fallback (#437 a B1) keeps a degraded readlink from
-# resolving the dir to the invoking cwd; a $0 whose target path is
-# broken (dangling symlink) fails LOUD via the cd under set -e —
-# deliberate (#437 b D2): the old spelling degraded silently to cwd
-# trust, the exact hole the anchor exists to close.
+# resolving the dir to the invoking cwd. Two degraded shapes (#437 c
+# E1, measured): a $0 through a broken INTERMEDIATE component fails
+# LOUD via the cd under set -e (deliberate, #437 b D2); a dangling
+# FINAL symlink -- readlink -f refuses to resolve it -- degrades
+# silently to the LINK'S OWN dir, still not the cwd. Both are
+# strictly narrower than the old spelling's silent cwd trust.
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")")" && pwd)"
 # Streamed stdin runs (curl ... | sudo bash, issue #405): $0 is the
 # interpreter, not this script — readlink resolves it against the
