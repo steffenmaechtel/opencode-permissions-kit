@@ -98,15 +98,29 @@
 set -u
 
 # --- shared UI helpers (checkout-first, status.sh pattern) ------------------------
-# Caller-dir anchor (#405, review a A2): a streamed stdin run
-# (curl ... | sudo sh) has no real $0 — the dirname-$0 lookups below
-# (and DOCTOR_OPK's exec in fix mode) would resolve cwd-sibling files,
-# unpinned, as root. Pin stdin runs to the deployed library's
-# management dir on the FLAT layout; checkout and installed runs keep
-# their own dir. A real script path resolves to an existing file, the
-# interpreter name does not.
-DR_CALL_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
-if ! [ -f "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")" ]; then
+# Caller-dir anchor (#405, review a A2; #434 readlink alignment, #433
+# hardening): a streamed stdin run (curl ... | sudo sh) has no real $0
+# — the dirname-$0 lookups below (and DOCTOR_OPK's exec in fix mode)
+# would resolve cwd-sibling files, unpinned, as root. Pin stdin runs to
+# the deployed library's management dir on the FLAT layout; checkout
+# and installed runs keep their own dir. The dir resolves through
+# readlink -f like uninstall.sh's UN_CALL_DIR — a user SYMLINK to this
+# entry keeps the checkout-first sibling lookup instead of silently
+# serving the deployed vintage from the link's dir. The stdin
+# discriminator compares $0 against the interpreter's own argv[0]
+# (#433: a planted cwd FILE named like the interpreter must not
+# re-open the cwd trust; same discriminator at all six #405 anchors).
+DR_CALL_DIR="$(dirname "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")")"
+_opk_stdin=false
+_opk_argv0="$(tr '\0' '\n' </proc/$$/cmdline 2>/dev/null | head -n 1)"
+if [ -n "$_opk_argv0" ]; then
+    if [ "$0" = "$_opk_argv0" ]; then
+        _opk_stdin=true
+    fi
+elif ! [ -f "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")" ]; then
+    _opk_stdin=true
+fi
+if [ "$_opk_stdin" = true ]; then
     DR_CALL_DIR="/usr/local/lib/opencode-permissions-kit/management"
 fi
 UI_LIB="$DR_CALL_DIR/../sh/ui.sh"

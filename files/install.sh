@@ -215,10 +215,21 @@ STREAMED=false
 # Stdin runs (curl ... | sudo bash) never trust the cwd-derived checkout
 # test (#405): a cwd inside a kit checkout passes it spuriously and
 # installs an unpinned local vintage instead of the pinned ref — the
-# same anchor update.sh carries. A real script path resolves to an
-# existing file; the interpreter name of a stdin run does not.
-if ! [ -f "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")" ] ||
-    [ ! -f "$SCRIPT_DIR/../VERSION" ]; then
+# same anchor update.sh carries. The stdin discriminator compares $0
+# against the interpreter's own argv[0] (#433: a planted cwd FILE named
+# like the interpreter must not re-open the cwd trust; same
+# discriminator at all six #405 anchors); without /proc the #405 file
+# probe remains the fallback.
+_opk_stdin=false
+_opk_argv0="$(tr '\0' '\n' </proc/$$/cmdline 2>/dev/null | head -n 1)"
+if [ -n "$_opk_argv0" ]; then
+    if [ "$0" = "$_opk_argv0" ]; then
+        _opk_stdin=true
+    fi
+elif ! [ -f "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")" ]; then
+    _opk_stdin=true
+fi
+if [ "$_opk_stdin" = true ] || [ ! -f "$SCRIPT_DIR/../VERSION" ]; then
     echo "Not a local checkout — fetching kit files from $KIT_BASE_URL ..."
     # Direct call, NOT SCRIPT_DIR="$(fetch_kit)": command substitution runs
     # in a subshell, where _FETCH_TREE/_TMP_REGISTRY registrations would be

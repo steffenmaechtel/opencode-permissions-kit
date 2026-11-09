@@ -1008,10 +1008,12 @@ fi
 # source ITS OWN ui.sh/git-check.sh — a deployed pre-#158 copy would drop
 # every ui_kv_ok/ui_kv_bad row (command not found) and the verdict. The
 # resolvers ride ST_CALL_DIR (#405): the caller dir for real script runs
-# (checkout-first, unchanged) with stdin runs pinned to the deployed lib.
+# (checkout-first, unchanged) with stdin runs pinned to the deployed lib;
+# resolved through readlink since #434 (a symlinked entry keeps the
+# checkout-first lookup).
 if grep -qF 'UI_LIB="$ST_CALL_DIR/../sh/ui.sh"' "$STATUS" &&
     grep -qF 'GIT_CHECK_LIB="$ST_CALL_DIR/../sh/git-check.sh"' "$STATUS" &&
-    grep -qF 'ST_CALL_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"' "$STATUS"; then
+    grep -qF 'ST_CALL_DIR="$(dirname "$(readlink -f "$0" 2>/dev/null || printf '"'"'%s'"'"' "$0")")"' "$STATUS"; then
     pass "status.sh resolves ui.sh/git-check.sh checkout-first"
 else
     fail "status.sh resolves ui.sh/git-check.sh deployed-first (pre-#158 skew)"

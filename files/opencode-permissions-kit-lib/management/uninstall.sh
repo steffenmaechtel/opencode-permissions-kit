@@ -53,17 +53,28 @@ done
 # before any removal so the final lines are written before the library and
 # the log directory itself are deleted.
 #
-# Caller-dir anchor (#405), placed before the first dirname-$0 lookup:
-# a streamed stdin run (curl ... | sudo sh) has no real $0 — the
-# lookups below would resolve a cwd-sibling lib and source it as root,
-# unpinned. Pin stdin runs to the deployed library's management dir on
-# the FLAT layout (review a B1: the repo-layout path does not exist
-# deployed); checkout and installed runs keep their own dir — resolved
-# through readlink like the pre-#405 UNINSTALL_CORE line (review a B1:
-# the bare dirname lost symlink resolution). A real script path
-# resolves to an existing file, the interpreter name does not.
+# Caller-dir anchor (#405; #433 hardening), placed before the first
+# dirname-$0 lookup: a streamed stdin run (curl ... | sudo sh) has no
+# real $0 — the lookups below would resolve a cwd-sibling lib and source
+# it as root, unpinned. Pin stdin runs to the deployed library's
+# management dir on the FLAT layout (review a B1: the repo-layout path
+# does not exist deployed); checkout and installed runs keep their own
+# dir — resolved through readlink like the pre-#405 UNINSTALL_CORE line
+# (review a B1: the bare dirname lost symlink resolution). The stdin
+# discriminator compares $0 against the interpreter's own argv[0]
+# (#433: a planted cwd FILE named like the interpreter must not
+# re-open the cwd trust; same discriminator at all six #405 anchors).
 UN_CALL_DIR="$(dirname "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")")"
-if ! [ -f "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")" ]; then
+_opk_stdin=false
+_opk_argv0="$(tr '\0' '\n' </proc/$$/cmdline 2>/dev/null | head -n 1)"
+if [ -n "$_opk_argv0" ]; then
+    if [ "$0" = "$_opk_argv0" ]; then
+        _opk_stdin=true
+    fi
+elif ! [ -f "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")" ]; then
+    _opk_stdin=true
+fi
+if [ "$_opk_stdin" = true ]; then
     UN_CALL_DIR="/usr/local/lib/opencode-permissions-kit/management"
 fi
 log() { :; }
