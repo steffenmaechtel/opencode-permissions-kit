@@ -31,6 +31,27 @@ a broad `deny` exempts a file from an overmatching rule. The template uses
 that carve-out itself: TYPO3's `ext_localconf.php` is re-allowed after the
 broad `*conf.php` deny (it is code, not secrets).
 
+### Bash rules match the whole command
+
+A `permission.bash` rule is matched against the **entire command text**
+(anchored at both ends, `*` matches any run — last matching rule wins), and
+opencode evaluates the command **including its redirects**. A redirect deny
+therefore needs a leading `*` and an operator-swallowing inner `*`:
+
+```jsonc
+"bash": {
+    // DEAD: no command text starts with ">" — this never matches
+    // "> /srv/backup/*": "deny",
+    // Works: any command redirecting into the tree (>, >>, >|, 2>, &>),
+    // spaced or glued ("> file", ">file")
+    "*>*/srv/backup/*": "deny"
+}
+```
+
+The same shape rule applies to every command you want to catch mid-line:
+`sudo dd of=/dev/sda` never matches `"dd of=/dev/sd*"` (the command starts
+with `sudo`) — use `"*dd*of=/dev/sd*"` (issue #391).
+
 ## Add a per-project config
 
 Each project can have its own `opencode.jsonc` in its root. Project configs

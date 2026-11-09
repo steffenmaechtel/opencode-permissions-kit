@@ -118,11 +118,32 @@
             // SYSTEM PROTECTION — destructive system commands, never allow.
             // Must come AFTER the allow rules: opencode applies the LAST
             // matching rule, so these override any broader allow above.
+            // REDIRECT DENIES (issue #391): a bash rule is matched against
+            // the WHOLE per-command text (leading-anchored, "*" = any run),
+            // so a rule like "> /dev/sd*" can never match — no command
+            // text starts with ">". Redirect rules therefore carry a
+            // LEADING "*", and the inner "*" swallows the operator token:
+            // "*>*/dev/sd*" catches >, >>, >|, &>, &>>, 2> and <> —
+            // spaced, glued (" >/dev/sda") and commandless ("> /file");
+            // the resource opencode matches includes the redirect itself. Device families are enumerated on purpose:
+            // a broad "*>*/dev/*" would deny the everyday "> /dev/null"
+            // sink. Lexical residuals stay (issue #391): tee/cp/mv onto a
+            // device, loop/md device families, variable indirection.
             "rm -rf /*": "deny",
-            "> /dev/sd*": "deny",
-            ">> /dev/sd*": "deny",
+            "*>*/dev/sd*": "deny",
+            "*>*/dev/nvme*": "deny",
+            "*>*/dev/mmcblk*": "deny",
+            "*>*/dev/vd*": "deny",
+            "*>*/dev/xvd*": "deny",
+            "*>*/dev/hd*": "deny",
+            "*>*/etc/*": "deny",
             "dd if=/dev/zero*": "deny",
-            "dd of=/dev/sd*": "deny",
+            "*dd*of=/dev/sd*": "deny",
+            "*dd*of=/dev/nvme*": "deny",
+            "*dd*of=/dev/mmcblk*": "deny",
+            "*dd*of=/dev/vd*": "deny",
+            "*dd*of=/dev/xvd*": "deny",
+            "*dd*of=/dev/hd*": "deny",
             "dd if=/dev/urandom of=/*": "deny",
             "mkfs*": "deny",
             "mkswap*": "deny",
@@ -133,8 +154,6 @@
             "chown -R * /*": "deny",
             "chgrp -R * /*": "deny",
             "mount *": "deny",
-            "> /etc/*": "deny",
-            ">> /etc/*": "deny",
             "shred /*": "deny",
             // CONTAINER TOOLS — the global config denies docker/ddev so
             // nothing is granted implicitly; a project opts in via its own

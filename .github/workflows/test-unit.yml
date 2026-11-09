@@ -78,6 +78,8 @@ jobs:
         run: ./tests/unit/test-opencode-as-opencode.sh
       - name: Run JSONC parser edge-case tests
         run: ./tests/unit/test-jsonc-parser.sh
+      - name: Run template bash rule tests
+        run: ./tests/unit/test-template-bash-rules.sh
       - name: Run git-config toggle tests
         run: ./tests/unit/test-git-config.sh
       - name: Run container backend tests

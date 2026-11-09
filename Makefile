@@ -122,7 +122,7 @@ help:
 	@echo "  make check-version Validate VERSION + consistent KIT_BRANCH in install.sh/update.sh"
 	@echo "  make release VERSION=x.y.z  Cut a release: tag + fast-forward the stable mirror (maintainer)"
 
-test: lint check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-check-host test-docs test-skills-lint test-reviews-meta-aggregate test-rules-meta test-rules-revisit test-line-length test-string-continuations test-format-gate test-coverage test-install-args test-kit-files test-tui-mode test-uninstall test-uninstall-core test-status test-status-core test-doctor test-update-flags test-update-core test-install-core test-release test-e2e-sources test-browser-bridge test-security-advisories test-log test-deploy-lib test-secure-binary test-sudoers-deploy test-sandbox-policy test-pages test-rules-index-parity test-update-check test-stdin-anchor test-harness
+test: lint check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-template-bash-rules test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-check-host test-docs test-skills-lint test-reviews-meta-aggregate test-rules-meta test-rules-revisit test-line-length test-string-continuations test-format-gate test-coverage test-install-args test-kit-files test-tui-mode test-uninstall test-uninstall-core test-status test-status-core test-doctor test-update-flags test-update-core test-install-core test-release test-e2e-sources test-browser-bridge test-security-advisories test-log test-deploy-lib test-secure-binary test-sudoers-deploy test-sandbox-policy test-pages test-rules-index-parity test-update-check test-stdin-anchor test-harness
 	@echo ""
 	@echo "All shell tests passed."
 
@@ -260,6 +260,10 @@ test-opencode-as-opencode:
 test-parser:
 	@echo "=== JSONC Parser Edge-Case Tests ==="
 	@./tests/unit/test-jsonc-parser.sh
+
+test-template-bash-rules:
+	@echo "=== Template Bash Rule Tests ==="
+	@./tests/unit/test-template-bash-rules.sh
 
 test-git-config:
 	@echo "=== Git-Config Toggle Tests ==="
