@@ -73,22 +73,22 @@ else
     fail "functions missing after sourcing:$_missing"
 fi
 
-# The entry's resolver: checkout-first (readlink -f-resolved $0 → ../sh,
-# update.sh parity) WITH the
-# deployed $LIBDIR fallback — the update.sh UPDATE_CORE shape, deliberately
-# NOT install.sh's kit_source-without-fallback (uninstall.sh runs from the
-# deployed tree via `opk uninstall`; install.sh never does). Loud abort when
-# both candidates miss.
-if grep -qF 'UNINSTALL_CORE="$(dirname "$(readlink -f "$0")")/../sh/uninstall-core.sh"' "$UNINSTALL" &&
+# The entry's resolver: checkout-first (the $0-derived caller dir —
+# anchored for stdin runs, update.sh parity) WITH the deployed $LIBDIR
+# fallback — the update.sh UPDATE_CORE shape, deliberately NOT
+# install.sh's kit_source-without-fallback (uninstall.sh runs from the
+# deployed tree via `opk uninstall`; install.sh never does). Loud abort
+# when both candidates miss.
+if grep -qF 'UNINSTALL_CORE="$UN_CALL_DIR/../sh/uninstall-core.sh"' "$UNINSTALL" &&
     grep -qF 'UNINSTALL_CORE="/usr/local/lib/opencode-permissions-kit/sh/uninstall-core.sh"' "$UNINSTALL" &&
     grep -qF 'error: uninstall-core.sh not found' "$UNINSTALL" &&
     ! sed 's/^[[:space:]]*#.*$//' "$UNINSTALL" | grep -q 'kit_source'; then
-    pass "entry resolver: checkout-first (readlink -f, update.sh parity) + \$LIBDIR fallback, loud abort"
+    pass "entry resolver: checkout-first (anchored caller dir, update.sh parity) + \$LIBDIR fallback, loud abort"
 else
     fail "entry resolver shape (checkout-first + LIBDIR fallback)"
 fi
 # resolver sits before the first section call (order pin)
-_res_ln=$(grep -n 'UNINSTALL_CORE="$(dirname "$(readlink -f "$0")")/../sh/uninstall-core.sh"' "$UNINSTALL" | cut -d: -f1)
+_res_ln=$(grep -n 'UNINSTALL_CORE="$UN_CALL_DIR/../sh/uninstall-core.sh"' "$UNINSTALL" | cut -d: -f1)
 _ctx_ln=$(grep -n '^un_context_load$' "$UNINSTALL" | cut -d: -f1)
 _first_sec_ln=$(grep -n '^un_sudoers_remove$' "$UNINSTALL" | cut -d: -f1)
 if [ -n "$_res_ln" ] && [ -n "$_ctx_ln" ] && [ -n "$_first_sec_ln" ] &&
@@ -1672,6 +1672,15 @@ if [ -z "$_pg_missing" ]; then
     pass "pairing guard list covers every core call the entry makes (#413)"
 else
     fail "core calls in uninstall.sh but absent from the guard:$_pg_missing (#413)"
+fi
+
+_unc_pi=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -c 'python3 -I' || true)
+if [ "${_unc_pi:-0}" -ge 1 ]; then
+    echo "  ${GREEN}PASS${NC}  tui unregister runs python3 -I ($_unc_pi found) (#249)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  the tui unregister must run python3 -I (#249)"
+    failures=$((failures + 1))
 fi
 
 if [ "$failures" -gt 0 ]; then

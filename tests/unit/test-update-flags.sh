@@ -306,7 +306,9 @@ _obw_n="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE" | grep -cF 'if [ "$ONLY_BINARY" 
 check "gating: kit re-deploy sections are wrapped (2 skip zones; wrap sites: $_obw_n, need >=2)" \
     [ "$_obw_n" -ge 2 ]
 check "no kit self-fetch in binary-only mode (library runs stay offline for kit files)" \
-    sh -c "grep -qF 'for _opk_a in \"\$@\"' \"\$1\" && grep -qF '[ \"\$_opk_binonly\" != true ] && [ ! -f \"\$SCRIPT_DIR/../../../VERSION\" ]' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -qF 'for _opk_a in \"\$@\"' \"\$1\" \
+        && grep -qF '[ \"\$_opk_binonly\" != true ] && { [ \"\$_opk_stdin_run\" = true ] ||' \"\$1\" \
+        && grep -qF '[ ! -f \"\$SCRIPT_DIR/../../../VERSION\" ]; }; then' \"\$1\"" _ "$UPDATE"
 check "--binary-path alone does NOT skip the self-fetch (full update + binary swap, review 0.0.29)" \
     sh -c "grep -A2 -F -- '--only-binary)' \"\$1\" | tr -s '[:space:]' ' ' | grep -qF '_opk_binonly=true break' " _ "$UPDATE"
 check "library runs fall back to the installed version stamp" \
@@ -1480,6 +1482,49 @@ if [ "$(cat "$_VSG/elfroot/sub/missing.txt" 2>/dev/null)" = "fetched-body" ] &&
 else
     fail "ensure_local_file healthy arm broken (out=$_elf_ok) (#376 B4)"
 fi
+
+# --- #257: the xdg shim section follows the binary swap ----------------------------
+# The shim gate reads the DEPLOYED binary's version, so the section must
+# run AFTER update_binary_upgrade in update.sh's phase order (a downgrade
+# + update re-deploys the shim in the same run; an upgrade past the fix
+# removes it). Both the run order and the pairing-guard list are pinned
+# — they must agree.
+_xdg_pos() {
+    _phase_lines="$(sed 's/^[[:space:]]*#.*$//' "$1" | grep -nE '^[[:space:]]*(update_binary_upgrade|update_redeploy_xdg_shim)[[:space:]]*$' | cut -d: -f1)"
+    _bin=""
+    _xdg=""
+    for _ln in $_phase_lines; do
+        case "$(sed -n "${_ln}p" "$1" | tr -d '[:space:]')" in
+            update_binary_upgrade) _bin="$_ln" ;;
+            update_redeploy_xdg_shim) _xdg="$_ln" ;;
+        esac
+    done
+    [ -n "$_bin" ] && [ -n "$_xdg" ] && [ "$_bin" -lt "$_xdg" ]
+}
+if _xdg_pos "$UPDATE"; then
+    pass "xdg shim section runs after the binary upgrade (#257)"
+else
+    fail "the xdg shim gate must see the post-swap binary version (#257)"
+fi
+# Pairing guard list: binary upgrade before xdg shim, same as the run
+# order above (the guard pins the section list — keep them in agreement).
+# The list spans backslash-continued lines — joined first, comments
+# stripped (the rider idiom — a comment inside the guard must not carry
+# the order proof, review a C3), then the ORDER is proven by prefix:
+# whatever precedes update_redeploy_xdg_shim must already contain
+# update_binary_upgrade.
+_pg_list="$(sed -n "/^update_pairing_guard() {/,/^}/p" "$UPDATE" | sed 's/^[[:space:]]*#.*$//' | tr -d '\\' | tr -s '[:space:]' ' ')"
+case "$_pg_list" in
+    *update_binary_upgrade*update_redeploy_xdg_shim*)
+        pass "pairing guard list keeps the same order (#257)"
+        ;;
+    *update_redeploy_xdg_shim*)
+        fail "pairing guard must list update_redeploy_xdg_shim after update_binary_upgrade (#257)"
+        ;;
+    *)
+        fail "pairing guard must list update_redeploy_xdg_shim (#257)"
+        ;;
+esac
 
 # --- Summary ----------------------------------------------------------------------
 suite_done "tests"

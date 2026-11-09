@@ -43,6 +43,17 @@ trap cleanup EXIT
 trap 'cleanup; exit 1' INT TERM
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+# Stdin-run anchor (#405): a streamed config.sh (curl ... | sudo sh) has
+# no real $0 — the derivation above resolves against the invoking cwd
+# and the checkout-first lookups below would source cwd-sibling files
+# as root, unpinned. Pin stdin runs to the deployed library; checkout
+# and installed runs keep their own derivation.
+if ! [ -f "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")" ]; then
+    # The DEPLOYED management dir on the flat library layout (review a
+    # B1: the repo-layout path does not exist deployed) — a stdin run
+    # then resolves exactly like a deployed run.
+    SCRIPT_DIR="/usr/local/lib/opencode-permissions-kit/management"
+fi
 LIBDIR="/usr/local/lib/opencode-permissions-kit"
 
 # === Shared UI helpers ===

@@ -226,6 +226,28 @@ if [ -n "$KIT_UPDATE_NOTE" ]; then
     note ""
 fi
 
+# _opk_timeout_ok: cached two-class timeout probe (#248) — `command -v`
+# proves findability, not function; a findable-but-broken timeout used
+# to fail the bounded probes below outright (empty ADV_LINE / major 1).
+# Only a timeout that actually runs `true` counts; everything else
+# takes the unguarded fallback arm (the absent-timeout trade both sites
+# already make). Residual, accepted: a timeout that hangs on trivial
+# use hangs the probe — nothing left to bound it. The wrapper keeps no
+# lib dependencies, so this is a standalone copy; identical copies:
+# sh/update-core.sh and sh/status-core.sh (keep them in sync).
+_opk_timeout_ok() {
+    case "${_OPK_TIMEOUT_OK:-}" in
+        1) return 0 ;;
+        2) return 1 ;;
+    esac
+    if command -v timeout >/dev/null 2>&1 && timeout 2 true >/dev/null 2>&1; then
+        _OPK_TIMEOUT_OK=1
+        return 0
+    fi
+    _OPK_TIMEOUT_OK=2
+    return 1
+}
+
 # Known security advisories for the installed binary (issue #107): the
 # curated database ships with the kit (sh/advisories.sh) and is checked
 # LOCALLY — no network on the hot path, fresh entries arrive through the
@@ -249,7 +271,7 @@ ADV_HITS=""
 if [ -f /usr/local/lib/opencode-permissions-kit/sh/advisories.sh ]; then
     # shellcheck disable=SC1091  # deployed lib, guarded above
     . /usr/local/lib/opencode-permissions-kit/sh/advisories.sh
-    if command -v timeout >/dev/null 2>&1; then
+    if _opk_timeout_ok; then
         ADV_LINE=$(timeout 5 /usr/bin/sudo -n -u opencode \
             /usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1 || true)
     else
@@ -453,7 +475,7 @@ if [ -z "${OPENCODE_MAJOR:-}" ]; then
     # case fail-open delay on every unstamped start; the narrowed band
     # is the cheaper side of that trade.
     if [ -z "$_MAJOR_SRC" ] && [ ! -f /usr/local/lib/opencode-permissions-kit/sh/advisories.sh ]; then
-        if command -v timeout >/dev/null 2>&1; then
+        if _opk_timeout_ok; then
             _MAJOR_SRC=$(timeout 10 /usr/bin/sudo -n -u opencode \
                 /usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1 || true)
         else
@@ -489,7 +511,9 @@ merged_config() {
     # the bound even `opencode --version` hangs after the banner (observed
     # on a real WSL, issue #80). On timeout the wrapper falls back to the
     # project-only scan. 10s covers a cold service boot (~2-4s) generously.
-    if command -v timeout >/dev/null 2>&1; then
+    # The gate is the #248 two-class probe (a broken-but-findable timeout
+    # degrades to the unbounded arm, not to a failed probe).
+    if _opk_timeout_ok; then
         timeout 10 /usr/bin/sudo -n -u opencode \
             /usr/local/lib/opencode-permissions-kit/bin/opencode debug config 2>/dev/null || true
     else
@@ -501,7 +525,11 @@ tools_from_config() {
     # "-" reads stdin (the piped merged config); a path reads that file.
     # Non-zero exit = output not trustworthy (JSON error, or exit 3 for an
     # unusable shape) — the caller falls back to the project-only scan.
-    python3 /usr/local/lib/opencode-permissions-kit/py/jsonc-parser.py --tools "$1" 2>/dev/null
+    # -I (#249): the ambient PYTHONHOME/PYTHONPATH must not break (or
+    # shadow) the container opt-in — the parser imports stdlib only. A
+    # warn line on the fallback stayed deliberately undone (review W5's
+    # deferred part: hot-path noise for a rare broken-env case).
+    python3 -I /usr/local/lib/opencode-permissions-kit/py/jsonc-parser.py --tools "$1" 2>/dev/null
 }
 # opencode 2.x: the probe may have cold-started the background service —
 # stop it again (graceful). A long-lived service answers later probes with
@@ -513,7 +541,7 @@ tools_from_config() {
 # the service. 1.x: unknown subcommand, error ignored.
 stop_merged_config_service() {
     [ "${OPENCODE_MAJOR:-}" = 2 ] || return 0
-    if command -v timeout >/dev/null 2>&1; then
+    if _opk_timeout_ok; then
         timeout 5 /usr/bin/sudo -n -u opencode \
             /usr/local/lib/opencode-permissions-kit/bin/opencode service stop >/dev/null 2>&1 || true
     else

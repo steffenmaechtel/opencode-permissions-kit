@@ -506,7 +506,12 @@ printing URL and device code.
 **Fix:** update the kit (`sudo opk update`) — it deploys an xdg-open
 fallback shim to `/usr/local/bin/xdg-open`, but only while no real
 xdg-open exists (`sudo apt install xdg-utils` works too; the kit stands
-back once a real one appears). The login then degrades gracefully: URL and
+back once a real one appears) **and** the installed opencode still needs
+it: opencode ≥ 2.0.32 handles a missing xdg-open itself (upstream fix,
+first release 2.0.32), so on current 2.x the shim is withheld/removed.
+The whole 1.x line and 2.x before 2.0.32 keep it (downgrade for testing?
+Re-run `sudo opk update` afterwards to re-evaluate the shim). The login
+then degrades gracefully: URL and
 code stay on screen, open the URL in any browser. Self-test as your own
 user — the browser must open `https://opencode.ai`:
 

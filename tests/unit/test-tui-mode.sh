@@ -482,6 +482,16 @@ case "$_tps_out" in *rc=0*) check "unregister cleanup: caller PATH without pytho
 check "unregister cleanup: exec-context python3 runs despite caller absence (#244 e S1 arm B)" test -f "$TPSMARK"
 rm -rf "$TPSW" "$TPSABS2" "$TPSFIXA" "$TPSFIXB" "$TPSMARK"
 
+# --- #249 sweep floor: the unregister exec runs isolated -------------------------
+_tpm_pi=$(sed 's/^[[:space:]]*#.*$//' "$TUIPLUGIN" | grep -c 'exec python3 -I' || true)
+if [ "${_tpm_pi:-0}" -ge 1 ]; then
+    echo "  ${GREEN}PASS${NC}  tui-plugin's unregister exec runs python3 -I (#249)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  the unregister exec must run python3 -I (#249)"
+    failures=$((failures + 1))
+fi
+
 # --- summary ------------------------------------------------------------------
 echo ""
 if [ "$failures" -gt 0 ]; then

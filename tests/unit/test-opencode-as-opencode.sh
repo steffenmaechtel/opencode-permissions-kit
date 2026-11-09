@@ -866,6 +866,40 @@ else
     failures=$((failures + 1))
 fi
 
+# --- #249: tools_from_config runs the parser isolated (-I) ------------------------
+# The wrapper's own function names the deployed LIBDIR path (unpinnable
+# hermetically), so the wiring pin greps the real call site behind the
+# comment-strip rider; the mechanism pin (shadow pair) runs at
+# REAL_PARSER below, where the parser path is in hand.
+if sed 's/^[[:space:]]*#.*$//' "$WRAPPER_FILE" | grep -q 'python3 -I /usr/local/lib/opencode-permissions-kit/py/jsonc-parser.py --tools'; then
+    echo "  ${GREEN}PASS${NC}  tools_from_config invokes the parser with -I (#249)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  tools_from_config must run python3 -I (ambient env must not steer it) (#249)"
+    failures=$((failures + 1))
+fi
+
+# --- #248: the wrapper's bounded probes gate on the two-class timeout probe -------
+# Sabotage discriminator: reverting a gate to presence-only reintroduces
+# the `command -v timeout ...; then` GATE shape — the helper's own
+# first class is the `command -v ... && timeout 2 true` pair, which the
+# count pin above already requires.
+_w248="$(sed 's/^[[:space:]]*#.*$//' "$WRAPPER_FILE" | grep -c 'if _opk_timeout_ok; then' || true)"
+if [ "${_w248:-0}" -ge 4 ]; then
+    echo "  ${GREEN}PASS${NC}  all four wrapper probe gates use _opk_timeout_ok ($_w248 sites) (#248)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  wrapper probe gates must use the two-class timeout probe (found ${_w248:-0}) (#248)"
+    failures=$((failures + 1))
+fi
+if sed 's/^[[:space:]]*#.*$//' "$WRAPPER_FILE" | grep -q 'command -v timeout >/dev/null 2>&1; then'; then
+    echo "  ${RED}FAIL${NC}  wrapper must not gate probes on presence-only timeout checks (#248)"
+    failures=$((failures + 1))
+else
+    echo "  ${GREEN}PASS${NC}  no presence-only timeout gate remains in the wrapper (#248)"
+    passed=$((passed + 1))
+fi
+
 # functional: extract the detection logic, stub the probe + note, run the
 # REAL parser (same static-extraction technique as HL_BLOCK / SC_BLOCK)
 DT_BLOCK="$(sed -n '/^CONTAINER_REQUESTED=false$/,/^# .serve. always resolves container tools/p' "$WRAPPER_FILE" | sed '$d')"
@@ -879,6 +913,31 @@ fi
 
 mkdir -p "$TMPDIR/dt-project"
 REAL_PARSER="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/py/jsonc-parser.py"
+
+# --- #249 mechanism pair: the parser tools_from_config runs survives a shadow -----
+# -I keeps the real json module against a functional PYTHONPATH shadow
+# (the os.py lesson from #244: json is imported by the parser at call
+# time, not preloaded); the control arm proves the shadow is genuinely
+# hostile — without it the -I pin would pass vacuously.
+_shadow_dir="$TMPDIR/py-shadow-249"
+mkdir -p "$_shadow_dir" "$TMPDIR/shadow-proj"
+printf 'raise SystemExit("shadow json imported")\n' >"$_shadow_dir/json.py"
+printf '{ "permission": { "bash": { "docker *": "allow" } } }\n' >"$TMPDIR/shadow-proj/opencode.jsonc"
+if PYTHONPATH="$_shadow_dir" python3 -I "$REAL_PARSER" --tools "$TMPDIR/shadow-proj/opencode.jsonc" 2>/dev/null |
+    grep -q '^docker$'; then
+    echo "  ${GREEN}PASS${NC}  parser under -I ignores a functional json.py shadow (PYTHONPATH) (#249)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  -I must keep the real json module against a PYTHONPATH shadow (#249)"
+    failures=$((failures + 1))
+fi
+if PYTHONPATH="$_shadow_dir" python3 "$REAL_PARSER" --tools "$TMPDIR/shadow-proj/opencode.jsonc" >/dev/null 2>&1; then
+    echo "  ${RED}FAIL${NC}  control arm: bare python3 must pick the shadow (vacuous -I pin) (#249)"
+    failures=$((failures + 1))
+else
+    echo "  ${GREEN}PASS${NC}  control arm: bare python3 picks the shadow json.py (#249)"
+    passed=$((passed + 1))
+fi
 
 # dt_run <merged-json|EMPTY> <project-file|-> <project-content>
 # Prints "tools=[...] requested=.. auto=.. banner=.." (banner counts the

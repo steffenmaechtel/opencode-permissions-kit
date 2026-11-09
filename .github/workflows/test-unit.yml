@@ -160,6 +160,8 @@ jobs:
         run: ./tests/unit/test-log.sh
       - name: Run test harness meta tests
         run: ./tests/unit/test-harness.sh
+      - name: Run stdin-run caller-dir anchor tests (issue #405)
+        run: ./tests/unit/test-stdin-anchor.sh
       - name: Run browser bridge tests
         run: ./tests/unit/test-browser-bridge.sh
       - name: Run line-length ratchet

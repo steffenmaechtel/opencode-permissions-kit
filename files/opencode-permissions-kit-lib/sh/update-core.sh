@@ -185,11 +185,38 @@ update_redeploy_cli_links() {
 update_redeploy_xdg_shim() {
     # --- xdg-open fallback shim (opencode 1.18.33+ / 2.0.18+ login fix) -------------
 
-    # Deploy only while no real xdg-open exists; heal the shadow case (a real
-    # one appeared since install -> the kit stands back). Guards share the
-    # never-shadow probe with install.sh (0.0.42d S1/C1): xdg_open_real_exists
-    # scans the whole PATH except /usr/local/bin (our shim's slot) — a real
-    # xdg-open under /usr/sbin or /snap/bin no longer gets shadowed.
+    # Position (#257): runs AFTER update_binary_upgrade in update.sh's
+    # section order — the gate below reads the DEPLOYED binary's
+    # version, so a downgrade + update re-deploys the shim in the same
+    # run and an upgrade past the fix removes it.
+    # Deploy only while no real xdg-open exists AND the binary still
+    # needs the shim: opencode >= 2.0.32 handles a missing xdg-open
+    # itself (upstream #52548, PR #56082; the 1.x line never got the
+    # fix — xdg_shim_needed_for in sh/deploy-lib.sh, issue #257). Heal
+    # the shadow case (a real one appeared since install -> the kit
+    # stands back). Guards share the never-shadow probe with install.sh
+    # (0.0.42d S1/C1): xdg_open_real_exists scans the whole PATH except
+    # /usr/local/bin (our shim's slot) — a real xdg-open under
+    # /usr/sbin or /snap/bin no longer gets shadowed.
+    _xds_ver=$(opencode_version_line)
+    _xds_maj=$(printf '%s' "$_xds_ver" | sed -n 's/^opencode v\([0-9][0-9]*\).*/\1/p')
+    if [ -z "$_xds_maj" ] && printf '%s' "$_xds_ver" | grep -qE '^[0-9]+(\.[0-9]+)*$'; then
+        _xds_maj=1 # bare version line = 1.x, full-line anchored
+    fi
+    _xds_trip=$(printf '%s' "$_xds_ver" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
+    if ! xdg_shim_needed_for "${_xds_maj:-}" "$_xds_trip"; then
+        # The binary opens without one — same stand-back as the
+        # real-xdg heal below; only a kit-owned link is ever removed.
+        if [ -L /usr/local/bin/xdg-open ] &&
+            [ "$(readlink /usr/local/bin/xdg-open 2>/dev/null || true)" = "$LIBDIR/bin/xdg-open" ]; then
+            sudo rm -f /usr/local/bin/xdg-open
+            ui_detail "xdg-open fallback removed: opencode ${_xds_trip} opens without one (>= $XDG_SHIM_FIX_VERSION)"
+            log "xdg-open shim removed: opencode $_xds_trip >= $XDG_SHIM_FIX_VERSION needs no fallback (#257)"
+        else
+            log "xdg-open shim withheld: opencode ${_xds_trip:-<unparsed>} opens without one (>= $XDG_SHIM_FIX_VERSION, #257)"
+        fi
+        return 0
+    fi
     if [ -L /usr/local/bin/xdg-open ] &&
         [ "$(readlink /usr/local/bin/xdg-open 2>/dev/null || true)" = "$LIBDIR/bin/xdg-open" ]; then
         if xdg_open_real_exists; then
@@ -673,13 +700,45 @@ detect_target() {
     echo "$target"
 }
 
+# _opk_timeout_ok: cached two-class timeout probe (#248). `command -v`
+# proves findability, not function — a findable-but-BROKEN timeout
+# (dangling shim, corrupted binary) used to turn every bounded probe
+# below into an immediate failure with no named cause (the residual
+# hang case is documented below). Presence PLUS a bounded behavior
+# check, the installer's python3-gate shape on a smaller scale: only a
+# timeout that actually runs `true` counts, everything else takes the
+# unguarded fallback arm — the same deliberate trade an absent timeout
+# already makes at every site. Residual, accepted: a timeout binary
+# that HANGS on trivial use hangs this probe too — no working bounder
+# is left to bound it. Probed once per run. Identical copies:
+# sh/status-core.sh and bin/opencode-as-opencode (no shared lib reaches
+# all three — keep them in sync).
+_opk_timeout_ok() {
+    case "${_OPK_TIMEOUT_OK:-}" in
+        1) return 0 ;;
+        2) return 1 ;;
+    esac
+    if command -v timeout >/dev/null 2>&1 && timeout 2 true >/dev/null 2>&1; then
+        _OPK_TIMEOUT_OK=1
+        return 0
+    fi
+    _OPK_TIMEOUT_OK=2
+    return 1
+}
+
 # Verify a candidate binary actually runs, then install it over $SYSTEM_BIN.
 # Bounded `--version` probe (0.0.43b W3): a wedged 2.x service can make
-# even --version hang (issue #80) — the update paths, including the
-# pre-upgrade major resolution, must never block on it. Empty output
-# means unknown, never a guess.
+# even --version hang (issue #80) — with a WORKING timeout the update
+# paths, including the pre-upgrade major resolution, never block on it
+# and empty output means unknown, never a guess. The gate is the #248
+# two-class probe: a broken-but-findable timeout degrades to the
+# UNBOUNDED arm, not to a failed probe — for install_binary that
+# converts the old bounded refusal (probe failed → candidate rejected)
+# into an unbounded run of the candidate (review a A4: same deliberate
+# trade an absent timeout already made, now named); a broken timeout
+# PLUS the #80 wedge can hang the update on such hosts.
 opencode_version_line() {
-    if command -v timeout >/dev/null 2>&1; then
+    if _opk_timeout_ok; then
         timeout 10 "$SYSTEM_BIN" --version 2>/dev/null | head -1 || true
     else
         "$SYSTEM_BIN" --version 2>/dev/null | head -1 || true
@@ -688,7 +747,7 @@ opencode_version_line() {
 
 install_binary() {
     local src="$1" current new
-    if command -v timeout >/dev/null 2>&1; then
+    if _opk_timeout_ok; then
         timeout 30 "$src" --version >/dev/null 2>&1 || return 1
     else
         "$src" --version >/dev/null 2>&1 || return 1
@@ -817,6 +876,9 @@ resolve_latest_opencode_version() {
     if [ "$_rlov_major" = 2 ]; then
         # python3 is the kit's canonical JSON parser (grep/sed on a
         # packument can match an earlier "latest": occurrence elsewhere).
+        # -I (#249): a poisoned PYTHONHOME/PYTHONPATH must not break (or
+        # steer) the resolver — stdlib-only import, same hardening as the
+        # installer gate.
         # Interpreter stderr passes through on the failure path (#244 c
         # S3): an unparseable registry body stays silent (the except
         # path is the expected failure), a broken interpreter names
@@ -827,7 +889,7 @@ resolve_latest_opencode_version() {
         _rlov_ver=""
         if command -v python3 >/dev/null 2>&1; then
             _rlov_ver=$(curl -fsSL --max-time 10 "https://registry.npmjs.org/@opencode/cli-$_rlov_target" 2>/dev/null |
-                python3 -c 'import json,sys
+                python3 -I -c 'import json,sys
 try:
     dist = json.load(sys.stdin)["dist-tags"]
     print(dist["latest"])

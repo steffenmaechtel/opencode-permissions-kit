@@ -52,8 +52,22 @@ done
 # Best-effort shared logger (/var/log/opencode-permissions-kit/). Sourced
 # before any removal so the final lines are written before the library and
 # the log directory itself are deleted.
+#
+# Caller-dir anchor (#405), placed before the first dirname-$0 lookup:
+# a streamed stdin run (curl ... | sudo sh) has no real $0 — the
+# lookups below would resolve a cwd-sibling lib and source it as root,
+# unpinned. Pin stdin runs to the deployed library's management dir on
+# the FLAT layout (review a B1: the repo-layout path does not exist
+# deployed); checkout and installed runs keep their own dir — resolved
+# through readlink like the pre-#405 UNINSTALL_CORE line (review a B1:
+# the bare dirname lost symlink resolution). A real script path
+# resolves to an existing file, the interpreter name does not.
+UN_CALL_DIR="$(dirname "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")")"
+if ! [ -f "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")" ]; then
+    UN_CALL_DIR="/usr/local/lib/opencode-permissions-kit/management"
+fi
 log() { :; }
-for cand in "$(dirname "$0")/../sh/log.sh" \
+for cand in "$UN_CALL_DIR/../sh/log.sh" \
     "/usr/local/lib/opencode-permissions-kit/sh/log.sh" "/usr/local/lib/opencode/log.sh"; do
     if [ -f "$cand" ]; then
         . "$cand"
@@ -67,7 +81,7 @@ done
 # F27): the old silent no-op let the caller below claim "removed" over
 # a removal that never ran.
 browser_bridge_remove() { return 1; }
-for cand in "$(dirname "$0")/../sh/wsl-browser-bridge.sh" \
+for cand in "$UN_CALL_DIR/../sh/wsl-browser-bridge.sh" \
     "/usr/local/lib/opencode-permissions-kit/sh/wsl-browser-bridge.sh"; do
     if [ -f "$cand" ]; then
         . "$cand"
@@ -80,7 +94,7 @@ done
 # ~/.config/opencode — agent-replaceable). Stub keeps older installs
 # (pre-0.0.39h deployed library, no walker yet) uninstallable.
 agent_home_sane() { return 0; }
-for cand in "$(dirname "$0")/../sh/staged-write.sh" "/usr/local/lib/opencode-permissions-kit/sh/staged-write.sh"; do
+for cand in "$UN_CALL_DIR/../sh/staged-write.sh" "/usr/local/lib/opencode-permissions-kit/sh/staged-write.sh"; do
     if [ -f "$cand" ]; then
         . "$cand"
         break
@@ -142,7 +156,7 @@ fi
 # lib is a broken kit (the #165 class): loud error, no silent section
 # drops. Unlike install.sh's kit_source there IS a $LIBDIR fallback here
 # -- uninstall.sh runs from the deployed tree, install.sh never does.
-UNINSTALL_CORE="$(dirname "$(readlink -f "$0")")/../sh/uninstall-core.sh"
+UNINSTALL_CORE="$UN_CALL_DIR/../sh/uninstall-core.sh"
 [ -f "$UNINSTALL_CORE" ] || UNINSTALL_CORE="/usr/local/lib/opencode-permissions-kit/sh/uninstall-core.sh"
 if [ -f "$UNINSTALL_CORE" ]; then
     # shellcheck disable=SC1090

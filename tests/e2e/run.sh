@@ -159,8 +159,18 @@ check "2b: traverse grant stays read-less (home not listable)" \
     E '! getfacl -p /home/dev 2>/dev/null | grep -q "^group:opencode:r"'
 check "2b: podman-rootless never sets the ddev bind-mounts switch" \
     E '! grep -q "config global --no-bind-mounts" /tmp/fake-ddev.log'
-check "2b: xdg-open fallback shim deployed (no real xdg-open in the container)" \
-    E 'readlink /usr/local/bin/xdg-open | grep -q "^/usr/local/lib/opencode-permissions-kit/bin/xdg-open$"'
+# xdg-open shim follows the binary (issue #257): opencode >= 2.0.32
+# handles a missing xdg-open itself (upstream anomalyco/opencode#52548,
+# PR #56082; first fixed release v2.0.32) — the kit withholds/removes
+# the fallback shim. Older 2.x and the whole 1.x line (never fixed
+# upstream) keep it. Version order via sort -V, the advisories idiom.
+if [ "$(printf '%s\n2.0.32\n' "$OC_VERSION" | sort -V | tail -n 1)" = "$OC_VERSION" ]; then
+    check "2b: xdg-open shim withheld (opencode $OC_VERSION >= 2.0.32 opens without one, #257)" \
+        E '! test -e /usr/local/bin/xdg-open'
+else
+    check "2b: xdg-open fallback shim deployed (opencode $OC_VERSION predates the #257 fix)" \
+        E 'readlink /usr/local/bin/xdg-open | grep -q "^/usr/local/lib/opencode-permissions-kit/bin/xdg-open$"'
+fi
 
 echo ""
 echo "--- 2c. ddev database migration (issue #15) ---"

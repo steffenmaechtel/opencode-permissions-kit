@@ -76,8 +76,10 @@ tui_plugin_sync_user() {
     # secure_path that differs from the caller's PATH cannot make the
     # two disagree (silent skip in one arm, not-found noise in the
     # other). Operands pass as argv to the inner sh — nothing is
-    # expanded inside the quoted script.
-    _tp_sudo sh -c 'command -v python3 >/dev/null 2>&1 && exec python3 "$@"' tui-unregister \
+    # expanded inside the quoted script. -I (#249): a poisoned
+    # PYTHONHOME/PYTHONPATH must not break the cleanup — stdlib-only
+    # import.
+    _tp_sudo sh -c 'command -v python3 >/dev/null 2>&1 && exec python3 -I "$@"' tui-unregister \
         "$_tp_libdir/py/tui-register.py" "$_tp_user_dir/cli.json" unregister \
         "$_tp_libdir/tui/kit-mode-2x.tsx" --drop "$_tp_libdir/tui/kit-mode.tsx" >/dev/null || true
     return 0

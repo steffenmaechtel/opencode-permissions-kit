@@ -65,7 +65,9 @@ _opk_ddev_describe() {
 # of a `ddev describe -j` document (single line); empty when the path is
 # absent or not a string. Keys may be passed as separate arguments or
 # dot-joined. python3 is a kit prerequisite (the installer already
-# depends on it for its jsonc parsing). Expected misses are silent
+# depends on it for its jsonc parsing); -I (#249): ambient
+# PYTHONHOME/PYTHONPATH must not break the URL resolution — stdlib-only
+# import. Expected misses are silent
 # (except: pass, empty output); a broken interpreter's own stderr
 # passes through (#244 c S3) — the empty-on-miss contract is untouched.
 # An absent interpreter is guarded to the same silent empty output
@@ -81,7 +83,7 @@ _opk_json_get() {
     _opk_gj="$1"
     shift
     command -v python3 >/dev/null 2>&1 || return 0
-    printf '%s' "$_opk_gj" | python3 -c '
+    printf '%s' "$_opk_gj" | python3 -I -c '
 import json, sys
 try:
     d = json.load(sys.stdin)["raw"]

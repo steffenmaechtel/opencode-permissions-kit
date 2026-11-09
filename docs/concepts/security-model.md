@@ -134,7 +134,10 @@ Newer opencode versions (1.x ≥ 1.18.33, 2.x ≥ 2.0.18) bundle an opener that
 access-checks powershell and falls back to `xdg-open` — no bridge needed.
 Because WSL distros ship no `xdg-open` by default, the kit deploys a fallback
 shim at `/usr/local/bin/xdg-open` (only while no real one exists;
-`sudo apt install xdg-utils` works too).
+`sudo apt install xdg-utils` works too) and only while the installed
+opencode still needs it — opencode ≥ 2.0.32 opens without one itself, so
+on current 2.x the kit withholds the shim (1.x never got the upstream fix
+and always keeps it).
 
 `opk status` reports the bridge state; the wrapper warns on every start while
 the carrier is missing. `OPK_BROWSER_BRIDGE_DEBUG=1` before a direct

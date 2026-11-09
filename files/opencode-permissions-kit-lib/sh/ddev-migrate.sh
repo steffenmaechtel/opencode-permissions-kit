@@ -169,13 +169,37 @@ ddev_migrate_gap() {
     # 0 attempted (the gap warning then fires — correct).
     dmg_stage=$(mktemp) || return 1
     command -v _tmp_track >/dev/null 2>&1 && _tmp_track "$dmg_stage"
-    dmg_found=$(find "$dmg_dir" -maxdepth 1 -type f -name manifest.conf -print -quit 2>/dev/null)
-    if [ -z "$dmg_found" ] || ! timeout 5 cat "$dmg_found" >"$dmg_stage" 2>/dev/null; then
+    dmg_finderr=$(mktemp) || {
         rm -f "$dmg_stage" 2>/dev/null || true
+        return 1
+    }
+    command -v _tmp_track >/dev/null 2>&1 && _tmp_track "$dmg_finderr"
+    # find's stderr is kept (#322, the #232 rules-audit idiom): an
+    # unreadable dump dir used to masquerade as "no manifest" — this
+    # rc 1 silently suppressed the partial-export warning over a tree
+    # nobody can read, the exact blind spot this detector exists for.
+    # Decision: skip-with-note — no gap is CLAIMED (rc 1 keeps its "no
+    # verdict" meaning for both callers), but the unreadable dir names
+    # itself on stderr for install/status output.
+    dmg_found=$(find "$dmg_dir" -maxdepth 1 -type f -name manifest.conf -print -quit 2>"$dmg_finderr")
+    if [ -s "$dmg_finderr" ]; then
+        # UI_SILENT-gated (review a B2): status --short's one-verdict-line
+        # contract (agent/conventions.md, "Script output style") must
+        # survive the note — the ui.sh printers are muted under it, a raw
+        # echo is not. The CLI and install paths (no UI_SILENT) keep the
+        # stderr note.
+        if [ "${UI_SILENT:-0}" != 1 ]; then
+            echo "ddev-migrate: cannot inspect $dmg_dir ($(head -1 "$dmg_finderr")) — partial-export check skipped" >&2
+        fi
+        rm -f "$dmg_stage" "$dmg_finderr" 2>/dev/null || true
+        return 1
+    fi
+    if [ -z "$dmg_found" ] || ! timeout 5 cat "$dmg_found" >"$dmg_stage" 2>/dev/null; then
+        rm -f "$dmg_stage" "$dmg_finderr" 2>/dev/null || true
         return 1
     fi
     dmg_have=$(grep -cE '^(OK|SKIP|FAIL)\|' "$dmg_stage" 2>/dev/null || true)
-    rm -f "$dmg_stage" 2>/dev/null || true
+    rm -f "$dmg_stage" "$dmg_finderr" 2>/dev/null || true
     dmg_have=${dmg_have:-0}
     dmg_now=$(ddev_migrate_projects "$(ddev_migrate_home "$dmg_dev")/.ddev" "$@" 2>/dev/null | grep -c . || true)
     dmg_now=${dmg_now:-0}
@@ -668,19 +692,33 @@ ddev_migrate_import() {
     # all of them: a mktemp failure returned 1 SILENTLY, and a cat
     # timeout (rc 124, the S6 stat-to-read swap residual) or an
     # unreadable manifest masqueraded as the genuine no-manifest case.
+    # #322 adds the fourth cause: find's own stderr is kept (the #232
+    # idiom) — an unreadable dump dir is REFUSED by name, never folded
+    # into the no-manifest arm it used to silently degrade to.
     dm_manifest=$(mktemp) || {
         echo "ddev-migrate: cannot create a staging temp for the manifest (disk full?)"
         return 1
     }
     command -v _tmp_track >/dev/null 2>&1 && _tmp_track "$dm_manifest"
-    dm_found=$(find "$dm_dir" -maxdepth 1 -type f -name manifest.conf -print -quit 2>/dev/null)
-    if [ -z "$dm_found" ]; then
+    dm_finderr=$(mktemp) || {
         rm -f "$dm_manifest" 2>/dev/null || true
+        echo "ddev-migrate: cannot create a staging temp for find errors (disk full?)"
+        return 1
+    }
+    command -v _tmp_track >/dev/null 2>&1 && _tmp_track "$dm_finderr"
+    dm_found=$(find "$dm_dir" -maxdepth 1 -type f -name manifest.conf -print -quit 2>"$dm_finderr")
+    if [ -s "$dm_finderr" ]; then
+        echo "ddev-migrate: dump directory unreadable — refusing to import from $dm_dir ($(head -1 "$dm_finderr"))"
+        rm -f "$dm_manifest" "$dm_finderr" 2>/dev/null || true
+        return 1
+    fi
+    if [ -z "$dm_found" ]; then
+        rm -f "$dm_manifest" "$dm_finderr" 2>/dev/null || true
         echo "ddev-migrate: no dump directory with a manifest found under $DDEV_MIG_BACKUP_ROOT"
         return 1
     fi
     if ! timeout 5 cat "$dm_found" >"$dm_manifest" 2>/dev/null; then
-        rm -f "$dm_manifest" 2>/dev/null || true
+        rm -f "$dm_manifest" "$dm_finderr" 2>/dev/null || true
         echo "ddev-migrate: manifest found but unreadable (timeout or permissions) — refusing to import from $dm_dir"
         return 1
     fi
@@ -759,7 +797,7 @@ ddev_migrate_import() {
             dm_failed="$dm_failed $dm_n"
         fi
     done <"$dm_manifest"
-    rm -f "$dm_manifest" 2>/dev/null || true
+    rm -f "$dm_manifest" "$dm_finderr" 2>/dev/null || true
 
     echo ""
     echo "  imported $dm_ok database(s) from $dm_dir"
