@@ -639,14 +639,13 @@ un_user_remove() {
 # Swap-skips and genuine chown errors share the "find-chown failed"
 # label deliberately: both mean "entries stayed behind — inspect the
 # tree", and a per-cause channel through xargs is not worth the
-# machinery (the fs-baseline twin logs the same way). Residual windows
-# (#420 a A4/A5, recorded here): the per-operand recheck->chown gap is
+# machinery (the fs-baseline twin logs the same way). Residual window
+# (#420 a A4, recorded here): the per-operand recheck->chown gap is
 # microsecond-scale and undetectable (same accepted shape as the
-# handover pair's gate->op residual and _fsb_pass's); and the walk
-# starts BELOW the scan root — the ROOT itself swapped between find and
-# the worker still redirects the batch (the pre-existing _fsb_pass
-# shape, :364 there; closing it is a two-worker class sweep, work order
-# proposed in this PR's review).
+# handover pair's gate->op residual and _fsb_pass's). The ROOT-swap
+# window #420 a A5 named (the walk starting below the scan root) is
+# CLOSED (#421): the worker head rechecks [ -L "$_root" ] per batch
+# and refuses loud — the two-worker class sweep _fsb_pass rides.
 _un_revert_chown() { # <root>; UN_OC_UID/UN_OC_GID select, DEFAULT_USER/
     #                  UN_DEV_GROUP are the chown target
     _unr_root="$1"
@@ -679,6 +678,16 @@ _un_revert_chown() { # <root>; UN_OC_UID/UN_OC_GID select, DEFAULT_USER/
         # V9 shape): a for-loop status alone is the LAST command.
         _root=$1; shift
         _own=$1; shift
+        # Scan-root recheck (#421): the component walk below starts
+        # BELOW the root — a root swapped for a symlink between find
+        # and this batch redirects every walk test (and the chown)
+        # through it, where components are real directories and no
+        # gate fires. Fail the batch loud; the degraded closing counts
+        # the root as left behind (un_rc_q).
+        if [ -L "$_root" ]; then
+            echo "  warn: scan root $_root was replaced by a symlink — revert chown batch refused" >&2
+            exit 1
+        fi
         _fail=0
         for _p in "$@"; do
             if [ -L "$_p" ]; then

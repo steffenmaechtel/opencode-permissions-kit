@@ -283,7 +283,15 @@ if counted and not aborted and not progress_dead:
 # operand whose parent is a link NOW resolves outside the tree. The
 # worker therefore re-tests EVERY component between the scan root and
 # the operand (chain-walker shape of agent_home_sane, staged-write.sh)
-# and skips the operand when any of them is a symlink.
+# and skips the operand when any of them is a symlink — including the
+# SCAN ROOT itself (#421): the walk proper starts below it, so a root
+# swapped between find and a batch would redirect every walk test and
+# the command through it; the worker-head recheck fails the batch
+# loud (_FSB_ERRORS counts it at the pass bookkeeping). Residual
+# window (#420 a A4, mirrored from _un_revert_chown's header): the
+# per-operand recheck->command gap is microsecond-scale and
+# undetectable — the same accepted shape as the handover pair's
+# gate->op residual.
 _fsb_pass() {
     _fsbp_label="$1"
     _fsbp_root="$2"
@@ -345,6 +353,16 @@ _fsb_pass() {
                 # appended.
                 _n=$1; shift
                 _root=$1; shift
+                # Scan-root recheck (#421): the component walk below
+                # starts BELOW the root — a root swapped for a symlink
+                # between find and this batch redirects every walk
+                # test (and the command) through it, where components
+                # are real directories and no gate fires. Fail the
+                # batch loud; the pass bookkeeping counts it.
+                if [ -L "$_root" ]; then
+                    echo "  warn: scan root $_root was replaced by a symlink — baseline batch refused" >&2
+                    exit 1
+                fi
                 _c=""
                 while [ "$_n" -gt 0 ]; do _c="$_c $1"; shift; _n=$((_n - 1)); done
                 # _fail accumulates across the WHOLE batch (0.0.44a V9):

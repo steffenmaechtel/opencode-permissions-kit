@@ -420,6 +420,54 @@ assert_eq "parent-swap: victim outside the tree keeps its mode (#211 a F1)" "600
 assert_eq "parent-swap: skipped operand does not fail the pass (rc 0)" "0" "$F1RC"
 rm -rf "$F1DIR" "$F1STUB"
 
+# --- 9b. root-swap race: worker-head scan-root recheck (#421) -----------------------
+# The #421 shape: the 9 walk (a F1) starts BELOW the scan root, so a
+# ROOT swapped for a symlink between find and the batch redirected
+# every walk test — and the command — through it, where components
+# are real directories and no gate fires. Same deterministic seam as
+# 9: the stub find runs the REAL find, then swaps the ROOT itself,
+# then exits — the replay then starts with a linked root. The worker
+# head must refuse the batch LOUD: the victim keeps its mode, the
+# pass FAILS (a redirected batch is never a skip), the message names
+# the swap.
+F2DIR=$(mktemp -d)
+F2STUB=$(mktemp -d)
+F2REAL="$(command -v find)"
+mkdir -p "$F2DIR/proj" "$F2DIR/victim"
+printf 'scanned\n' >"$F2DIR/proj/file"
+printf 'victim\n' >"$F2DIR/victim/file"
+chmod 600 "$F2DIR/victim/file"
+cat >"$F2STUB/find" <<EOF
+#!/bin/sh
+"$F2REAL" "\$@"
+_rc=\$?
+if [ -d "$F2DIR/proj" ] && [ ! -L "$F2DIR/proj" ]; then
+    mv "$F2DIR/proj" "$F2DIR/proj-moved"
+    ln -s "$F2DIR/victim" "$F2DIR/proj"
+fi
+exit \$_rc
+EOF
+chmod +x "$F2STUB/find"
+F2RC=0
+F2MSG=$(FS_SUDO="" PATH="$F2STUB:$PATH" \
+    sh -c '. "$1" && _fsb_pass "root-swap" "$2" -type f -- chmod g+w' \
+    _ "$LIB" "$F2DIR/proj" 2>&1) || F2RC=$?
+if [ -d "$F2DIR/proj-moved" ] && [ -L "$F2DIR/proj" ]; then
+    pass "root-swap fixture: the scan root was swapped between find and replay (#421 seam)"
+else
+    fail "root-swap fixture: the scan root was swapped between find and replay (#421 seam)"
+fi
+assert_eq "root-swap: victim outside the tree keeps its mode (#421)" "600" \
+    "$(stat -c %a "$F2DIR/victim/file")"
+if [ "$F2RC" -eq 0 ] &&
+    printf '%s' "$F2MSG" | grep -qF "scan root $F2DIR/proj was replaced by a symlink" &&
+    printf '%s' "$F2MSG" | grep -qF 'baseline pass "root-swap" hit errors'; then
+    pass "root-swap: the batch is refused loud, the pass counts the error (#421)"
+else
+    fail "root-swap: the batch is refused loud, the pass counts the error (#421; rc=$F2RC out=$F2MSG)"
+fi
+rm -rf "$F2DIR" "$F2STUB"
+
 # Root '/' is refused loud, never walked (#211 b W7): the refusal fires
 # before any find runs — nothing on the host is touched.
 F1RRC=0
