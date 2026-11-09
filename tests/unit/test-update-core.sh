@@ -473,6 +473,20 @@ _b3p_out=$(UPD_BACKUP_ROOT="/nonexistent-root-$$" sh -c '
         sync_tui_registration() { :; }
         rm() { echo "RM: $*"; command rm "$@"; }
         . "$1"
+        # Post-source stubs (maintainer steering 2026-11-09, the 0.0.46a
+        # F2 class): update-core.sh DEFINES its own resolver, fetch,
+        # major probe and installer — the pre-source stubs above are dead
+        # for those four (sourcing re-defines them), so this pin ran the
+        # REAL network path on every green run (api.github.com resolve +
+        # release-asset download), reddening whenever the shared host-IP
+        # budget was exhausted. The helper under test is the backup-base
+        # selection; resolution/fetch behavior is pinned hermetically in
+        # test-update-flags.sh (curl stub). Stubs must sit AFTER sourcing.
+        ui_section() { :; }
+        current_opencode_major() { echo 1; }
+        resolve_latest_opencode_version() { echo "1.9.9"; }
+        fetch_opencode_version() { echo /dev/null; }
+        install_binary() { echo "INSTALL_BIN"; return 0; }
         update_binary_upgrade
     ' _ "$LIB" 2>&1)
 if printf '%s\n' "$_b3p_out" | grep -qF 'warn: no durable backup dir available — opencode binary upgrade skipped (nothing changed)' &&
