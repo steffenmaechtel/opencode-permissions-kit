@@ -589,7 +589,16 @@ un_user_remove() {
                     elif sudo mkdir -p "/var/backups/opencode-permissions-kit" 2>/dev/null &&
                         sudo mkdir -m 700 "$_un_ag_dir" &&
                         sudo cp -a "$_un_ag_src/." "$_un_ag_dir/" 2>/dev/null; then
-                        id "$DEFAULT_USER" >/dev/null 2>&1 && sudo chown -R "$DEFAULT_USER" "$_un_ag_dir"
+                        # (#438 a A2): the handover skip used to be silent —
+                        # the success echo below promised a restore the
+                        # stated audience could not read once the leaf is
+                        # 700 and not their uid. Loud if/else now.
+                        if id "$DEFAULT_USER" >/dev/null 2>&1; then
+                            sudo chown -R "$DEFAULT_USER" "$_un_ag_dir"
+                        else
+                            echo "WARNING: developer '$DEFAULT_USER' not found — backup stays agent/root-owned, restoring needs sudo."
+                            log "agents backup owner handover skipped: DEFAULT_USER '$DEFAULT_USER' missing"
+                        fi
                         if ! sudo chmod 700 "$_un_ag_dir"; then
                             echo "WARNING: could not enforce mode 700 on $_un_ag_dir — check it before restoring from there."
                             log "agents backup mode assert failed: $_un_ag_dir"

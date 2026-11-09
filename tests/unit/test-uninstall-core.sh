@@ -840,11 +840,12 @@ fi
 # LOWS-6 (#430): the leaf on the shared backup root follows the -m 700
 # doctrine (install-core.sh / update-core.sh siblings) — the W2 gate's
 # sudo stub EXECs, so the leaf is a REAL dir here: pin its mode. The
-# 777 source (prep above) makes this discriminate BOTH guards: the
-# mkdir -m 700 AND the post-copy chmod that re-asserts it past
-# `cp -a src/.` mode propagation. The root stays at umask
-# (world-traversable by design — the DEFAULT_USER must reach their own
-# chowned leaf).
+# 777 source (prep above) makes this pin discriminate the post-copy
+# chmod re-assert; the mkdir -m 700 guard is discriminated by the
+# log-grep pin above (the pair covers both — deleting only the -m 700
+# leaves the re-assert producing 700, #438 a A4). The root stays at
+# umask (world-traversable by design — the DEFAULT_USER must reach
+# their own chowned leaf).
 _un_w2_leaf=$(ls -d "$_un_w2/backups/.agents-backup-"* 2>/dev/null | head -n 1)
 if [ -n "$_un_w2_leaf" ] && [ "$(stat -c %a "$_un_w2_leaf" 2>/dev/null)" = "700" ]; then
     pass "agents-backup leaf dir is 700 despite a 777 source (#430)"
@@ -1700,6 +1701,53 @@ if [ -n "$_f2_bak_block" ]; then
         pass "mode-assert failure degrades loud, backup claim stays true (#430)"
     else
         fail "mode-assert failure arm (got: $_out) (#430)"
+    fi
+    # (#438 a A5): the ordering claim — ownership handover BEFORE the
+    # chmod re-assert — was behaviorally unobserved (both W2 and the
+    # F2 drives skip the chown: absent devuser / unset DEFAULT_USER).
+    # Drive the extracted block with id() stubbed so the handover
+    # EXECUTES; assert the sudo log ORDER (chown strictly before
+    # chmod). (#438 a A2) rides the same driver with id() failing:
+    # the skip must be LOUD (WARNING + log) while the backup claim
+    # stays true. sudo logs without executing — no real paths run.
+    _f2ord_run() {
+        (
+            OPENCODE_USER=oc
+            DEFAULT_USER=dev
+            DRY_RUN=false
+            id() { return "${F2ORDID:-0}"; }
+            sudo() {
+                case "$1" in
+                    ls) echo "agent-resource" ;;
+                    *) echo "sudo $*" ;;
+                esac
+                return 0
+            }
+            log() { echo "log: $*"; }
+            eval "$_f2_bak_block"
+        )
+    }
+    _f2ord_out=$(F2ORDID=0 _f2ord_run 2>&1) || true
+    _f2ord_log=$(printf '%s\n' "$_f2ord_out" | grep '^sudo ')
+    _f2ord_chn=$(printf '%s\n' "$_f2ord_log" | grep -n 'chown -R' | head -n 1 | cut -d: -f1)
+    _f2ord_chm=$(printf '%s\n' "$_f2ord_log" | grep -n 'chmod 700' | head -n 1 | cut -d: -f1)
+    if [ -n "$_f2ord_chn" ] && [ -n "$_f2ord_chm" ] &&
+        [ "$_f2ord_chn" -lt "$_f2ord_chm" ]; then
+        pass "handover executes and precedes the chmod re-assert (#438 a A5)"
+    else
+        fail "handover order unobserved (chown=${_f2ord_chn:-none} chmod=${_f2ord_chm:-none} log=$_f2ord_log) (#438 a A5)"
+    fi
+    _f2ord_out=$(F2ORDID=1 _f2ord_run 2>&1) || true
+    _f2_ok=0
+    case "$_f2ord_out" in *"WARNING: developer 'dev' not found"*) ;; *) _f2_ok=1 ;; esac
+    case "$_f2ord_out" in *"restoring needs sudo"*) ;; *) _f2_ok=1 ;; esac
+    case "$_f2ord_out" in *"log: agents backup owner handover skipped: DEFAULT_USER 'dev' missing"*) ;; *) _f2_ok=1 ;; esac
+    case "$_f2ord_out" in *"Agent resources backed up:"*) ;; *) _f2_ok=1 ;; esac
+    case "$_f2ord_out" in *"could not back up"*) _f2_ok=1 ;; esac
+    if [ "$_f2_ok" -eq 0 ]; then
+        pass "chown-skip is loud, restore hint names sudo, backup claim stays true (#438 a A2)"
+    else
+        fail "chown-skip arm (got: $_f2ord_out) (#438 a A2)"
     fi
 else
     fail "agents-backup loop extractable (#211 f W2)"
