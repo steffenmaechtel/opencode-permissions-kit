@@ -48,7 +48,9 @@ done
 GOLDEN_IMAGE="${E2E_DDEV_IMAGE:-opencode-e2e-ddev:cached}"
 BASE_IMAGE="opencode-e2e-ddev-base"
 E2E_IMAGE="$BASE_IMAGE" # the build path starts from the base image
-E2E_CONTAINER="opencode-e2e-ddev-test"
+# Env-overridable; lib.sh appends the checkout-path suffix (issue #366) so
+# parallel same-suite runs from another worktree cannot collide on the name.
+E2E_CONTAINER="${E2E_CONTAINER:-opencode-e2e-ddev-test}"
 E2E_DOCKERFILE="Dockerfile.rootless"
 E2E_SYSTEMD=1
 E2E_CMD="/sbin/init"
