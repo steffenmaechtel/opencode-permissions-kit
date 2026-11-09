@@ -39,8 +39,9 @@ XDG_SHIM_FIX_VERSION="2.0.32"
 # the fallback shim; rc 1 = it opens without one itself (2.x at or
 # above XDG_SHIM_FIX_VERSION). An empty or non-version-shaped value
 # keeps the shim — the probe must prove safety, never assume it (the
-# wrapper's fail-open idiom; 1.x is never fixed, so only a parsed 2.x
-# triple can ever return 1). The shape gate is load-bearing (review a
+# wrapper's fail-open idiom; 1.x is never fixed, so major 2 plus an
+# all-numeric dotted value — a triple today — is the only rc-1 path).
+# The shape gate is load-bearing (review a
 # A3): sort -V places non-numeric strings AFTER the triple, so without
 # it a garbage version would compare as "newer" and fail OPEN.
 # Version order via sort -V, the advisories.sh idiom.

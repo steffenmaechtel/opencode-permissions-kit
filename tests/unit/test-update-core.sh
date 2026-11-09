@@ -643,7 +643,11 @@ fi
 # Dual mentions on one line occur only as guard+exec pairs or prose
 # (the tui-plugin.sh:82 shape): the -I exclusion drops those lines when
 # the exec is isolated — a BARE exec behind a guard keeps the line
-# (no -I anywhere) and stays caught.
+# (no -I anywhere) and stays caught. Two known blind spots (review b
+# D4, latent — zero hits today): a single line carrying BOTH a bare
+# and an -I invocation vanishes under the line-level exclusion, and a
+# backslash-continued `python3 \` opener matches no arm; the per-file
+# floor pins bound the residual.
 _bare_py=""
 while IFS= read -r _pyf; do
     _hits=$(sed 's/^[[:space:]]*#.*$//' "$_pyf" |
