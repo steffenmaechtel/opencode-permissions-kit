@@ -134,8 +134,8 @@
             // A later ask tripwire that also matches (cat settings.php
             // > /dev/sda) downgrades a deny to ask — last match wins;
             // the ask still gates. Lexical residuals stay (issue #391):
-            // tee/cp/mv onto a device, loop/md/mapper/dm device families,
-            // variable indirection.
+            // tee/cp/mv onto a device, loop/md/sr/mapper/dm device
+            // families, variable indirection.
             "rm -rf /*": "deny",
             "*>*/dev/sd*": "deny",
             "*>*/dev/nvme*": "deny",

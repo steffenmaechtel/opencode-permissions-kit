@@ -13,7 +13,7 @@
 # deny, everyday shapes must not).
 #
 # HOW: a python replica of opencode's wildcard matcher (upstream
-# sources: opencode 1.18.15 packages/opencode/src/util/wildcard.ts and
+# sources: opencode 1.18.35 packages/opencode/src/util/wildcard.ts and
 # 2.x packages/core/src/util/wildcard.ts — translate-anchored-regex,
 # escape [.+^${}()|[\]\\], "*" -> ".*", "?" -> ".", trailing " *"
 # optional, dot-all; last matching rule wins per v1 permission/index.ts
@@ -62,7 +62,7 @@ import sys
 
 
 def wildcard_match(value, pattern):
-    # 1:1 translation of opencode's Wildcard.match (v1.18.15
+    # 1:1 translation of opencode's Wildcard.match (v1.18.35
     # packages/opencode/src/util/wildcard.ts, v2 packages/core/src/util/
     # wildcard.ts): normalize backslashes, escape regex specials,
     # "*" -> ".*", "?" -> ".", trailing " *" optional, anchored, dot-all.

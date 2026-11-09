@@ -40,7 +40,7 @@ Rule sources, in evaluation order (last match wins):
 3. **Saved approvals** append AFTER the configured rules (both
    versions). Semantic difference: **v2 runs the deny check over the
    configured rules only** (`denied()` before saved rules join), so a
-   saved "always allow" can never lift a configured deny. **v1.18.15
+   saved "always allow" can never lift a configured deny. **v1.18.35
    evaluates findLast over configured + approved together** — a
    per-session prefix approval (`cmd *`) that matches a deny-command
    does override the deny there. The template's ask-by-default design
@@ -63,7 +63,7 @@ opencode does NOT match the rule against "the command" as one blob of
 argv — the shell tool parses the command (tree-sitter) and derives one
 **resource string per command**, and the resource INCLUDES redirects:
 
-- v1.18.15 `tool/shell.ts`: `source(node)` returns the parent
+- v1.18.35 `tool/shell.ts`: `source(node)` returns the parent
   `redirected_statement` text — `echo x > /dev/sda` is ONE resource
   `echo x > /dev/sda`. Commandless redirects (`> /etc/passwd` alone)
   produce **no command node, hence no resource, hence no permission
@@ -95,8 +95,10 @@ per-pattern with an immediate deny return; v2 `denied()` = some()).
   carry neither `>` nor `of=`, so they sailed past every redirect/dd
   deny onto the `git diff *` allow — the one verified write shape that
   landed at allow, not ask (found in review, PR #436 round a S1);
-  closed by dedicated `*--output=/etc/*` + `*--output=/dev/<fam>` deny
-  rules with the same family enumeration.
+  closed for the ABSOLUTE-path shapes by dedicated `*--output=/etc/*`
+  + `*--output=/dev/<fam>` deny rules with the same family enumeration
+  (relative traversal like `--output=../../etc/x` and variables still
+  evade — the §6 lexical residual).
 - `/dev/*` must NOT be denied broadly: `> /dev/null` (incl. glued
   `>/dev/null 2>&1`, `2>/dev/null`) is an everyday sink — enumerate
   device families instead (sd, nvme, mmcblk, vd, xvd, hd).
@@ -122,7 +124,7 @@ per-pattern with an immediate deny return; v2 `denied()` = some()).
 The no-LLM seam is that HTTP route, **not** a CLI flag: the
 `--validate-command` / `conversation --dry-run` commands floated in
 issue #391's research comment are hallucinated — they exist in neither
-v1.18.15 nor v2.2.6 (verified against both pinned sources; the
+v1.18.35 nor v2.2.6 (verified against both pinned sources; the
 maintainer marked them in the issue accordingly). Probe mechanics: the
 server always runs with a password (random unless `OPENCODE_PASSWORD`
 is set — Basic auth, username `opencode`); the probe pins it via env
@@ -150,13 +152,16 @@ spaced `echo "x" > /tmp/steffen/dev/sda` and glued
 `> /dev/null` asked, allowlisted `ls -la` ran unprompted.
 
 E2E probe result on the corrected template (opencode 2.2.6,
-2026-11-09): all 7 probes green — spaced/glued/family redirects
-denied, sudo dd denied, /etc denied, `> /dev/null` stays ask,
-allowlisted `ls -la` stays allow. Full suite: 342 checks passed.
+2026-11-09): all 7 probes of that run green — spaced/glued/family
+redirects denied, sudo dd denied, /etc denied, `> /dev/null` stays
+ask, allowlisted `ls -la` stays allow; full suite: 342 checks. Round a
+of the PR review added the 8th probe (the `git diff --output=` flag
+write path) — CI on the round-a fix push (5c2ceca9) ran every e2e
+suite green with it.
 
 ## 6. Accepted residuals
 
-- v1.18.15 commandless redirects bypass the permission layer entirely
+- v1.18.35 commandless redirects bypass the permission layer entirely
   (no resource is produced — upstream gap, config-side unfixable).
 - Write tools are not redirects: `tee /dev/sda`, `cp x /dev/sda`,
   `mv x /dev/sda` match none of the redirect denies (same as before
