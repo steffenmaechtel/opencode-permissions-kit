@@ -656,6 +656,65 @@ check "worker: a dead find never reaches xargs (#267)" \
     sh -c "! grep -q xargs \"\$1\"" _ "$WORK/unr-find2.log"
 rm -rf "${UNR:?}" "${UNRS:?}" "${UNRM:?}" "${UNRF:?}"
 
+# --- 4b3. find-chown worker: scan-root recheck (#421) -------------------------------
+# The #421 shape: the 4b2 component walk starts BELOW the scan root,
+# so a ROOT swapped for a symlink between find and the worker
+# redirected every walk test — and the chown — through it (components
+# in the target are real directories, no gate fires). Deterministic
+# seam: the stub find streams the "scanned" operand, THEN swaps the
+# root, then exits — the worker then starts with a linked root. The
+# worker head must refuse the batch LOUD (the distinct message, not a
+# bare rc): nothing reaches chown, the pass fails, un_rc_q counts the
+# root as left behind.
+UNR2="$(work_new)"
+UNR2S="$(work_new)"
+mkdir -p "$UNR2/root" "$UNR2/victim" "$UNR2S/bin"
+printf 'scanned\n' >"$UNR2/root/regular.conf"
+printf 'victim\n' >"$UNR2/victim/regular.conf"
+cat >"$UNR2S/bin/find" <<EOF
+#!/bin/sh
+# fake find: streams the "scanned" operand, then swaps the scan root
+# itself for a symlink — the scan->worker window, deterministically.
+printf '%s\\0' "$UNR2/root/regular.conf"
+if [ -d "$UNR2/root" ] && [ ! -L "$UNR2/root" ]; then
+    mv "$UNR2/root" "$UNR2/root-moved"
+    ln -s "$UNR2/victim" "$UNR2/root"
+fi
+exit 0
+EOF
+cat >"$UNR2S/bin/chown" <<'EOF'
+#!/bin/sh
+echo "chown $*" >>"$CHOWN_LOG"
+exit 0
+EOF
+chmod +x "$UNR2S/bin/find" "$UNR2S/bin/chown"
+: >"$WORK/unr2-chown.log"
+UNR2_RC=0
+UNR2_OUT=$(PATH="$UNR2S/bin:$PATH" CHOWN_LOG="$WORK/unr2-chown.log" sh -c '
+    . "$1"
+    sudo() { "$@"; }
+    UN_OC_UID=60000
+    UN_OC_GID=60002
+    DEFAULT_USER=devuser
+    UN_DEV_GROUP=devgroup
+    _un_revert_chown "$2"
+' _ "$LIB" "$UNR2/root" 2>&1) || UNR2_RC=$?
+if [ -d "$UNR2/root-moved" ] && [ -L "$UNR2/root" ]; then
+    pass "worker: root-swap fixture fired (#421 seam)"
+else
+    fail "worker: root-swap fixture fired (#421 seam — root not swapped)"
+fi
+check "worker: a swapped scan root never reaches chown (#421)" \
+    sh -c '! grep -q . "\$1"' _ "$WORK/unr2-chown.log"
+case "$UNR2_OUT" in
+    *"scan root $UNR2/root was replaced by a symlink"*)
+        pass "worker: the swapped root is refused with its own cause (#421)"
+        ;;
+    *) fail "worker: the swapped root must be refused with its own cause (got: $UNR2_OUT) (#421)" ;;
+esac
+check "worker: the refused batch fails the pass — never a green revert (#421)" \
+    sh -c '[ "$1" -ne 0 ]' _ "$UNR2_RC"
+
 # --- issue #245: a symlinked conf root is skipped, never operated on ----
 # Measured (issue #245 comment, ext4 + overlayfs): a projects.conf entry
 # that IS a symlink to a directory passes [ ! -d ] (it follows), and the

@@ -133,6 +133,7 @@ VERSION \
 opencode-permissions-kit-lib/sh/path-sane.sh \
 opencode-permissions-kit-lib/sh/install-core.sh \
 opencode-permissions-kit-lib/sh/uninstall-core.sh \
+opencode-permissions-kit-lib/sh/handover-core.sh \
 opencode-permissions-kit-lib/management/config.sh \
 opencode-permissions-kit-lib/management/doctor.sh \
 opencode-permissions-kit-lib/management/update.sh \
@@ -270,20 +271,35 @@ ensure_local_file() {
     mv "$_elf_tmp" "$FILES_ROOT/$f"
 }
 
-SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+# The readlink fallback (#437 a B1) keeps a degraded readlink from
+# resolving the dir to the invoking cwd. Two degraded shapes (#437 c
+# E1, measured): a $0 through a broken INTERMEDIATE component fails
+# LOUD via the cd under set -e (deliberate, #437 b D2); a dangling
+# FINAL symlink -- readlink -f refuses to resolve it -- degrades
+# silently to the LINK'S OWN dir, still not the cwd. Both are
+# strictly narrower than the old spelling's silent cwd trust.
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")")" && pwd)"
 # Streamed stdin runs (curl ... | sudo bash, issue #405): $0 is the
 # interpreter, not this script — readlink resolves it against the
 # INVOKING cwd, so SCRIPT_DIR above is cwd-derived and every
 # checkout-first lookup below (ui.sh through update-core.sh) would
 # source whatever sibling files the cwd happens to sit next to, as
 # root, with no vintage pinning. Detect the shape once, for the whole
-# class of lookups: a real script path resolves to an existing file,
-# the interpreter name does not. (A cwd file literally named "bash"
-# re-degenerates to the pre-#405 behavior — accepted; the anchor only
-# ever narrows trust.)
-_opk_stdin_run=false
-if ! [ -f "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")" ]; then
-    _opk_stdin_run=true
+# class of lookups (#433 hardening, same discriminator at all six
+# #405 anchors): a streamed run's $0 IS the interpreter's own argv[0]
+# — /proc/$$/cmdline's first field names exactly that, so a planted
+# cwd FILE named like the interpreter no longer defeats the check
+# (the #405 file probe alone resolved it to an existing file and
+# re-opened the cwd trust). Without /proc the file probe remains the
+# fallback (best effort, the pre-#433 surface).
+_opk_stdin=false
+_opk_argv0="$(tr '\0' '\n' 2>/dev/null </proc/$$/cmdline | head -n 1)"
+if [ -n "$_opk_argv0" ]; then
+    if [ "$0" = "$_opk_argv0" ]; then
+        _opk_stdin=true
+    fi
+elif ! [ -f "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")" ]; then
+    _opk_stdin=true
 fi
 # Binary-only mode (--only-binary) needs no kit FETCH — when running
 # from the installed library, skip the self-fetch (and the per-file heal
@@ -308,7 +324,7 @@ done
 # kit checkout adjacent to the invoking cwd would pass it spuriously
 # and run an unpinned local vintage. The fetch re-pins the vintage
 # (KIT_BASE_URL) and the re-exec gives the fetched copy a real $0.
-if [ "$_opk_binonly" != true ] && { [ "$_opk_stdin_run" = true ] ||
+if [ "$_opk_binonly" != true ] && { [ "$_opk_stdin" = true ] ||
     [ ! -f "$SCRIPT_DIR/../../../VERSION" ]; }; then
     echo "No local checkout — fetching kit files from $KIT_BASE_URL ..."
     # Direct call, NOT SCRIPT_DIR="$(fetch_kit)" — a subshell's variable
@@ -345,7 +361,7 @@ fi
 # library (the installed vintage, root-owned) instead of the invoking
 # cwd, and refuse loudly when nothing is installed — a cwd-sibling
 # update-core.sh is not a substitute (#405).
-if [ "$_opk_stdin_run" = true ] && [ "$_opk_binonly" = true ]; then
+if [ "$_opk_stdin" = true ] && [ "$_opk_binonly" = true ]; then
     if [ -f /usr/local/lib/opencode-permissions-kit/sh/update-core.sh ]; then
         # The DEPLOYED management dir on the flat library layout — a
         # stdin run then resolves exactly like a deployed run (every

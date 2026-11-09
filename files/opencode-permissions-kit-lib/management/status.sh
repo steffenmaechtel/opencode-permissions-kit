@@ -41,13 +41,27 @@ PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
 # below): the checkout's status.sh needs its OWN ui.sh — the deployed one
 # can predate ui_kv_ok/ui_kv_bad (issue #158) and would drop those rows.
 # A deployed run resolves to the identical file anyway.
-# Caller-dir anchor (#405): the lib resolvers below are checkout-first
-# (a checkout status.sh renders its own libs). A streamed stdin run
-# (curl ... | sh) has no real $0 — dirname lands on the INVOKING cwd and
-# a cwd-sibling lib would shadow the deployed one. Pin stdin runs to
-# the deployed library; checkout and installed runs keep their own dir.
-ST_CALL_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
-if ! [ -f "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")" ]; then
+# Caller-dir anchor (#405; #434 readlink alignment, #433 hardening): the
+# lib resolvers below are checkout-first (a checkout status.sh renders
+# its own libs). The dir resolves through readlink -f like uninstall.sh's
+# UN_CALL_DIR — a user SYMLINK to this entry (kstatus -> the checkout's
+# status.sh) keeps the checkout-first sibling lookup instead of silently
+# serving the deployed vintage from the link's dir. A streamed stdin run
+# (curl ... | sh) has no real $0 and is pinned to the deployed library
+# (#433: the discriminator compares $0 against the interpreter's own
+# argv[0] — a planted cwd FILE named like the interpreter must not
+# re-open the cwd trust; same discriminator at all six #405 anchors).
+ST_CALL_DIR="$(dirname "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")")"
+_opk_stdin=false
+_opk_argv0="$(tr '\0' '\n' 2>/dev/null </proc/$$/cmdline | head -n 1)"
+if [ -n "$_opk_argv0" ]; then
+    if [ "$0" = "$_opk_argv0" ]; then
+        _opk_stdin=true
+    fi
+elif ! [ -f "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")" ]; then
+    _opk_stdin=true
+fi
+if [ "$_opk_stdin" = true ]; then
     # The DEPLOYED management dir on the flat library layout (review a
     # B1: the repo-layout path does not exist deployed) — a stdin run
     # then resolves exactly like a deployed run.

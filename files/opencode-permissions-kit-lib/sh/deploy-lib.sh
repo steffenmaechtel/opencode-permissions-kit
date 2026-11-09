@@ -166,6 +166,9 @@ opencode-permissions-kit-lib/sh/install-core.sh 644
 # sourced checkout-first by management/uninstall.sh (with the deployed
 # $LIBDIR fallback -- `opk uninstall` runs from the installed tree)
 opencode-permissions-kit-lib/sh/uninstall-core.sh 644
+# handover-core.sh: the opk handover subcommand (issue #415 ride-along on
+# #346), sourced by bin/opk through its SELF-resolved $LIBDIR
+opencode-permissions-kit-lib/sh/handover-core.sh 644
 opencode-permissions-kit-lib/sh/render-agent-config.sh 644
 opencode-permissions-kit-lib/sh/secure-binary.sh 644
 opencode-permissions-kit-lib/sh/shell-warn.sh 644

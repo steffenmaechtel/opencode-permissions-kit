@@ -42,13 +42,33 @@ cleanup() {
 trap cleanup EXIT
 trap 'cleanup; exit 1' INT TERM
 
-SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
-# Stdin-run anchor (#405): a streamed config.sh (curl ... | sudo sh) has
-# no real $0 — the derivation above resolves against the invoking cwd
-# and the checkout-first lookups below would source cwd-sibling files
-# as root, unpinned. Pin stdin runs to the deployed library; checkout
-# and installed runs keep their own derivation.
-if ! [ -f "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")" ]; then
+# The readlink fallback (#437 a B1) keeps a degraded readlink from
+# resolving the dir to the invoking cwd. Two degraded shapes (#437 c
+# E1, measured): a $0 through a broken INTERMEDIATE component fails
+# LOUD via the cd under set -e (deliberate, #437 b D2); a dangling
+# FINAL symlink -- readlink -f refuses to resolve it -- degrades
+# silently to the LINK'S OWN dir, still not the cwd. Both are
+# strictly narrower than the old spelling's silent cwd trust.
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")")" && pwd)"
+# Stdin-run anchor (#405; #433 hardening): a streamed config.sh
+# (curl ... | sudo sh) has no real $0 — the derivation above resolves
+# against the invoking cwd and the checkout-first lookups below would
+# source cwd-sibling files as root, unpinned. Pin stdin runs to the
+# deployed library; checkout and installed runs keep their own
+# derivation. The stdin discriminator compares $0 against the
+# interpreter's own argv[0] (#433: a planted cwd FILE named like the
+# interpreter must not re-open the cwd trust; same discriminator at
+# all six #405 anchors).
+_opk_stdin=false
+_opk_argv0="$(tr '\0' '\n' 2>/dev/null </proc/$$/cmdline | head -n 1)"
+if [ -n "$_opk_argv0" ]; then
+    if [ "$0" = "$_opk_argv0" ]; then
+        _opk_stdin=true
+    fi
+elif ! [ -f "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")" ]; then
+    _opk_stdin=true
+fi
+if [ "$_opk_stdin" = true ]; then
     # The DEPLOYED management dir on the flat library layout (review a
     # B1: the repo-layout path does not exist deployed) — a stdin run
     # then resolves exactly like a deployed run.

@@ -129,6 +129,7 @@ fetch_kit() {
         opencode-permissions-kit-lib/sh/path-sane.sh \
         opencode-permissions-kit-lib/sh/install-core.sh \
         opencode-permissions-kit-lib/sh/uninstall-core.sh \
+        opencode-permissions-kit-lib/sh/handover-core.sh \
         opencode-permissions-kit-lib/management/config.sh \
         opencode-permissions-kit-lib/management/doctor.sh \
         opencode-permissions-kit-lib/management/update.sh \
@@ -210,15 +211,33 @@ fetch_kit() {
     _FK_DIR="$dir"
 }
 
-SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+# The readlink fallback (#437 a B1) keeps a degraded readlink from
+# resolving the dir to the invoking cwd. Two degraded shapes (#437 c
+# E1, measured): a $0 through a broken INTERMEDIATE component fails
+# LOUD via the cd under set -e (deliberate, #437 b D2); a dangling
+# FINAL symlink -- readlink -f refuses to resolve it -- degrades
+# silently to the LINK'S OWN dir, still not the cwd. Both are
+# strictly narrower than the old spelling's silent cwd trust.
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")")" && pwd)"
 STREAMED=false
 # Stdin runs (curl ... | sudo bash) never trust the cwd-derived checkout
 # test (#405): a cwd inside a kit checkout passes it spuriously and
 # installs an unpinned local vintage instead of the pinned ref — the
-# same anchor update.sh carries. A real script path resolves to an
-# existing file; the interpreter name of a stdin run does not.
-if ! [ -f "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")" ] ||
-    [ ! -f "$SCRIPT_DIR/../VERSION" ]; then
+# same anchor update.sh carries. The stdin discriminator compares $0
+# against the interpreter's own argv[0] (#433: a planted cwd FILE named
+# like the interpreter must not re-open the cwd trust; same
+# discriminator at all six #405 anchors); without /proc the #405 file
+# probe remains the fallback.
+_opk_stdin=false
+_opk_argv0="$(tr '\0' '\n' 2>/dev/null </proc/$$/cmdline | head -n 1)"
+if [ -n "$_opk_argv0" ]; then
+    if [ "$0" = "$_opk_argv0" ]; then
+        _opk_stdin=true
+    fi
+elif ! [ -f "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")" ]; then
+    _opk_stdin=true
+fi
+if [ "$_opk_stdin" = true ] || [ ! -f "$SCRIPT_DIR/../VERSION" ]; then
     echo "Not a local checkout — fetching kit files from $KIT_BASE_URL ..."
     # Direct call, NOT SCRIPT_DIR="$(fetch_kit)": command substitution runs
     # in a subshell, where _FETCH_TREE/_TMP_REGISTRY registrations would be

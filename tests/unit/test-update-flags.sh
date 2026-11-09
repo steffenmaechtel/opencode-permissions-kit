@@ -307,7 +307,7 @@ check "gating: kit re-deploy sections are wrapped (2 skip zones; wrap sites: $_o
     [ "$_obw_n" -ge 2 ]
 check "no kit self-fetch in binary-only mode (library runs stay offline for kit files)" \
     sh -c "grep -qF 'for _opk_a in \"\$@\"' \"\$1\" \
-        && grep -qF '[ \"\$_opk_binonly\" != true ] && { [ \"\$_opk_stdin_run\" = true ] ||' \"\$1\" \
+        && grep -qF '[ \"\$_opk_binonly\" != true ] && { [ \"\$_opk_stdin\" = true ] ||' \"\$1\" \
         && grep -qF '[ ! -f \"\$SCRIPT_DIR/../../../VERSION\" ]; }; then' \"\$1\"" _ "$UPDATE"
 check "--binary-path alone does NOT skip the self-fetch (full update + binary swap, review 0.0.29)" \
     sh -c "grep -A2 -F -- '--only-binary)' \"\$1\" | tr -s '[:space:]' ' ' | grep -qF '_opk_binonly=true break' " _ "$UPDATE"

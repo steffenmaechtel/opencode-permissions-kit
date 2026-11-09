@@ -496,10 +496,14 @@ _gca_n="$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" | grep -c 'staged_write 664' || 
 check "wiring: config.sh git_config_apply renders offline, ONE staged_write (0.0.39h F8; staged_write sites: $_gca_n of 2)" \
     sh -c 'grep -qF "_gca_tmp" "$1" && [ "$2" = 2 ] && ! grep -qF "sed -i '"'"'s|" "$1"' _ "$CONFIG" "$_gca_n"
 OPK="$REPO/files/opencode-permissions-kit-lib/bin/opk"
+# The handover arm's logic lives in sh/handover-core.sh since the #415
+# ride-along extraction — the F10/F4 pins follow the movement (the
+# dispatcher keeps only the resolver + pairing guard).
+HOCORE_SW="$REPO/files/opencode-permissions-kit-lib/sh/handover-core.sh"
 check "0.0.39h F10: opk handover refuses symlinked operands + rechecks between the ops" \
-    sh -c 'grep -qF "[ -L \"\$_ho_a\" ]" "$1" && grep -qF "[ ! -L \"\$_ho_a\" ]" "$1"' _ "$OPK"
+    sh -c 'grep -qF "[ -L \"\$_ho_a\" ]" "$1" && grep -qF "[ ! -L \"\$_ho_a\" ]" "$1"' _ "$HOCORE_SW"
 check "0.0.39i F4: opk handover --dry-run previews the symlink refuse" \
-    grep -qF "would refuse" "$OPK"
+    grep -qF "would refuse" "$HOCORE_SW"
 check "0.0.39h F12: no 1;33 color definition remains repo-wide (files/)" \
     sh -c '! grep -rq "1;33" "$1"' _ "$REPO/files"
 
