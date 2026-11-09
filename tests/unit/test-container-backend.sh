@@ -280,10 +280,20 @@ check "config.sh menu has a container backend entry" \
 
 echo ""
 echo "-- status.sh wiring (section rows live in sh/status-core.sh, #346 wave 1) --"
-check "status.sh reports the backend name" \
-    grep -Fq 'backend:' "$STATUS_CORE"
-check "status.sh handles rootless backends" \
-    grep -Fq 'docker-rootless|podman-rootless' "$STATUS_CORE"
+# #403: 'backend:' matched exactly one line — the re-run HINT (ui_detail
+# "...rootless backend:") — and 'docker-rootless|podman-rootless' only the
+# hint's install command, so deleting every real backend row kept both
+# pins green. The pins bind the ui_kv rows and the case arms; the
+# per-backend BEHAVIOR (known/unknown/empty CONTAINER_BACKEND, socket
+# probes) is driven by test-status.sh's run_case sourcing pins.
+check "status.sh backend row: docker-rootless" \
+    grep -Fq 'ui_kv_ok "backend" "docker-rootless"' "$STATUS_CORE"
+check "status.sh backend row: podman-rootless" \
+    grep -Fq 'ui_kv_ok "backend" "podman-rootless"' "$STATUS_CORE"
+check "status.sh backend row: unknown backend flagged bad" \
+    grep -Fq 'ui_kv_bad "backend" "unknown' "$STATUS_CORE"
+check "status.sh backend dispatch: rootless case arms" \
+    sh -c 'grep -Fq "docker-rootless)" "$1" && grep -Fq "podman-rootless)" "$1"' _ "$STATUS_CORE"
 check "status.sh reports socket reachability" \
     grep -Fq 'NOT reachable' "$STATUS_CORE"
 check "status.sh has no migration-stamp section (legacy cleanup)" \

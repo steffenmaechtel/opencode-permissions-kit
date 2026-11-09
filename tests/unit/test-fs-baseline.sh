@@ -1199,13 +1199,19 @@ assert_eq "#265 cat arm: SIGPIPE (141) maps to the consumer-EPIPE 0" "0" "$W65C1
 # clear an inherited ignore via shell trap — POSIX forbids
 # re-enabling it), and under SIG_IGN cat exits 1 (write error) instead
 # of dying by signal; the disposition reset must happen in a real
-# process before exec. Under kcov the rider is SKIPPED via the
+# process before exec. Under kcov BOTH riders are SKIPPED via the
 # OPK_KCOV_RUN marker (#418 b C2): kcov's engine turns cat's signal
 # death into rc 1 regardless of the disposition — an instrumentation
 # property (the documented-conflict class scripts/coverage.sh's header
-# carries, like the PS4 shields), carried by the skip note below. Skipped with a note where bash/python3 absent.
+# carries, like the PS4 shields), carried by the skip note below. The
+# SIG_IGN leg (#419) runs the SAME pipeline with the inherited-ignore
+# disposition instead of the reset: cat ends in write-error rc 1, the
+# cat arm propagates it (only 141 maps to 0) and the pipeline fails
+# LOUD rc 1 — the safe direction pinned where fs-baseline.sh's cat-arm
+# comment previously claimed it only ("documented, not pinned", the
+# #418 b R3 residual). Skipped with a note where bash/python3 absent.
 if [ "${OPK_KCOV_RUN:-0}" = 1 ]; then
-    echo "  note: under kcov — cat-arm pipefail rider skipped (kcov's engine turns cat's SIGPIPE death into rc 1; the stub pins above carry the rc contract) (#418 b C2)"
+    echo "  note: under kcov — cat-arm pipefail riders skipped (kcov's engine turns cat's SIGPIPE death into rc 1 either way; the stub pins above carry the rc contract) (#418 b C2)"
 elif command -v bash >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
     W65BIG="$WORK/issue265-big"
     python3 -c 'import sys; sys.stdout.buffer.write(b"e\0" * 524288)' >"$W65BIG"
@@ -1216,9 +1222,16 @@ os.execvp("bash", ["bash", "-c", sys.argv[1], "_"] + sys.argv[2:])' \
         'set -eu; set -o pipefail; . "$1"; _fsb_py_checked=1; _fsb_py_ok=0; _fsb_count_tee pf <"$2" | sh -c "exit 0"' \
         "$LIB" "$W65BIG" >/dev/null 2>&1 || W65PF=$?
     assert_eq "#265 pipefail rider: cat's SIGPIPE stays green under the production set -eu+pipefail shape" "0" "$W65PF"
-    rm -rf "$W65BIG"
+    W65IGN=0
+    FS_SUDO="" python3 -c 'import os, signal, sys
+signal.signal(signal.SIGPIPE, signal.SIG_IGN)
+os.execvp("bash", ["bash", "-c", sys.argv[1], "_"] + sys.argv[2:])' \
+        'set -eu; set -o pipefail; . "$1"; _fsb_py_checked=1; _fsb_py_ok=0; _fsb_count_tee pf <"$2" | sh -c "exit 0"' \
+        "$LIB" "$W65BIG" >/dev/null 2>&1 || W65IGN=$?
+    assert_eq "#265 pipefail rider, SIG_IGN leg: inherited-ignore turns cat into write-error rc 1 — fails LOUD (#419)" "1" "$W65IGN"
+    rm -rf "${W65BIG:?}"
 else
-    echo "  note: bash or python3 absent — cat-arm pipefail rider skipped (#244 a Q1 shape)"
+    echo "  note: bash or python3 absent — cat-arm pipefail riders skipped (#244 a Q1 shape)"
 fi
 # Python arm: an interpreter failure must not be masked either (the
 # stub dies rc 3 before touching the stream — the function's rc is

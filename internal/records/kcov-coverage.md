@@ -66,7 +66,8 @@ files, 1979/3732 = 53.0% (the post-lift CI comparator, superseding the
    the block's first line — semantics unchanged, that block simply stops
    being attributed (fine for a report). Any future `bash -c 'set -eu'`
    test block needs the same shield; the failure is loud (suite red), and
-   tests/unit/test-coverage.sh pins shields == bash -c blocks.
+   tests/unit/test-coverage.sh pins shields == set -u -c blocks across
+   every suite and every -c form (#369; originally install-args-only).
 
 ## Dead ends (do not re-try without new information)
 
