@@ -42,7 +42,7 @@ cleanup() {
 trap cleanup EXIT
 trap 'cleanup; exit 1' INT TERM
 
-SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")")" && pwd)"
 # Stdin-run anchor (#405; #433 hardening): a streamed config.sh
 # (curl ... | sudo sh) has no real $0 — the derivation above resolves
 # against the invoking cwd and the checkout-first lookups below would
@@ -53,7 +53,7 @@ SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 # interpreter must not re-open the cwd trust; same discriminator at
 # all six #405 anchors).
 _opk_stdin=false
-_opk_argv0="$(tr '\0' '\n' </proc/$$/cmdline 2>/dev/null | head -n 1)"
+_opk_argv0="$(tr '\0' '\n' 2>/dev/null </proc/$$/cmdline | head -n 1)"
 if [ -n "$_opk_argv0" ]; then
     if [ "$0" = "$_opk_argv0" ]; then
         _opk_stdin=true

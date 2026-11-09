@@ -2,11 +2,16 @@
 # opencode permissions kit -- handover-core.sh
 #
 # The opk handover subcommand's logic (issue #346 wave shape, #415
-# ride-along): the former case arm of bin/opk, moved verbatim -- pure
-# code movement, user-visible output byte-identical (proven by the
-# test-kit-cli.sh behavioral matrix and an old-vs-new cmp drive; the
+# ride-along): the former case arm of bin/opk, moved verbatim. The
+# MOVEMENT is pure code movement -- the normalized body equals the old
+# arm (re-verified by PR #437 review a's structural diff: verbatim
+# modulo indent, only the two #422 insertions below differ), and the
 # dispatcher sources this lib and calls handover_core with the args
-# after the subcommand). Sourced (never executed) by bin/opk through
+# after the subcommand. #422 IS this file's one behavioral delta vs
+# the old arm: operands whose path chain crosses a symlinked component
+# are refused now (the exec-time component walk) where the old arm
+# proceeded -- do not read "moved verbatim" as output-identity for
+# those inputs. Sourced (never executed) by bin/opk through
 # its $LIBDIR (SELF-resolved: the checkout copy when run from a
 # checkout, the deployed tree otherwise -- bin/opk always has a real
 # $0, no stdin-run anchor needed here), loud abort when the lib is

@@ -539,6 +539,18 @@ check "chain walk: relative operands resolve against the cwd (#422)" \
     sh -c '. "$1" && cd "$2/real" && _ho_chain_sane tree' _ "$HOCORE" "$HO_WALK"
 check "chain walk: spaced paths survive the string-op walk (#422)" \
     sh -c '. "$1" && mkdir -p "$2/spaced root" && _ho_chain_sane "$2/spaced root"' _ "$HOCORE" "$HO_WALK"
+# The realpath-absent fallback (#437 a C4): a PATH-shadowed FAILING
+# realpath drives the || printf arm — the walk runs on the raw prefixed
+# form and still gates the linked parent (and still passes the clean
+# chain; string-op walk needs no externals beyond the probed realpath).
+_nrb="$WORK/norealpath-bin"
+mkdir -p "$_nrb"
+printf '#!/bin/sh\nexit 1\n' >"$_nrb/realpath"
+chmod +x "$_nrb/realpath"
+check "chain walk: realpath-absent fallback still refuses a linked parent (#437 a C4)" \
+    sh -c '! (. "$1" && PATH="$2" _ho_chain_sane "$3")' _ "$HOCORE" "$_nrb" "$HO_WALK/link-parent/tree"
+check "chain walk: realpath-absent fallback passes a clean chain (#437 a C4)" \
+    sh -c '. "$1" && PATH="$2" _ho_chain_sane "$3"' _ "$HOCORE" "$_nrb" "$HO_WALK/real/tree"
 
 # dry-run previews the chain refuse like the leaf refuse (F4 parity)
 out="$(run_kit handover me "$HO_WALK/link-parent/tree" --dry-run)"

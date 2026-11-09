@@ -271,7 +271,7 @@ ensure_local_file() {
     mv "$_elf_tmp" "$FILES_ROOT/$f"
 }
 
-SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")")" && pwd)"
 # Streamed stdin runs (curl ... | sudo bash, issue #405): $0 is the
 # interpreter, not this script — readlink resolves it against the
 # INVOKING cwd, so SCRIPT_DIR above is cwd-derived and every
@@ -286,7 +286,7 @@ SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 # re-opened the cwd trust). Without /proc the file probe remains the
 # fallback (best effort, the pre-#433 surface).
 _opk_stdin=false
-_opk_argv0="$(tr '\0' '\n' </proc/$$/cmdline 2>/dev/null | head -n 1)"
+_opk_argv0="$(tr '\0' '\n' 2>/dev/null </proc/$$/cmdline | head -n 1)"
 if [ -n "$_opk_argv0" ]; then
     if [ "$0" = "$_opk_argv0" ]; then
         _opk_stdin=true

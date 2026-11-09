@@ -112,7 +112,7 @@ set -u
 # re-open the cwd trust; same discriminator at all six #405 anchors).
 DR_CALL_DIR="$(dirname "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")")"
 _opk_stdin=false
-_opk_argv0="$(tr '\0' '\n' </proc/$$/cmdline 2>/dev/null | head -n 1)"
+_opk_argv0="$(tr '\0' '\n' 2>/dev/null </proc/$$/cmdline | head -n 1)"
 if [ -n "$_opk_argv0" ]; then
     if [ "$0" = "$_opk_argv0" ]; then
         _opk_stdin=true

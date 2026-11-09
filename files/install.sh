@@ -211,7 +211,7 @@ fetch_kit() {
     _FK_DIR="$dir"
 }
 
-SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")")" && pwd)"
 STREAMED=false
 # Stdin runs (curl ... | sudo bash) never trust the cwd-derived checkout
 # test (#405): a cwd inside a kit checkout passes it spuriously and
@@ -222,7 +222,7 @@ STREAMED=false
 # discriminator at all six #405 anchors); without /proc the #405 file
 # probe remains the fallback.
 _opk_stdin=false
-_opk_argv0="$(tr '\0' '\n' </proc/$$/cmdline 2>/dev/null | head -n 1)"
+_opk_argv0="$(tr '\0' '\n' 2>/dev/null </proc/$$/cmdline | head -n 1)"
 if [ -n "$_opk_argv0" ]; then
     if [ "$0" = "$_opk_argv0" ]; then
         _opk_stdin=true

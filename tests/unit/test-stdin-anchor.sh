@@ -70,9 +70,11 @@ _UN="$(strip "$UNINSTALL")"
 _DR="$(strip "$DOCTOR")"
 _IN="$(strip "$INSTALL")"
 
-# The hardened discriminator's argv[0] read (#433) — one shape, six
+# The hardened discriminator's argv[0] read (#433; A2 fix: 2>/dev/null
+# precedes the < read — redirections apply left-to-right, the reversed
+# order leaked the open error on /proc-less hosts) — one shape, six
 # anchors. Assembled to keep the single-quote needle readable.
-_ARGV0='_opk_argv0="$(tr '\''\0'\'' '\''\n'\'' </proc/$$/cmdline 2>/dev/null | head -n 1)"'
+_ARGV0='_opk_argv0="$(tr '\''\0'\'' '\''\n'\'' 2>/dev/null </proc/$$/cmdline | head -n 1)"'
 # no_standalone_probe <haystack>: rc 0 when the pre-#433 STANDALONE
 # file-probe condition is ABSENT. Line-anchored on purpose: the elif
 # fallback line ("elif ! [ -f ...") legitimately carries the same
@@ -84,6 +86,10 @@ no_standalone_probe() {
 # behavioral drive below exercises status.sh's copy; the other five
 # anchors pin their arm's presence (comment-stripped).
 _ELIF='elif ! [ -f "$(readlink -f "$0" 2>/dev/null || printf '"'"'%s'"'"' "$0")" ]; then'
+# The SCRIPT_DIR derivations carry the readlink fallback too (#437 a
+# B1: config.sh/update.sh/install.sh previously lacked it — a degraded
+# readlink resolved the dir to the invoking cwd).
+_SDIR='SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || printf '"'"'%s'"'"' "$0")")" && pwd)"'
 
 # --- 1. behavioral: a stdin run cannot source a cwd sibling (#405, #433) -----------
 # A REAL stdin run (the curl | sh shape): the body is piped to the
@@ -202,6 +208,18 @@ assert_eq "fallback arm: /proc-less stdin shape still pins from a clean cwd (#43
     "SET" "$(_fall "$WORK/clean" "$_fbk")"
 assert_eq "fallback residual: the /proc-less probe stays defeatable by the interpreter-named cwd file (accepted, #433)" \
     "UNSET" "$(_fall "$WORK/cwd" "$_fbk")"
+# The A2 noise pin (#437 a A2): the reordered redirections (2>/dev/null
+# BEFORE the < read) must silence the open error on /proc-less hosts —
+# the pre-fix spelling leaked one "cannot open" line per anchor.
+_fbn="$(cd "$WORK/clean" && PATH="$_FBBIN" "$_SH_BIN" -c 'eval "$1" >/dev/null' sh "$_fbk" 2>&1)"
+case "$_fbn" in
+    *"cannot open"*)
+        fail "fallback arm stays silent on /proc-less hosts (#437 a A2)"
+        ;;
+    *)
+        pass "fallback arm stays silent on /proc-less hosts (#437 a A2)"
+        ;;
+esac
 
 # --- 2. wiring: update.sh ----------------------------------------------------------
 # The stdin flag, the forced fetch (a cwd-adjacent checkout can no
@@ -213,6 +231,8 @@ check "update.sh keeps no standalone #405 file-probe condition (#433)" \
     no_standalone_probe "$_UP"
 check "update.sh keeps the /proc-less fallback arm (#433)" \
     has "$_UP" "$_ELIF"
+check "update.sh SCRIPT_DIR derivation carries the readlink fallback (#437 a B1)" \
+    has "$_UP" "$_SDIR"
 check "update.sh forces the fetch for stdin runs (#405)" \
     has "$_UP" '[ "$_opk_stdin" = true ] ||'
 check "update.sh pins streamed --only-binary runs to the deployed library (#405)" \
@@ -229,6 +249,8 @@ check "install.sh keeps no standalone #405 file-probe condition (#433)" \
     no_standalone_probe "$_IN"
 check "install.sh keeps the /proc-less fallback arm (#433)" \
     has "$_IN" "$_ELIF"
+check "install.sh SCRIPT_DIR derivation carries the readlink fallback (#437 a B1)" \
+    has "$_IN" "$_SDIR"
 check "install.sh streams (fetches) on stdin runs (#405, #433)" \
     has "$_IN" 'if [ "$_opk_stdin" = true ] || [ ! -f "$SCRIPT_DIR/../VERSION" ]; then'
 
@@ -239,6 +261,8 @@ check "config.sh keeps no standalone #405 file-probe condition (#433)" \
     no_standalone_probe "$_CF"
 check "config.sh keeps the /proc-less fallback arm (#433)" \
     has "$_CF" "$_ELIF"
+check "config.sh SCRIPT_DIR derivation carries the readlink fallback (#437 a B1)" \
+    has "$_CF" "$_SDIR"
 check "config.sh pins stdin runs to the deployed library (#405)" \
     sh -c 'printf "%s" "$1" | grep -qF "if [ \"\$_opk_stdin\" = true ]; then" &&
         printf "%s" "$1" | grep -qF "SCRIPT_DIR=\"/usr/local/lib/opencode-permissions-kit/management\""' \
