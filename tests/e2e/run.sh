@@ -260,14 +260,15 @@ if [ "$(printf '%s\n2.2.6\n' "$OC_VERSION" | sort -V | tail -n 1)" = "$OC_VERSIO
         -e OPENCODE_PASSWORD=e2e-probe-pw \
         -e OPENCODE_DISABLE_MODELS_FETCH=1 \
         "$E2E_CONTAINER" \
-        sh -c 'cd /tmp && exec /usr/local/lib/opencode-permissions-kit/bin/opencode serve --port 4789 --hostname 127.0.0.1' \
+        sh -c 'cd /tmp && exec /usr/local/lib/opencode-permissions-kit/bin/opencode serve --port 4789 --hostname 127.0.0.1 >/tmp/e2e-serve.log 2>&1' \
         >/dev/null 2>&1 &
     E2E_SERVE_JOB=$!
     # Readiness is SEMANTIC, not just "port answers": the HTTP listener
     # comes up ~1s before the agent registry finishes mounting the config
-    # rules (measured on 2.2.6: asks in that window evaluate against the
-    # default agent's allow-all and wrongly return allow). Poll until a
-    # NEUTRAL warmup resource evaluates "ask" — the template's "*": "ask"
+    # rules (measured on 2.2.6: asks in that window return allow — a
+    # pre-config posture; the mechanism is not traced, and the defense
+    # below deliberately does not depend on it). Poll until a NEUTRAL
+    # warmup resource evaluates "ask" — the template's "*": "ask"
     # catch-all being live in evaluation proves the registry settled,
     # without pre-asserting any deny shape the checks below own.
     _probe_up=""
@@ -292,6 +293,8 @@ if [ "$(printf '%s\n2.2.6\n' "$OC_VERSION" | sort -V | tail -n 1)" = "$OC_VERSIO
         E 'curl -sf -u opencode:e2e-probe-pw -X POST -H "content-type: application/json" -d "{\"action\":\"shell\",\"resources\":[\"sudo dd if=/dev/zero of=/dev/mmcblk0\"]}" "http://127.0.0.1:4789/api/session/$(cat /tmp/e2e-probe-sid)/permission" | grep -q "\"effect\":\"deny\""'
     check "probe: /etc redirect denied (echo x > /etc/passwd)" \
         E 'curl -sf -u opencode:e2e-probe-pw -X POST -H "content-type: application/json" -d "{\"action\":\"shell\",\"resources\":[\"echo x > /etc/passwd\"]}" "http://127.0.0.1:4789/api/session/$(cat /tmp/e2e-probe-sid)/permission" | grep -q "\"effect\":\"deny\""'
+    check "probe: flag write path denied (git diff --output=/etc/passwd, #436 a S1)" \
+        E 'curl -sf -u opencode:e2e-probe-pw -X POST -H "content-type: application/json" -d "{\"action\":\"shell\",\"resources\":[\"git diff HEAD --output=/etc/passwd\"]}" "http://127.0.0.1:4789/api/session/$(cat /tmp/e2e-probe-sid)/permission" | grep -q "\"effect\":\"deny\""'
     check "probe: /dev/null sink stays ask, not denied (echo x > /dev/null)" \
         E 'curl -sf -u opencode:e2e-probe-pw -X POST -H "content-type: application/json" -d "{\"action\":\"shell\",\"resources\":[\"echo x > /dev/null\"]}" "http://127.0.0.1:4789/api/session/$(cat /tmp/e2e-probe-sid)/permission" | grep -q "\"effect\":\"ask\""'
     check "probe: allowlisted command evaluates allow (ls -la)" \

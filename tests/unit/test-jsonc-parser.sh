@@ -165,11 +165,13 @@ assert_exitcode "carve-out: edit allow after deny (issue #23)" 0 \
 # History: the raw-disk redirect deny shipped broken twice — ">: /dev/sd*"
 # (stray colon, #378), then "> /dev/sd*" / ">> /dev/sd*" plus the
 # "> /etc/*" append siblings (#390 round a, A2). Issue #391 verified in
-# live sessions that EVERY leading-literal redirect rule is dead: opencode
-# matches a bash rule against the whole command text, so the rule needs a
-# leading "*". The corrected operator-agnostic shapes ("*>*/dev/sd*" ...)
-# and their behavior matrix are pinned by test-template-bash-rules.sh
-# (single ownership — no duplicate literals here).
+# live sessions that leading-literal redirect rules are dead for real
+# (in-command) redirects: opencode matches a bash rule against the whole
+# command text, so the rule needs a leading "*" (v2's commandless corner
+# is the one exception). The corrected operator-agnostic shapes
+# ("*>*/dev/sd*" ...) and their behavior matrix are pinned by
+# test-template-bash-rules.sh (single ownership — no duplicate literals
+# here).
 
 # --- 14. --tools: no permission.bash → no tools ---
 OUT=$(python3 "$PARSER" --tools "$FIXTURES/block-comments.jsonc" 2>/dev/null || true)

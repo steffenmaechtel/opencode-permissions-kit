@@ -40,7 +40,8 @@ therefore needs a leading `*` and an operator-swallowing inner `*`:
 
 ```jsonc
 "bash": {
-    // DEAD: no command text starts with ">" — this never matches
+    // DEAD for real commands: in-command text never starts with ">" —
+    // this matches nothing (only v2's rare commandless corner)
     // "> /srv/backup/*": "deny",
     // Works: any command redirecting into the tree (>, >>, >|, 2>, &>),
     // spaced or glued ("> file", ">file")

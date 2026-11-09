@@ -120,15 +120,22 @@
             // matching rule, so these override any broader allow above.
             // REDIRECT DENIES (issue #391): a bash rule is matched against
             // the WHOLE per-command text (leading-anchored, "*" = any run),
-            // so a rule like "> /dev/sd*" can never match — no command
-            // text starts with ">". Redirect rules therefore carry a
-            // LEADING "*", and the inner "*" swallows the operator token:
-            // "*>*/dev/sd*" catches >, >>, >|, &>, &>>, 2> and <> —
-            // spaced, glued (" >/dev/sda") and commandless ("> /file");
-            // the resource opencode matches includes the redirect itself. Device families are enumerated on purpose:
-            // a broad "*>*/dev/*" would deny the everyday "> /dev/null"
-            // sink. Lexical residuals stay (issue #391): tee/cp/mv onto a
-            // device, loop/md device families, variable indirection.
+            // so a rule like "> /dev/sd*" never matches a real command —
+            // in-command text never starts with ">". Redirect rules
+            // therefore carry a LEADING "*", and the inner "*" swallows
+            // the operator token: "*>*/dev/sd*" catches >, >>, >|, &>,
+            // &>>, 2> and <> — spaced and glued (" >/dev/sda"); the
+            // resource opencode matches includes the redirect itself.
+            // Commandless redirects ("> /file") are caught on v2 (it
+            // makes them a resource); v1.x produces no resource for them
+            // at all — unasked there, config-side unfixable.
+            // Device families are enumerated on purpose: a broad
+            // "*>*/dev/*" would deny the everyday "> /dev/null" sink.
+            // A later ask tripwire that also matches (cat settings.php
+            // > /dev/sda) downgrades a deny to ask — last match wins;
+            // the ask still gates. Lexical residuals stay (issue #391):
+            // tee/cp/mv onto a device, loop/md/mapper/dm device families,
+            // variable indirection.
             "rm -rf /*": "deny",
             "*>*/dev/sd*": "deny",
             "*>*/dev/nvme*": "deny",
@@ -137,6 +144,18 @@
             "*>*/dev/xvd*": "deny",
             "*>*/dev/hd*": "deny",
             "*>*/etc/*": "deny",
+            // Flag-write path (#436 a S1): "git diff --output=<file>"
+            // carries no ">" and no "of=", so it sailed past every deny
+            // above onto the "git diff *" allow — prompt-free. Same
+            // enumeration as the redirects (/tmp and other benign
+            // --output targets stay allowed).
+            "*--output=/etc/*": "deny",
+            "*--output=/dev/sd*": "deny",
+            "*--output=/dev/nvme*": "deny",
+            "*--output=/dev/mmcblk*": "deny",
+            "*--output=/dev/vd*": "deny",
+            "*--output=/dev/xvd*": "deny",
+            "*--output=/dev/hd*": "deny",
             "dd if=/dev/zero*": "deny",
             "*dd*of=/dev/sd*": "deny",
             "*dd*of=/dev/nvme*": "deny",

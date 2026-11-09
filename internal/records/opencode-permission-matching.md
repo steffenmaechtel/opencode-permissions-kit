@@ -3,7 +3,7 @@
 > Status: **CURRENT** — living reference for how opencode v1.18.x and
 > v2.x evaluate `permission` rules (bash/shell focus), verified for
 > issue #391 (the dead redirect-deny shapes). Where this record and the
-> opencode sources disagree, the sources win. Anchors: opencode v1.18.15
+> opencode sources disagree, the sources win. Anchors: opencode v1.18.35
 > (`packages/opencode/src/util/wildcard.ts`, `permission/index.ts`,
 > `tool/shell.ts`) and v2.2.6 (`packages/core/src/util/wildcard.ts`,
 > `permission.ts`, `shell/scan.ts`, `config/normalize.ts`,
@@ -14,11 +14,12 @@
 
 The template's redirect denies (`"> /dev/sd*"`, `">> /dev/sd*"`,
 `"> /etc/*"`, `">> /etc/*"`, `"dd of=/dev/sd*"`) shipped for months
-without matching a single realistic command: a bash rule is matched
-against the whole command text, and no command text starts with `>`.
-Two review rounds (#378 stray colon, #390 append forms) fixed spelling
-variants of the same dead shape; issue #391's live tests proved the
-whole class dead and drove the corrected shapes plus the verification
+without matching a single real command: a bash rule is matched against
+the whole command text, and in-command text never starts with `>`
+(v2's commandless corner is the one exception — §3). Two review rounds
+(#378 stray colon, #390 append forms) fixed spelling variants of the
+same dead shape; issue #391's live tests proved the whole class dead
+for real commands and drove the corrected shapes plus the verification
 layers below.
 
 ## 2. The matching pipeline
@@ -69,8 +70,10 @@ argv — the shell tool parses the command (tree-sitter) and derives one
   question at all** — a 1.x upstream gap no config rule can close.
 - v2 `shell/scan.ts`: same per-command model, but commandless redirects
   DO produce resources (`>/dev/null` as its own head), and the redirect
-  operator list (`BASH_REDIRECTS`) covers `>`, `>>`, `>|`, `&>`, `&>>`,
-  fd-prefixed (`2>`) and `<>` forms.
+  operator list (`BASH_REDIRECTS`) covers `>`, `>>`, `>|`, `&>`, `&>>`
+  and `<>` (fd-prefixed forms like `2>` are not in the list — their
+  coverage comes from the resource preserving the raw command span as
+  typed).
 
 Any resource hitting a deny blocks the whole tool call (v1 evaluates
 per-pattern with an immediate deny return; v2 `denied()` = some()).
@@ -88,6 +91,12 @@ per-pattern with an immediate deny return; v2 `denied()` = some()).
   where a `>` appears before a `/dev/<fam>` path in the same command.
 - dd writes: `*dd*of=/dev/<fam>` catches `sudo dd …`, any argument
   order, any spacing.
+- Flag-write paths: `git diff --output=<file>` / `git log --output=`
+  carry neither `>` nor `of=`, so they sailed past every redirect/dd
+  deny onto the `git diff *` allow — the one verified write shape that
+  landed at allow, not ask (found in review, PR #436 round a S1);
+  closed by dedicated `*--output=/etc/*` + `*--output=/dev/<fam>` deny
+  rules with the same family enumeration.
 - `/dev/*` must NOT be denied broadly: `> /dev/null` (incl. glued
   `>/dev/null 2>&1`, `2>/dev/null`) is an everyday sink — enumerate
   device families instead (sd, nvme, mmcblk, vd, xvd, hd).
@@ -122,9 +131,10 @@ skip the probe).
 
 **Warm-up race (measured on 2.2.6):** the HTTP listener answers ~1s
 before the agent registry finishes mounting the config rules. A
-permission ask in that window evaluates against the default agent's
-allow-all and returns `allow` — for deny-shaped resources too. The
-e2e probe therefore waits SEMANTICALLY: it polls a neutral warmup
+permission ask in that window returns `allow` — for deny-shaped
+resources too (the pre-config posture; the exact mechanism is not
+traced, and the defense below deliberately does not depend on it).
+The e2e probe therefore waits SEMANTICALLY: it polls a neutral warmup
 resource (`echo x > /tmp/e2e-warmup`) until it evaluates `ask` — the
 template's `"*": "ask"` catch-all being live in evaluation proves the
 registry settled, without pre-asserting any deny shape the checks own.
@@ -152,9 +162,9 @@ allowlisted `ls -la` stays allow. Full suite: 342 checks passed.
   `mv x /dev/sda` match none of the redirect denies (same as before
   #391; a follow-up rule set would need per-family `*tee /dev/<fam>*`
   shapes with a `/dev/null` carve-out for `tee`).
-- Device families not enumerated: `loop*`, `md*`, `sr*` (raw writes
-  there are root-gated in practice; the whole block is defense in
-  depth on top of Unix device permissions).
+- Device families not enumerated: `loop*`, `md*`, `sr*`, `mapper/*`,
+  `dm-*` (raw writes there are root-gated in practice; the whole block
+  is defense in depth on top of Unix device permissions).
 - Lexical-only matching (the template's own tripwire caveat applies):
   variables (`F=/dev/sda; echo x > $F`), indirection, and
   same-command false positives in the safe direction (a quoted string

@@ -5,12 +5,12 @@
 # WHY: opencode matches a bash permission rule against the WHOLE
 # per-command text (leading-anchored wildcard, "*" = any run, last
 # matching rule wins), and the matched resource includes the redirect.
-# A rule like "> /dev/sd*" therefore never matches — no command text
-# starts with ">". The template's redirect denies shipped in that dead
-# shape until issue #391; these pins keep the corrected shapes in and
-# the dead shapes out, and pin the EFFECT of every rule on a command
-# matrix (attack shapes must evaluate to deny, everyday shapes must
-# not).
+# A rule like "> /dev/sd*" therefore never matches a real command —
+# in-command text never starts with ">". The template's redirect
+# denies shipped in that dead shape until issue #391; these pins keep
+# the corrected shapes in and the dead shapes out, and pin the EFFECT
+# of every rule on a command matrix (attack shapes must evaluate to
+# deny, everyday shapes must not).
 #
 # HOW: a python replica of opencode's wildcard matcher (upstream
 # sources: opencode 1.18.15 packages/opencode/src/util/wildcard.ts and
@@ -31,7 +31,10 @@
 #     and the presence pin go red
 #   - revert a rule to the dead "> /dev/sd*" shape -> matrix rows red,
 #     absence pin red
-#   - mangle the replica (drop the dot-all flag) -> selftest red
+#   - mangle the replica (swap re.fullmatch for re.search) -> selftest
+#     red (the anchoring is what the ground-truth rows pin; a mutation
+#     that no probe input can observe, e.g. the dot-all flag — no
+#     probe contains a newline — does NOT discriminate)
 #
 # Run: sh tests/unit/test-template-bash-rules.sh
 set -eu
@@ -159,10 +162,13 @@ deny	echo "x" > /etc/passwd
 deny	echo "x" >> /etc/shadow
 deny	> /etc/passwd
 deny	ls > /dev/sda
+deny	echo "x" <> /dev/sda
 deny	dd of=/dev/sda
 deny	sudo dd if=/dev/zero of=/dev/nvme0n1
 deny	dd if=/dev/zero of=/dev/mmcblk0
 deny	dd if=/dev/zero of=/dev/vda
+deny	git diff HEAD --output=/etc/passwd
+deny	git log --output=/dev/nvme0n1
 !	echo "x" > /dev/null
 !	echo "x" >/dev/null 2>&1
 !	echo "x" 2>/dev/null
@@ -171,6 +177,14 @@ deny	dd if=/dev/zero of=/dev/vda
 !	strings /dev/sda > /tmp/disk.txt
 !	echo x > /dev/shm/cache
 !	echo x > /dev/stdout
+!	git diff HEAD --output=/tmp/patch.diff
+!	tee /dev/sda
+!	echo x > /dev/loop0
+!	echo x > /dev/md0
+!	echo x > /dev/mapper/vg-root
+!	echo x > /dev/dm-0
+!	sudo dd if=/dev/zero of=/dev/mapper/vg-root
+!	F=/dev/sda; echo x > $F
 allow	ls -la
 allow	git diff HEAD
 CMDS
@@ -223,7 +237,14 @@ for rule in \
     '*dd*of=/dev/mmcblk*": "deny"' \
     '*dd*of=/dev/vd*": "deny"' \
     '*dd*of=/dev/xvd*": "deny"' \
-    '*dd*of=/dev/hd*": "deny"'; do
+    '*dd*of=/dev/hd*": "deny"' \
+    '*--output=/etc/*": "deny"' \
+    '*--output=/dev/sd*": "deny"' \
+    '*--output=/dev/nvme*": "deny"' \
+    '*--output=/dev/mmcblk*": "deny"' \
+    '*--output=/dev/vd*": "deny"' \
+    '*--output=/dev/xvd*": "deny"' \
+    '*--output=/dev/hd*": "deny"'; do
     check "redirect/dd deny present: $rule" grep -qF "$rule" "$STRIPPED"
 done
 
