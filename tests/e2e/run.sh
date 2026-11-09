@@ -8,7 +8,9 @@
 set -e
 
 E2E_IMAGE="opencode-e2e"
-E2E_CONTAINER="opencode-e2e-test"
+# Env-overridable; lib.sh appends the checkout-path suffix (issue #366) so
+# parallel same-suite runs from another worktree cannot collide on the name.
+E2E_CONTAINER="${E2E_CONTAINER:-opencode-e2e-test}"
 . "$(dirname "$(readlink -f "$0")")/lib.sh"
 
 echo ""

@@ -2,7 +2,8 @@
 # Unit tests for the e2e binary sources (tests/e2e/lib.sh, e2e_fetch_opencode):
 # the download channel must be picked by major — 1.x from GitHub release
 # assets, 2.x from the npm registry (2.x ships no GitHub assets) with the
-# legacy @opencode-ai scope as fallback. Mostly structural greps (like
+# legacy @opencode-ai scope as fallback. Plus the per-worktree
+# container-name derivation (issue #366). Mostly structural greps (like
 # test-bypass-guard.sh — lib.sh's runner-facing plumbing is e2e
 # scaffolding), plus behavioral probes of the self-contained helpers
 # (npm_dist_latest via a fake curl, the test-update-flags.sh pattern).
@@ -209,6 +210,82 @@ check "both Dockerfiles pull the configurable base (FROM \${BASE_IMAGE})" \
 check "workflows export the mirror base image to the e2e steps" \
     sh -c "grep -q 'E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04' \"\$1\" \
 && grep -q 'E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04' \"\$2\"" _ "$WF_E2E" "$WF_DDEV"
+
+# --- per-worktree container names (issue #366): two checkouts running the
+# SAME suite on one docker daemon shared the fixed container name — the
+# second start's rm -f tore the first run's container down mid-suite
+# (rc 137 + cross-run red checks). lib.sh now suffixes E2E_CONTAINER with
+# a slug of the checkout path at source time; the runners must PASS an
+# exported E2E_CONTAINER through instead of clobbering it before lib.sh
+# reads the env (the pre-fix hardcode silently killed the override). ---
+RUN_ROOTLESS="$(cd "$(dirname "$0")/../e2e" && pwd)/run-docker-rootless.sh"
+
+# Comment-stripped (a commented-out assignment must not satisfy the pin).
+if sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    grep -q 'E2E_CONTAINER="\$E2E_CONTAINER-$(e2e_worktree_suffix)"'; then
+    pass "lib.sh appends the worktree suffix to E2E_CONTAINER at source time"
+else
+    fail "lib.sh lost the worktree-suffix assignment on E2E_CONTAINER"
+fi
+check "e2e_worktree_suffix helper exists in lib.sh" \
+    grep -q '^e2e_worktree_suffix() {' "$LIB"
+check "per-suite base names stay distinct (the suites stay disjoint)" \
+    sh -c "grep -q 'E2E_CONTAINER:-opencode-e2e-test}\"' \"\$1\" \
+&& grep -q 'E2E_CONTAINER:-opencode-e2e-rootless-test}\"' \"\$2\" \
+&& grep -q 'E2E_CONTAINER:-opencode-e2e-ddev-test}\"' \"\$3\"" _ "$RUN_SH" "$RUN_ROOTLESS" "$RUN_DDEV"
+# Passthrough count, comment-stripped: all three runners must read the
+# env, not clobber it (guarded count — grep-in-pipe cannot trip set -e).
+_pwc=0
+for _r in "$RUN_SH" "$RUN_ROOTLESS" "$RUN_DDEV"; do
+    if sed 's/^[[:space:]]*#.*$//' "$_r" | grep -q 'E2E_CONTAINER="\${E2E_CONTAINER:-'; then
+        _pwc=$((_pwc + 1))
+    fi
+done
+if [ "$_pwc" -eq 3 ]; then
+    pass "all three runners pass an exported E2E_CONTAINER through (issue #366)"
+else
+    fail "E2E_CONTAINER passthrough present in only $_pwc of 3 runners"
+fi
+# The effective name must be visible at container start (incident aid:
+# with two same-suite runs the log must show which run owns which
+# container). Comment-stripped likewise.
+if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -q 'echo "  container: \$E2E_CONTAINER'; then
+    pass "e2e_start_container prints the effective container name"
+else
+    fail "e2e_start_container does not print the effective container name"
+fi
+
+# Behavioral: the slug itself (pure tr/sed, no fakes). Deterministic per
+# checkout, discriminating between checkouts, and a valid docker name
+# component (the leading '/' slugs away, so the first char stays alnum).
+# Example paths only (/tmp/example/...) — the sandbox policy forbids real
+# project-tree literals inside unit suites, and a real path here invites a
+# later session to reuse it for something destructive.
+WTWORK="$(work_new)"
+extract_func "$LIB" e2e_worktree_suffix >"$WTWORK/fn.sh"
+_wts() {
+    REPO_DIR="$1" sh -c '. "$1"; e2e_worktree_suffix' _ "$WTWORK/fn.sh"
+}
+_wt1=$(_wts /tmp/example/opencode-permissions-kit/repo)
+_wt2=$(_wts /tmp/example/opencode-permissions-kit/repo-kasantra)
+assert_eq "suffix slugs the checkout path deterministically" \
+    "tmp-example-opencode-permissions-kit-repo" "$_wt1"
+if [ "$(_wts /tmp/example/opencode-permissions-kit/repo)" = "$_wt1" ]; then
+    pass "suffix is stable across calls (same worktree -> same name)"
+else
+    fail "suffix unstable across calls"
+fi
+if [ -n "$_wt2" ] && [ "$_wt2" != "$_wt1" ]; then
+    pass "suffix discriminates two worktrees"
+else
+    fail "suffix does not discriminate worktrees (got: '$_wt1' / '$_wt2')"
+fi
+if printf '%s' "$_wt1" | grep -qE '^[a-zA-Z0-9][a-zA-Z0-9-]*$'; then
+    pass "suffix is a valid docker name component (alnum start, no foreign chars)"
+else
+    fail "suffix is not a valid docker name component: '$_wt1'"
+fi
+rm -rf "$WTWORK"
 
 # --- lib.sh cleanup traps (#287 a S2 / b S3, reapplied per #289) ----------------
 # e2e lib.sh is outside trap_scan's unit-suite floor, so its signal

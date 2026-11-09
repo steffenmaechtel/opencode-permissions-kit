@@ -62,7 +62,9 @@ for _arg in "$@"; do
 done
 
 E2E_IMAGE="opencode-e2e-rootless"
-E2E_CONTAINER="opencode-e2e-rootless-test"
+# Env-overridable; lib.sh appends the checkout-path suffix (issue #366) so
+# parallel same-suite runs from another worktree cannot collide on the name.
+E2E_CONTAINER="${E2E_CONTAINER:-opencode-e2e-rootless-test}"
 E2E_DOCKERFILE="Dockerfile.rootless"
 # systemd-as-PID1 container: lib.sh auto-detects the outer docker layout and
 # builds the cgroup/tmpfs args (see lib.sh e2e_detect_host_layout).

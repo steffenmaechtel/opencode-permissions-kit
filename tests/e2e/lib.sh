@@ -1,12 +1,17 @@
 #!/bin/sh
 # tests/e2e/lib.sh — shared scaffolding for the e2e suites.
-# Sourced (not executed) by run.sh and run-docker-rootless.sh. The runners set
-# the E2E_* knobs, then call the helpers below. Kept in one file so the two
-# suites cannot drift apart in their build/cache/check plumbing.
+# Sourced (not executed) by run.sh, run-docker-rootless.sh and run-ddev.sh.
+# The runners set the E2E_* knobs, then call the helpers below. Kept in one
+# file so the three suites cannot drift apart in their build/cache/check
+# plumbing.
 #
 # Knobs (set BEFORE sourcing):
 #   E2E_IMAGE        docker image tag           (default: opencode-e2e)
-#   E2E_CONTAINER    container name             (default: opencode-e2e-test)
+#   E2E_CONTAINER    container name base        (default: opencode-e2e-test).
+#                    The effective name gets the checkout's path appended
+#                    (issue #366: two worktrees on one docker daemon must
+#                    not share a container name); an exported value wins
+#                    and composes with that suffix.
 #   E2E_DOCKERFILE   Dockerfile name            (default: Dockerfile)
 #   E2E_RUN_ARGS     extra `docker run` args    (default: none)
 #   E2E_CMD          command for `docker run`   (default: sleep infinity)
@@ -102,6 +107,21 @@ case "$E2E_GIT_CHANNEL" in
     distro | "") : ;;
     *) E2E_IMAGE="$E2E_IMAGE-git-$E2E_GIT_CHANNEL" ;;
 esac
+
+# Per-worktree container names (issue #366): the fixed per-suite default is
+# shared by EVERY checkout on the same docker daemon, and
+# e2e_start_container rm -f's it before each run — a second worktree
+# starting the same suite tears the first run's container down mid-suite
+# (live incident 2026-11-03: rc 137 plus cross-run red checks that looked
+# like product bugs). The checkout's absolute path slugged onto the name
+# gives every worktree its own container — and its own leftover for the
+# next run to clean. E2E_IMAGE deliberately stays shared: a concurrent
+# rebuild's retag never affects a running container, so the layer cache
+# and the ddev golden image keep their cross-worktree value.
+e2e_worktree_suffix() {
+    printf '%s' "$REPO_DIR" | tr -c 'a-zA-Z0-9' '-' | sed 's/^-*//'
+}
+E2E_CONTAINER="$E2E_CONTAINER-$(e2e_worktree_suffix)"
 
 failures=0
 passed=0
@@ -493,6 +513,10 @@ e2e_start_container() {
 
     echo ""
     echo "--- Running E2E container ---"
+    # Name + image up front (issue #366): the name is per-worktree — with
+    # two same-suite runs on one daemon the logs must show which run
+    # owns which container.
+    echo "  container: $E2E_CONTAINER (image: $E2E_IMAGE)"
     # A leftover container from an aborted/debug run must not block the name.
     docker rm -f "$E2E_CONTAINER" >/dev/null 2>&1 || true
     # shellcheck disable=SC2086  # E2E_RUN_ARGS / E2E_CMD are intentional word splits
