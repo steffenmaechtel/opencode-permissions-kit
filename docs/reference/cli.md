@@ -348,9 +348,10 @@ sudo.
 
 Guardrails: system roots and their subpaths (`/etc`, `/usr/local/...`) and
 whole home directories are refused — hand over project trees, not systems
-(`/tmp` subpaths are allowed). Symlinked paths and operands carrying `/`,
-`.` or `..` components are refused too: the kit never hands a tree over
-through a link (`--dry-run` lists the refusals it would make). The
+(`/tmp` subpaths are allowed). Symlinked paths — the operand itself or any
+component of the chain leading to it — and operands carrying `/`, `.` or
+`..` components are refused too: the kit never hands a tree over through a
+link (`--dry-run` lists the refusals it would make). The
 chown/chmod passes are ordered per direction so a planted link cannot steer
 them; pre-arranged group/world-writable paths survive the passes in either
 order.

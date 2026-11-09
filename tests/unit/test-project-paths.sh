@@ -194,12 +194,12 @@ _PP377_WRITER=$(_pp377_arms "$PATH_SANE" project_path_sane)
 for _pp377_site in \
     "sh/update-core.sh:update_redeploy_project_roots:/tmp /tmp/* /var/tmp /var/tmp/*" \
     "management/config.sh:refresh:/tmp /tmp/* /var/tmp /var/tmp/*" \
-    "bin/opk:_ho_np:/tmp/*"; do
+    "sh/handover-core.sh:_ho_np:/tmp/*"; do
     _pp377_file=${_pp377_site%%:*}
     _pp377_rest=${_pp377_site#*:}
     _pp377_fnname=${_pp377_rest%%:*}
     _pp377_div=${_pp377_rest#*:}
-    if [ "$_pp377_file" = bin/opk ]; then
+    if [ "$_pp377_file" = sh/handover-core.sh ]; then
         # the handover gate is an inline block, not a function: the awk
         # range covers realpath → the FIRST esac (the system-path case;
         # the whole-home case after it starts with /home/* and must
@@ -596,11 +596,12 @@ grep -q '_pp_agent_home' "$PATH_SANE" &&
 # pattern makes the rider a no-op in effect, the letter is kept).
 DOCTOR="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/doctor.sh"
 OPK="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opk"
-_opr_defs=$(sed 's/^[[:space:]]*#.*$//' "$PATH_SANE" "$DOCTOR" "$OPK" |
+HANDOVER_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/handover-core.sh"
+_opr_defs=$(sed 's/^[[:space:]]*#.*$//' "$PATH_SANE" "$DOCTOR" "$OPK" "$HANDOVER_CORE" |
     grep -c '^opk_policy_root() {' || true)
 if [ "$_opr_defs" = 1 ] &&
     grep -q 'opk_policy_root "$DOCTOR_ROOT"' "$DOCTOR" &&
-    grep -q 'opk_policy_root "$_ho_policy_dir"' "$OPK" &&
+    grep -q 'opk_policy_root "$_ho_policy_dir"' "$HANDOVER_CORE" &&
     grep -q '\. "$PS_LIB"' "$DOCTOR" &&
     grep -q 'sh/path-sane.sh' "$OPK"; then
     pass "opk_policy_root defined once in the lib, called (not copied) by both consumers"

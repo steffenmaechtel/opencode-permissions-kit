@@ -129,6 +129,7 @@ fetch_kit() {
         opencode-permissions-kit-lib/sh/path-sane.sh \
         opencode-permissions-kit-lib/sh/install-core.sh \
         opencode-permissions-kit-lib/sh/uninstall-core.sh \
+        opencode-permissions-kit-lib/sh/handover-core.sh \
         opencode-permissions-kit-lib/management/config.sh \
         opencode-permissions-kit-lib/management/doctor.sh \
         opencode-permissions-kit-lib/management/update.sh \
