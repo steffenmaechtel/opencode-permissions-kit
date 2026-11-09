@@ -131,6 +131,14 @@ registry settled, without pre-asserting any deny shape the checks own.
 (`GET /api/agent` showing the full rule set is NOT sufficient — it
 settles ~1s before evaluation does.)
 
+**Live-session verification (2026-11-09, maintainer-run):** with a
+safe stand-in rule (`*>*/tmp/steffen/dev/sd*` — a /tmp path, no real
+device involved) the full real chain — agent, shell tool, tree-sitter
+resource construction, permission gate — confirmed the shapes:
+spaced `echo "x" > /tmp/steffen/dev/sda` and glued
+`>/tmp/steffen/dev/sda` both hard-denied without any prompt,
+`> /dev/null` asked, allowlisted `ls -la` ran unprompted.
+
 E2E probe result on the corrected template (opencode 2.2.6,
 2026-11-09): all 7 probes green — spaced/glued/family redirects
 denied, sudo dd denied, /etc denied, `> /dev/null` stays ask,
