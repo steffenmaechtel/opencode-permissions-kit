@@ -280,10 +280,26 @@ check "config.sh menu has a container backend entry" \
 
 echo ""
 echo "-- status.sh wiring (section rows live in sh/status-core.sh, #346 wave 1) --"
-check "status.sh reports the backend name" \
-    grep -Fq 'backend:' "$STATUS_CORE"
-check "status.sh handles rootless backends" \
-    grep -Fq 'docker-rootless|podman-rootless' "$STATUS_CORE"
+# #403: 'backend:' matched exactly one line — the re-run HINT (ui_detail
+# "...rootless backend:") — and 'docker-rootless|podman-rootless' only the
+# hint's install command, so deleting every real backend row kept both
+# pins green. The pins bind the ui_kv rows and the case arms; the
+# per-backend BEHAVIOR is driven by test-status.sh's run_case sourcing
+# pins for kubernetes/empty/docker-rootless only — the podman arm is
+# pinned structurally here (rows + dispatch), and behavioral podman
+# coverage is a deferred work order recorded in this PR's round-a loop
+# status (#439 a S2; the PR thread is the case record). Strip riders
+# on the presence legs (#439 a C3): a row commented out during
+# debugging and committed must not keep a pin green — the #261/#244 g
+# W1 survivor trap, presence form.
+check "status.sh backend row: docker-rootless" \
+    sh -c 'sed "s/^[[:space:]]*#.*\$//" "$1" | grep -Fq -- "$2"' _ "$STATUS_CORE" 'ui_kv_ok "backend" "docker-rootless"'
+check "status.sh backend row: podman-rootless" \
+    sh -c 'sed "s/^[[:space:]]*#.*\$//" "$1" | grep -Fq -- "$2"' _ "$STATUS_CORE" 'ui_kv_ok "backend" "podman-rootless"'
+check "status.sh backend row: unknown backend flagged bad" \
+    sh -c 'sed "s/^[[:space:]]*#.*\$//" "$1" | grep -Fq -- "$2"' _ "$STATUS_CORE" 'ui_kv_bad "backend" "unknown'
+check "status.sh backend dispatch: rootless case arms" \
+    sh -c 'sed "s/^[[:space:]]*#.*\$//" "$1" | grep -Fq -- "$2" && sed "s/^[[:space:]]*#.*\$//" "$1" | grep -Fq -- "$3"' _ "$STATUS_CORE" 'docker-rootless)' 'podman-rootless)'
 check "status.sh reports socket reachability" \
     grep -Fq 'NOT reachable' "$STATUS_CORE"
 check "status.sh has no migration-stamp section (legacy cleanup)" \

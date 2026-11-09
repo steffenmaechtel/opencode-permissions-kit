@@ -147,10 +147,15 @@ _re=$(run_resolver "$WORK/bin" "$WORK/stub-v1" 'current_opencode_major')
 check "update-core: bounded --version helper exists (timeout 10 + head -1)" \
     sh -c "grep -q 'timeout 10 \"\$SYSTEM_BIN\" --version' \"\$1\" && grep -q 'opencode_version_line() {' \"\$1\"" _ "$UPDATE_CORE"
 # Comment-strip riders (#261, the #244 g W1 class): commented-out lines
-# stop counting; full-line comments only (#244 h W6 residual).
-_ova_n="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE_CORE" | grep -c 'opencode_version_line' || true)"
-check "update-core: all --version probes route through the bounded helper (probe sites: $_ova_n, need >=4)" \
-    [ "$_ova_n" -ge 4 ]
+# stop counting; full-line comments only (#244 h W6 residual). The count
+# binds the CALL FORM (#439 a S1, the #408 discipline): the bare name
+# also matched the definer (opencode_version_line() {), inflating the
+# >=4 floor to 5 — deleting one of the four real probe sites stayed
+# green. For a no-argument helper the call form is the name followed by
+# `)` (the $(...) invocations); the definer's `(` cannot match.
+_ova_n="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE_CORE" | grep -c 'opencode_version_line)' || true)"
+check "update-core: all --version probes route through the bounded helper (call sites: $_ova_n, need exactly 4 — #439 a S1)" \
+    [ "$_ova_n" -eq 4 ]
 check "update-core: post-copy failure message never names a backup that was never taken (W6)" \
     sh -c "grep -qF 'no previous binary was backed up' \"\$1\" && grep -qF '[ -f \"\$BACKUP_DIR/opencode.current\" ]' \"\$1\"" _ "$UPDATE_CORE"
 

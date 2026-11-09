@@ -1802,10 +1802,16 @@ check "update.sh: routine skip hint kept verbatim (issue #219 move)" \
 check "install.sh: stamps after the install-time handover" \
     sh -c "grep -qF 'ddev_handover_stamp_write \"\$root\" \"\$OPENCODE_USER\" \"\$OPENCODE_GROUP\"' \"\$1\"" _ "$INSTALL_CORE"
 # Comment-strip riders (#261, the #244 g W1 class): commented-out lines
-# stop counting; full-line comments only (#244 h W6 residual).
-_stampw_n="$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" | grep -c "ddev_handover_stamp_write" || true)"
-check "config.sh: refresh + projects add + handover re-stamp (stamp sites: $_stampw_n, need >=3)" \
-    [ "$_stampw_n" -ge 3 ]
+# stop counting; full-line comments only (#244 h W6 residual). The count
+# binds the CALL FORM — the opening quote of the first argument, the
+# fs_baseline_root/ddev_handover_root discipline from PR #407 (#408):
+# the bare name also matched the fail-open stub definer, so deleting one
+# of the three real sites left count 3 >= 3 green while the wiring was
+# broken; the call form matches only real invocations (definers, error
+# echoes and comments cannot match) and the floor becomes exact.
+_stampw_n="$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" | grep -c 'ddev_handover_stamp_write "' || true)"
+check "config.sh: refresh + projects add + handover re-stamp (call sites: $_stampw_n, need exactly 3 — #408)" \
+    [ "$_stampw_n" -eq 3 ]
 check "handover.sh: stamp dir defaults to /etc/opencode-permissions-kit/handover" \
     sh -c "grep -qF 'OPK_HANDOVER_STAMP_DIR:-/etc/opencode-permissions-kit/handover' \"\$1\"" _ "$HANDOVER"
 check "handover.sh: stamp stubs fail open (valid=1) when the lib is missing" \
