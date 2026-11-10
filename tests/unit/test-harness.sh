@@ -68,7 +68,7 @@ _meta_cleanup() {
     rm -rf "${_lc_iso:-}" "${_lc_cell:-}" "${_sgi_iso:-}" \
         "${_sgi_scratch:-}" "${_afc_out:-}" "${_afc_cell:-}" \
         "${_a1h_out:-}" "${_a1h_cell:-}" "${_a1h_a:-}" "${_a1h_b:-}" \
-        "${_ef_fix:-}"
+        "${_ef_fix:-}" "${_ls_fix:-}"
     rm -f "${_sgi_out:-}"
 }
 trap _meta_cleanup EXIT INT TERM
@@ -542,6 +542,81 @@ rc_is 0 "9.8 outer_host: rc 0"
 has "outer_host() {" "9.8 ... finds the definition line"
 has "indented-decoy" "9.8 ... spans past the nested def's indented close"
 has "HOST_REACHED=1" "9.8 ... reaches the real body end (truncation discriminator)"
+
+# --- 10. live_src / check_live (#460): the canonical comment-strip rider -------
+# The rider primitive + the single-file sugar, pinned through the child
+# shell the way production observes them (pipelines, command
+# substitution, check_live rows + rc). Sabotage arms (committed tree,
+# then restore + re-run green):
+#   - delete the strip from live_src (body -> `cat "$_ls_f"`) -> the
+#     strip pin (10.1) and BOTH survivor-trap arms (10.2, 10.9) go
+#     red: a commented-out construct counts again -- exactly the
+#     #261/#244 g W1 trap the rider exists to kill
+#   - delete live_src from harness.sh -> every 10.x pin goes red
+#   - break check_live's pipe (grep the FILE directly) -> 10.9 reds
+#     while 10.1 stays green (discrimination runs through the strip,
+#     not through the fixture)
+_ls_fix="$(mktemp -d)"
+printf '%s\n' \
+    '# col-0 full-line comment rider_target' \
+    '    # indented full-line comment rider_target' \
+    'pinned_alpha="live-one"' \
+    '# pinned_beta="survivor_trap_construct"' \
+    '    # pinned_beta_ind="survivor_trap_construct"' \
+    'pinned_gamma="live-two"' \
+    'trailing_arm="kept # trailing comment stays"' \
+    >"$_ls_fix/subject.sh"
+printf '%s\n' \
+    'fileb_marker="live-in-b"' \
+    >"$_ls_fix/second.sh"
+
+arm "live_src \"$_ls_fix/subject.sh\""
+rc_is 0 "10.1 live_src: rc 0 over a readable file"
+lacks "rider_target" "10.1 ... strips col-0 AND indented full-line comments"
+lacks "survivor_trap_construct" "10.1 ... the commented constructs are gone from the stream"
+has 'pinned_alpha="live-one"' "10.1 ... live lines survive verbatim"
+
+arm "live_src \"$_ls_fix/subject.sh\" | grep -qF survivor_trap_construct"
+rc_is 1 "10.2 survivor trap: a commented-out construct does NOT count (grep rc 1)"
+
+arm "live_src \"$_ls_fix/subject.sh\" | grep -qF 'kept # trailing comment stays'"
+rc_is 0 "10.3 full-line strip only: a trailing comment after live code still counts (#244 h W6)"
+
+arm "live_src \"$_ls_fix/subject.sh\" \"$_ls_fix/second.sh\" | grep -qF live-in-b"
+rc_is 0 "10.4 multi-file: concatenation carries the second file (any-file presence)"
+arm "_c=\$(live_src \"$_ls_fix/subject.sh\" \"$_ls_fix/second.sh\" | grep -c 'live-'); printf 'COUNT=%s' \"\$_c\""
+has "COUNT=3" "10.4 ... counts sum over the concatenation (3 live markers)"
+
+arm "live_src \"$_ls_fix/subject.sh\" | grep -qF pinned_alpha"
+rc_is 0 "10.5 rc contract: the consumer grep owns rc 0 on a live match"
+arm "live_src \"$_ls_fix/subject.sh\" | grep -qF absent_pattern_xyz"
+rc_is 1 "10.5 ... and rc 1 on no match (no || true swallowed in here)"
+
+arm "live_src \"$_ls_fix/no-such-file\" | grep -qF x"
+rc_is 1 "10.6 missing file: downstream grep rc 1 (the pin fails loud)"
+has "no-such-file" "10.6 ... sed's own error names the file -- never a silent pass"
+
+arm "check_live \"cl pass\" \"$_ls_fix/subject.sh\" -qF live-one; suite_done demo"
+rc_is 0 "10.7 check_live: live match -> green suite"
+has "Passed: 1" "10.7 ... counts as a pass"
+has "cl pass" "10.7 ... the row carries the description"
+
+arm "check_live \"cl absent\" \"$_ls_fix/subject.sh\" -qF absent_pattern_xyz; suite_done demo"
+rc_is 1 "10.8 check_live: absent pattern -> red suite"
+has "Failed: 1" "10.8 ... counts as a failure"
+
+arm "check_live \"cl survivor\" \"$_ls_fix/subject.sh\" -qF survivor_trap_construct; suite_done demo"
+rc_is 1 "10.9 check_live survivor trap: comment-only construct -> red (the #460 core)"
+has "Failed: 1" "10.9 ... the trap counts as a failure, not a vacuous pass"
+
+arm "check_live \"cl noargs\" \"$_ls_fix/subject.sh\"; suite_done demo"
+rc_is 1 "10.10 check_live without grep arguments fails loud (F6 mirror)"
+has "no grep arguments given" "10.10 ... names the contract"
+
+arm "check_live \"cl ere\" \"$_ls_fix/subject.sh\" -Eq 'pinned_(alpha|gamma)=\"live'; suite_done demo"
+rc_is 0 "10.11 grep flags pass through verbatim (-Eq ERE arm)"
+arm "check_live \"cl spaced\" \"$_ls_fix/subject.sh\" -qF 'kept # trailing comment stays'; suite_done demo"
+rc_is 0 "10.11 ... a spaced pattern with a # survives quoting intact"
 
 # --- summary gate (independent on purpose -- see header) ------------------------
 echo ""
