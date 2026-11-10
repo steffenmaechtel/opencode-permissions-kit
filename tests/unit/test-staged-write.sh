@@ -44,7 +44,12 @@ TUIPLUGIN="$REPO/files/opencode-permissions-kit-lib/sh/tui-plugin.sh"
 # load-bearing the moment a call does.
 umask 022
 
-WORK=$(work_new)
+# Loud scratch guard (#441 a B1 / #454 a C1 class): the suite runs set -u
+# only -- a failed work_new must abort instead of degenerating writes.
+WORK=$(work_new) || {
+    echo "staged-write tests: scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
 
 echo ""
 echo "staged-write + handover symlink gates (0.0.39g S1/S2 + follow-ups)"

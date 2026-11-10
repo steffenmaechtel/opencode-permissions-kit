@@ -16,7 +16,12 @@ OLD_DATA="$REPO/internal/reviews-meta/2026-10-10/data"
 # (and check/assert_eq where present) live in lib/harness.sh now.
 . "$REPO/tests/unit/lib/harness.sh"
 
-WORK="$(work_new /tmp/opencode-test-meta-aggregate.XXXXXX)"
+# Loud scratch guard (#441 a B1 / #454 a C1 class): the suite runs set -u
+# only -- a failed work_new must abort instead of degenerating writes.
+WORK="$(work_new /tmp/opencode-test-meta-aggregate.XXXXXX)" || {
+    echo "reviews-meta aggregate tests: scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
 
 # --- compat: frozen 2026-10-10 data regenerates identically -------------------
 mkdir -p "$WORK/old"

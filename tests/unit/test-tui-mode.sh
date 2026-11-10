@@ -195,7 +195,12 @@ check "uninstall.sh removes the 2x plugin dir and cli.json entries" \
 
 # tui-register.py functional behavior (cli.json is user-owned state)
 check "tui-register.py exists" test -f "$REGISTER"
-T2X=$(work_new)
+# Loud scratch guard (#441 a B1 / #454 a C1 class): the suite runs set -u
+# only -- a failed work_new must abort instead of degenerating writes.
+T2X=$(work_new) || {
+    echo "tui-mode tests: scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
 check "register: creates minimal cli.json" \
     python3 "$REGISTER" "$T2X/cli.json" register /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx &&
     grep -q '"package": "/usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx"' "$T2X/cli.json"
@@ -250,7 +255,10 @@ check "first-run cli.json parses and carries the plugin entry" \
 # Step 8c and update.sh's sync_tui_registration. Runs here as the
 # current user: TR_SUDO wraps sudo with a stub that drops chown (a
 # non-root chown always fails; ownership is asserted by the e2e suites).
-TUIWORK=$(work_new)
+TUIWORK=$(work_new) || {
+    echo "tui-mode tests: scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
 mkdir -p "$TUIWORK/tps/bin"
 cat >"$TUIWORK/tps/bin/sudo-stub" <<'EOF'
 #!/bin/sh
