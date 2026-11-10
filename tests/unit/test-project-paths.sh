@@ -180,7 +180,10 @@ fi
 # SUBpaths open (a temp build tree is a legitimate handover operand)
 # while keeping /tmp itself and /var/tmp blocked.
 _LIBDIR="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib"
-_pp377_fn() { sed -n "/^$2() {/,/^}/p" "$1"; }
+# extract_func since #441 a A1 (strict col-0 site; the harness's
+# project-paths boundary citation covers the INDENT-tolerant extractor
+# at the top of this suite, not this strict one).
+_pp377_fn() { extract_func "$1" "$2"; }
 _pp377_arms() {
     # '/'-leading lines minus a lone '/*)' arm (the relative-path
     # reject), line-continuations joined, then '|'-split tokens.

@@ -8,11 +8,29 @@
 #
 # Run: sh tests/unit/test-docs.sh
 
-REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$REPO_ROOT" || exit 1
 
-TMP="$(mktemp)"
-trap 'rm -f "$TMP"' EXIT INT TERM
+# Shared harness (issue #417 adoption, scoped): this suite is a FAIL-
+# rows checker, not a pass/fail-row suite -- it has no local rows or
+# counters to migrate, so adoption here covers what it DOES duplicate:
+# extract_func for the parse_args extraction legs and the work
+# registry (issue #395) for the scratch receiver (the local trap is
+# gone; a local trap would disarm the harness registry). The FAIL-file
+# gate and the one-line verdict output stay the suite's own.
+. "$SCRIPT_DIR/lib/harness.sh"
+
+# Loud scratch guard (#441 a B1): this suite has no set -e (its checks
+# accumulate FAIL rows across legitimately failing probes), so a failed
+# work_new_file left TMP empty -- every FAIL writer degraded to stderr
+# noise and the [ -s "$TMP" ] gate read false: "docs link check: OK"
+# with detection disabled (the master shape, silently green). Abort
+# loud instead; the pin at the bottom drives this path hermetically.
+TMP="$(work_new_file)" || {
+    echo "docs link check: FAILED - scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
 
 # GitHub anchor normalization: lowercase; remove anything that is not a
 # letter, number, space, or hyphen; spaces -> hyphens; trim edge hyphens.
@@ -155,7 +173,7 @@ records_status_check
 # pin shipped W2 exactly this way: a documented `-y` the parser
 # rejected was invisible to it.
 _cli_md="$REPO_ROOT/docs/reference/cli.md"
-_f36_flags="$(sed -n '/^parse_args()/,/^}/p' "$REPO_ROOT/files/install.sh" |
+_f36_flags="$(extract_func "$REPO_ROOT/files/install.sh" parse_args |
     grep -oE '\-\-[a-z0-9-]+' | sort -u)"
 if [ -z "$_f36_flags" ]; then
     echo "FAIL cli.md: parse_args extraction empty — anchor drift? (#211 b W28)" >>"$TMP"
@@ -183,7 +201,7 @@ for _f36_df in $_f36_docflags; do
                 echo "FAIL cli.md: documented install flag '$_f36_df' not in the parser (#211 b W30)" >>"$TMP"
             ;;
         -?)
-            sed -n '/^parse_args()/,/^}/p' "$REPO_ROOT/files/install.sh" |
+            extract_func "$REPO_ROOT/files/install.sh" parse_args |
                 grep -qF -- "| $_f36_df)" ||
                 echo "FAIL cli.md: documented alias '$_f36_df' not in the parser (#211 b W30)" >>"$TMP"
             ;;
@@ -314,6 +332,26 @@ grep -q 'checked helper families' "$REPO_ROOT/docs/reference/cli.md" ||
     echo "FAIL cli.md: missing-library scope missing (#273 c C10)" >>"$TMP"
 grep -q 'pre-install exception: full mode exits 0' "$REPO_ROOT/docs/reference/cli.md" ||
     echo "FAIL cli.md: pre-install exit-code exception missing (#273 c C11)" >>"$TMP"
+
+# --- #441 a B1: scratch-creation failure fails loud, not silent-green -----------
+# Hermetic self-re-execution: the suite as a child process under a
+# dead TMPDIR must abort rc 1 with the loud guard message above (the
+# child stops at the guard, before any check -- the re-run is cheap).
+# Sabotage discriminator: with the guard deleted the child exits 0 and
+# prints the silent OK -- exactly the silent-green this pin forbids.
+# The OPK_DOCS_B1_CHILD marker is the recursion break (#441 b D1):
+# with the guard deleted -- or the sentinel dir accidentally existing
+# -- the child would otherwise reach THIS pin and spawn another child
+# forever (the round-a draft hang; each level is a full suite run).
+if [ -z "${OPK_DOCS_B1_CHILD:-}" ]; then
+    _b1_rc=0
+    _b1_out="$(OPK_DOCS_B1_CHILD=1 TMPDIR="$REPO_ROOT/.no-such-tmp-opk-441" \
+        sh "$SCRIPT_DIR/test-docs.sh" 2>&1)" || _b1_rc=$?
+    if [ "$_b1_rc" -ne 1 ] ||
+        ! printf '%s' "$_b1_out" | grep -qF 'scratch creation failed'; then
+        echo "FAIL test-docs itself: dead-TMPDIR run must abort loud, not pass silently (rc=$_b1_rc out=$_b1_out) (#441 a B1)" >>"$TMP"
+    fi
+fi
 
 if [ -s "$TMP" ]; then
     echo "docs link check: FAILED"

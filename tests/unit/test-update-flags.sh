@@ -1460,7 +1460,7 @@ fi
 # mktemp diagnostic; the healthy arm re-fetches to the temp and moves
 # it in (fake curl on PATH — the suite's established pattern).
 mkdir -p "$_VSG/elfroot/sub" "$_VSG/tmp" "$_VSG/bin"
-sed -n '/^ensure_local_file() {/,/^}$/p' "$UPDATE" >"$_VSG/elf.sh"
+extract_func "$UPDATE" ensure_local_file >"$_VSG/elf.sh"
 printf '#!/bin/sh\n_prev=\nwhile [ $# -gt 0 ]; do\n  if [ "$_prev" = "-o" ]; then printf "fetched-body\\n" >"$1"; exit 0; fi\n  _prev="$1"\n  shift\ndone\nexit 0\n' >"$_VSG/bin/curl"
 chmod +x "$_VSG/bin/curl"
 _elf_out=$(TMPDIR="$_VSG/nonexistent" FILES_ROOT="$_VSG/elfroot" sh -c '
@@ -1518,7 +1518,7 @@ fi
 # the order proof, review a C3), then the ORDER is proven by prefix:
 # whatever precedes update_redeploy_xdg_shim must already contain
 # update_binary_upgrade.
-_pg_list="$(sed -n "/^update_pairing_guard() {/,/^}/p" "$UPDATE" | sed 's/^[[:space:]]*#.*$//' | tr -d '\\' | tr -s '[:space:]' ' ')"
+_pg_list="$(extract_func "$UPDATE" update_pairing_guard | sed 's/^[[:space:]]*#.*$//' | tr -d '\\' | tr -s '[:space:]' ' ')"
 case "$_pg_list" in
     *update_binary_upgrade*update_redeploy_xdg_shim*)
         pass "pairing guard list keeps the same order (#257)"
