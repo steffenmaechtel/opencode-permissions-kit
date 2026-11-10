@@ -6,11 +6,11 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**139 metas · 136 active · 3 retired · 1 review-pending · next due 2026-11-14**
+**139 metas · 136 active · 3 retired · 0 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0139
+- **Review pending:** none
 - **Amended — pending:** none
 - **Overdue:** none
 
@@ -195,7 +195,7 @@
 | [RM-0074](0/0/7/RM-0074.md) | Every reviewer-agent finding is | active | approved | 1m | 2026-11-28 |
 | [RM-0075](0/0/7/RM-0075.md) | Retractions stay visible in | active | approved | 1m | 2026-11-19 |
 | [RM-0112](0/1/1/RM-0112.md) | A review round MAY run | active | approved | 1m | 2026-11-22 |
-| [RM-0139](0/1/3/RM-0139.md) | Sabotage spot-checks run only against | active | **pending** | 1m | 2026-12-10 |
+| [RM-0139](0/1/3/RM-0139.md) | Sabotage spot-checks run only against | active | approved | 1m | 2026-12-10 |
 
 ### Suites are the standing review
 
