@@ -154,10 +154,13 @@ fi
 # rider compared entry calls only and left the 7 helpers uncovered).
 # #457 fixes the substandard mechanics: the match source is a
 # comment-stripped copy of the guard source (the comment-survivor
-# false-pass was live -- a comment inside wrapper_pairing_guard naming
-# a dropped function counted as coverage), the extraction uses the
-# family ERE (digit-bearing and uppercase names visible; the old
-# '^[a-z_]+' form was blind to them), the match is BOUNDARY-ANCHORED
+# trap was armed -- a comment inside wrapper_pairing_guard naming a
+# dropped function would have counted as coverage; no such comment
+# exists today, the raw-source match was the latent hazard, #459 a
+# B2), the extraction uses the family ERE (digit-bearing and
+# uppercase names visible, latent -- no such name exists among
+# today's 24 defs; the old '^[a-z_]+' form was blind to them), the
+# match is BOUNDARY-ANCHORED
 # (the old " $_c[ ;]" prefix shape let a strict-prefix name of a listed
 # one match, #453 b D1), and the extraction carries an emptiness probe
 # (#455 a C2 contract): an empty list must fail loud, not run the loop
@@ -176,14 +179,20 @@ else
     fail "guard list misses function(s):$_pg_hmissing"
 fi
 # 4e. completeness rider (entry direction, #457): every function the
-# ENTRY calls at col 0 (the run sequence plus the standalone_mode gate)
-# must sit in the guard's list too -- the #453 fix replaced the old
-# entry-calls rider with the lib-defs rider above, so the wrapper's own
-# calls were enforced by nothing (latent: no unguarded call exists
-# today, verified at #457 filing). Same stripped guard source, same
-# boundary anchor, same emptiness probe as 4d.
+# ENTRY calls at col 0 (the run sequence) plus the standalone_mode
+# gate -- whose call shape `case $(standalone_mode "$@") in` does NOT
+# put the name at col 0, so the extraction normalizes it first
+# (#459 a B1: the original form claimed the gate while the anchored
+# grep could never see it; class sweep: this is the only non-col-0
+# call of a covered function across all six entries) -- must sit in
+# the guard's list too. The #453 fix had replaced the old entry-calls
+# rider with the lib-defs rider above, so the wrapper's own calls
+# were enforced by nothing (latent: no unguarded call exists today,
+# verified at #457 filing). Same stripped guard source, same boundary
+# anchor, same emptiness probe as 4d.
 _pg_missing=""
 _pg_entfns="$(sed 's/^[[:space:]]*#.*$//' "$ENTRY" |
+    sed 's/^case \$(standalone_mode.*/standalone_mode/' |
     grep -oE '^(wrapper_[a-z_0-9]+|openchamber_guard|standalone_mode)' |
     grep -v '^wrapper_pairing_guard$' | sort -u)"
 [ -n "$_pg_entfns" ] || _pg_missing="(entry call extraction empty)"
