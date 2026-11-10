@@ -40,7 +40,12 @@ mode_is() {
     [ "$(stat -c %a "$1")" = "$2" ]
 }
 
-WORK="$(work_new)"
+# Loud scratch guard (#441 a B1 / #454 a C1 class): no set -e here -- a
+# failed work_new must abort instead of degenerating fixture writes.
+WORK="$(work_new)" || {
+    echo "deploy-lib tests: scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
 LIBD="$WORK/libdir"
 
 # --- 1. happy path ----------------------------------------------------------

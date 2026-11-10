@@ -71,6 +71,18 @@
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT" || exit 1
 
+# Shared harness (issue #444 adoption, trap-only class): the lint
+# function, its fixture pins and the FAIL-rows gate stay suite-local --
+# adoption covers the scratch receivers, which register with the work
+# registry (issue #395) at creation; the local trap is gone (a local
+# trap would disarm the central registry trap).
+. "$REPO_ROOT/tests/unit/lib/harness.sh"
+
+TMP="$(work_new_file)" || {
+    echo "skills lint: FAILED - scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
+
 # This checkout's absolute workspace-local path (sibling of repo/):
 # matched literally so absolute references into the disposable dir
 # are caught without flagging /usr/local (system prefix). Escaped for
@@ -82,13 +94,6 @@ cd "$REPO_ROOT" || exit 1
 WS_LOCAL="$(cd "$REPO_ROOT/.." && pwd)/local"
 WS_LOCAL_ESC="$(printf '%s' "$WS_LOCAL" | sed 's/[.\^$()*+?[|\\]/\\&/g')"
 LOCAL_SHAPES="(^|[^.[:alnum:]_/-])local/|\.{1,2}/+local/|$WS_LOCAL_ESC"
-
-TMP="$(mktemp)"
-# One trap for every receiver of the suite, registered at the first
-# (#283): WORK and F16W are created further down and set unset-safe —
-# rm skips them until they exist. A re-registration at the WORK block
-# used to sit here (0.0.41f C4 merge); the full list makes it redundant.
-trap 'rm -f "${TMP:-}"; rm -rf "${WORK:-}" "${F16W:-}"' EXIT INT TERM
 
 # lint_skills <dir> -- prints FAIL lines, empty output = clean
 lint_skills() {
@@ -172,8 +177,13 @@ err:find-rc=$_frc $_d"
 # FAIL branch of lint_skills has a fixture that executes it (#235 a
 # S2: four branches used to have none).
 
-WORK="$(mktemp -d)"
-# covered by the suite trap at the TMP block above (#283 widening).
+WORK="$(work_new)" || {
+    echo "skills lint: FAILED - scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
+# registered at creation (issue #395) -- the #283 comment block on the
+# old suite-wide trap is obsolete: the registry collects WORK, F16W and
+# the TMP fail-rows file centrally.
 
 mkdir -p "$WORK/skills/opk-good-skill" "$WORK/skills/opk-no-desc" \
     "$WORK/skills/opk-wrong-name" "$WORK/skills/opk-local-ref" \
@@ -393,7 +403,10 @@ lint_skills .agents/skills >>"$TMP" 2>&1
 # pr-00263 a F16: a bare file at the skills root FAILs loudly — the
 # loop used to examine directories only, so a bare file (which the
 # loader picks up) was silently unexamined.
-F16W="$(mktemp -d)"
+F16W="$(work_new)" || {
+    echo "skills lint: FAILED - scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
 mkdir -p "$F16W/skills/opk-ok"
 cat >"$F16W/skills/opk-ok/SKILL.md" <<'EOF'
 ---
@@ -408,7 +421,26 @@ case "$_out16" in
     *"FAIL bare-at-root.md: bare file at the skills root"*) : ;;
     *) echo "  PIN BROKEN: bare file at the skills root unexamined (pr-00263 a F16)" >>"$TMP" ;;
 esac
-rm -rf "${F16W:?}"
+
+# --- #454 a C1: scratch-creation failure fails loud, not silent-green ------
+# Hermetic self-re-execution: the suite as a child process under a dead
+# TMPDIR must abort rc 1 at the FIRST scratch guard with the loud guard
+# message (the child stops before any fixture work -- the re-run is
+# cheap). Sabotage discriminator: with the guards deleted the child
+# proceeds into degenerate fixture writes instead of exiting 1. The
+# OPK_SKILLS_LINT_CHILD marker is the recursion break: a guard-deleted
+# child reaches THIS pin section again and must not spawn a grandchild.
+if [ -z "${OPK_SKILLS_LINT_CHILD:-}" ]; then
+    _c1_rc=0
+    _c1_out="$(OPK_SKILLS_LINT_CHILD=1 TMPDIR="$REPO_ROOT/.no-such-tmp-opk-454" \
+        sh "$0" 2>&1)" || _c1_rc=$?
+    if [ "$_c1_rc" -ne 1 ] ||
+        ! printf '%s' "$_c1_out" | grep -qF 'scratch creation failed'; then
+        echo "  PIN BROKEN: dead-TMPDIR run must abort loud at the scratch guard (rc=$_c1_rc out=$_c1_out) (#454 a C1)" >>"$TMP"
+    else
+        echo "  pin ok: dead-TMPDIR run aborts loud at the scratch guard (C1)"
+    fi
+fi
 
 if [ -s "$TMP" ]; then
     echo "FAIL skills lint:"

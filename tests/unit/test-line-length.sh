@@ -66,6 +66,13 @@
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT" || exit 1
 
+# Shared harness (issue #444 adoption, trap-only class): the ratchet's
+# own verdict lines and its baseline mechanics stay suite-local --
+# adoption covers the three scratch receivers, which register with the
+# work registry (issue #395); the two local traps are gone (a local trap
+# would disarm the central registry trap).
+. "$REPO_ROOT/tests/unit/lib/harness.sh"
+
 LIMIT=120
 TREND=100
 BASELINE="$(dirname "$0")/line-length-baseline.txt"
@@ -145,9 +152,17 @@ if [ "${1:-}" = "--regen" ]; then
     exit 0
 fi
 
-TMP_CUR="$(mktemp)"
-TMP_PROBE="$(mktemp)"
-trap 'rm -f "$TMP_CUR" "$TMP_PROBE"' EXIT INT TERM
+# Loud scratch guards (#441 a B1 class swept to the adopted suites): no
+# set -e here, so a failed work_new_file would leave TMP_CUR empty and
+# every redirect would degenerate to a root-level literal. Abort loud.
+TMP_CUR="$(work_new_file)" || {
+    echo "line length ratchet: FAILED (scratch creation failed, TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
+TMP_PROBE="$(work_new_file)" || {
+    echo "line length ratchet: FAILED (scratch creation failed, TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
 
 [ -f "$BASELINE" ] || {
     echo "line length ratchet: FAILED (baseline missing)"
@@ -168,9 +183,10 @@ trap 'rm -f "$TMP_CUR" "$TMP_PROBE"' EXIT INT TERM
 # post-close prose counted — the two probe4 long lines differ in
 # length (130 in-span, 131 post-close) so the asserted sum pins
 # WHICH line was counted, not just how many (#235 c S2).
-PROBE_DIR="$(mktemp -d)"
-trap 'rm -rf "${PROBE_DIR:?}" "$TMP_CUR" "$TMP_PROBE"' EXIT INT TERM
-mkdir -p "$PROBE_DIR"
+PROBE_DIR="$(work_new)" || {
+    echo "line length ratchet: FAILED (scratch creation failed, TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
 printf -- '---\nname: probe\ndescription: %s\n---\nshort prose line\n' \
     "$(printf 'x%.0s' $(seq 1 130))" >"$PROBE_DIR/probe.md"
 printf -- '---\nshort frontmatter line\n---\n%s\n' \

@@ -31,18 +31,20 @@
 REPO_ROOT=$(cd -- "$(dirname -- "$0")/../.." && pwd) || exit 1
 cd "$REPO_ROOT" || exit 1
 
-RED=''
-NC=''
-[ -t 1 ] && RED='\033[31m' && NC='\033[0m'
+# Shared harness (issue #444 adoption, minimal-pass() class): the local
+# counter shell is gone -- the silent pass() and the FAILS-buffered
+# fail() are replaced by the shared pass/fail rows, and the summary gate
+# is suite_done (the same red strength: any fail row exits 1). The
+# scratch tree registers with the work registry (issue #395); the local
+# trap is gone. Loud scratch guard (#441 a B1 class swept here): no
+# set -e in this suite, so a failed work_new must abort instead of
+# degrading every pin writer onto root-level literal paths.
+. "$REPO_ROOT/tests/unit/lib/harness.sh"
 
-WORK=$(mktemp -d /tmp/test-rules-revisit.XXXXXX) || exit 1
-trap 'rm -rf "$WORK"' EXIT INT TERM
-FAILS=$WORK/fails
-: >"$FAILS"
-passed=0
-
-fail() { printf '  %sFAIL%s  %s\n' "${RED:-}" "${NC:-}" "$1" >>"$FAILS"; }
-pass() { passed=$((passed + 1)); }
+WORK="$(work_new /tmp/test-rules-revisit.XXXXXX)" || {
+    echo "rules-revisit pins: FAILED - scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
 
 contains() { # $1 haystack, $2 needle
     case $1 in
@@ -119,7 +121,7 @@ OUT=$(FORCE_TODAY=2026-10-16 sh "$REPO_ROOT/scripts/rules-report.sh" 2>&1)
 RC=$?
 if [ "$RC" -eq 0 ] && contains "$OUT" "rule-meta revisit report — 2026-10-16" &&
     out_line_is "$OUT" "overdue: 0"; then
-    pass
+    pass "R0 real tree: report green, overdue 0"
 else
     fail "R0 real tree: report must be green, got rc=$RC: $OUT"
 fi
@@ -145,20 +147,20 @@ if [ "$RC" -eq 0 ] && out_line_is "$OUT" "overdue: 1" &&
     contains "$OUT" "RM-9006  due 2026-07-01  1m" &&
     out_line_is "$OUT" "review-pending (approval queue): 1" &&
     contains "$OUT" "next due after the horizon: 2026-12-01 (RM-9004)"; then
-    pass
+    pass "R1 lanes: worklist lists the right metas"
 else
     fail "R1 lanes: wrong worklist, rc=$RC: $OUT"
 fi
 if contains "$OUT" "RM-9005"; then
     fail "R1 retired lane leak: RM-9005 must not appear in the revisit lanes"
 else
-    pass
+    pass "R1 retired: RM-9005 absent from the revisit lanes"
 fi
 # due-TODAY is horizon, never overdue (audit lateness semantics);
 # both needles anchored -- a count of 12 would satisfy an unanchored
 # "overdue: 1" and dodge the unanchored negation in one move
 if out_line_is "$OUT" "overdue: 1" && ! out_line_is "$OUT" "overdue: 2"; then
-    pass
+    pass "R1 boundary: due-today counted as horizon"
 else
     fail "R1 boundary: due-today meta counted as overdue"
 fi
@@ -171,7 +173,7 @@ if [ "$RC" -eq 0 ] &&
         "due within the horizon (2026-06-15..2026-06-15): 1" &&
     contains "$OUT" "RM-9002  due 2026-06-15  6m" &&
     contains "$OUT" "next due after the horizon: 2026-06-20 (RM-9003)"; then
-    pass
+    pass "R2 horizon override: window boundary follows HORIZON"
 else
     fail "R2 horizon override: wrong window, rc=$RC: $OUT"
 fi
@@ -183,7 +185,7 @@ T=2026-06-15
 HORIZON=8x
 run_report
 if [ "$RC" -eq 2 ] && contains "$OUT" "HORIZON must be a day count"; then
-    pass
+    pass "R3 bad HORIZON fails loud"
 else
     fail "R3 bad HORIZON: expected rc=2 with message, got rc=$RC: $OUT"
 fi
@@ -197,7 +199,7 @@ OUT=$(RM_AUDIT_ROOT="$SCRATCH" FORCE_TODAY="$T" \
     sh "$REPO_ROOT/scripts/rules-report.sh" 2>&1)
 RC=$?
 if [ "$RC" -eq 2 ] && contains "$OUT" "/nonexistent-rules-python unavailable"; then
-    pass
+    pass "R4 missing python fails loud"
 else
     fail "R4 missing python: expected rc=2 naming the interpreter, got rc=$RC: $OUT"
 fi
@@ -209,7 +211,7 @@ OUT=$(RM_AUDIT_ROOT="$EMPTY" FORCE_TODAY=2026-06-15 \
     sh "$REPO_ROOT/scripts/rules-report.sh" 2>&1)
 RC=$?
 if [ "$RC" -eq 2 ] && contains "$OUT" "no metas found"; then
-    pass
+    pass "R5 empty meta tree fails loud"
 else
     fail "R5 empty tree: expected rc=2, got rc=$RC: $OUT"
 fi
@@ -219,7 +221,7 @@ OUT=$(RM_AUDIT_ROOT="$RSCRATCH" FORCE_TODAY=2026-13-99 \
     sh "$REPO_ROOT/scripts/rules-report.sh" 2>&1)
 RC=$?
 if [ "$RC" -eq 2 ] && contains "$OUT" "horizon date computation failed"; then
-    pass
+    pass "R6 bad FORCE_TODAY fails loud"
 else
     fail "R6 bad FORCE_TODAY: expected rc=2, got rc=$RC: $OUT"
 fi
@@ -236,7 +238,7 @@ SCRATCH=$CSCRATCH
 T=2026-06-15
 run_report
 if [ "$RC" -eq 2 ] && contains "$OUT" "no id in frontmatter"; then
-    pass
+    pass "R7 no id in frontmatter fails loud"
 else
     fail "R7 no id: expected rc=2 naming it, got rc=$RC: $OUT"
 fi
@@ -245,7 +247,7 @@ fi
 sed -i 's/^id:$/id: RM-9001/; s/^status: active$/status: paused/' "$CM"
 run_report
 if [ "$RC" -eq 2 ] && contains "$OUT" "bad status 'paused'"; then
-    pass
+    pass "R8 bad status fails loud"
 else
     fail "R8 bad status: expected rc=2 naming it, got rc=$RC: $OUT"
 fi
@@ -254,7 +256,7 @@ fi
 sed -i 's/^status: paused$/status: active/; s/^revisit-interval: 1m$/revisit-interval: 3w/' "$CM"
 run_report
 if [ "$RC" -eq 2 ] && contains "$OUT" "bad revisit-interval '3w'"; then
-    pass
+    pass "R9 bad revisit-interval fails loud"
 else
     fail "R9 bad interval: expected rc=2 naming it, got rc=$RC: $OUT"
 fi
@@ -264,7 +266,7 @@ sed -i -e 's/^revisit-interval: 3w$/revisit-interval: 1m/' \
     -e 's/^next-revisit: 2026-06-01$/next-revisit: soon/' "$CM"
 run_report
 if [ "$RC" -eq 2 ] && contains "$OUT" "active meta without ISO next-revisit"; then
-    pass
+    pass "R10 non-ISO next-revisit fails loud"
 else
     fail "R10 non-ISO next-revisit: expected rc=2 naming it, got rc=$RC: $OUT"
 fi
@@ -277,7 +279,7 @@ OUT=$(RM_AUDIT_ROOT="$NOTREE" FORCE_TODAY=2026-06-15 \
     sh "$REPO_ROOT/scripts/rules-report.sh" 2>&1)
 RC=$?
 if [ "$RC" -eq 2 ] && contains "$OUT" "no meta tree at"; then
-    pass
+    pass "R11 missing meta tree fails loud"
 else
     fail "R11 no meta tree: expected rc=2 naming it, got rc=$RC: $OUT"
 fi
@@ -287,7 +289,7 @@ OUT=$(RM_AUDIT_ROOT="$WORK/gone$$" FORCE_TODAY=2026-06-15 \
     sh "$REPO_ROOT/scripts/rules-report.sh" 2>&1)
 RC=$?
 if [ "$RC" -eq 2 ] && contains "$OUT" "cannot enter RM_AUDIT_ROOT"; then
-    pass
+    pass "R12 un-enterable RM_AUDIT_ROOT fails loud"
 else
     fail "R12 bad root: expected rc=2 naming it, got rc=$RC: $OUT"
 fi
@@ -304,7 +306,7 @@ SCRATCH=$RSCRATCH
 T=2026-06-15
 run_report
 if [ "$RC" -eq 0 ]; then
-    pass
+    pass "R13 control: unstubbed tree stays green"
 else
     fail "R13 control: unstubbed tree must stay green, got rc=$RC: $OUT"
 fi
@@ -322,7 +324,7 @@ OUT=$(RM_AUDIT_ROOT="$RSCRATCH" FORCE_TODAY=2026-06-15 \
 RC=$?
 if [ "$RC" -eq 2 ] && contains "$OUT" "worklist pipeline failed" &&
     ! contains "$OUT" "overdue:" && ! contains "$OUT" "review-pending"; then
-    pass
+    pass "R13 sort rc: rc=2 + die message, no lanes printed"
 else
     fail "R13 sort rc: expected rc=2 + die message + no lanes, got rc=$RC: $OUT"
 fi
@@ -347,19 +349,19 @@ if [ "$RC" -eq 0 ] && contains "$OUT" "RM-9001: clean" &&
     line_is "$M" "reviewed: 2026-05-01" &&
     line_is "$M" \
         "- 2026-06-15 revisit clean — still pinned upstream (interval 1m -> 6m, next 2026-12-15)."; then
-    pass
+    pass "V1 clean ladder: interval bumped, next from the revisit date"
 else
     fail "V1 clean ladder: wrong update, rc=$RC: $OUT"
 fi
 if line_is "$M" "next-revisit: 2026-12-01"; then
     fail "V1 revisit-date basis: next computed from the stale due date (2026-12-01)"
 else
-    pass
+    pass "V1 basis: next not computed from the stale due date"
 fi
 if find "$VSCRATCH" -name '*.tmp.*' | grep -q .; then
     fail "V1 leftover temp file next to the meta"
 else
-    pass
+    pass "V1 no leftover temp file next to the meta"
 fi
 
 # V2. clean at 2y stays 2y (the ladder max)
@@ -370,7 +372,7 @@ run_revisit RM-9001 clean
 if [ "$RC" -eq 0 ] &&
     line_is "$(meta_path "$VSCRATCH" RM-9001)" "revisit-interval: 2y" &&
     line_is "$(meta_path "$VSCRATCH" RM-9001)" "next-revisit: 2028-06-15"; then
-    pass
+    pass "V2 2y stays the ladder max"
 else
     fail "V2 2y max: expected 2y -> 2y, next 2028-06-15, rc=$RC: $OUT"
 fi
@@ -385,7 +387,7 @@ if [ "$RC" -eq 0 ] &&
     line_is "$(meta_path "$VSCRATCH" RM-9001)" "next-revisit: 2026-07-15" &&
     line_is "$(meta_path "$VSCRATCH" RM-9001)" \
         "- 2026-06-15 revisit findings — upstream dropped the flag (interval reset to 1m from 6m, next 2026-07-15)."; then
-    pass
+    pass "V3 findings: reset to 1m, note in the log line"
 else
     fail "V3 findings reset: wrong update, rc=$RC: $OUT"
 fi
@@ -396,7 +398,7 @@ SCRATCH=$VSCRATCH
 T=2026-06-15
 run_revisit RM-9001 findings
 if [ "$RC" -eq 2 ] && contains "$OUT" "findings needs a note"; then
-    pass
+    pass "V4 findings without a note is a usage error"
 else
     fail "V4 findings no note: expected rc=2, got rc=$RC: $OUT"
 fi
@@ -408,7 +410,7 @@ T=2026-06-15
 run_revisit RM-9001 clean "line one
 line two"
 if [ "$RC" -eq 2 ] && contains "$OUT" "single-line"; then
-    pass
+    pass "V5 multi-line note refused"
 else
     fail "V5 newline note: expected rc=2, got rc=$RC: $OUT"
 fi
@@ -419,7 +421,7 @@ SCRATCH=$VSCRATCH
 T=2026-06-15
 run_revisit RM-9777 clean
 if [ "$RC" -eq 1 ] && contains "$OUT" "no meta RM-9777"; then
-    pass
+    pass "V6 unknown meta refused naming the id"
 else
     fail "V6 unknown id: expected rc=1 naming RM-9777, got rc=$RC: $OUT"
 fi
@@ -431,7 +433,7 @@ SCRATCH=$VSCRATCH
 T=2026-06-15
 run_revisit RM-9001 clean
 if [ "$RC" -eq 1 ] && contains "$OUT" "retired"; then
-    pass
+    pass "V7 retired meta refused"
 else
     fail "V7 retired: expected rc=1 naming retired, got rc=$RC: $OUT"
 fi
@@ -442,7 +444,7 @@ SCRATCH=$VSCRATCH
 T=2026-06-15
 run_revisit RM-9001 maybe
 if [ "$RC" -eq 2 ] && contains "$OUT" "clean or findings"; then
-    pass
+    pass "V8 bad verdict is a usage error"
 else
     fail "V8 bad verdict: expected rc=2, got rc=$RC: $OUT"
 fi
@@ -455,7 +457,7 @@ SCRATCH=$BSCRATCH
 T=2026-06-15
 run_revisit RM-9001 clean
 if [ "$RC" -eq 2 ] && contains "$OUT" "bad revisit-interval '3w'"; then
-    pass
+    pass "V8b malformed interval refused"
 else
     fail "V8b bad interval: expected rc=2 naming it, got rc=$RC: $OUT"
 fi
@@ -483,7 +485,7 @@ SCRATCH=$LSCRATCH
 T=2026-06-15
 run_revisit RM-9001 clean
 if [ "$RC" -eq 2 ] && contains "$OUT" "Review log"; then
-    pass
+    pass "V8c missing review log refused"
 else
     fail "V8c no review log: expected rc=2, got rc=$RC: $OUT"
 fi
@@ -496,7 +498,7 @@ T=2027-01-31
 run_revisit RM-9001 findings "rationale rotted"
 if [ "$RC" -eq 0 ] &&
     line_is "$(meta_path "$VSCRATCH" RM-9001)" "next-revisit: 2027-02-28"; then
-    pass
+    pass "V9 month arithmetic clamps at month end"
 else
     fail "V9 clamp: expected 2027-02-28, rc=$RC: $OUT"
 fi
@@ -512,7 +514,7 @@ OUT=$(RM_AUDIT_ROOT="$WORK/one$$.v10" FORCE_TODAY=2026-06-15 \
 RC=$?
 if [ "$RC" -eq 2 ] && contains "$OUT" "unavailable" &&
     cmp -s "$WORK/v10.before" "$M"; then
-    pass
+    pass "V10 missing python fails loud, meta untouched"
 else
     fail "V10 missing python: rc=$RC, meta must stay untouched"
 fi
@@ -557,7 +559,7 @@ AOUT=$(RM_AUDIT_ROOT="$GSCRATCH" FORCE_TODAY=2026-10-16 \
 ARC=$?
 if [ "$RC" -eq 0 ] && [ "$ARC" -eq 0 ] && contains "$AOUT" "rules-audit: 0 blocking" &&
     line_is "$(meta_path "$GSCRATCH" RM-9001)" "next-revisit: 2027-04-22"; then
-    pass
+    pass "V11 revisited tree stays audit-green"
 else
     fail "V11 audit interplay: revisit rc=$RC, audit rc=$ARC: $AOUT"
 fi
@@ -596,7 +598,7 @@ cp "$DM" "$WORK/v12.before"
 run_revisit RM-9001 clean
 if [ "$RC" -eq 2 ] && contains "$OUT" "not found exactly once" &&
     cmp -s "$WORK/v12.before" "$DM"; then
-    pass
+    pass "V12 duplicated field refuses before any write"
 else
     fail "V12 duplicated field: expected rc=2 + untouched meta, got rc=$RC: $OUT"
 fi
@@ -614,7 +616,7 @@ T=2026-06-15
 run_revisit RM-9001 clean
 if [ "$RC" -eq 2 ] && contains "$OUT" "not found exactly once" &&
     cmp -s "$WORK/v13.before" "$MN"; then
-    pass
+    pass "V13 missing next-revisit hits the count guard"
 else
     fail "V13 missing next-revisit: expected rc=2 + untouched meta, got rc=$RC: $OUT"
 fi
@@ -624,7 +626,7 @@ OUT=$(RM_AUDIT_ROOT="$WORK/gone$$" FORCE_TODAY=2026-06-15 \
     sh "$REPO_ROOT/scripts/rules-revisit.sh" RM-9001 clean 2>&1)
 RC=$?
 if [ "$RC" -eq 2 ] && contains "$OUT" "cannot enter RM_AUDIT_ROOT"; then
-    pass
+    pass "V14 un-enterable RM_AUDIT_ROOT fails loud"
 else
     fail "V14 bad root: expected rc=2 naming it, got rc=$RC: $OUT"
 fi
@@ -635,7 +637,7 @@ SCRATCH=$VSCRATCH
 T=2026-06-15
 run_revisit
 if [ "$RC" -eq 2 ] && contains "$OUT" "usage:"; then
-    pass
+    pass "V15 wrong argument count is a usage error"
 else
     fail "V15 usage: expected rc=2 with usage line, got rc=$RC: $OUT"
 fi
@@ -646,7 +648,7 @@ SCRATCH=$VSCRATCH
 T=2026-06-15
 run_revisit RM-99 clean
 if [ "$RC" -eq 2 ] && contains "$OUT" "bad id 'RM-99'"; then
-    pass
+    pass "V16 malformed id is a usage error"
 else
     fail "V16 bad id: expected rc=2 naming it, got rc=$RC: $OUT"
 fi
@@ -664,7 +666,7 @@ T=2026-06-15
 run_revisit RM-9001 clean
 if [ "$RC" -eq 2 ] && contains "$OUT" "bad status 'paused'" &&
     cmp -s "$WORK/v17.before" "$PM"; then
-    pass
+    pass "V17 corrupt status is an env failure, meta untouched"
 else
     fail "V17 corrupt status: expected rc=2 + untouched meta, got rc=$RC: $OUT"
 fi
@@ -682,7 +684,7 @@ T=2026-06-15
 run_revisit RM-9001 clean
 if [ "$RC" -eq 2 ] && contains "$OUT" "not found exactly once" &&
     cmp -s "$WORK/v18.before" "$NM"; then
-    pass
+    pass "V18 duplicated next-revisit refuses"
 else
     fail "V18 duplicated next-revisit: expected rc=2 + untouched meta, got rc=$RC: $OUT"
 fi
@@ -695,7 +697,7 @@ SCRATCH=$VSCRATCH
 T=2026-13-99
 run_revisit RM-9001 clean
 if [ "$RC" -eq 2 ] && contains "$OUT" "next-revisit computation failed"; then
-    pass
+    pass "V19 unparsable revisit date dies in the date math"
 else
     fail "V19 bad FORCE_TODAY: expected rc=2 naming it, got rc=$RC: $OUT"
 fi
@@ -713,7 +715,7 @@ T=2026-06-15
 run_revisit RM-9001 clean
 if [ "$RC" -eq 2 ] && contains "$OUT" "bad status ''" &&
     cmp -s "$WORK/v20.before" "$SM"; then
-    pass
+    pass "V20 missing status dies rc=2, meta untouched"
 else
     fail "V20 missing status: expected rc=2 + untouched meta, got rc=$RC: $OUT"
 fi
@@ -774,7 +776,7 @@ if [ "$RC" -eq 0 ] && [ "$BQ" = "1" ] && contains "$OUT" "RM-9003" &&
     [ "$BARC" -eq 1 ] && contains "$BAOUT" "bare 'reviewed:' line (key without a value)" &&
     [ "$_b3_ok" = 1 ] && [ "$_b4_ok" = 1 ] && [ "$_bh_ok" = 1 ] &&
     [ "$_bb_ok" = 1 ]; then
-    pass
+    pass "V21 bare reviewed line: pending everywhere"
 else
     fail "V21 bare reviewed agreement: report rc=$RC queue=$BQ audit rc=$BARC index3=$_b3_ok index4=$_b4_ok hdr=$_bh_ok bul=$_bb_ok: $BAOUT"
 fi
@@ -839,7 +841,7 @@ if [ "$RC" -eq 0 ] && [ "$QQ" = "1" ] && contains "$OUT" "RM-9005" &&
     [ "$_qfix_ok" = 1 ] &&
     [ "$_q5_ok" = 1 ] && [ "$_q6_ok" = 1 ] && [ "$_qh_ok" = 1 ] &&
     [ "$_qb_ok" = 1 ]; then
-    pass
+    pass "V22 quoted reviewed normalizes everywhere"
 else
     fail "V22 quoted reviewed agreement: report rc=$RC queue=$QQ audit rc=$QARC fix=$_qfix_ok row5=$_q5_ok row6=$_q6_ok hdr=$_qh_ok bul=$_qb_ok: $QAOUT"
 fi
@@ -860,7 +862,7 @@ if [ "$RC" -eq 0 ] && contains "$OUT" "RM-9001: clean" &&
     contains "$OUT" "1m -> 6m" && contains "$OUT" "next-revisit 2026-12-15" &&
     line_is "$QFM" "revisit-interval: 6m" &&
     line_is "$QFM" "next-revisit: 2026-12-15"; then
-    pass
+    pass "V23 quoted frontmatter takes the ladder"
 else
     fail "V23 quoted frontmatter: expected clean ladder despite quoted values, rc=$RC: $OUT"
 fi
@@ -889,7 +891,7 @@ case "$OUT" in *"bad status ''active''"*) _dwp_ok=1 ;; *) _dwp_ok=0 ;; esac
 case "$DWAOUT" in *"bad status: ''active''"*) _dwa_ok=1 ;; *) _dwa_ok=0 ;; esac
 if [ "$DWREV" -eq 2 ] && [ "$_dwr_ok" = 1 ] && [ "$DWREP" -eq 2 ] &&
     [ "$_dwp_ok" = 1 ] && [ "$DWARC" -eq 1 ] && [ "$_dwa_ok" = 1 ]; then
-    pass
+    pass "V24 double-wrap strips exactly one layer"
 else
     fail "V24 double-wrap one-layer: revisit rc=$DWREV/$_dwr_ok report rc=$DWREP/$_dwp_ok audit rc=$DWARC/$_dwa_ok: $DWAOUT"
 fi
@@ -918,7 +920,7 @@ else
     if [ "$RC" -eq 2 ] && contains "$OUT" "find reported errors" &&
         contains "$OUT" "rules-report: find error:" &&
         ! contains "$OUT" "overdue:" && ! contains "$OUT" "review-pending"; then
-        pass
+        pass "V25 unreadable subtree kills the report before lanes"
     else
         fail "V25 unreadable subtree: expected rc=2 + find stderr relay + no lanes, got rc=$RC: $OUT"
     fi
@@ -939,7 +941,7 @@ OUT=$(RM_AUDIT_ROOT="$D1S" FORCE_TODAY=2026-06-15 \
 RC=$?
 if [ "$RC" -eq 0 ] && contains "$OUT" "review-pending (approval queue): 1" &&
     contains "$OUT" "RM-9001"; then
-    pass
+    pass "R14 bare-first duplicate reads pending (first wins)"
 else
     fail "R14 bare-first duplicate: expected queue=1, got rc=$RC: $OUT"
 fi
@@ -951,7 +953,7 @@ OUT=$(RM_AUDIT_ROOT="$D2S" FORCE_TODAY=2026-06-15 \
     sh "$REPO_ROOT/scripts/rules-report.sh" 2>&1)
 RC=$?
 if [ "$RC" -eq 0 ] && contains "$OUT" "review-pending (approval queue): 0"; then
-    pass
+    pass "R14 dated-first duplicate reads approved"
 else
     fail "R14 dated-first duplicate: expected queue=0, got rc=$RC: $OUT"
 fi
@@ -1031,14 +1033,10 @@ if [ "$RC" -eq 0 ] &&
     [ "$AARC" -eq 0 ] && contains "$AAOUT" "0 blocking" &&
     [ "$_r9_ok" = 1 ] && [ "$_r7_ok" = 1 ] && [ "$_r8_ok" = 1 ] &&
     [ "$_ah_ok" = 1 ] && [ "$_bp_ok" = 1 ] && [ "$_ba_ok" = 1 ]; then
-    pass
+    pass "R15 amended meta: re-approval queue everywhere"
 else
     fail "R15 amended agreement: report rc=$RC audit rc=$AARC row9=$_r9_ok row7=$_r7_ok row8=$_r8_ok hdr=$_ah_ok bulp=$_bp_ok bula=$_ba_ok: $AAOUT"
 fi
 
-if [ -s "$FAILS" ]; then
-    printf 'rules-revisit pins: FAILED\n'
-    cat "$FAILS"
-    exit 1
-fi
-printf 'rules-revisit pins: OK (%s pins green)\n' "$passed"
+# ------------------------------------------------------------- summary
+suite_done "rules-revisit pins"

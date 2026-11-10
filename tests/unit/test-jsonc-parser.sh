@@ -6,50 +6,42 @@
 # Run: ./tests/unit/test-jsonc-parser.sh
 set -e
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PARSER="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/py/jsonc-parser.py"
 FIXTURES="$SCRIPT_DIR/../fixtures/jsonc"
 
-failures=0
-passed=0
+# Shared harness (issue #444 adoption, full local check()/counter stack):
+# pass/fail rows, the counters and the summary gate live in
+# lib/harness.sh now; the four assert_* helpers stay suite-local (they
+# carry the parser-output subject knowledge) and delegate their verdicts
+# to the shared pass/fail; the scratch receiver registers with the work
+# registry (issue #395) and the local trap is gone.
+. "$SCRIPT_DIR/lib/harness.sh"
 
 assert_contains() {
     local desc="$1" pattern="$2" list="$3"
     if echo "$list" | grep -qF "$pattern"; then
-        echo "  ${GREEN}PASS${NC}  $desc"
-        passed=$((passed + 1))
+        pass "$desc"
     else
-        echo "  ${RED}FAIL${NC}  $desc"
-        echo "        expected pattern '$pattern' in output"
-        failures=$((failures + 1))
+        fail "$desc (expected pattern '$pattern' in output)"
     fi
 }
 
 assert_not_contains() {
     local desc="$1" pattern="$2" list="$3"
     if ! echo "$list" | grep -qF "$pattern"; then
-        echo "  ${GREEN}PASS${NC}  $desc"
-        passed=$((passed + 1))
+        pass "$desc"
     else
-        echo "  ${RED}FAIL${NC}  $desc"
-        echo "        pattern '$pattern' should NOT be present"
-        failures=$((failures + 1))
+        fail "$desc (pattern '$pattern' should NOT be present)"
     fi
 }
 
 assert_empty() {
     local desc="$1" list="$2"
     if [ -z "$(echo "$list" | tr -d '[:space:]')" ]; then
-        echo "  ${GREEN}PASS${NC}  $desc"
-        passed=$((passed + 1))
+        pass "$desc"
     else
-        echo "  ${RED}FAIL${NC}  $desc"
-        echo "        expected empty output, got: $list"
-        failures=$((failures + 1))
+        fail "$desc (expected empty output, got: $list)"
     fi
 }
 
@@ -61,12 +53,9 @@ assert_exitcode() {
         ec=$?
         [ "$ec" = "$expected" ]
     then
-        echo "  ${GREEN}PASS${NC}  $desc"
-        passed=$((passed + 1))
+        pass "$desc"
     else
-        echo "  ${RED}FAIL${NC}  $desc"
-        echo "        expected exit code $expected"
-        failures=$((failures + 1))
+        fail "$desc (expected exit code $expected, got $ec)"
     fi
 }
 
@@ -177,8 +166,7 @@ assert_exitcode "carve-out: edit allow after deny (issue #23)" 0 \
 OUT=$(python3 "$PARSER" --tools "$FIXTURES/block-comments.jsonc" 2>/dev/null || true)
 assert_empty "tools: no bash section → no tools" "$OUT"
 
-TMP=$(mktemp -d)
-trap 'rm -rf "$TMP"' EXIT INT TERM
+TMP="$(work_new)"
 
 # --- 15. --tools: catch-all allow → docker AND ddev ---
 printf '%s\n' '{ "permission": { "bash": { "*": "allow" } } }' >"$TMP/catchall.jsonc"
@@ -345,13 +333,4 @@ assert_contains "non-dict stderr carries the clean note (W12)" "top-level config
 assert_not_contains "non-dict stderr carries no traceback (W12)" "Traceback" "$_nd_err"
 
 # --- Summary ---
-echo ""
-echo "===================================="
-echo "  ${GREEN}Passed: $passed${NC}"
-if [ "$failures" -gt 0 ]; then
-    echo "  ${RED}Failed: $failures${NC}"
-    exit 1
-else
-    echo "  All tests passed."
-fi
-echo ""
+suite_done "jsonc parser edge-case tests"

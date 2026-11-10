@@ -10,8 +10,18 @@
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT" || exit 1
 
-TMP="$(mktemp)"
-trap 'rm -f "$TMP" "${TMP:?}.gen"' EXIT INT TERM
+# Shared harness (issue #444 adoption, trap-only class): the FAIL-rows
+# gate stays suite-local -- adoption covers the scratch receivers, which
+# register with the work registry (issue #395); the local trap is gone.
+# The three suffixed siblings hang off the same TMP base (#443: the old
+# trap listed only TMP and TMP.gen, so one .files and one .rows file
+# leaked per run) -- registered here at their known creation points.
+. "$REPO_ROOT/tests/unit/lib/harness.sh"
+TMP="$(work_new_file)" || {
+    echo "rules index parity: FAILED - scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
+work_register "${TMP}.gen" "${TMP}.files" "${TMP}.rows"
 
 INDEX=internal/rules-meta/INDEX.md
 

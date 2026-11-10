@@ -15,7 +15,12 @@ LOG_SH="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/log.sh"
 # summary gate live in lib/harness.sh now.
 . "$SCRIPT_DIR/lib/harness.sh"
 
-WORK="$(work_new)"
+# Loud scratch guard (#441 a B1 / #454 a C1 class): no set -e here -- a
+# failed work_new must abort instead of degenerating fixture writes.
+WORK="$(work_new)" || {
+    echo "log tests: scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
 
 # Source the lib once per scenario (log() re-inits every call, but a
 # fresh shell keeps the scenarios independent and the assertions local).
@@ -109,7 +114,10 @@ else
 fi
 
 # Below the threshold: no rotation artifacts at all.
-WORK2="$(work_new)"
+WORK2="$(work_new)" || {
+    echo "log tests: scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
 run_lib "$WORK2" 1048576 'log "small"' >/dev/null 2>&1
 if [ -f "$WORK2/log/kit.log" ] && [ ! -f "$WORK2/log/kit.log.1" ]; then
     pass "no rotation below the size threshold"

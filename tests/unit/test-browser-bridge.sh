@@ -22,7 +22,13 @@ BRIDGE_SH="$REPO/files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh"
 # (and check/assert_eq where present) live in lib/harness.sh now.
 . "$REPO/tests/unit/lib/harness.sh"
 
-WORK="$(work_new)"
+# Loud scratch guard (#441 a B1 / #454 a C1 class): the suite never arms
+# set -e (its set -e hits are comments and child shells) -- a failed
+# work_new must abort here instead of degenerating writes.
+WORK="$(work_new)" || {
+    echo "browser-bridge tests: scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
 
 # Hermetic driver: sourced helper + overrides, zero privileges.
 CONF="$WORK/etc/wsl.conf"

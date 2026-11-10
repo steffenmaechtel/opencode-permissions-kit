@@ -36,7 +36,12 @@ REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT" || exit 1
 RUNNER="scripts/coverage.sh"
 WF=".github/workflows/test-unit.yml"
-WORK="$(work_new)"
+# Loud scratch guard (#441 a B1 / #454 a C1 class): no set -e here -- a
+# failed work_new must abort instead of degenerating fixture writes.
+WORK="$(work_new)" || {
+    echo "coverage tests: scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
 
 _strip() { sed 's/^[[:space:]]*#.*$//' "$1"; }
 
