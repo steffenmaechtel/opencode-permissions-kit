@@ -200,7 +200,11 @@ cat >"$WORK/sudo" <<'EOF'
 #!/bin/sh
 # fail on any interactive sudo attempt: -n must already be in the args;
 # a prompt attempt also touches $SUDO_PROMPT_MARKER so callers that
-# discard stderr stay observable
+# discard stderr stay observable. Defense-in-depth limit (#442 a A2):
+# if the env var is ever UNSET here, this guard's own expansion error
+# goes to stderr — swallowed by the same redirect — and the channel
+# dies silently with every leg green; the export in the suite is
+# load-bearing, do not drop it.
 case " $* " in
     *" -n "*) exit 1 ;;
     *)
@@ -252,7 +256,13 @@ chmod 755 "$WORK/locked-runtime" 2>/dev/null || true
 
 # e) podman + configured socket that does not exist: NOT reachable, and
 #    the probe must not prompt (sudo -n — same shim and marker channel
-#    as the docker twin).
+#    as the docker twin). Host dependence, accepted with the twin
+#    (#442 a A1): a host WITH an existing non-traversable
+#    /run/user/99999 (a uid-99999 system user) sees "unknown — needs
+#    root" instead and this leg fails spuriously — the 0.0.46a F2
+#    class, mirrored from leg c rather than healed (CI runners have no
+#    such user; healing only the podman twin would de-mirror the
+#    twins this wave exists to keep identical).
 rm -f "$SUDO_PROMPT_MARKER"
 out=$(run_case "podman-rootless" "" "unix:///run/user/99999/podman.sock" || true)
 if printf '%s' "$out" | grep -q "NOT reachable" &&
