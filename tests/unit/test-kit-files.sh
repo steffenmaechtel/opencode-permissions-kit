@@ -130,7 +130,10 @@ fi
 # (never the repo files) and verify the checks above would trip, reusing
 # the SAME extraction helpers — not a re-implementation.
 
-WORK="$(work_new)"
+WORK="$(work_new)" || {
+    echo "kit file list tests: scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
 
 # Shared mutation for 4a/4c: update.sh without opencode-deny-all.jsonc in
 # KIT_FILES (a file install.sh both fetches and cp-deploys).
@@ -294,7 +297,16 @@ _fk_dir="$(PATH="$WORK/fakebin:$PATH" sh -c '
     eval "$(cat "$2")"
     fetch_kit && printf "%s\n" "$_FK_DIR"
 ' _ "$WORK/kitfiles.env" "$WORK/fetchkit.fn" 2>/dev/null || true)"
+# Register the staged tree (#443): inside the inner shell fetch_kit's
+# `mktemp -d` base has no cleanup of its own (the inner shell loads only
+# KIT_FILES plus the extracted function -- update.sh's _tmp_track
+# registry and its trap are not there), and the parent never collected
+# it either: one tmp.<X> directory leaked per run. The receiver is the
+# mktemp BASE (the parent of _FK_DIR, incl. the fetched VERSION);
+# unset-safe: an empty _fk_dir is the failed-fetch case the check below
+# reports red -- registering dirname("") would target ".".
 _fk_base="$(dirname "$_fk_dir")"
+[ -n "$_fk_dir" ] && work_register "$_fk_base"
 _fk_missing=""
 for f in $update_list; do
     if [ "$f" = "VERSION" ]; then p="$_fk_base/VERSION"; else p="$_fk_dir/$f"; fi

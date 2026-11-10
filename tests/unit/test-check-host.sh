@@ -4,8 +4,19 @@
 # Run: sh tests/unit/test-check-host.sh
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-WORK="$(mktemp -d)"
-trap 'rm -rf "${WORK:?}"' EXIT INT TERM
+# Shared harness (issue #444 adoption, trap-only class): the suite keeps
+# its own arm()/fails rows -- adoption covers the scratch receiver, which
+# registers with the work registry (issue #395); the local trap is gone
+# (a local trap would disarm the central registry trap).
+. "$REPO_ROOT/tests/unit/lib/harness.sh"
+# Loud scratch guard (#441 a B1 class swept to the adopted suites): no
+# set -e here, so a failed work_new would leave WORK empty and every
+# fixture write would degenerate to a root-level literal ("/gh"). Abort
+# loud instead.
+WORK="$(work_new)" || {
+    echo "test-check-host: scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
 fails=0
 # the threshold under test comes from the script itself, so a GH_MIN bump
 # cannot leave the pin asserting a stale number (col-0 anchor: a commented

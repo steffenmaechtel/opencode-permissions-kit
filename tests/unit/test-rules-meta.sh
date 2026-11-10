@@ -13,18 +13,20 @@
 REPO_ROOT=$(cd -- "$(dirname -- "$0")/../.." && pwd) || exit 1
 cd "$REPO_ROOT" || exit 1
 
-RED=''
-NC=''
-[ -t 1 ] && RED='\033[31m' && NC='\033[0m'
+# Shared harness (issue #444 adoption, minimal-pass() class): the local
+# counter shell is gone -- the silent pass() and the FAILS-buffered
+# fail() are replaced by the shared pass/fail rows, and the summary gate
+# is suite_done (the same red strength: any fail row exits 1). The
+# scratch tree registers with the work registry (issue #395); the local
+# trap is gone. Loud scratch guard (#441 a B1 class swept here): no
+# set -e in this suite, so a failed work_new must abort instead of
+# degrading every pin writer onto root-level literal paths.
+. "$REPO_ROOT/tests/unit/lib/harness.sh"
 
-WORK=$(mktemp -d /tmp/test-rules-meta.XXXXXX) || exit 1
-trap 'rm -rf "$WORK"' EXIT INT TERM
-FAILS=$WORK/fails
-: >"$FAILS"
-passed=0
-
-fail() { printf '  %sFAIL%s  %s\n' "${RED:-}" "${NC:-}" "$1" >>"$FAILS"; }
-pass() { passed=$((passed + 1)); }
+WORK="$(work_new /tmp/test-rules-meta.XXXXXX)" || {
+    echo "rules-meta audit pins: FAILED - scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
 
 run_audit() { # runs the real audit against $SCRATCH; sets OUT/RC
     OUT=$(cd "$SCRATCH" && RM_AUDIT_ROOT="$SCRATCH" FORCE_TODAY=2026-10-16 \
@@ -39,7 +41,7 @@ expect_block() { # $1 label, $2 required output snippet
         return
     fi
     case $OUT in
-        *"$2"*) pass ;;
+        *"$2"*) pass "$1" ;;
         *) fail "$1: output lacks '$2'" ;;
     esac
 }
@@ -51,7 +53,7 @@ expect_ok() { # $1 label, $2 required output snippet
         return
     fi
     case $OUT in
-        *"$2"*) pass ;;
+        *"$2"*) pass "$1" ;;
         *) fail "$1: output lacks '$2'" ;;
     esac
 }
@@ -129,7 +131,7 @@ meta_file() { # $1 id -> path in the CURRENT scratch
 OUT=$(RM_AUDIT_ROOT="$REPO_ROOT" FORCE_TODAY=2026-10-16 sh scripts/rules-audit.sh 2>&1)
 RC=$?
 if [ "$RC" -eq 0 ] && printf '%s' "$OUT" | grep -q '0 blocking'; then
-    pass
+    pass "real tree: audit green with 0 blocking"
 else
     fail "real tree: audit must be green, got rc=$RC: $OUT"
 fi
@@ -273,7 +275,7 @@ else
         "INDEX not regenerated (meta-tree walk reported errors)"
     if grep -qxF 'sentinel INDEX -- must survive a blocked run' \
         "$SCRATCH/internal/rules-meta/INDEX.md"; then
-        pass
+        pass "meta-tree INDEX survives a blocked run"
     else
         fail "meta-tree INDEX rewritten on a blocked run"
     fi
@@ -300,7 +302,7 @@ expect_block "meta-tree absent meta tree blocks" "[meta-tree]"
 new_scratch n323ctl
 run_audit
 if [ "$RC" -eq 0 ]; then
-    pass
+    pass "#323 control: unstubbed scratch tree stays green"
 else
     fail "#323 control: unstubbed scratch tree must stay green, got rc=$RC: $OUT"
 fi
@@ -339,7 +341,7 @@ fi
 new_scratch n341ctl
 run_audit
 if [ "$RC" -eq 0 ]; then
-    pass
+    pass "#341 control: unstubbed scratch tree stays green"
 else
     fail "#341 control: unstubbed scratch tree must stay green, got rc=$RC: $OUT"
 fi
@@ -537,7 +539,7 @@ else
     new_scratch n322
     write_meta RM-9011 "Unreadable demo rule" agent/conventions.md interactive-prompts-yn ""
     if (cd "$SCRATCH" && python3 scripts/gen-rules-index.py) >/dev/null 2>&1; then
-        pass
+        pass "#322 control: readable tree generates rc 0"
     else
         fail "#322 control: readable tree must generate rc 0"
     fi
@@ -547,7 +549,7 @@ else
     case "$OUT" in
         *'cannot list bucket directory'*)
             if [ "$RC" -ne 0 ]; then
-                pass
+                pass "#322 gen die: bucket message with non-zero rc"
             else
                 fail "#322 gen die: message but rc=0"
             fi
@@ -575,7 +577,7 @@ expect_block "inv6 duplicate key blocks (dup status)" \
     "duplicate frontmatter key: status"
 if grep -qxF 'sentinel INDEX -- must survive a blocked run' \
     "$SCRATCH/internal/rules-meta/INDEX.md"; then
-    pass
+    pass "inv6 duplicate key: INDEX survives a blocked run"
 else
     fail "inv6 duplicate key: INDEX rewritten on a blocked run"
 fi
@@ -584,7 +586,7 @@ RC=$?
 case "$OUT" in
     *'duplicate frontmatter key'*)
         if [ "$RC" -ne 0 ]; then
-            pass
+            pass "inv6 gen die: duplicate-key message with non-zero rc"
         else
             fail "inv6 gen die: message but rc=0"
         fi
@@ -610,7 +612,7 @@ expect_ok "inv8 stale INDEX non-blocking" "INDEX regenerated"
 if grep -q '^hand edit$' "$SCRATCH/internal/rules-meta/INDEX.md"; then
     fail "inv8: INDEX was not rewritten to the generated state"
 else
-    pass
+    pass "inv8: INDEX rewritten to the generated state"
 fi
 
 # 10. no fake findings -- every real meta ID occurs at exactly THREE
@@ -628,7 +630,7 @@ fi
 #     empty extraction fails this pin's setup).
 SCOPE=$(sed -n 's/^SCOPE_FILES="\(.*\)"$/\1/p' "$REPO_ROOT/scripts/rules-audit.sh")
 if [ -n "$SCOPE" ]; then
-    pass
+    pass "pin10 setup: SCOPE_FILES extracted from rules-audit.sh"
 else
     fail "pin10 setup: SCOPE_FILES not extractable from rules-audit.sh"
 fi
@@ -648,9 +650,9 @@ for f in $SCOPE; do
 done
 if [ -s "$WORK/p10a" ]; then
     fail "pin10 lane a, fake ID mention(s) in scope files:"
-    sed 's/^/         /' "$WORK/p10a" >>"$FAILS"
+    sed 's/^/         /' "$WORK/p10a"
 else
-    pass
+    pass "pin10 lane a: scope files carry only ref-form tokens"
 fi
 
 # lane b: meta files carry only their own id -- cross-references in
@@ -665,9 +667,9 @@ find "$REPO_ROOT/internal/rules-meta" -type f -name 'RM-*.md' 2>/dev/null |
 done
 if [ -s "$WORK/p10b" ]; then
     fail "pin10 lane b, foreign ID mention(s) inside meta files:"
-    sed 's/^/         /' "$WORK/p10b" >>"$FAILS"
+    sed 's/^/         /' "$WORK/p10b"
 else
-    pass
+    pass "pin10 lane b: meta files carry only their own id"
 fi
 
 # lane c helper: greps <root> for real IDs with the frozen-corpus
@@ -714,9 +716,9 @@ p10_lane_c_hits() { # $1 root, $2 scope
 p10_lane_c_hits "$REPO_ROOT" "$SCOPE" >"$WORK/p10c"
 if [ -s "$WORK/p10c" ]; then
     fail "pin10 lane c, real ID(s) outside refs and meta files:"
-    sed 's/^/         /' "$WORK/p10c" >>"$FAILS"
+    sed 's/^/         /' "$WORK/p10c"
 else
-    pass
+    pass "pin10 lane c: no real ID outside refs and meta files"
 fi
 
 # lane c scratch pins (#235 a Q4): a LIVING README.md under
@@ -758,7 +760,7 @@ case "$_hits" in
                             *pr-00001*) fail "pin10 lane c scratch: frozen snapshot flagged" ;;
                             *internal/reviews/legacy-index.md*) fail "pin10 lane c scratch: frozen legacy-index flagged" ;;
                             *internal/reviews-meta/2026-01-01/*) fail "pin10 lane c scratch: frozen run data flagged" ;;
-                            *) pass ;;
+                            *) pass "pin10 lane c scratch: living citations caught, frozen files exempt" ;;
                         esac
                         ;;
                     *) fail "pin10 lane c scratch: living .json citation not caught" ;;
@@ -771,9 +773,4 @@ case "$_hits" in
 esac
 
 # ------------------------------------------------------------- summary
-if [ -s "$FAILS" ]; then
-    printf 'rules-meta audit pins: FAILED\n'
-    cat "$FAILS"
-    exit 1
-fi
-printf 'rules-meta audit pins: OK (%s pins green)\n' "$passed"
+suite_done "rules-meta audit pins"

@@ -49,6 +49,14 @@
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT" || exit 1
 
+# Shared harness (issue #444 adoption, trap-only class): the scan, the
+# allowlist mechanics and the verdict lines stay suite-local -- adoption
+# covers the scratch receivers (the hit file and the probe mini-repo),
+# which register with the work registry (issue #395); the local trap is
+# gone. The probe's scratch COPY of this suite re-sources the harness in
+# its own process, so its receivers clean up there too.
+. "$REPO_ROOT/tests/unit/lib/harness.sh"
+
 # Deliberate no-space joins, one entry per line: path-suffix | seam text.
 # A reason line starts with '#' and sits above its entry.
 ALLOW="
@@ -57,8 +65,10 @@ ALLOW="
 sh/update-core.sh|'),gid=
 "
 
-TMP="$(mktemp)"
-trap 'rm -f "$TMP"; rm -rf "${_pdir:-}"' EXIT INT TERM
+TMP="$(work_new_file)" || {
+    echo "string-continuation guard: FAILED (scratch creation failed, TMPDIR=${TMPDIR:-unset})"
+    exit 1
+}
 
 # Paths in this repo contain no spaces (same assumption as the ratchet).
 {
@@ -178,14 +188,16 @@ fi
 # guard -- a full suite run on a scratch mini-repo (the suite resolves
 # REPO_ROOT from its own location; the copy in the scratch dir scans
 # the probe files). Both probes MUST fail with the expected seams.
-_pdir="$(mktemp -d)"
-if [ ! -d "$_pdir" ]; then
-    echo "  FAIL  scratch setup failed (mktemp) -- probes not run (D4 guard)"
+_pdir="$(work_new)" || {
+    echo "string-continuation guard: FAILED (probe scratch creation failed, TMPDIR=${TMPDIR:-unset})"
     exit 1
-fi
+}
 mkdir -p "$_pdir/files/etc" "$_pdir/files/opencode-permissions-kit-lib/bin" \
-    "$_pdir/tests/unit"
+    "$_pdir/tests/unit/lib"
 cp "$0" "$_pdir/tests/unit/test-string-continuations.sh"
+# The scratch copy sources the harness from its OWN location (REPO_ROOT
+# resolves against the mini-repo) -- carry the lib along with it.
+cp "$REPO_ROOT/tests/unit/lib/harness.sh" "$_pdir/tests/unit/lib/harness.sh"
 # C1: single-quote splice -- detected AND the seam text must be
 # normalized (no quote bytes between the fragments).
 printf '#!/bin/sh\nui_warn %sfragment one.end.%s%s\\\nnext fragment here%s\n' \
@@ -200,7 +212,6 @@ printf '#!/bin/sh\nui_warn "failed %s"\\\n"retry now"\nui_warn %scount exceeded.
     "'" "'" "'" "$(printf '\342\200\224')" "'" >"$_pdir/files/etc/umask.sh"
 if OPK_SC_PROBE_DEPTH=1 sh "$_pdir/tests/unit/test-string-continuations.sh" >"$_pdir/out" 2>&1; then
     echo "  FAIL  probe: sq-splice / em-dash joins went undetected"
-    rm -rf "$_pdir"
     exit 1
 fi
 if grep -q 'one.end.next fragment' "$_pdir/out" &&
@@ -211,9 +222,7 @@ if grep -q 'one.end.next fragment' "$_pdir/out" &&
 else
     echo "  FAIL  probe seams wrong (normalization or alphabet regressed):"
     cat "$_pdir/out"
-    rm -rf "$_pdir"
     exit 1
 fi
-rm -rf "$_pdir"
 
 echo "string-continuation guard: OK ($allowed allowlisted join(s), no missing-space joins)"

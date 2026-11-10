@@ -71,6 +71,18 @@
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT" || exit 1
 
+# Shared harness (issue #444 adoption, trap-only class): the lint
+# function, its fixture pins and the FAIL-rows gate stay suite-local --
+# adoption covers the scratch receivers, which register with the work
+# registry (issue #395) at creation; the local trap is gone (a local
+# trap would disarm the central registry trap).
+. "$REPO_ROOT/tests/unit/lib/harness.sh"
+
+TMP="$(work_new_file)" || {
+    echo "skills lint: FAILED - scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
+
 # This checkout's absolute workspace-local path (sibling of repo/):
 # matched literally so absolute references into the disposable dir
 # are caught without flagging /usr/local (system prefix). Escaped for
@@ -82,13 +94,6 @@ cd "$REPO_ROOT" || exit 1
 WS_LOCAL="$(cd "$REPO_ROOT/.." && pwd)/local"
 WS_LOCAL_ESC="$(printf '%s' "$WS_LOCAL" | sed 's/[.\^$()*+?[|\\]/\\&/g')"
 LOCAL_SHAPES="(^|[^.[:alnum:]_/-])local/|\.{1,2}/+local/|$WS_LOCAL_ESC"
-
-TMP="$(mktemp)"
-# One trap for every receiver of the suite, registered at the first
-# (#283): WORK and F16W are created further down and set unset-safe —
-# rm skips them until they exist. A re-registration at the WORK block
-# used to sit here (0.0.41f C4 merge); the full list makes it redundant.
-trap 'rm -f "${TMP:-}"; rm -rf "${WORK:-}" "${F16W:-}"' EXIT INT TERM
 
 # lint_skills <dir> -- prints FAIL lines, empty output = clean
 lint_skills() {
@@ -172,8 +177,10 @@ err:find-rc=$_frc $_d"
 # FAIL branch of lint_skills has a fixture that executes it (#235 a
 # S2: four branches used to have none).
 
-WORK="$(mktemp -d)"
-# covered by the suite trap at the TMP block above (#283 widening).
+WORK="$(work_new)"
+# registered at creation (issue #395) -- the #283 comment block on the
+# old suite-wide trap is obsolete: the registry collects WORK, F16W and
+# the TMP fail-rows file centrally.
 
 mkdir -p "$WORK/skills/opk-good-skill" "$WORK/skills/opk-no-desc" \
     "$WORK/skills/opk-wrong-name" "$WORK/skills/opk-local-ref" \
@@ -393,7 +400,7 @@ lint_skills .agents/skills >>"$TMP" 2>&1
 # pr-00263 a F16: a bare file at the skills root FAILs loudly — the
 # loop used to examine directories only, so a bare file (which the
 # loader picks up) was silently unexamined.
-F16W="$(mktemp -d)"
+F16W="$(work_new)"
 mkdir -p "$F16W/skills/opk-ok"
 cat >"$F16W/skills/opk-ok/SKILL.md" <<'EOF'
 ---
@@ -408,7 +415,6 @@ case "$_out16" in
     *"FAIL bare-at-root.md: bare file at the skills root"*) : ;;
     *) echo "  PIN BROKEN: bare file at the skills root unexamined (pr-00263 a F16)" >>"$TMP" ;;
 esac
-rm -rf "${F16W:?}"
 
 if [ -s "$TMP" ]; then
     echo "FAIL skills lint:"

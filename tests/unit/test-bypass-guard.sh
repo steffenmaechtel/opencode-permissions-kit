@@ -9,10 +9,6 @@
 #       `curl | bash` install fetches, deploys, hooks, and updates it.
 set -e
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="$SCRIPT_DIR/../.."
 WARN="$REPO/files/opencode-permissions-kit-lib/sh/shell-warn.sh"
@@ -29,20 +25,12 @@ DEPLOYLIB="$REPO/files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 UMASK="$REPO/files/etc/umask.sh"
 TEST_YML="$REPO/.github/workflows/test-unit.yml"
 
-failures=0
-passed=0
-
-check() {
-    local desc="$1"
-    shift
-    if "$@"; then
-        echo "  ${GREEN}PASS${NC}  $desc"
-        passed=$((passed + 1))
-    else
-        echo "  ${RED}FAIL${NC}  $desc"
-        failures=$((failures + 1))
-    fi
-}
+# Shared harness (issue #444 adoption, full local check()/counter stack):
+# pass/fail rows, the counters and the summary gate live in
+# lib/harness.sh now; the scratch receivers register with the work
+# registry (issue #395) and the local trap is gone (a local trap would
+# disarm the central registry trap).
+. "$SCRIPT_DIR/lib/harness.sh"
 
 # Source shell-warn.sh with a controlled HOME/PATH; prints nothing on stderr
 # when quiet, the warning text when triggered.
@@ -51,8 +39,7 @@ run_warn() {
     HOME="$home" PATH="$path" sh -c '. "$0"' "$WARN" 2>&1
 }
 
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT INT TERM
+TMP="$(work_new)"
 
 echo ""
 echo "Wrapper-Bypass Guard Tests"
@@ -106,7 +93,7 @@ check "install.sh deploys shell-warn.sh to LIBDIR (lib_deploy manifest)" \
 # (behavioral, extraction-driven): the streamed/fetched VERSION is
 # remote-mirror content stamped into the root-sourced install.conf; a
 # malformed file aborts BEFORE the banner or any step runs.
-_BGW="$(mktemp -d)"
+_BGW="$(work_new)"
 sed -n '/^if \[ -f "\$SCRIPT_DIR\/\.\.\/VERSION" \]; then/,/^fi$/p' "$INSTALL" >"$_BGW/vergate.sh"
 mkdir -p "$_BGW/proj" # [ -f ] resolves THROUGH proj/.. — without it the gate never fires
 printf '0.0.59-suffix\n' >"$_BGW/VERSION"
@@ -117,13 +104,10 @@ else
 fi
 if [ "$_bgw_rc" -ne 0 ] &&
     printf '%s\n' "$_bgw_out" | grep -qF "error: fetched VERSION file is malformed (expected x.y.z, got '0.0.59-suffix')"; then
-    echo "  ${GREEN}PASS${NC}  install.sh gates its fetched VERSION to x.y.z (#376 B3 sweep)"
-    passed=$((passed + 1))
+    pass "install.sh gates its fetched VERSION to x.y.z (#376 B3 sweep)"
 else
-    echo "  ${RED}FAIL${NC}  install.sh VERSION gate missing (rc=$_bgw_rc out=$_bgw_out) (#376 B3 sweep)"
-    failures=$((failures + 1))
+    fail "install.sh VERSION gate missing (rc=$_bgw_rc out=$_bgw_out) (#376 B3 sweep)"
 fi
-rm -rf "$_BGW"
 # #211 b W4: the sourced-lib mode invariant needs a pin per lib —
 # shell-warn.sh was the only one here (log.sh via test-deploy-lib);
 # advisories.sh and ui.sh had no mode pin anywhere. Modes flipped 755 ->
@@ -263,12 +247,4 @@ check "shell-warn.sh is a sourced lib (git 100644, not executed by path)" \
 check "test-unit.yml runs test-bypass-guard.sh" \
     grep -Fq './tests/unit/test-bypass-guard.sh' "$TEST_YML"
 
-echo ""
-echo "===================================="
-echo "  ${GREEN}Passed: $passed${NC}"
-if [ "$failures" -gt 0 ]; then
-    echo "  ${RED}Failed: $failures${NC}"
-    exit 1
-fi
-echo "  All tests passed."
-echo ""
+suite_done "wrapper-bypass guard tests"
