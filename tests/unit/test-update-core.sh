@@ -408,7 +408,15 @@ fi
 # ddev-handover, fs-baseline) with its own || stub arms — those count;
 # xdg_shim_needed_for was the unswept example fixed with this wave
 # (update-core asks deploy-lib, only lib_deploy was stubbed, and only
-# for the missing-FILE case). Comment-stripped both sides.
+# for the missing-FILE case). Comment-stripped both sides. The lib
+# list is what THIS RUN sources: the entry's resolver loops plus the
+# three libs update-core self-sources with its own stub arms
+# (wsl-browser-bridge, ddev-handover, fs-baseline) — not the whole
+# sh/ glob, whose wrapper-side scripts define shell hooks (ddev(),
+# note()) that are not update's callable surface. Token extraction
+# stays line-separated: tr -d '[:space:]()' concatenates every
+# definition into one token and the loop goes vacuous (the #456
+# sabotage cycle found exactly that on the install twin, L4).
 _xl_missing=""
 UPDATE_ENTRY="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh"
 _xl_combined="$(
@@ -416,9 +424,22 @@ _xl_combined="$(
     sed 's/^[[:space:]]*#.*$//' "$LIB"
 )"
 [ -n "$_xl_combined" ] || _xl_missing="(stripped entry+core extraction empty)"
-for _xl_lib in "$SCRIPT_DIR"/../../files/opencode-permissions-kit-lib/sh/*.sh; do
-    case $_xl_lib in */ui.sh) continue ;; esac
-    for _xl_fn in $(grep -oE '^[[:space:]]*[a-zA-Z_][a-zA-Z0-9_]*\(\)' "$_xl_lib" | tr -d '[:space:]()'); do
+for _xl_rel in opencode-permissions-kit-lib/sh/staged-write.sh \
+    opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
+    opencode-permissions-kit-lib/sh/secure-binary.sh \
+    opencode-permissions-kit-lib/sh/deploy-lib.sh \
+    opencode-permissions-kit-lib/sh/tui-plugin.sh \
+    opencode-permissions-kit-lib/sh/git-check.sh \
+    opencode-permissions-kit-lib/sh/log.sh \
+    opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh \
+    opencode-permissions-kit-lib/sh/ddev-handover.sh \
+    opencode-permissions-kit-lib/sh/fs-baseline.sh; do
+    _xl_lib="$SCRIPT_DIR/../../files/$_xl_rel"
+    [ -f "$_xl_lib" ] || {
+        _xl_missing="$_xl_missing (missing lib $_xl_rel)"
+        continue
+    }
+    for _xl_fn in $(grep -oE '^[[:space:]]*[a-zA-Z_][a-zA-Z0-9_]*\(\)' "$_xl_lib" | tr -d '()'); do
         printf '%s\n' "$_xl_combined" | grep -qE "(^|[^a-zA-Z0-9_])${_xl_fn}([^a-zA-Z0-9_(]|$)" ||
             continue
         printf '%s\n' "$_xl_combined" | grep -qE "(^|[|;[:space:]])${_xl_fn}\(\)" ||

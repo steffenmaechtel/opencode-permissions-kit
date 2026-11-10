@@ -306,9 +306,25 @@ _xl_combined="$(
     sed 's/^[[:space:]]*#.*$//' "$LIB"
 )"
 [ -n "$_xl_combined" ] || _xl_missing="(stripped entry+core extraction empty)"
-for _xl_lib in "$SCRIPT_DIR"/../../files/opencode-permissions-kit-lib/sh/*.sh; do
-    case $_xl_lib in */ui.sh) continue ;; esac
-    for _xl_fn in $(grep -oE '^[[:space:]]*[a-zA-Z_][a-zA-Z0-9_]*\(\)' "$_xl_lib" | tr -d '[:space:]()'); do
+# What THIS RUN sources: the entry resolves git-check.sh and ui.sh;
+# status-core resolves ddev-migrate.sh and ddev-handover.sh behind file
+# guards; wsl-browser-bridge.sh's never-shadow probe is the optional
+# surface the xdg call site command-v-guards. Not the whole sh/ glob —
+# its wrapper-side scripts define shell hooks (ddev(), note()) that
+# are not status's callable surface. Token extraction stays
+# line-separated: tr -d '[:space:]()' concatenates every definition
+# into one token and the loop goes vacuous (the #456 sabotage cycle
+# found exactly that on the install twin, L4).
+for _xl_rel in opencode-permissions-kit-lib/sh/git-check.sh \
+    opencode-permissions-kit-lib/sh/ddev-migrate.sh \
+    opencode-permissions-kit-lib/sh/ddev-handover.sh \
+    opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh; do
+    _xl_lib="$SCRIPT_DIR/../../files/$_xl_rel"
+    [ -f "$_xl_lib" ] || {
+        _xl_missing="$_xl_missing (missing lib $_xl_rel)"
+        continue
+    }
+    for _xl_fn in $(grep -oE '^[[:space:]]*[a-zA-Z_][a-zA-Z0-9_]*\(\)' "$_xl_lib" | tr -d '()'); do
         printf '%s\n' "$_xl_combined" | grep -qE "(^|[^a-zA-Z0-9_])${_xl_fn}([^a-zA-Z0-9_(]|$)" ||
             continue
         printf '%s\n' "$_xl_combined" | grep -qE "(^|[|;[:space:]])${_xl_fn}\(\)" &&

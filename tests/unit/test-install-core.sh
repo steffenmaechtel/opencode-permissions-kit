@@ -471,34 +471,53 @@ fi
 # calls from those same libs (agent_home_sane was the live example — 14
 # gated call sites, no stub: a truncated staged-write.sh would have
 # rc-127'd the ddev phase under set -e). STRONGEST form — every
-# function defined by ANY sh/ lib (ui.sh exempt: its surface is the
-# used-set guard's, own rider in test-ui.sh) and CALLED by entry or
-# core (word-boundary, not the definition paren) must be DEFINED in
-# install.sh itself — a stub arm or fallback — so a present-but-
-# truncated lib can never rc-127 a bare call, and a call into a lib
-# nothing sources fails the same way. Comment-stripped both sides
-# (conventions.md "Source-counting pins"); stub-only names (defined,
-# never called) are out of scope — staleness, not a gap.
+# function defined by ANY sh/ file (the glob carries the phase cores
+# too; ui.sh exempt: its surface is the used-set guard's, own rider in
+# test-ui.sh) and CALLED by entry or core (word-boundary, not the
+# definition paren) must be DEFINED somewhere in the sourced run —
+# entry stub arm, fallback, or install-core's own definitions (it is
+# kit_source'd before main, so a definition there covers at runtime) —
+# so a present-but-truncated lib can never rc-127 a bare call, and a
+# call into a lib nothing sources fails the same way. Comment-stripped
+# both sides (conventions.md "Source-counting pins"); stub-only names
+# (defined, never called) are out of scope — staleness, not a gap.
+# The extraction keeps tokens line-separated: a tr -d '[:space:]()'
+# here concatenates every definition into one token and the loop goes
+# vacuous (found by the #456 sabotage cycle, L4). The lib list is what
+# THIS RUN sources — live from the kit_source lines plus log.sh's
+# direct sourcing — not the whole sh/ glob: sh/ also carries
+# wrapper-side scripts (ddev-terminal.sh, as-opencode-core.sh) whose
+# shell-hook definitions (ddev(), note()) are not install's callable
+# surface, and globbing them false-reds on binary-name prose.
 _xl_missing=""
 _xl_combined="$(
     sed 's/^[[:space:]]*#.*$//' "$INSTALL"
     sed 's/^[[:space:]]*#.*$//' "$LIB"
 )"
-_xl_entry_s="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL")"
 [ -n "$_xl_combined" ] || _xl_missing="(stripped entry+core extraction empty)"
-for _xl_lib in "$SCRIPT_DIR"/../../files/opencode-permissions-kit-lib/sh/*.sh; do
+_xl_libs="$(
+    grep -oE 'kit_source "\$SCRIPT_DIR/opencode-permissions-kit-lib/sh/[a-z0-9-]+\.sh"' "$INSTALL" |
+        sed -e 's/^kit_source "\$SCRIPT_DIR\///' -e 's/"$//'
+    echo opencode-permissions-kit-lib/sh/log.sh
+)"
+for _xl_rel in $_xl_libs; do
+    _xl_lib="$SCRIPT_DIR/../../files/$_xl_rel"
     case $_xl_lib in */ui.sh) continue ;; esac
-    for _xl_fn in $(grep -oE '^[[:space:]]*[a-zA-Z_][a-zA-Z0-9_]*\(\)' "$_xl_lib" | tr -d '[:space:]()'); do
+    [ -f "$_xl_lib" ] || {
+        _xl_missing="$_xl_missing (missing lib $_xl_rel)"
+        continue
+    }
+    for _xl_fn in $(grep -oE '^[[:space:]]*[a-zA-Z_][a-zA-Z0-9_]*\(\)' "$_xl_lib" | tr -d '()'); do
         printf '%s\n' "$_xl_combined" | grep -qE "(^|[^a-zA-Z0-9_])${_xl_fn}([^a-zA-Z0-9_(]|$)" ||
             continue
-        printf '%s\n' "$_xl_entry_s" | grep -qE "(^|[|;[:space:]])${_xl_fn}\(\)" ||
+        printf '%s\n' "$_xl_combined" | grep -qE "(^|[|;[:space:]])${_xl_fn}\(\)" ||
             _xl_missing="$_xl_missing $_xl_fn"
     done
 done
 if [ -z "$_xl_missing" ]; then
-    pass "every lib function entry-or-core calls is stubbed in install.sh (#456)"
+    pass "every lib function entry-or-core calls is defined in install.sh/install-core.sh (#456)"
 else
-    fail "lib functions called but not stubbed in install.sh:$_xl_missing (#456)"
+    fail "lib functions called but defined nowhere in install.sh/install-core.sh:$_xl_missing (#456)"
 fi
 
 # --- 8. LOWS-1 (#371/#372/#340): install.sh residual hygiene ----------------------
