@@ -156,8 +156,8 @@ to prove a pin fails (mutation verification), commit the finished work or
 `git stash` it first — a sabotage restore (`git checkout --` /
 `git restore`) resets the file to its INDEX state and silently wipes
 every edit since the last commit or stage (learned the hard way,
-2026-10; recurred 2026-11 in PR #441 round b D1, which pushed a fix
-with its recursion-break marker silently wiped). The securing check is
+2026-10; recurred 2026-11 in PR #441 round b D1 — that wave pushed a
+pin whose recursion-break marker had been silently wiped). The securing check is
 a PER-CYCLE invariant, not one-time phase preparation: every single
 sabotage cycle starts from a verified-clean tree (`git status
 --porcelain` empty for the target file) — the PR-#441 loss happened in

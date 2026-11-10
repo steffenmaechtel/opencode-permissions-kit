@@ -240,7 +240,8 @@ uncommitted-tree incident (2026-10) never entered a review snapshot — it
 lived as an AGENTS.md Testing rule alone until the class recurred anyway
 (2026-11; roughly every third session, maintainer estimate). The
 recurrence DID enter a round comment (PR #441 round b, D1 HIGH — the
-fix-wave re-review caught what two rc-based self-checks could not see)
+fix-wave re-review caught what the wave's own rc-based self-checks
+could not see)
 and on 2026-11-10 took this section's first escalation path: wording
 sharpened (AGENTS.md Testing — per-cycle invariant, content-based
 restore verification, amend indicator) and restated in
