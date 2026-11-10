@@ -17,6 +17,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="$SCRIPT_DIR/../.."
 WARN="$REPO/files/opencode-permissions-kit-lib/sh/shell-warn.sh"
 WRAPPER="$REPO/files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
+# Wrapper core lib since #449 (the #346 wave shape): pins on moved
+# wrapper code target the lib.
+WRAPPER_CORE="$REPO/files/opencode-permissions-kit-lib/sh/as-opencode-core.sh"
 INSTALL="$REPO/files/install.sh"
 INSTALL_CORE="$REPO/files/opencode-permissions-kit-lib/sh/install-core.sh"
 UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
@@ -88,9 +91,9 @@ echo "-- umask.sh / wrapper wiring --"
 check "umask.sh sources shell-warn.sh" \
     grep -Fq 'shell-warn.sh' "$UMASK"
 check "wrapper self-checks for shadow binary" \
-    grep -Fq 'self-installed opencode detected' "$WRAPPER"
+    grep -Fq 'self-installed opencode detected' "$WRAPPER_CORE"
 check "wrapper self-checks PATH resolution" \
-    grep -Fq "'opencode' on this PATH resolves to" "$WRAPPER"
+    grep -Fq "'opencode' on this PATH resolves to" "$WRAPPER_CORE"
 
 echo ""
 echo "-- install.sh wiring --"

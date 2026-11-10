@@ -16,6 +16,9 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="$SCRIPT_DIR/../.."
 WRAPPER="$REPO/files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
+# The wrapper's executable sections live in sh/as-opencode-core.sh
+# since #449 (the #346 wave shape): pins on moved code target the lib.
+WRAPPER_CORE="$REPO/files/opencode-permissions-kit-lib/sh/as-opencode-core.sh"
 INSTALL="$REPO/files/install.sh"
 INSTALL_CORE="$REPO/files/opencode-permissions-kit-lib/sh/install-core.sh"
 UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
@@ -137,13 +140,13 @@ check "wrapper accepts docker-rootless/podman-rootless backends" \
 check "wrapper exports DOCKER_HOST for rootless" \
     grep -Fq 'export DOCKER_HOST="$CONTAINER_DOCKER_HOST"' "$WRAPPER"
 check "wrapper warns about unknown/missing backend instead of downgrading" \
-    grep -Fq 'no rootless container backend configured' "$WRAPPER"
+    grep -Fq 'no rootless container backend configured' "$WRAPPER_CORE"
 check "wrapper has podman-CLI path (daemonless, no DOCKER_HOST)" \
-    grep -Fq 'CONTAINER_PODMAN=true' "$WRAPPER"
+    grep -Fq 'CONTAINER_PODMAN=true' "$WRAPPER_CORE"
 check "wrapper verifies 'command -v podman' for the podman-CLI path" \
-    grep -Fq 'command -v podman' "$WRAPPER"
+    grep -Fq 'command -v podman' "$WRAPPER_CORE"
 check "wrapper warns when podman-rootless but podman not installed" \
-    grep -Fq "'podman' is not installed" "$WRAPPER"
+    grep -Fq "'podman' is not installed" "$WRAPPER_CORE"
 
 echo ""
 echo "-- wrapper rootless socket probe (socket-check.sh) --"
@@ -155,15 +158,15 @@ check "socket-check only does test -S (no command execution)" \
 check "socket-check strips a unix:// prefix" \
     grep -Fq 'sock="${sock#unix://}"' "$SOCKCHECK"
 check "wrapper has a sock_reachable probe function" \
-    grep -Fq 'sock_reachable()' "$WRAPPER"
+    grep -Fq 'sock_reachable()' "$WRAPPER_CORE"
 check "wrapper probes the socket directly first (root/opencode contexts)" \
-    grep -Fq '[ -S "$sock" ] 2>/dev/null && return 0' "$WRAPPER"
+    grep -Fq '[ -S "$sock" ] 2>/dev/null && return 0' "$WRAPPER_CORE"
 check "wrapper re-probes as the opencode user via socket-check.sh" \
-    grep -Fq 'sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/socket-check "$sock"' "$WRAPPER"
+    grep -Fq 'sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/socket-check "$sock"' "$WRAPPER_CORE"
 check "docker-rootless branch uses sock_reachable" \
-    grep -Fq 'if sock_reachable "$sock_host"; then' "$WRAPPER"
+    grep -Fq 'if sock_reachable "$sock_host"; then' "$WRAPPER_CORE"
 check "podman-rootless socket branch uses sock_reachable" \
-    grep -Fq 'if sock_reachable "$sock_host"; then' "$WRAPPER"
+    grep -Fq 'if sock_reachable "$sock_host"; then' "$WRAPPER_CORE"
 
 echo ""
 echo "-- install.sh wiring --"

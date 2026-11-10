@@ -17,6 +17,9 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LIB="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/advisories.sh"
 WRAPPER="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
+# Wrapper core lib since #449 (the #346 wave shape): pins on moved
+# wrapper code target the lib.
+WRAPPER_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/as-opencode-core.sh"
 STATUS="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/status.sh"
 STATUS_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core.sh"
 # Shared harness (issue #394): pass/fail, colors, counters
@@ -245,9 +248,9 @@ done
 
 # --- 7. wiring -----------------------------------------------------------------------------
 
-if grep -q '/sh/advisories.sh' "$WRAPPER" &&
-    grep -q "WARNING: the installed opencode .* is affected by a known security advisory" "$WRAPPER" &&
-    grep -q "Please upgrade opencode with 'opk upgrade-opencode'" "$WRAPPER"; then
+if grep -q '/sh/advisories.sh' "$WRAPPER_CORE" &&
+    grep -q "WARNING: the installed opencode .* is affected by a known security advisory" "$WRAPPER_CORE" &&
+    grep -q "Please upgrade opencode with 'opk upgrade-opencode'" "$WRAPPER_CORE"; then
     pass "wrapper: sources the database, warns, hints the upgrade command"
 else
     fail "wrapper: sources the database, warns, hints the upgrade command"
@@ -255,15 +258,18 @@ fi
 # the --version early-exec must stay ahead of the advisory block: scripts and
 # the official installer parse that output, the warning must never pollute it
 # (comment-stripped operands, #385 — comments around both blocks name the
-# subjects; one quoting a full literal must not become the anchor)
-_verline=$(sed 's/^[[:space:]]*#.*$//' "$WRAPPER" | grep -n -m1 -- '--version | -v | -h | --help)' | cut -d: -f1)
-_advline=$(sed 's/^[[:space:]]*#.*$//' "$WRAPPER" | grep -n -m1 '/sh/advisories.sh' | cut -d: -f1)
+# subjects; one quoting a full literal must not become the anchor). Both
+# blocks live in the lib since #449 — their relative order there mirrors
+# the entry's call order (wrapper_version_passthrough runs before
+# wrapper_advisories).
+_verline=$(sed 's/^[[:space:]]*#.*$//' "$WRAPPER_CORE" | grep -n -m1 -- '--version | -v | -h | --help)' | cut -d: -f1)
+_advline=$(sed 's/^[[:space:]]*#.*$//' "$WRAPPER_CORE" | grep -n -m1 '/sh/advisories.sh' | cut -d: -f1)
 if [ -n "$_verline" ] && [ -n "$_advline" ] && [ "$_verline" -lt "$_advline" ]; then
     pass "wrapper: --version early-exec stays ahead of the advisory check"
 else
     fail "wrapper: --version early-exec stays ahead of the advisory check ($_verline vs $_advline)"
 fi
-if grep -q 'timeout 5 /usr/bin/sudo -n -u opencode' "$WRAPPER" && grep -q 'bin/opencode --version' "$WRAPPER"; then
+if grep -q 'timeout 5 /usr/bin/sudo -n -u opencode' "$WRAPPER_CORE" && grep -q 'bin/opencode --version' "$WRAPPER_CORE"; then
     pass "wrapper: the --version probe is timeout-bounded (wedged 2.x service, issue #80)"
 else
     fail "wrapper: the --version probe is timeout-bounded (wedged 2.x service, issue #80)"

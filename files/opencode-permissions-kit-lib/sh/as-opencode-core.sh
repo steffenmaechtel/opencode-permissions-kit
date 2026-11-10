@@ -1,0 +1,823 @@
+# shellcheck shell=sh
+# opencode permissions kit -- as-opencode-core.sh
+#
+# The opencode wrapper's section functions (issue #346 wave shape,
+# #449): every executable section of bin/opencode-as-opencode's <main>
+# as a function -- pure code movement, output byte-identical
+# (execution-proven old vs new). Sourced (never executed) by the
+# wrapper, checkout-first (the bin/opk openchamber-core pattern, #447);
+# POSIX sh, no top-level side effects (definitions and comments only).
+# The functions execute in the CALLER's shell under its `set -e` and
+# read the globals the entry sets before them (colors, PROJECTS_CONF,
+# VERSION, CONTAINER_BACKEND); they set the run-state globals the
+# later sections read (HEADLESS, CWD/VALID, ADV_*, OPENCODE_MAJOR,
+# CONTAINER_*, SERVE_FALLBACK). exec/exit/cd stay process-global:
+# exec and exit inside a section replace or end the wrapper, a cd
+# persists for the exec'd binary -- same bytes, same process, only
+# the brace around them is new. Sections that read the command line
+# take it as "$@" from the entry's call.
+
+# Headless mode (issue #42; generalizes the 0.0.16 serve fix). Ecosystem
+# tools spawn opencode non-interactively and parse its stdout:
+#   `opencode serve`   OpenChamber, cezar, CodeWalk, the VS Code extension
+#                      (parse the "listening on <url>" line)
+#   `opencode run`     CI runners, kanban orchestrators, eval harnesses
+#                      (`--format json` / stream-json on stdout)
+#   `opencode acp`     JSON-RPC over stdio (IDE agents) — stdout must stay
+#                      protocol-clean
+#   query subcommands  `models`, `agent`, `providers`, ... (e.g. cezar
+#                      caches `opencode models` output)
+# A banner on stdout breaks those parsers twice over — extra noise and a
+# `read` hitting EOF under set -e killing the wrapper before the exec —
+# and the project-dir refusal would block tools running from git
+# worktrees or temp checkouts. Headless therefore prints NOTHING on
+# stdout (diagnostics go to stderr), skips the project-dir check (the
+# soft layer — global + per-project opencode.jsonc — still applies to
+# every session), and resolves container tools silently. Interactive TUI
+# starts (no subcommand, flags-only start, `tui`, `attach`, or `run` with
+# a tty and no message argument) keep banner and check.
+wrapper_headless_classify() {
+    HEADLESS=false
+    _hr_first=true
+    _hr_msg=false
+    _hr_help=false
+    for _hr_a in "$@"; do
+        if [ "$_hr_first" = true ]; then
+            _hr_first=false
+            continue
+        fi
+        case "$_hr_a" in
+            # (#370 a E1): a help flag in the leading flag region (before
+            # the first message argument) is a help QUERY -- `run --help`
+            # from a non-project cwd used to hit the project-dir refusal
+            # below instead of help (the #91 any-dir path covered flags in
+            # $1 only). Past the first message argument a "--help" is
+            # message text, not a query -- the break keeps it unflagged.
+            -h | --help) _hr_help=true ;;
+            -*) ;;
+            *)
+                _hr_msg=true
+                break
+                ;;
+        esac
+    done
+    # Subcommand union for headless classification: opencode 1.x names (agent,
+    # plug, providers, account, github, pr, db, generate, web — kept; unknown to
+    # 2.x, which errors on them anyway) plus 2.x additions (api, auth, plugin,
+    # service, pair, update — issue #80). `console` joins for its `login`
+    # subcommand (issue #91): device auth carries no project context and must
+    # work from any directory. 2.x `mini` is an interactive UI and stays
+    # bannered like `tui`/`attach`.
+    case "${1:-}" in
+        serve | acp | models | agent | providers | session | export | import | stats | account | console | github | \
+            pr | mcp | plug | db | generate | web | debug | uninstall | \
+            upgrade | api | auth | plugin | service | pair | update)
+            HEADLESS=true
+            ;;
+        run)
+            # Non-interactive when a message argument exists (any arg after the
+            # subcommand that is not a flag) or stdin is piped (prompt on stdin).
+            if [ "$_hr_msg" = true ] || ! [ -t 0 ]; then
+                HEADLESS=true
+            fi
+            ;;
+    esac
+}
+
+# Wrapper diagnostics: interactive starts print to the terminal, headless
+# mode redirects to stderr so stdout carries only opencode's own output.
+# printf '%s' (#211 a F29): arguments print literally — escape sequences
+# in directory names cannot garble the line (the color vars below carry
+# real ESC bytes, which %s passes through untouched). An empty argument
+# prints a blank separator line.
+note() {
+    _fd=1
+    [ "$HEADLESS" = true ] && _fd=2
+    if [ -n "$1" ]; then
+        # %s, not %b (#211 a F29): note() interpolates paths ($CWD,
+        # $SERVE_FALLBACK) — a directory named like an escape sequence
+        # garbled the warning. No caller relies on escape expansion
+        # (grepped); static text is unaffected.
+        printf '  %s\n' "$1" >&"$_fd"
+    else
+        printf '\n' >&"$_fd"
+    fi
+}
+
+wrapper_validate_cwd() {
+    CWD=$(pwd)
+    VALID=false
+    if [ -f "$PROJECTS_CONF" ]; then
+        while IFS= read -r root; do
+            [ -z "$root" ] && continue
+            [ ! -d "$root" ] && continue
+            root_clean="${root%/}"
+            if [ "$CWD" = "$root_clean" ] || [ "${CWD#"$root_clean"/}" != "$CWD" ]; then
+                VALID=true
+                break
+            fi
+        done <"$PROJECTS_CONF"
+    fi
+}
+
+# Version/help queries carry no project context and no kit state — answer
+# them straight from the real binary, from ANY directory (issue #91): the
+# banner and the wrapper diagnostics must not pollute `opencode --version`
+# output, which scripts and the official installer parse. The official
+# opencode installer probes `opencode --version` from $HOME while the kit
+# installs; the refusal mid-install confused users ("ERROR: opencode cannot
+# be started here"). Same exec path as below — no banner, no project-dir
+# check, no container resolution.
+wrapper_version_passthrough() {
+    case "${1:-}" in
+        --version | -v | -h | --help)
+            exec /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode "$@"
+            ;;
+    esac
+    # (#370 a E1): help in the leading flag region joins the any-dir path
+    # above -- same rationale (help carries no project context and no kit
+    # state), same exec. Checked AFTER the $1 case so that arm keeps
+    # answering version probes unchanged.
+    if [ "$_hr_help" = true ]; then
+        exec /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode "$@"
+    fi
+}
+
+wrapper_refusal() {
+    if [ "$VALID" != true ] && [ "$HEADLESS" != true ]; then
+        echo ""
+        echo "  ${RED}ERROR: opencode cannot be started here${NC}"
+        echo "  ${YELLOW}$CWD${NC} is not a valid project directory."
+        echo ""
+        echo "  Valid project directories:"
+        if [ -f "$PROJECTS_CONF" ] && [ -s "$PROJECTS_CONF" ]; then
+            count=0
+            while IFS= read -r root; do
+                [ -z "$root" ] && continue
+                count=$((count + 1))
+                if [ "$count" -gt 10 ]; then
+                    echo "  ... and more"
+                    break
+                fi
+                printf "  - %s\n" "$root"
+            done <"$PROJECTS_CONF"
+        else
+            echo "  (none configured — run install.sh first)"
+        fi
+        echo ""
+        exit 1
+    fi
+}
+
+wrapper_banner() {
+    if [ "$HEADLESS" != true ]; then
+        echo ""
+        echo "  ${GREEN}SECURED BY opencode permissions kit ($VERSION)${NC}"
+        echo "  ${CYAN}@steffenmaechtel/opencode-permissions-kit${NC}"
+        echo ""
+    fi
+}
+
+# Kit update notice (issue #358): the first interactive start of the day
+# checks the tracking channel (install.conf's KIT_CHANNEL) for a newer
+# kit and caches the verdict in the invoking user's
+# ~/.cache/opencode-permissions-kit/ — every later start replays it from
+# there, so the network cost is one bounded curl per day (3 s worst
+# case, offline included). Headless starts skip the check entirely: no
+# network on the hot path, stdout stays machine-clean. Fail-open (the
+# wrapper's contract for every probe): a missing lib, missing curl, an
+# unwritable cache, or a dead network means no note — never a blocked
+# or delayed start. OPK_UPDATE_CHECK=0 disables it (e2e, air-gapped).
+wrapper_update_note() {
+    KIT_UPDATE_NOTE=""
+    if [ "$HEADLESS" != true ] && [ -f /usr/local/lib/opencode-permissions-kit/sh/update-check.sh ]; then
+        # shellcheck disable=SC1091  # deployed lib, guarded above
+        . /usr/local/lib/opencode-permissions-kit/sh/update-check.sh
+        # The || true is deliberate defense-in-depth (review #365 a Q4):
+        # kit_update_daily_note's contract returns 0 on every path today,
+        # but the guard also suspends set -e INSIDE the substitution — a
+        # future unguarded failing command there would otherwise kill the
+        # wrapper before the exec (verifier-evidenced, dash micro-tests).
+        KIT_UPDATE_NOTE=$(kit_update_daily_note "$VERSION" "${KIT_CHANNEL:-master}" || true)
+    fi
+    if [ -n "$KIT_UPDATE_NOTE" ]; then
+        note "${YELLOW}NOTE: $KIT_UPDATE_NOTE${NC}"
+        note ""
+    fi
+}
+
+# _opk_timeout_ok: cached two-class timeout probe (#248) — `command -v`
+# proves findability, not function; a findable-but-broken timeout used
+# to fail the bounded probes below outright (empty ADV_LINE / major 1).
+# Only a timeout that actually runs `true` counts; everything else
+# takes the unguarded fallback arm (the absent-timeout trade both sites
+# already make). Residual, accepted: a timeout that hangs on trivial
+# use hangs the probe — nothing left to bound it. The wrapper's core
+# keeps this a standalone copy (never sourced from a sibling core);
+# identical copies: sh/update-core.sh and sh/status-core.sh (keep them
+# in sync).
+_opk_timeout_ok() {
+    case "${_OPK_TIMEOUT_OK:-}" in
+        1) return 0 ;;
+        2) return 1 ;;
+    esac
+    if command -v timeout >/dev/null 2>&1 && timeout 2 true >/dev/null 2>&1; then
+        _OPK_TIMEOUT_OK=1
+        return 0
+    fi
+    _OPK_TIMEOUT_OK=2
+    return 1
+}
+
+# Known security advisories for the installed binary (issue #107): the
+# curated database ships with the kit (sh/advisories.sh) and is checked
+# LOCALLY — no network on the hot path, fresh entries arrive through the
+# normal release channel (opk update). The version is probed fresh on
+# every start (never a stale install.conf stamp) via the same sudo path
+# the exec below uses. timeout(1) bounds the probe: a 2.x service that
+# cannot bind its port makes even `--version` hang (observed on a real
+# WSL, issue #80). Fail-open — a failed, hung, or unparseable probe skips
+# the check; a security warning must never keep a session from starting.
+# The kit installs the binary itself (never through a package manager),
+# so its install channel is always 'standalone' — advisories qualified
+# 'npm' (GHSA-632h-h47v-g4x4) do not match kit installs.
+# Initialize the probe's variables BEFORE the guarded block (issue #220):
+# an env-exported ADV_LINE/ADV_VERSION/ADV_HITS (name collision — the
+# wrapper does not sanitize inherited names) must never impersonate a
+# probe result while advisories.sh is missing. Same discipline as
+# status.sh's ADV_VER="" init.
+wrapper_advisories() {
+    ADV_LINE=""
+    ADV_VERSION=""
+    ADV_HITS=""
+    if [ -f /usr/local/lib/opencode-permissions-kit/sh/advisories.sh ]; then
+        # shellcheck disable=SC1091  # deployed lib, guarded above
+        . /usr/local/lib/opencode-permissions-kit/sh/advisories.sh
+        if _opk_timeout_ok; then
+            ADV_LINE=$(timeout 5 /usr/bin/sudo -n -u opencode \
+                /usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1 || true)
+        else
+            ADV_LINE=$(/usr/bin/sudo -n -u opencode \
+                /usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1 || true)
+        fi
+        ADV_VERSION=$(advisories_version_of "$ADV_LINE")
+        # An unparseable version (empty) matches nothing — the lib fails safe.
+        ADV_HITS=$(advisories_matching opencode "$ADV_VERSION" standalone || true)
+    fi
+    if [ -n "$ADV_HITS" ]; then
+        note "${RED}WARNING: the installed opencode $ADV_VERSION is affected by a known security advisory:${NC}"
+        while IFS= read -r ADV_HIT; do
+            IFS='|' read -r ADV_PKG ADV_RANGES ADV_PATCHED ADV_CHANNEL ADV_SEV ADV_ID ADV_SUMMARY <<EOF
+$ADV_HIT
+EOF
+            note "${YELLOW}$ADV_ID ($ADV_SEV): $ADV_SUMMARY${NC}"
+            if [ -n "$ADV_PATCHED" ]; then
+                note "${YELLOW}patched in opencode $ADV_PATCHED${NC}"
+            fi
+        done <<EOF
+$ADV_HITS
+EOF
+        note "${YELLOW}Please upgrade opencode with 'opk upgrade-opencode'.${NC}"
+        note ""
+    fi
+}
+
+# Self-check: self-installed opencode binaries and OpenChamber's settings
+# pin (issue #154). The official installer re-run puts ~/.opencode/bin/
+# opencode (+ the opencode2 shim) back on disk; OpenChamber's one-click
+# "Update to OpenCode 2" installs the same files AND pins them via
+# "opencodeBinary" in ~/.config/openchamber/settings.json — from then on
+# every OpenChamber session spawns the pinned binary directly and runs
+# OUTSIDE the kit (no dedicated user, no permission layer), while a pin
+# whose binaries are gone hangs OpenChamber at startup ("OpenCode port is
+# not available"). Warn (but keep running), state-specific; the fix advice
+# is always TWO steps — binaries AND settings line — because a half fix
+# produces the hang state. With /etc/openchamber/policy.json pinning the
+# wrapper (kit opt-in / opk openchamber-secure) sessions are secured and
+# leftover files are inert: print a cleanup note instead of a warning.
+openchamber_guard() {
+    _oc_bins=""
+    for _oc_name in opencode opencode2; do
+        _oc_path="$HOME/.opencode/bin/$_oc_name"
+        if [ -e "$_oc_path" ]; then
+            if [ -L "$_oc_path" ] && [ "$(readlink -f "$_oc_path" 2>/dev/null || echo "$_oc_path")" \
+                = "/usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode" ]; then
+                : # kit-owned symlink — not a shadow
+            else
+                _oc_bins="$_oc_bins $_oc_path"
+            fi
+        fi
+    done
+    # OpenChamber settings pin. settings.json is untrusted user input:
+    # one targeted sed extraction, no eval, and the VALUE never flows into
+    # note() (printf %s prints it literally — only the file and key are
+    # named, belt and suspenders). Empty string counts as unset
+    # (openchamber's optionalText semantics); a pin on the kit wrapper
+    # is secured.
+    _oc_pin=""
+    if [ -f "$HOME/.config/openchamber/settings.json" ]; then
+        _oc_pin=$(sed -n 's/.*"opencodeBinary"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+            "$HOME/.config/openchamber/settings.json" 2>/dev/null | tail -n 1)
+        if [ -z "$_oc_pin" ] || [ "$_oc_pin" = "/usr/local/bin/opencode" ]; then
+            _oc_pin=""
+        fi
+    fi
+    if [ -z "$_oc_bins" ] && [ -z "$_oc_pin" ]; then
+        return 0
+    fi
+    # kit-written policy pin on the wrapper defuses the settings pin
+    # (openchamber: policy wins, never falls back). Leftovers are inert —
+    # name BOTH kinds (0.0.47a F2: a pin-only leftover must not dangle
+    # behind an empty binaries list).
+    if [ -f /etc/openchamber/policy.json ] &&
+        [ "$(sed -n 's/.*"opencodeBinary"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+            /etc/openchamber/policy.json 2>/dev/null | tail -n 1)" = "/usr/local/bin/opencode" ]; then
+        note "${CYAN}NOTE: OpenChamber is pinned to the kit wrapper via /etc/openchamber/policy.json;${NC}"
+        if [ -n "$_oc_bins" ]; then
+            note "${CYAN}leftover bypass binaries are inert and safe to remove:$_oc_bins${NC}"
+        fi
+        if [ -n "$_oc_pin" ]; then
+            note "${CYAN}the \"opencodeBinary\" pin in $HOME/.config/openchamber/settings.json is${NC}"
+            note "${CYAN}inert — remove the line, or run: sudo opk openchamber-secure${NC}"
+        fi
+        note ""
+        return 0
+    fi
+    if [ -n "$_oc_bins" ] && [ -n "$_oc_pin" ]; then
+        note "${YELLOW}WARNING: OpenChamber sessions run OUTSIDE the kit (bypass detected):${NC}"
+        note "${YELLOW}self-installed binaries:$_oc_bins${NC}"
+        note "${YELLOW}plus an \"opencodeBinary\" pin in $HOME/.config/openchamber/settings.json${NC}"
+        note "${YELLOW}Fix (BOTH steps — a half fix hangs OpenChamber at startup):${NC}"
+        note "${YELLOW}  rm -f$_oc_bins${NC}"
+        note "${YELLOW}  remove the \"opencodeBinary\" line from $HOME/.config/openchamber/settings.json${NC}"
+        note "${YELLOW}See docs/how-to/openchamber.md${NC}"
+        note ""
+        return 0
+    fi
+    if [ -n "$_oc_bins" ]; then
+        note "${YELLOW}WARNING: self-installed opencode detected:$_oc_bins${NC}"
+        note "${YELLOW}New shells would run it instead of this wrapper. Fix: rm -f$_oc_bins${NC}"
+        note "${YELLOW}OpenChamber users: also check for an \"opencodeBinary\" pin in${NC}"
+        note "${YELLOW}$HOME/.config/openchamber/settings.json — see docs/how-to/openchamber.md${NC}"
+        note ""
+        return 0
+    fi
+    note "${YELLOW}WARNING: OpenChamber settings pin without binary — OpenChamber will hang${NC}"
+    note "${YELLOW}at startup (\"OpenCode port is not available\").${NC}"
+    note "${YELLOW}Fix: remove the \"opencodeBinary\" line from $HOME/.config/openchamber/settings.json${NC}"
+    note "${YELLOW}See docs/how-to/openchamber.md${NC}"
+    note ""
+}
+
+wrapper_path_shadow_warning() {
+    RESOLVED=$(command -v opencode 2>/dev/null || true)
+    if [ -n "$RESOLVED" ] && [ "$RESOLVED" != "/usr/local/bin/opencode" ]; then
+        note "${YELLOW}WARNING: 'opencode' on this PATH resolves to $RESOLVED, not the kit wrapper.${NC}"
+        note ""
+    fi
+}
+
+# WSL2 exposure check: the drvfs /mnt/c mount runs with the Windows session
+# token — NTFS ACLs do not distinguish WSL users, so a world-readable mount
+# lets the agent read the whole Windows profile (.ssh, NTUSER.DAT, browser
+# data). Warn on EVERY start until the restriction is applied.
+wrapper_wsl_checks() {
+    if [ -d /mnt/c ]; then
+        mnt_mode=$(stat -c %a /mnt/c 2>/dev/null || echo "")
+        if [ -n "$mnt_mode" ] && [ $((0$mnt_mode & 0004)) -ne 0 ]; then
+            if grep -q '^options *=.*dmask' /etc/wsl.conf 2>/dev/null; then
+                note "${YELLOW}WARNING: /mnt/c restriction configured but PENDING (mode $mnt_mode).${NC}"
+                note "${YELLOW}Run 'wsl --shutdown' from Windows and reopen the distro — until then${NC}"
+                note "${YELLOW}the agent can read your Windows profile via /mnt/c.${NC}"
+            else
+                note "${YELLOW}WARNING: /mnt/c is world-readable (mode $mnt_mode) — the agent can read${NC}"
+                note "${YELLOW}your whole Windows profile (.ssh, browser data). Fix in /etc/wsl.conf:${NC}"
+                note "${YELLOW}  [automount]${NC}"
+                note "${YELLOW}  enabled = true${NC}"
+                note "${YELLOW}  options = \"uid=<uid>,gid=<gid>,dmask=027,fmask=037\"${NC}"
+                note "${YELLOW}then 'wsl --shutdown' from Windows (apply it yourself""\
+ — the kit never edits wsl.conf).${NC}"
+            fi
+            note ""
+        fi
+        # Browser bridge sanity (issues #91, #100): on a hardened /mnt/c the
+        # opencode user cannot execute powershell.exe, and opencode's device-login
+        # flows (`console login`, `auth login`) die on that spawn error. The kit's
+        # browser bridge redirects the bundled `open` package's powershell lookup
+        # to a harmless stand-in via the kit comment block in /etc/wsl.conf
+        # (explicit opt-in — the kit never edits wsl.conf implicitly). Warn when
+        # the mount is restricted but the bridge is not in place.
+        # Version gate: opencode 1.18.33+ and 2.0.18+ (upstream PR #51414)
+        # bundle `open` 11.x, which access-checks powershell.exe BEFORE
+        # spawning and falls back to xdg-open — device logins survive a
+        # restricted /mnt/c without the bridge (the kit ships an xdg-open
+        # fallback shim for that fallback path, see bin/xdg-open). Earlier
+        # versions bundle open@10.1.2 (1.x < 1.18.33, 2.0.2-2.0.17) and DO
+        # need the carrier (2.0.10 verified live). ADV_VERSION comes from
+        # the fail-open probe above: an unknown version keeps the warning.
+        # The comparator-availability arm (issue #220): with an inherited
+        # env ADV_VERSION and a kit whose comparator is undefined
+        # (advisories.sh missing or stripped) the empty substitution
+        # satisfied != lt and suppressed this warning — the guard keeps the
+        # warning instead. Same shape as status.sh's bridge verdict gate.
+        _bridge_needed=1
+        if [ -n "${ADV_VERSION:-}" ] && command -v advisories_version_cmp >/dev/null 2>&1; then
+            case "$ADV_VERSION" in
+                1.*) if [ "$(advisories_version_cmp "$ADV_VERSION" 1.18.33)" != lt ]; then _bridge_needed=0; fi ;;
+                2.*) if [ "$(advisories_version_cmp "$ADV_VERSION" 2.0.18)" != lt ]; then _bridge_needed=0; fi ;;
+            esac
+        fi
+        if [ "$_bridge_needed" -eq 1 ] && [ -n "$mnt_mode" ] && [ $((0$mnt_mode & 0004)) -eq 0 ]; then
+            if ! [ -x \
+                /usr/local/lib/opencode-permissions-kit/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe \
+                ] ||
+                ! grep -q '^# opencode permissions kit browser bridge -- begin$' /etc/wsl.conf 2>/dev/null; then
+                note "${YELLOW}WARNING: browser bridge missing — 'console login'/'auth login' would fail${NC}"
+                note "${YELLOW}on this restricted /mnt/c. Enable it: sudo opk wsl-add-opencode-1-fix${NC}"
+                note ""
+            fi
+        fi
+    fi
+}
+
+# opencode major version (2.x changes the session-server model, issue #80):
+# normally stamped into install.conf at install/update time; the runtime
+# fallback covers stamps from older kit versions ("opencode v2..." -> 2).
+# The probe is bounded like every sibling (0.0.43a F3): a 2.x service that
+# cannot bind its port makes even `--version` hang (issue #80), and an
+# unbounded substitution would hang EVERY start. Fail-open: a failed, hung,
+# or empty probe means major 1 — a deliberate trade (0.0.44b W10), NOT a
+# mirror of install.sh's stamp (0.0.44f F1/G3): the install-time anchor
+# keeps/leaves the stamp on unparseable probes instead of defaulting to 1.
+wrapper_resolve_major() {
+    if [ -z "${OPENCODE_MAJOR:-}" ]; then
+        # Reuse ADV_LINE when the advisories probe ran (0.0.44a V21): it is
+        # the SAME bounded `--version` first line — a second serial probe
+        # only added up to 15 s of fail-open delay per start on unstamped
+        # installs. The direct fallback covers stamps from kit versions
+        # that predate the advisories block (or a missing advisories.sh).
+        _MAJOR_SRC="${ADV_LINE:-}"
+        # Accepted trade (0.0.44b W10): when advisories.sh exists but its
+        # 5 s probe failed (cold service in the 5-10 s band, one sudo
+        # flake), the old second 10 s probe no longer retries — the major
+        # resolves fail-open to 1 and --standalone is dropped for that
+        # start (the issue-#80 degradation, self-healing on the next start
+        # once the service answers). Keeping the retry doubled the worst-
+        # case fail-open delay on every unstamped start; the narrowed band
+        # is the cheaper side of that trade.
+        if [ -z "$_MAJOR_SRC" ] && [ ! -f /usr/local/lib/opencode-permissions-kit/sh/advisories.sh ]; then
+            if _opk_timeout_ok; then
+                _MAJOR_SRC=$(timeout 10 /usr/bin/sudo -n -u opencode \
+                    /usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1 || true)
+            else
+                _MAJOR_SRC=$(/usr/bin/sudo -n -u opencode \
+                    /usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1 || true)
+            fi
+        fi
+        case "$_MAJOR_SRC" in
+            "opencode v2"*) OPENCODE_MAJOR=2 ;;
+            *) OPENCODE_MAJOR=1 ;;
+        esac
+    fi
+}
+
+# Detect container tools (docker/ddev) enabled by the session's FINAL
+# permission config (issue #81): a broad allow counts no matter which file
+# declares it — the project's opencode.json[c] OR the opencode user's global
+# ~/.config/opencode/opencode.json[c]. The final result comes from opencode
+# itself: `opencode debug config`, run here as the opencode user from the
+# current directory, resolves exactly the merge the real session will see
+# (that user's global config, this cwd's project config, last matching rule
+# wins). The call rides the kit's base sudoers rule (bin/opencode with any
+# args) and never prompts (-n). When the probe returns nothing or an
+# untrustworthy answer (opencode too old for `debug config`, unreadable
+# cwd, sudo denied, a cold-start error object — parser exit 3), fall back
+# to scanning only the project config — the pre-#81 behavior. Any enabled
+# tool means "enable container tools for this session" — the rootless
+# backend decides the actual mechanism.
+merged_config() {
+    # timeout(1) bounds the probe: a 2.x service that cannot bind its port
+    # makes `debug config` retry forever — 2.x assigns the service port per
+    # CHANNEL, not per user (127.0.0.1:0xc0de), so a bare 2.x opencode run
+    # by the default user blocks the opencode user's service, and without
+    # the bound even `opencode --version` hangs after the banner (observed
+    # on a real WSL, issue #80). On timeout the wrapper falls back to the
+    # project-only scan. 10s covers a cold service boot (~2-4s) generously.
+    # The gate is the #248 two-class probe (a broken-but-findable timeout
+    # degrades to the unbounded arm, not to a failed probe).
+    if _opk_timeout_ok; then
+        timeout 10 /usr/bin/sudo -n -u opencode \
+            /usr/local/lib/opencode-permissions-kit/bin/opencode debug config 2>/dev/null || true
+    else
+        /usr/bin/sudo -n -u opencode \
+            /usr/local/lib/opencode-permissions-kit/bin/opencode debug config 2>/dev/null || true
+    fi
+}
+
+tools_from_config() {
+    # "-" reads stdin (the piped merged config); a path reads that file.
+    # Non-zero exit = output not trustworthy (JSON error, or exit 3 for an
+    # unusable shape) — the caller falls back to the project-only scan.
+    # -I (#249): the ambient PYTHONHOME/PYTHONPATH must not break (or
+    # shadow) the container opt-in — the parser imports stdlib only. A
+    # warn line on the fallback stayed deliberately undone (review W5's
+    # deferred part: hot-path noise for a rare broken-env case).
+    python3 -I /usr/local/lib/opencode-permissions-kit/py/jsonc-parser.py --tools "$1" 2>/dev/null
+}
+
+# opencode 2.x: the probe may have cold-started the background service —
+# stop it again (graceful). A long-lived service answers later probes with
+# its BOOT-TIME config snapshot: root-owned config edits (sudo tee, sed -i)
+# need seconds to reload, so a reused daemon reports stale permissions
+# right after an edit (observed in the e2e: a fresh global allow invisible
+# to the immediate next start). Stopping keeps every probe on fresh files,
+# matching the kit's per-invocation model; the next 2.x command re-ensures
+# the service. 1.x: unknown subcommand, error ignored.
+stop_merged_config_service() {
+    [ "${OPENCODE_MAJOR:-}" = 2 ] || return 0
+    if _opk_timeout_ok; then
+        timeout 5 /usr/bin/sudo -n -u opencode \
+            /usr/local/lib/opencode-permissions-kit/bin/opencode service stop >/dev/null 2>&1 || true
+    else
+        /usr/bin/sudo -n -u opencode \
+            /usr/local/lib/opencode-permissions-kit/bin/opencode service stop >/dev/null 2>&1 || true
+    fi
+}
+
+wrapper_container_detect() {
+    CONTAINER_REQUESTED=false
+    CONTAINER_AUTO=false
+    PROJECT_TOOLS=""
+    MERGED_CONFIG=$(merged_config)
+    if [ -n "$MERGED_CONFIG" ] && PROJECT_TOOLS=$(printf '%s' "$MERGED_CONFIG" | tools_from_config -); then
+        : # probe output is authoritative (may legitimately list no tools)
+    else
+        PROJECT_TOOLS=""
+        PROJECT_CONFIG=""
+        if [ -f "./opencode.jsonc" ]; then
+            PROJECT_CONFIG="./opencode.jsonc"
+        elif [ -f "./opencode.json" ]; then PROJECT_CONFIG="./opencode.json"; fi
+        if [ -n "$PROJECT_CONFIG" ]; then
+            PROJECT_TOOLS=$(tools_from_config "$PROJECT_CONFIG") || PROJECT_TOOLS=""
+        fi
+    fi
+    stop_merged_config_service
+    if [ -n "$PROJECT_TOOLS" ]; then
+        note "${CYAN}Container tools enabled by this project:${NC}"
+        # Same stream note() uses — recomputed here instead of relying on the
+        # _fd global leaking out of the preceding note() call (0.0.38 C12).
+        _tools_fd=1
+        [ "$HEADLESS" = true ] && _tools_fd=2
+        printf '%s\n' "$PROJECT_TOOLS" | sed 's/^/    - /' >&"$_tools_fd"
+        note ""
+        CONTAINER_REQUESTED=true
+        CONTAINER_AUTO=true
+    fi
+
+    # `serve` always resolves container tools silently (a server process
+    # serves many projects — no single opt-in, no terminal). Other headless
+    # invocations get them through the project opt-in above (notes are
+    # stderr-only in headless mode, stdout stays machine-clean). This stays
+    # inside the soft model — whether a session may use docker/ddev is still
+    # decided per session by the global and per-project opencode.jsonc
+    # permission rules.
+    if [ "${1:-}" = "serve" ]; then
+        CONTAINER_REQUESTED=true
+        CONTAINER_AUTO=false
+    fi
+}
+
+# Resolve the container mechanism for the configured backend. Produces one of:
+#   CONTAINER_DOCKER_HOST   -> sudo -u opencode with DOCKER_HOST exported
+#                              (docker-rootless socket, or podman-rootless when
+#                               OPENCODE_PODMAN_SOCKET is set for docker-CLI compat)
+#   CONTAINER_PODMAN=true   -> sudo -u opencode, no DOCKER_HOST (podman-CLI path,
+#                              daemonless per §9.8 — podman run needs no socket)
+#   all empty               -> no container tools this session
+# Probe whether a rootless backend socket is reachable. The sockets live in the
+# opencode user's runtime dir (/run/user/<uid>, mode 700 opencode:opencode), so
+# a wrapper running as the developer cannot stat them directly. Try directly
+# first (works when the wrapper runs as root or as the opencode user itself, or
+# the socket sits somewhere traversable); otherwise re-probe as the opencode
+# user — the context that will actually connect — via the kit's NOPASSWD
+# socket-check rule. Accepts "unix://..." or a plain path.
+sock_reachable() {
+    [ -n "$1" ] || return 1
+    sock="$1"
+    case "$sock" in unix://*) sock="${sock#unix://}" ;; esac
+    [ -S "$sock" ] 2>/dev/null && return 0
+    # -n like every sibling probe (0.0.43a F17): without it a missing
+    # sudoers rule makes sudo try to authenticate (password prompt
+    # interactively, a failed probe headless) instead of failing open.
+    /usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/socket-check "$sock" 2>/dev/null
+}
+
+wrapper_container_resolve() {
+    CONTAINER_DOCKER_HOST=""
+    CONTAINER_XDG=""
+    CONTAINER_PODMAN=""
+    CONTAINER_LABEL=""
+    if [ "$CONTAINER_REQUESTED" = true ]; then
+        if [ -z "$CONTAINER_BACKEND" ]; then
+            note "${RED}WARNING: no rootless container backend configured.${NC}"
+            note "${YELLOW}Running WITHOUT container tools. Re-run install.sh to provision one.${NC}"
+            note ""
+            CONTAINER_REQUESTED=false
+            CONTAINER_AUTO=false
+        else
+            CONTAINER_LABEL="the $CONTAINER_BACKEND backend"
+            case "$CONTAINER_BACKEND" in
+                docker-rootless)
+                    # Requires the per-user dockerd socket. Never fall back to a
+                    # root-equivalent docker group — warn loudly and run without.
+                    sock_host="${OPENCODE_DOCKER_HOST:-}"
+                    if sock_reachable "$sock_host"; then
+                        CONTAINER_DOCKER_HOST="$sock_host"
+                        CONTAINER_XDG="/run/user/$(id -u opencode 2>/dev/null || echo 0)"
+                    else
+                        note "${RED}WARNING: docker-rootless socket not reachable (${sock_host:-unset}).${NC}"
+                        note "${YELLOW}Running WITHOUT container tools""\
+ — not downgrading to a root-equivalent path.${NC}"
+                        note ""
+                        CONTAINER_REQUESTED=false
+                        CONTAINER_AUTO=false
+                    fi
+                    ;;
+                podman-rootless)
+                    # Default: podman is daemonless — `podman run` needs no socket
+                    # and no DOCKER_HOST (§9.8 podman-CLI path). Optional:
+                    # OPENCODE_PODMAN_SOCKET enables docker-CLI compat (point a
+                    # `docker` CLI at the podman socket); when set, verify
+                    # reachability like the docker-rootless path.
+                    sock_host="${OPENCODE_PODMAN_SOCKET:-}"
+                    if [ -n "$sock_host" ]; then
+                        if sock_reachable "$sock_host"; then
+                            CONTAINER_DOCKER_HOST="$sock_host"
+                            CONTAINER_XDG="/run/user/$(id -u opencode 2>/dev/null || echo 0)"
+                        else
+                            note "${RED}WARNING: podman-rootless socket not reachable ($sock_host).${NC}"
+                            note "${YELLOW}Running WITHOUT container tools""\
+     — not downgrading to a root-equivalent path.${NC}"
+                            note ""
+                            CONTAINER_REQUESTED=false
+                            CONTAINER_AUTO=false
+                        fi
+                    elif command -v podman >/dev/null 2>&1; then
+                        CONTAINER_PODMAN=true
+                    else
+                        note "${RED}WARNING: podman-rootless backend selected but 'podman' is not installed.${NC}"
+                        note "${YELLOW}Running WITHOUT container tools""\
+ — not downgrading to a root-equivalent path.${NC}"
+                        note ""
+                        CONTAINER_REQUESTED=false
+                        CONTAINER_AUTO=false
+                    fi
+                    ;;
+            esac
+        fi
+    fi
+}
+
+# No prompts, no pause (since 0.0.21): the banner prints, opencode
+# starts immediately. The [Y/n] container question was always answered
+# with yes in practice, and the kit's state is now visible INSIDE the
+# TUI (mode row in app_bottom, docs/_archive/design/plan-ui-tui-opencode.md) —
+# a pause before the TUI would only delay that information. Headless
+# mode was never allowed to prompt (0.0.16 contract); its advisory goes
+# to stderr only.
+wrapper_container_advisory() {
+    if [ "$CONTAINER_AUTO" = true ] || [ "$HEADLESS" = true ]; then
+        if [ -n "$CONTAINER_DOCKER_HOST" ] || [ "$CONTAINER_PODMAN" = true ]; then
+            note "${GREEN}opencode will run with $CONTAINER_LABEL.${NC}"
+        fi
+    fi
+}
+
+# Headless serve working-directory sanity (OpenChamber & co): a server
+# whose working directory the opencode user cannot read still boots, but
+# every request that loads config for that directory answers HTTP 500 —
+# opencode treats EACCES on <dir>/opencode.jsonc as a hard error, not as
+# "no config file". OpenChamber defaults the server cwd to the
+# developer's $HOME, exactly the unreadable case. Probe from the opencode
+# user's own context (cwd-check, same sudoers pattern as
+# socket-check); on "unreadable" fall back to a readable directory so
+# the server comes up working: the configured projects root containing
+# the cwd, else the first readable configured root, else the opencode
+# user's home. Empty probe output (sudoers rule missing, sudo denied)
+# means "unknown" — proceed without touching the directory. The warning
+# goes to stderr via note() — headless stdout stays machine-clean.
+cwd_probe() {
+    /usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/cwd-check "$1" 2>/dev/null || true
+}
+
+wrapper_serve_cwd_fallback() {
+    if [ "${1:-}" = "serve" ] && [ "$(cwd_probe "$CWD")" = "unreadable" ]; then
+        SERVE_FALLBACK=""
+        if [ -f "$PROJECTS_CONF" ]; then
+            # pass 1: the configured root containing the cwd (project subdir
+            # with restrictive bits falls back to its own projects root)
+            while IFS= read -r root; do
+                [ -z "$root" ] && continue
+                [ ! -d "$root" ] && continue
+                root_clean="${root%/}"
+                if [ "$CWD" = "$root_clean" ] || [ "${CWD#"$root_clean"/}" != "$CWD" ]; then
+                    if [ "$(cwd_probe "$root_clean")" = "readable" ]; then
+                        SERVE_FALLBACK="$root_clean"
+                        break
+                    fi
+                fi
+            done <"$PROJECTS_CONF"
+            # pass 2: first readable configured root (the OpenChamber case:
+            # cwd is $HOME, no root contains it)
+            if [ -z "$SERVE_FALLBACK" ]; then
+                while IFS= read -r root; do
+                    [ -z "$root" ] && continue
+                    [ ! -d "$root" ] && continue
+                    root_clean="${root%/}"
+                    if [ "$(cwd_probe "$root_clean")" = "readable" ]; then
+                        SERVE_FALLBACK="$root_clean"
+                        break
+                    fi
+                done <"$PROJECTS_CONF"
+            fi
+        fi
+        if [ -z "$SERVE_FALLBACK" ]; then
+            SERVE_FALLBACK=$(getent passwd opencode 2>/dev/null | cut -d: -f6 || true)
+            [ -n "$SERVE_FALLBACK" ] && [ "$(cwd_probe "$SERVE_FALLBACK")" = "readable" ] || SERVE_FALLBACK=""
+        fi
+        note "${RED}WARNING: the server working directory is not readable by the opencode user:${NC}"
+        note "${YELLOW}$CWD${NC}"
+        note "${YELLOW}Config load fails there — /session, /config and /project would answer HTTP 500.${NC}"
+        if [ -n "$SERVE_FALLBACK" ]; then
+            note "${YELLOW}Falling back to: $SERVE_FALLBACK${NC}"
+            note "${YELLOW}OpenChamber: 'export OPENCHAMBER_OPENCODE_CWD=$SERVE_FALLBACK'""\
+ picks the server directory.${NC}"
+            note ""
+            # Guarded like the login twin below (0.0.43a F4): the probe ran AS
+            # opencode — the invoking developer may still lack traversal (fresh
+            # group membership activates only at the next login). A failed cd
+            # must not abort serve under set -e; the server then starts from
+            # the inherited (warned-about) cwd — the documented degradation.
+            cd "$SERVE_FALLBACK" 2>/dev/null || true
+        else
+            note "${YELLOW}No readable fallback found (no projects.conf entry, no opencode home).${NC}"
+            note "${YELLOW}Set OPENCHAMBER_OPENCODE_CWD (OpenChamber) to a readable directory.${NC}"
+            note ""
+        fi
+    fi
+}
+
+# Device logins (console/auth, issue #91): the browser-open spawn inside
+# opencode (`open` package → the kit's powershell.exe stand-in on WSL) goes
+# through Bun's posix_spawn, which fails with EACCES when the process cwd
+# is not readable by the opencode user — the developer's home (mode 750)
+# is exactly that case, and the login died on the spawn error right after
+# printing URL + device code. Direct execve from such a cwd works (the
+# kernel never touches it for absolute paths); only Bun's spawn chokes.
+# Device logins carry no project context — run them from a readable
+# directory (the opencode home, same last-resort fallback as serve above)
+# instead of the inherited one. Empty probe output means "unknown" —
+# proceed without touching the directory (same contract as serve).
+wrapper_login_cwd_fallback() {
+    if [ "${1:-}" = "console" ] || [ "${1:-}" = "auth" ]; then
+        if [ "$(cwd_probe "$CWD")" = "unreadable" ]; then
+            LOGIN_FALLBACK=$(getent passwd opencode 2>/dev/null | cut -d: -f6 || true)
+            if [ -n "$LOGIN_FALLBACK" ] && [ "$(cwd_probe "$LOGIN_FALLBACK")" = "readable" ]; then
+                note "${YELLOW}Login runs from $LOGIN_FALLBACK (the current directory is not readable${NC}"
+                note "${YELLOW}by the opencode user; device logins carry no project context).${NC}"
+                note ""
+                cd "$LOGIN_FALLBACK" 2>/dev/null || true
+            fi
+        fi
+    fi
+}
+
+# opencode 2.x session servers (issue #80): 2.x commands prefer the shared
+# background service (`opencode serve --service`, auto-spawned, env from its
+# own registration) — tools then run in a daemon that never saw this
+# wrapper's exported DOCKER_HOST/XDG_RUNTIME_DIR, and the per-project
+# container opt-in breaks. `--standalone` forces a private server as a child
+# of the exec'd process (full env inheritance, dies with the session). The
+# flag exists only in 2.x, gated on OPENCODE_MAJOR (resolved above; the
+# install.conf stamp wins, runtime detection is the fallback). Session
+# commands only — the TUI default start (no args or flags-only), `run`, and
+# `mini`; an explicit --server or --standalone in the user's args always
+# wins.
+standalone_mode() {
+    [ "${OPENCODE_MAJOR:-}" = 2 ] || {
+        echo none
+        return 0
+    }
+    for _sa in "$@"; do
+        case "$_sa" in --server | --server=* | --standalone)
+            echo none
+            return 0
+            ;;
+        esac
+    done
+    case "${1:-}" in
+        run | mini) echo after-first ;;
+        "" | -*) echo append ;;
+        *) echo none ;;
+    esac
+}

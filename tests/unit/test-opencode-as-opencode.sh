@@ -1,6 +1,15 @@
 #!/bin/sh
 # Test wrapper directory validation logic.
 # Creates temp directories and projects.conf, then tests various CWD scenarios.
+# Since #449 the wrapper is decomposed (the #346 wave shape): the
+# executable sections live in sh/as-opencode-core.sh, the entry
+# bin/opencode-as-opencode keeps globals + section sequence + exec. The
+# pins span BOTH files: entry-level pins stay on $WRAPPER_FILE, pins on
+# moved code target $CORE_LIB, and the block-extraction legs became
+# sourcing pins (source the lib, stub its dependencies, drive the REAL
+# functions — #396 accounting). The lib's own contract (sourcing
+# purity, definition census, pairing guard) lives in
+# tests/unit/test-as-opencode-core.sh.
 # Run: sh tests/unit/test-opencode-as-opencode.sh
 set -e
 
@@ -167,33 +176,36 @@ echo ""
 echo "--- Soft-only wrapper/sudoers shape ---"
 
 WRAPPER_FILE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
+CORE_LIB="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/as-opencode-core.sh"
 SUDOERS_FILE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/templates/sudoers.template"
 
-if ! grep -q 'protect-projects' "$WRAPPER_FILE"; then
+# The wrapper surface spans entry + sourced core lib since #449: absence
+# pins sweep BOTH files (a reintroduction in either is the regression).
+if ! grep -q 'protect-projects' "$WRAPPER_FILE" && ! grep -q 'protect-projects' "$CORE_LIB"; then
     pass "wrapper no longer calls protect-projects"
 else
     fail "wrapper still references protect-projects"
 fi
 
-if ! grep -qE '\-g\|--gid' "$WRAPPER_FILE"; then
+if ! grep -qE '\-g\|--gid' "$WRAPPER_FILE" && ! grep -qE '\-g\|--gid' "$CORE_LIB"; then
     pass "wrapper has no -g/--gid docker parsing"
 else
     fail "wrapper still parses -g/--gid"
 fi
 
-if ! grep -q 'OPENCODE_LAUNCH_CWD' "$WRAPPER_FILE"; then
+if ! grep -q 'OPENCODE_LAUNCH_CWD' "$WRAPPER_FILE" && ! grep -q 'OPENCODE_LAUNCH_CWD' "$CORE_LIB"; then
     pass "wrapper does not stamp OPENCODE_LAUNCH_CWD"
 else
     fail "wrapper still stamps OPENCODE_LAUNCH_CWD"
 fi
 
-if ! grep -q 'CONTAINER_GROUP=' "$WRAPPER_FILE"; then
+if ! grep -q 'CONTAINER_GROUP=' "$WRAPPER_FILE" && ! grep -q 'CONTAINER_GROUP=' "$CORE_LIB"; then
     pass "wrapper has no docker-group escalation variable"
 else
     fail "wrapper still escalates via CONTAINER_GROUP"
 fi
 
-if grep -q 'jsonc-parser.py --tools' "$WRAPPER_FILE"; then
+if grep -q 'jsonc-parser.py --tools' "$CORE_LIB"; then
     pass "wrapper keeps --tools project detection"
 else
     fail "wrapper lost --tools detection"
@@ -211,31 +223,73 @@ else
     fail "wrapper lost the sudo -u opencode exec"
 fi
 
+# --- #449 movement cross-checks: replica vs the REAL lib functions -------------
+# The validate_dir/banner_line replicas above predate the decomposition
+# and stay (their matrix is the suite's original core); these sourcing
+# pins prove the MOVED code still matches them (movement purity at unit
+# level — the full-script proof is the #449 purity drive + e2e). The
+# moved wrapper_validate_cwd takes no arguments: it resolves CWD=$(pwd)
+# itself, so the driver cds into the probe directory. Plain mkdir inside
+# the registered work_new receiver -- no new scratch receiver (#283).
+_vcwd_root="$TMPDIR/vcwd-root"
+mkdir -p "$_vcwd_root/sub"
+printf '%s\n' "$_vcwd_root" "$TMPDIR/project-b" >"$TMPDIR/vcwd.conf"
+for _pair in \
+    "$_vcwd_root:valid" "$_vcwd_root/sub:valid" "$TMPDIR/project-ab:invalid" \
+    "$TMPDIR/other:invalid" "$TMPDIR/project-b:valid"; do
+    _d="${_pair%:*}"
+    _want="${_pair#*:}"
+    _rep="$(validate_dir "$_d" "$TMPDIR/vcwd.conf")"
+    _real="$(
+        cd "$_d" || exit 1
+        . "$CORE_LIB"
+        PROJECTS_CONF="$TMPDIR/vcwd.conf"
+        wrapper_validate_cwd
+        if [ "$VALID" = true ]; then echo valid; else echo invalid; fi
+    )"
+    assert_eq "moved wrapper_validate_cwd matches replica ($_d) -> $_want" "$_rep" "$_real"
+done
+
+# banner: drive the moved wrapper_banner and compare its banner line
+# against the replica (the section prints blank, banner, blank; the
+# replica prints the banner line only)
+_bnr="$(
+    . "$CORE_LIB"
+    HEADLESS=false
+    VERSION=1.2.3
+    wrapper_banner
+)"
+assert_eq "moved wrapper_banner matches the banner_line replica" \
+    "$(banner_line "$TMPDIR/install.conf")" "$(printf '%s\n' "$_bnr" | sed -n '2p')"
+
 # --- Version/help passthrough from ANY directory (issue #91) ---
 # The official opencode installer probes `opencode --version` from $HOME
 # (an invalid directory) while the kit installs; the wrapper must answer
 # from the real binary instead of refusing (regression: the mid-install
 # "ERROR: opencode cannot be started here" confused users). Since issue
 # #91 the passthrough is its own case BEFORE the project-dir check —
-# version/help must stay banner-free from valid directories too.
-if sed -n '/--version | -v | -h | --help)/,/^esac/p' "$WRAPPER_FILE" | grep -q -- '--version'; then
+# version/help must stay banner-free from valid directories too. The
+# arms live in the lib's wrapper_version_passthrough since #449 — the
+# pins drive the extracted function (#396 accounting).
+_vp_fn="$(extract_func "$CORE_LIB" wrapper_version_passthrough)"
+if [ -n "$_vp_fn" ] && printf '%s\n' "$_vp_fn" | grep -q -- '--version'; then
     pass "wrapper answers --version from any directory (installer probe)"
 else
     fail "wrapper refuses --version outside a project directory"
 fi
 
-if sed -n '/--version | -v | -h | --help)/,/^esac/p' "$WRAPPER_FILE" | grep -q 'bin/opencode "\$@"'; then
+if [ -n "$_vp_fn" ] && printf '%s\n' "$_vp_fn" | grep -q 'bin/opencode "\$@"'; then
     pass "version passthrough execs the secured binary"
 else
     fail "version passthrough lost the binary exec"
 fi
 
 # The passthrough must precede the refusal (exec replaces the process, the
-# ERROR banner must stay unreachable for version/help args). Comment-strip
-# ridden + guarded (#384 b b1): the raw grep anchored the full-line comment
-# above the case block, not the live label — case-block motion stayed green.
-_pass_ln="$(sed 's/^[[:space:]]*#.*$//' "$WRAPPER_FILE" | grep -n -- '--version' | head -1 | cut -d: -f1)"
-_refusal_ln="$(sed 's/^[[:space:]]*#.*$//' "$WRAPPER_FILE" | grep -n 'ERROR: opencode cannot be started here' | head -1 | cut -d: -f1)"
+# ERROR banner must stay unreachable for version/help args). Since #449
+# both exec arms live in wrapper_version_passthrough and the precedence
+# is the ENTRY's call order — pin the exact call lines.
+_pass_ln="$(grep -n '^wrapper_version_passthrough "\$@"$' "$WRAPPER_FILE" | cut -d: -f1)"
+_refusal_ln="$(grep -n '^wrapper_refusal$' "$WRAPPER_FILE" | cut -d: -f1)"
 if [ -n "$_pass_ln" ] && [ -n "$_refusal_ln" ] && [ "$_pass_ln" -lt "$_refusal_ln" ]; then
     pass "passthrough is checked before the refusal"
 else
@@ -247,26 +301,20 @@ fi
 # project-dir refusal instead of help: the #91 any-dir path covered
 # flags in $1 only. Classification contract: a -h/--help BEFORE the
 # first message argument is a help query (any-dir exec); past the first
-# message argument, "--help" is message text. Extract the REAL scan
-# loop and drive it with the discriminating argument shapes.
-_hr_scan="$(sed -n '/^_hr_first=true$/,/^done$/p' "$WRAPPER_FILE")"
-# comment-strip rider (round a A5): the extract includes the loop's
-# comment lines -- the presence check must see the CODE, not a
-# commented-out arm
-if [ -n "$_hr_scan" ] &&
-    printf '%s' "$_hr_scan" | sed 's/^[[:space:]]*#.*$//' | grep -q '_hr_help'; then
-    pass "leading-region help scan extractable (#370 a E1)"
-    printf '%s\n' "$_hr_scan" >"$TMPDIR/hr-scan.sh"
-    hr_class() { # <args...> -> the loop's msg/help state. Sourcing the
-        # extracted loop INSIDE this function is the mechanism: POSIX
-        # positional parameters stay visible to sourced code, so the
-        # loop's "$@" resolves to hr_class's arguments (round a A9).
+# message argument, "--help" is message text. Sourcing pin since #449:
+# the scan loop + subcommand case moved into the lib's
+# wrapper_headless_classify -- source the lib and drive the REAL
+# classifier (#396 accounting; the eval'd text extraction retired).
+if [ -n "$(extract_func "$CORE_LIB" wrapper_headless_classify)" ]; then
+    pass "leading-region help classifier present (#370 a E1)"
+    # <args...> -> the classifier's msg/help state. The lib defines no
+    # top-level side effects (pinned in test-as-opencode-core.sh), so
+    # sourcing it inside the substitution is safe; the classifier's
+    # "$@" resolves to hr_class's arguments.
+    hr_class() {
         (
-            HEADLESS=false
-            _hr_first=true
-            _hr_msg=false
-            _hr_help=false
-            . "$TMPDIR/hr-scan.sh"
+            . "$CORE_LIB"
+            wrapper_headless_classify "$@"
             echo "msg=$_hr_msg help=$_hr_help"
         )
     }
@@ -289,15 +337,17 @@ if [ -n "$_hr_scan" ] &&
         fail "help behind other leading flags still a query (got: $_got) (#370 a E1)"
     fi
     # the any-dir exec for _hr_help must ALSO precede the refusal (the
-    # classification is worthless if the refusal runs first)
-    _ehelp_ln="$(sed 's/^[[:space:]]*#.*$//' "$WRAPPER_FILE" | grep -n 'if \[ "\$_hr_help" = true \]; then' | head -1 | cut -d: -f1)"
-    if [ -n "$_ehelp_ln" ] && [ -n "$_refusal_ln" ] && [ "$_ehelp_ln" -lt "$_refusal_ln" ]; then
-        pass "the _hr_help exec precedes the project-dir refusal (#370 a E1)"
+    # classification is worthless if the refusal runs first) — the exec
+    # lives in the lib's wrapper_version_passthrough (second arm), the
+    # precedence is the entry's call order pinned above; here the arm
+    # itself must exist in the extracted function.
+    if printf '%s\n' "$_vp_fn" | grep -q 'if \[ "\$_hr_help" = true \]; then'; then
+        pass "the _hr_help exec arm exists in wrapper_version_passthrough (#370 a E1)"
     else
-        fail "the _hr_help exec precedes the project-dir refusal (help:$_ehelp_ln refusal:$_refusal_ln) (#370 a E1)"
+        fail "the _hr_help exec arm missing from wrapper_version_passthrough (#370 a E1)"
     fi
 else
-    fail "leading-region help scan extractable (#370 a E1)"
+    fail "leading-region help classifier present (#370 a E1)"
 fi
 
 # --- Headless mode (third-party UIs + orchestrators, issue #42) ---
@@ -310,13 +360,13 @@ fi
 echo ""
 echo "--- Headless mode (third-party tools) ---"
 
-if grep -q '^HEADLESS=false' "$WRAPPER_FILE" && grep -q 'serve | acp | models | agent | providers' "$WRAPPER_FILE"; then
+if grep -q 'HEADLESS=false' "$CORE_LIB" && grep -q 'serve | acp | models | agent | providers' "$CORE_LIB"; then
     pass "wrapper classifies headless subcommands (serve/acp/queries)"
 else
     fail "wrapper lost headless subcommand classification"
 fi
 
-if grep -q 'if \[ "\$VALID" != true \] && \[ "\$HEADLESS" != true \]; then' "$WRAPPER_FILE"; then
+if grep -q 'if \[ "\$VALID" != true \] && \[ "\$HEADLESS" != true \]; then' "$CORE_LIB"; then
     pass "headless mode skips the project-dir refusal"
 else
     fail "headless mode still bound to project-dir validation"
@@ -329,40 +379,37 @@ fi
 # printing URL + code. The wrapper must move device logins to a readable
 # directory (opencode home) before the exec, using the same cwd_probe as
 # the serve fallback.
-if grep -q '\[ "\${1:-}" = "console" \] || \[ "\${1:-}" = "auth" \]' "$WRAPPER_FILE"; then
+if grep -q '\[ "\${1:-}" = "console" \] || \[ "\${1:-}" = "auth" \]' "$CORE_LIB"; then
     pass "device logins (console/auth) have a cwd fallback branch"
 else
     fail "device logins lack the cwd fallback branch (Bun EACCES crash)"
 fi
 
-if sed -n '/= "console" \] || \[ "\${1:-}" = "auth" \]/,/^fi$/p' "$WRAPPER_FILE" | grep -q 'cwd_probe'; then
+if sed -n '/= "console" \] || \[ "\${1:-}" = "auth" \]/,/^fi$/p' "$CORE_LIB" | grep -q 'cwd_probe'; then
     pass "device-login fallback probes readability (cwd_probe reuse)"
 else
     fail "device-login fallback does not probe readability"
 fi
 
-if sed -n '/= "console" \] || \[ "\${1:-}" = "auth" \]/,/^fi$/p' "$WRAPPER_FILE" | grep -q 'cd "\$LOGIN_FALLBACK"'; then
+if sed -n '/= "console" \] || \[ "\${1:-}" = "auth" \]/,/^fi$/p' "$CORE_LIB" | grep -q 'cd "\$LOGIN_FALLBACK"'; then
     pass "device-login fallback cds before the exec"
 else
     fail "device-login fallback never changes directory"
 fi
 
-# Classification is executable: extract the block and run it against
-# representative argument vectors (same static-extraction technique as
-# test-status.sh). tty-less CI makes `run` (no message) headless via the
-# stdin check — an interactive terminal would keep it bannered; that
-# branch is covered by the `-t 0` grep below.
-HL_BLOCK="$(sed -n '/^HEADLESS=false/,/^esac/p' "$WRAPPER_FILE")"
-[ -n "$HL_BLOCK" ] || {
-    fail "headless block not extractable"
-}
+# Classification is executable: source the lib and drive the REAL
+# classifier against representative argument vectors (sourcing pin,
+# #396 accounting — same technique as hr_class above). tty-less CI
+# makes `run` (no message) headless via the stdin check — an
+# interactive terminal would keep it bannered; that branch is covered
+# by the `-t 0` grep below.
 hl_case() { # <desc> <expected> <args...>
     _desc="$1"
     _want="$2"
     shift 2
     _got=$(
-        set -- "$@"
-        eval "$HL_BLOCK"
+        . "$CORE_LIB"
+        wrapper_headless_classify "$@"
         echo "$HEADLESS"
     )
     if [ "$_got" = "$_want" ]; then
@@ -390,37 +437,38 @@ hl_case "2x mini stays interactive" false mini
 hl_case "no args stays interactive" false
 hl_case "flags-only start stays interactive" false --debug
 
-if grep -q '\-t 0' "$WRAPPER_FILE"; then
+if grep -q '\-t 0' "$CORE_LIB"; then
     pass "run without message checks stdin tty (piped = headless)"
 else
     fail "run lost the interactive-tty distinction"
 fi
 
-if grep -q 'if \[ "${1:-}" = "serve" \]; then' "$WRAPPER_FILE" && grep -q 'CONTAINER_AUTO=false' "$WRAPPER_FILE"; then
+if grep -q 'if \[ "${1:-}" = "serve" \]; then' "$CORE_LIB" && grep -q 'CONTAINER_AUTO=false' "$CORE_LIB"; then
     pass "serve requests container tools without prompting"
 else
     fail "serve lost the silent container-tool request"
 fi
 
-if grep -q 'Press Enter to start opencode' "$WRAPPER_FILE"; then
+if grep -q 'Press Enter to start opencode' "$WRAPPER_FILE" || grep -q 'Press Enter to start opencode' "$CORE_LIB"; then
     fail "wrapper still pauses on Press Enter (removed 0.0.21)"
 else
     pass "no Press-Enter pause (removed 0.0.21 — the TUI shows the kit mode)"
 fi
 
-if grep -q 'Run opencode with .*?\[Y/n\]\|Run opencode with %s? \[Y/n\]' "$WRAPPER_FILE" || grep -qF '"[Y/n]"' "$WRAPPER_FILE"; then
+if { grep -q 'Run opencode with .*?\[Y/n\]\|Run opencode with %s? \[Y/n\]' "$WRAPPER_FILE" || grep -qF '"[Y/n]"' "$WRAPPER_FILE"; } ||
+    { grep -q 'Run opencode with .*?\[Y/n\]\|Run opencode with %s? \[Y/n\]' "$CORE_LIB" || grep -qF '"[Y/n]"' "$CORE_LIB"; }; then
     fail "wrapper still asks the [Y/n] container question (removed 0.0.21)"
 else
     pass "no [Y/n] container question (removed 0.0.21 — state is visible in the TUI)"
 fi
 
-if grep -q 'read -r answer' "$WRAPPER_FILE"; then
+if grep -q 'read -r answer' "$WRAPPER_FILE" || grep -q 'read -r answer' "$CORE_LIB"; then
     fail "wrapper still reads an interactive answer"
 else
     pass "wrapper is prompt-free (no interactive reads left)"
 fi
 
-if grep -A8 '^note()' "$WRAPPER_FILE" | grep -q '>&"\$_fd"\|>&\$_fd' && grep -A8 '^note()' "$WRAPPER_FILE" | grep -q '_fd=2'; then
+if grep -A8 '^note()' "$CORE_LIB" | grep -q '>&"\$_fd"\|>&\$_fd' && grep -A8 '^note()' "$CORE_LIB" | grep -q '_fd=2'; then
     pass "headless diagnostics go to stderr (note helper)"
 else
     fail "headless diagnostics would pollute stdout"
@@ -428,7 +476,7 @@ fi
 
 # The container-tools advisory must also route through note() — a raw
 # printf to stdout would pollute `opencode run --format json` output.
-if ! grep -q 'printf "  ${GREEN}opencode will run with' "$WRAPPER_FILE"; then
+if ! grep -q 'printf "  ${GREEN}opencode will run with' "$CORE_LIB"; then
     pass "container advisory uses note() (stdout-safe for orchestrators)"
 else
     fail "container advisory prints raw to stdout"
@@ -481,23 +529,25 @@ assert_eq "cwd-check: empty argument reports unreadable" "unreadable" "$result"
 sh "$CWD_CHECK" "$TMPDIR/no-such-dir" >/dev/null 2>&1
 assert_eq "cwd-check: always exits 0 (empty output = probe unavailable)" "0" "$?"
 
-# functional: the wrapper's fallback selection (block extracted and run
-# with a stubbed cwd_probe — same static-extraction technique as HL_BLOCK)
-SC_BLOCK="$(sed -n '/^if \[ "\${1:-}" = "serve" \] &&/,/^# Rootless: pass the per-user socket/p' "$WRAPPER_FILE" | sed '$d')"
-if [ -n "$SC_BLOCK" ]; then
-    pass "serve cwd block extractable"
+# functional: the wrapper's fallback selection (sourcing pin since #449:
+# the block moved into the lib's wrapper_serve_cwd_fallback — source the
+# lib, stub cwd_probe + note (later definitions win), drive the REAL
+# function with $1=serve; #396 accounting)
+if [ -n "$(extract_func "$CORE_LIB" wrapper_serve_cwd_fallback)" ]; then
+    pass "serve cwd fallback function present"
 else
-    fail "serve cwd block not extractable"
+    fail "serve cwd fallback function missing"
 fi
 
-# sc_serve <cwd> <readable-dirs, space-separated> — runs the extracted
-# block with $1=serve, a stubbed cwd_probe and a silent note(); prints
+# sc_serve <cwd> <readable-dirs, space-separated> — runs the sourced
+# section with $1=serve, a stubbed cwd_probe and a silent note(); prints
 # "fallback=<dir|none> pwd=<dir> warn=<0|1>"
 sc_serve() {
     _cwd="$1"
     _readable="$2"
     (
-        set -- serve
+        . "$CORE_LIB"
+        HEADLESS=false
         CWD="$_cwd"
         PROJECTS_CONF="$TMPDIR/sc-projects.conf"
         SERVE_FALLBACK=""
@@ -507,7 +557,7 @@ sc_serve() {
         cwd_probe() {
             case " $_readable " in *" $1 "*) echo readable ;; *) echo unreadable ;; esac
         }
-        eval "$SC_BLOCK"
+        wrapper_serve_cwd_fallback serve
         printf 'fallback=%s pwd=%s warn=%s\n' "${SERVE_FALLBACK:-none}" "$(pwd)" "$_warned"
     )
 }
@@ -540,7 +590,8 @@ assert_eq "serve cwd: readable cwd is left alone" \
 # must NOT trigger the fallback path
 sc_serve_noprobe() {
     (
-        set -- serve
+        . "$CORE_LIB"
+        HEADLESS=false
         CWD="$TMPDIR/other"
         PROJECTS_CONF="$TMPDIR/sc-projects.conf"
         SERVE_FALLBACK=""
@@ -548,7 +599,7 @@ sc_serve_noprobe() {
         RED='' GREEN='' CYAN='' YELLOW='' NC=''
         note() { if [ -n "$1" ]; then _warned=1; fi; }
         cwd_probe() { :; }
-        eval "$SC_BLOCK"
+        wrapper_serve_cwd_fallback serve
         printf 'fallback=%s warn=%s\n' "${SERVE_FALLBACK:-none}" "$_warned"
     )
 }
@@ -557,20 +608,20 @@ assert_eq "serve cwd: unavailable probe (empty output) changes nothing" \
     "fallback=none warn=0" "$result"
 
 # static: wrapper wiring + sudoers rule
-if grep -q 'cwd-check "\$1" 2>/dev/null || true' "$WRAPPER_FILE" &&
-    grep -q 'sudo -n -u opencode.*cwd-check' "$WRAPPER_FILE"; then
+if grep -q 'cwd-check "\$1" 2>/dev/null || true' "$CORE_LIB" &&
+    grep -q 'sudo -n -u opencode.*cwd-check' "$CORE_LIB"; then
     pass "wrapper probes the serve cwd via cwd-check (sudo -n, fault-tolerant)"
 else
     fail "wrapper lost the fault-tolerant cwd-check probe"
 fi
 
-if grep -q 'OPENCHAMBER_OPENCODE_CWD' "$WRAPPER_FILE"; then
+if grep -q 'OPENCHAMBER_OPENCODE_CWD' "$CORE_LIB"; then
     pass "serve warning names OPENCHAMBER_OPENCODE_CWD as the fix"
 else
     fail "serve warning lost the OPENCHAMBER_OPENCODE_CWD hint"
 fi
 
-if grep -q 'getent passwd opencode' "$WRAPPER_FILE"; then
+if grep -q 'getent passwd opencode' "$CORE_LIB"; then
     pass "serve fallback ends at the opencode user's home"
 else
     fail "serve fallback lost the opencode-home last resort"
@@ -598,7 +649,7 @@ fi
 echo ""
 echo "--- OpenChamber bypass guard (issue #154) ---"
 
-OC_BLOCK="$(extract_func "$WRAPPER_FILE" openchamber_guard)"
+OC_BLOCK="$(extract_func "$CORE_LIB" openchamber_guard)"
 if [ -n "$OC_BLOCK" ]; then
     pass "openchamber_guard function extractable"
 else
@@ -748,7 +799,7 @@ fi
 
 # static wiring: the wrapper calls the guard and links the how-to
 if grep -q '^openchamber_guard$' "$WRAPPER_FILE" &&
-    grep -q 'docs/how-to/openchamber.md' "$WRAPPER_FILE"; then
+    grep -q 'docs/how-to/openchamber.md' "$CORE_LIB"; then
     pass "wrapper calls openchamber_guard and links the how-to"
 else
     fail "wrapper lost the openchamber_guard call or how-to link"
@@ -764,13 +815,13 @@ echo ""
 echo "--- Merged-config container detection (issue #81) ---"
 
 # static: the probe is wired as designed (fault-tolerant, no prompt)
-if grep -q '/usr/bin/sudo -n -u opencode' "$WRAPPER_FILE" && grep -q 'bin/opencode debug config' "$WRAPPER_FILE"; then
+if grep -q '/usr/bin/sudo -n -u opencode' "$CORE_LIB" && grep -q 'bin/opencode debug config' "$CORE_LIB"; then
     pass "wrapper probes the merged config via opencode debug config (sudo -n)"
 else
     fail "wrapper lost the opencode debug config probe"
 fi
 
-if grep -q 'tools_from_config -' "$WRAPPER_FILE" && grep -q 'tools_from_config "\$PROJECT_CONFIG"' "$WRAPPER_FILE"; then
+if grep -q 'tools_from_config -' "$CORE_LIB" && grep -q 'tools_from_config "\$PROJECT_CONFIG"' "$CORE_LIB"; then
     pass "wrapper evaluates the merged config first, project file as fallback"
 else
     fail "wrapper lost the merged/project detection order"
@@ -781,7 +832,7 @@ fi
 # hermetically), so the wiring pin greps the real call site behind the
 # comment-strip rider; the mechanism pin (shadow pair) runs at
 # REAL_PARSER below, where the parser path is in hand.
-if sed 's/^[[:space:]]*#.*$//' "$WRAPPER_FILE" | grep -q 'python3 -I /usr/local/lib/opencode-permissions-kit/py/jsonc-parser.py --tools'; then
+if sed 's/^[[:space:]]*#.*$//' "$CORE_LIB" | grep -q 'python3 -I /usr/local/lib/opencode-permissions-kit/py/jsonc-parser.py --tools'; then
     pass "tools_from_config invokes the parser with -I (#249)"
 else
     fail "tools_from_config must run python3 -I (ambient env must not steer it) (#249)"
@@ -792,25 +843,26 @@ fi
 # the `command -v timeout ...; then` GATE shape — the helper's own
 # first class is the `command -v ... && timeout 2 true` pair, which the
 # count pin above already requires.
-_w248="$(sed 's/^[[:space:]]*#.*$//' "$WRAPPER_FILE" | grep -c 'if _opk_timeout_ok; then' || true)"
+_w248="$(sed 's/^[[:space:]]*#.*$//' "$CORE_LIB" | grep -c 'if _opk_timeout_ok; then' || true)"
 if [ "${_w248:-0}" -ge 4 ]; then
     pass "all four wrapper probe gates use _opk_timeout_ok ($_w248 sites) (#248)"
 else
     fail "wrapper probe gates must use the two-class timeout probe (found ${_w248:-0}) (#248)"
 fi
-if sed 's/^[[:space:]]*#.*$//' "$WRAPPER_FILE" | grep -q 'command -v timeout >/dev/null 2>&1; then'; then
+if sed 's/^[[:space:]]*#.*$//' "$WRAPPER_FILE" | grep -q 'command -v timeout >/dev/null 2>&1; then' ||
+    sed 's/^[[:space:]]*#.*$//' "$CORE_LIB" | grep -q 'command -v timeout >/dev/null 2>&1; then'; then
     fail "wrapper must not gate probes on presence-only timeout checks (#248)"
 else
     pass "no presence-only timeout gate remains in the wrapper (#248)"
 fi
 
-# functional: extract the detection logic, stub the probe + note, run the
-# REAL parser (same static-extraction technique as HL_BLOCK / SC_BLOCK)
-DT_BLOCK="$(sed -n '/^CONTAINER_REQUESTED=false$/,/^# .serve. always resolves container tools/p' "$WRAPPER_FILE" | sed '$d')"
-if [ -n "$DT_BLOCK" ]; then
-    pass "detection block extractable"
+# functional: source the lib's detection section, stub the probe + note,
+# run the REAL parser (sourcing pin since #449, #396 accounting — same
+# technique as HL/sc_serve: later definitions override the lib's)
+if [ -n "$(extract_func "$CORE_LIB" wrapper_container_detect)" ]; then
+    pass "detection section function present"
 else
-    fail "detection block not extractable"
+    fail "detection section function missing"
 fi
 
 mkdir -p "$TMPDIR/dt-project"
@@ -839,7 +891,7 @@ fi
 
 # dt_run <merged-json|EMPTY> <project-file|-> <project-content>
 # Prints "tools=[...] requested=.. auto=.. banner=.." (banner counts the
-# non-empty note() calls the block makes).
+# non-empty note() calls the section makes).
 dt_run() {
     _merged="$1"
     _proj="$2"
@@ -848,11 +900,8 @@ dt_run() {
         cd "$TMPDIR/dt-project" || exit 1
         rm -f opencode.jsonc opencode.json
         if [ "$_proj" != "-" ]; then printf '%s\n' "$_content" >"$_proj"; fi
-        CONTAINER_REQUESTED=false
-        CONTAINER_AUTO=false
-        PROJECT_TOOLS=""
-        MERGED_CONFIG=""
-        _fd=1
+        . "$CORE_LIB"
+        HEADLESS=false
         _banner=0
         note() { if [ -n "$1" ]; then _banner=$((_banner + 1)); fi; }
         merged_config() {
@@ -861,7 +910,7 @@ dt_run() {
         }
         tools_from_config() { command python3 "$REAL_PARSER" --tools "$@" 2>/dev/null; }
         stop_merged_config_service() { :; }
-        eval "$DT_BLOCK" >/dev/null
+        wrapper_container_detect run >/dev/null
         printf 'tools=[%s] requested=%s auto=%s banner=%s\n' \
             "$(printf '%s' "$PROJECT_TOOLS" | tr '\n' ' ')" "$CONTAINER_REQUESTED" "$CONTAINER_AUTO" "$_banner"
     )
@@ -901,7 +950,7 @@ assert_eq "merged: error-object probe falls back to the project scan" \
     "tools=[docker] requested=true auto=true banner=1" "$result"
 
 # 2.x: the probe's background service is stopped again (stale-config guard)
-if grep -q 'stop_merged_config_service()' "$WRAPPER_FILE" && grep -q 'service stop' "$WRAPPER_FILE"; then
+if grep -q 'stop_merged_config_service()' "$CORE_LIB" && grep -q 'service stop' "$CORE_LIB"; then
     pass "wrapper stops the 2.x probe service (stale-config guard)"
 else
     fail "wrapper lost the probe service stop"
@@ -910,7 +959,7 @@ fi
 # the probe is time-bounded: a 2.x service blocked from its port makes
 # `debug config` retry forever (port is per channel, not per user) — the
 # wrapper must fall through instead of hanging even --version
-if grep -q 'timeout 10' "$WRAPPER_FILE" && grep -q 'timeout 5' "$WRAPPER_FILE"; then
+if grep -q 'timeout 10' "$CORE_LIB" && grep -q 'timeout 5' "$CORE_LIB"; then
     pass "probe + service stop are time-bounded (port-collision hang)"
 else
     fail "wrapper lost the probe/stop timeouts"
@@ -923,9 +972,9 @@ fi
 # bounded --version first line — a second serial probe only added fail-
 # open delay); the direct fallback stays bounded for advisories-less
 # stamps and covers the pre-advisories cohort.
-if grep -qF '_MAJOR_SRC="${ADV_LINE:-}"' "$WRAPPER_FILE" &&
-    grep -qF 'case "$_MAJOR_SRC" in' "$WRAPPER_FILE" &&
-    grep -q '_MAJOR_SRC=$(timeout 10' "$WRAPPER_FILE"; then
+if grep -qF '_MAJOR_SRC="${ADV_LINE:-}"' "$CORE_LIB" &&
+    grep -qF 'case "$_MAJOR_SRC" in' "$CORE_LIB" &&
+    grep -q '_MAJOR_SRC=$(timeout 10' "$CORE_LIB"; then
     pass "OPENCODE_MAJOR fallback probe reuses ADV_LINE, direct fallback bounded (0.0.43a F3, 0.0.44a V21)"
 else
     fail "OPENCODE_MAJOR fallback probe is unbounded or duplicated (0.0.43a F3, 0.0.44a V21)"
@@ -934,7 +983,7 @@ fi
 # the serve fallback cd is guarded like the login twin (0.0.43a F4): the
 # fallback was probed AS opencode — the invoking developer may lack
 # traversal, and under set -e an unguarded cd would kill serve.
-if grep -qF 'cd "$SERVE_FALLBACK" 2>/dev/null || true' "$WRAPPER_FILE"; then
+if grep -qF 'cd "$SERVE_FALLBACK" 2>/dev/null || true' "$CORE_LIB"; then
     pass "serve fallback cd fails open (0.0.43a F4)"
 else
     fail "serve fallback cd aborts on failure (0.0.43a F4)"
@@ -953,7 +1002,7 @@ assert_eq "fallback: no project config → no tools" \
 echo ""
 echo "--- 2.x standalone gating (issue #80) ---"
 
-SM_BLOCK="$(extract_func "$WRAPPER_FILE" standalone_mode)"
+SM_BLOCK="$(extract_func "$CORE_LIB" standalone_mode)"
 if [ -n "$SM_BLOCK" ]; then
     pass "standalone_mode function extractable"
 else
@@ -997,7 +1046,7 @@ else
 fi
 
 # runtime fallback detects 2.x from --version output
-if grep -q '"opencode v2"\*) OPENCODE_MAJOR=2' "$WRAPPER_FILE"; then
+if grep -q '"opencode v2"\*) OPENCODE_MAJOR=2' "$CORE_LIB"; then
     pass "wrapper runtime-detects 2.x (fallback without stamp)"
 else
     fail "wrapper lost the 2.x runtime detection"
@@ -1007,7 +1056,7 @@ fi
 # note() used printf %b — a directory named like a \-sequence garbled the
 # warning that interpolates it. Extract the REAL note() and assert a
 # literal passthrough.
-_f29_fn="$(extract_func "$WRAPPER_FILE" note)"
+_f29_fn="$(extract_func "$CORE_LIB" note)"
 if [ -n "$_f29_fn" ]; then
     _out=$(HEADLESS=false sh -c 'eval "$1"; note "$2"' sh "$_f29_fn" '\tdangerous-name') || true
     if printf '%s' "$_out" | grep -qF '\tdangerous-name' &&
@@ -1029,8 +1078,10 @@ fi
 # comparator unset and PATH emptied (a host binary of the same name must
 # not satisfy the guard either — 0.0.46a F2 class), keeps _bridge_needed=1
 # on both arms and unknown; with the REAL advisories.sh comparator the
-# version keying still holds (boundaries on their own arm each).
-_b220_block="$(sed -n '/^    _bridge_needed=1$/,/^    fi$/p' "$WRAPPER_FILE")"
+# version keying still holds (boundaries on their own arm each). The
+# anchors re-dented 4->8 spaces with the #449 move (the gate sits one
+# nesting level deeper inside wrapper_wsl_checks).
+_b220_block="$(sed -n '/^        _bridge_needed=1$/,/^        fi$/p' "$CORE_LIB")"
 _b220_adv_src="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/advisories.sh"
 if [ -n "$_b220_block" ] && [ -f "$_b220_adv_src" ]; then
     pass "bridge gate block extractable (#220)"
@@ -1078,11 +1129,11 @@ fi
 # impersonate a probe result while advisories.sh is missing (a1 swept
 # the whole ADV_* family, ADV_HITS included). Pin: every init literal
 # exists (comment-strip-ridden) and sits BEFORE the advisories.sh gate.
-_b220_gate_ln="$(sed 's/^[[:space:]]*#.*$//' "$WRAPPER_FILE" |
+_b220_gate_ln="$(sed 's/^[[:space:]]*#.*$//' "$CORE_LIB" |
     grep -nF '[ -f /usr/local/lib/opencode-permissions-kit/sh/advisories.sh ]; then' | head -1 | cut -d: -f1)"
 _b220_init_n=0
 for _v in ADV_LINE ADV_VERSION ADV_HITS; do
-    _ln="$(sed 's/^[[:space:]]*#.*$//' "$WRAPPER_FILE" | grep -nF "${_v}=\"\"" | head -1 | cut -d: -f1)"
+    _ln="$(sed 's/^[[:space:]]*#.*$//' "$CORE_LIB" | grep -nF "${_v}=\"\"" | head -1 | cut -d: -f1)"
     if [ -n "$_ln" ] && [ -n "$_b220_gate_ln" ] && [ "$_ln" -lt "$_b220_gate_ln" ]; then
         _b220_init_n=$((_b220_init_n + 1))
     fi

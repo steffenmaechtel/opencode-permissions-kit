@@ -175,6 +175,10 @@ opencode-permissions-kit-lib/sh/handover-core.sh 644
 # openchamber-core.sh: the opk openchamber-secure subcommand (#415 wave 1,
 # the #346 wave shape), sourced by bin/opk through its SELF-resolved $LIBDIR
 opencode-permissions-kit-lib/sh/openchamber-core.sh 644
+# as-opencode-core.sh: the opencode wrapper's section functions (#415 wave 3,
+# the #346 wave shape), sourced by bin/opencode-as-opencode through its
+# SELF-resolved $LIBDIR
+opencode-permissions-kit-lib/sh/as-opencode-core.sh 644
 opencode-permissions-kit-lib/sh/render-agent-config.sh 644
 opencode-permissions-kit-lib/sh/secure-binary.sh 644
 opencode-permissions-kit-lib/sh/shell-warn.sh 644
