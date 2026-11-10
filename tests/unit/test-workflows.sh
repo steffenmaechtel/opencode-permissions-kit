@@ -325,8 +325,10 @@ check_job_lane "$WF_E2E" "test-e2e.yml: 'e2e-2x-git-distro' names the distro cha
 # TEMP 2026-11-11: commented out with the lane envs during the
 # launchpad/archive outage (the count pin tracks exactly the lines that
 # are commented out right now). Restore together with the env lines.
-# _n_latest=$(sed 's/^[[:space:]]*#.*$//' "$WF_E2E" | grep -c 'E2E_GIT_CHANNEL: latest' || true)
-# _n_distro=$(sed 's/^[[:space:]]*#.*$//' "$WF_E2E" | grep -c 'E2E_GIT_CHANNEL: distro' || true)
+# (Already converted to the live_src idiom by #462 — re-enable from
+# that form below, not the pre-rebase sed form.)
+# _n_latest=$(live_src "$WF_E2E" | grep -c 'E2E_GIT_CHANNEL: latest' || true)
+# _n_distro=$(live_src "$WF_E2E" | grep -c 'E2E_GIT_CHANNEL: distro' || true)
 # if [ "$_n_latest" = 1 ] && [ "$_n_distro" = 1 ]; then
 #     pass "git channel values appear exactly once each (latest + distro, git pair only)"
 # else
@@ -471,7 +473,7 @@ done
 # for a run: block is bash -e — pipefail must be re-established, or a
 # failed listing call left of the pipe exits 0 through the while loop).
 # Full-line comments never satisfy these checks (#261 rider).
-_pages_body() { sed 's/^[[:space:]]*#.*$//' "$WF_PAGES"; }
+_pages_body() { live_src "$WF_PAGES"; }
 
 _clean_ln="$(_pages_body | grep -nF 'actions/runs/${GITHUB_RUN_ID}/artifacts' | cut -d: -f1 | head -1)"
 _upload_ln="$(_pages_body | grep -nF 'upload-pages-artifact' | cut -d: -f1 | head -1)"

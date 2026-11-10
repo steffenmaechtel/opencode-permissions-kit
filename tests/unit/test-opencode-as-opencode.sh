@@ -850,7 +850,7 @@ fi
 # hermetically), so the wiring pin greps the real call site behind the
 # comment-strip rider; the mechanism pin (shadow pair) runs at
 # REAL_PARSER below, where the parser path is in hand.
-if sed 's/^[[:space:]]*#.*$//' "$CORE_LIB" | grep -q 'python3 -I /usr/local/lib/opencode-permissions-kit/py/jsonc-parser.py --tools'; then
+if live_src "$CORE_LIB" | grep -q 'python3 -I /usr/local/lib/opencode-permissions-kit/py/jsonc-parser.py --tools'; then
     pass "tools_from_config invokes the parser with -I (#249)"
 else
     fail "tools_from_config must run python3 -I (ambient env must not steer it) (#249)"
@@ -861,14 +861,14 @@ fi
 # the `command -v timeout ...; then` GATE shape — the helper's own
 # first class is the `command -v ... && timeout 2 true` pair, which the
 # count pin above already requires.
-_w248="$(sed 's/^[[:space:]]*#.*$//' "$CORE_LIB" | grep -c 'if _opk_timeout_ok; then' || true)"
+_w248="$(live_src "$CORE_LIB" | grep -c 'if _opk_timeout_ok; then' || true)"
 if [ "${_w248:-0}" -ge 4 ]; then
     pass "all four wrapper probe gates use _opk_timeout_ok ($_w248 sites) (#248)"
 else
     fail "wrapper probe gates must use the two-class timeout probe (found ${_w248:-0}) (#248)"
 fi
-if sed 's/^[[:space:]]*#.*$//' "$WRAPPER_FILE" | grep -q 'command -v timeout >/dev/null 2>&1; then' ||
-    sed 's/^[[:space:]]*#.*$//' "$CORE_LIB" | grep -q 'command -v timeout >/dev/null 2>&1; then'; then
+if live_src "$WRAPPER_FILE" | grep -q 'command -v timeout >/dev/null 2>&1; then' ||
+    live_src "$CORE_LIB" | grep -q 'command -v timeout >/dev/null 2>&1; then'; then
     fail "wrapper must not gate probes on presence-only timeout checks (#248)"
 else
     pass "no presence-only timeout gate remains in the wrapper (#248)"
@@ -1177,11 +1177,11 @@ fi
 # impersonate a probe result while advisories.sh is missing (a1 swept
 # the whole ADV_* family, ADV_HITS included). Pin: every init literal
 # exists (comment-strip-ridden) and sits BEFORE the advisories.sh gate.
-_b220_gate_ln="$(sed 's/^[[:space:]]*#.*$//' "$CORE_LIB" |
+_b220_gate_ln="$(live_src "$CORE_LIB" |
     grep -nF '[ -f /usr/local/lib/opencode-permissions-kit/sh/advisories.sh ]; then' | head -1 | cut -d: -f1)"
 _b220_init_n=0
 for _v in ADV_LINE ADV_VERSION ADV_HITS; do
-    _ln="$(sed 's/^[[:space:]]*#.*$//' "$CORE_LIB" | grep -nF "${_v}=\"\"" | head -1 | cut -d: -f1)"
+    _ln="$(live_src "$CORE_LIB" | grep -nF "${_v}=\"\"" | head -1 | cut -d: -f1)"
     if [ -n "$_ln" ] && [ -n "$_b220_gate_ln" ] && [ "$_ln" -lt "$_b220_gate_ln" ]; then
         _b220_init_n=$((_b220_init_n + 1))
     fi

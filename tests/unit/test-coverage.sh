@@ -43,7 +43,7 @@ WORK="$(work_new)" || {
     exit 1
 }
 
-_strip() { sed 's/^[[:space:]]*#.*$//' "$1"; }
+_strip() { live_src "$1"; }
 
 # --- 1. wiring ----------------------------------------------------------------
 if [ -f "$RUNNER" ] && _strip Makefile | grep -qE '^coverage:' &&

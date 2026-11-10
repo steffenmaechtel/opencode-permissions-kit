@@ -274,14 +274,18 @@ echo "-- status.sh wiring (section rows live in sh/status-core.sh, #346 wave 1) 
 # on the presence legs (#439 a C3): a row commented out during
 # debugging and committed must not keep a pin green — the #261/#244 g
 # W1 survivor trap, presence form.
-check "status.sh backend row: docker-rootless" \
-    sh -c 'sed "s/^[[:space:]]*#.*\$//" "$1" | grep -Fq -- "$2"' _ "$STATUS_CORE" 'ui_kv_ok "backend" "docker-rootless"'
-check "status.sh backend row: podman-rootless" \
-    sh -c 'sed "s/^[[:space:]]*#.*\$//" "$1" | grep -Fq -- "$2"' _ "$STATUS_CORE" 'ui_kv_ok "backend" "podman-rootless"'
-check "status.sh backend row: unknown backend flagged bad" \
-    sh -c 'sed "s/^[[:space:]]*#.*\$//" "$1" | grep -Fq -- "$2"' _ "$STATUS_CORE" 'ui_kv_bad "backend" "unknown'
-check "status.sh backend dispatch: rootless case arms" \
-    sh -c 'sed "s/^[[:space:]]*#.*\$//" "$1" | grep -Fq -- "$2" && sed "s/^[[:space:]]*#.*\$//" "$1" | grep -Fq -- "$3"' _ "$STATUS_CORE" 'docker-rootless)' 'podman-rootless)'
+check_live "status.sh backend row: docker-rootless" "$STATUS_CORE" \
+    -Fq -- 'ui_kv_ok "backend" "docker-rootless"'
+check_live "status.sh backend row: podman-rootless" "$STATUS_CORE" \
+    -Fq -- 'ui_kv_ok "backend" "podman-rootless"'
+check_live "status.sh backend row: unknown backend flagged bad" "$STATUS_CORE" \
+    -Fq -- 'ui_kv_bad "backend" "unknown'
+if live_src "$STATUS_CORE" | grep -Fq -- 'docker-rootless)' &&
+    live_src "$STATUS_CORE" | grep -Fq -- 'podman-rootless)'; then
+    pass "status.sh backend dispatch: rootless case arms"
+else
+    fail "status.sh backend dispatch: rootless case arms"
+fi
 check "status.sh reports socket reachability" \
     grep -Fq 'NOT reachable' "$STATUS_CORE"
 check "status.sh has no migration-stamp section (legacy cleanup)" \
@@ -483,7 +487,7 @@ check "failed daemon start warns instead of ready (pr-00263 a F13)" \
     grep -Fq 'daemon start FAILED (rc=$_dc_start_rc)' "$SETUP"
 # Comment-strip rider (#261, the #244 g W1 class — sweep find beyond the
 # issue list): a commented-out observation site stops counting.
-_dcsrc_n="$(sed 's/^[[:space:]]*#.*$//' "$SETUP" | grep -c "_dc_start_rc" || true)"
+_dcsrc_n="$(live_src "$SETUP" | grep -c "_dc_start_rc" || true)"
 check "daemon start rc observed at every site, exactly 5 (pr-00263 a F13 + d W4; observed: $_dcsrc_n)" \
     [ "$_dcsrc_n" = 5 ]
 

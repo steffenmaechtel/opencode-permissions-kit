@@ -261,14 +261,14 @@ _ui_used_tokens() {
     _ut_core="$2"
     _ut_guard="$3"
     {
-        sed 's/^[[:space:]]*#.*$//' "$_ut_entry" |
+        live_src "$_ut_entry" |
             awk -v d="${_ut_guard}() {" '
                 index($0, d) == 1 { infn = 1 }
                 infn && /^}/ { infn = 0; next }
                 !infn { print }
             '
         if [ -n "$_ut_core" ]; then
-            sed 's/^[[:space:]]*#.*$//' "$_ut_core"
+            live_src "$_ut_core"
         fi
     } | grep -oE '(^|[^a-zA-Z0-9_])ui_[a-z_0-9]+' | grep -oE 'ui_[a-z_0-9]+$' | sort -u
 }
@@ -290,7 +290,7 @@ for _uc in $_ui_consumers; do
     # wiring pin: a guard defined but never CALLED protects nothing —
     # the entry must invoke it right after its ui.sh resolution (the
     # shape every core pairing guard already carries).
-    if sed 's/^[[:space:]]*#.*$//' "$_uc_entry" | grep -qF "${_uc_guard} || exit 1"; then
+    if live_src "$_uc_entry" | grep -qF "${_uc_guard} || exit 1"; then
         pass "$_uc_name: entry wires ${_uc_guard} after the ui.sh resolution (#456)"
     else
         fail "$_uc_name: $(basename "$_uc_entry") must call ${_uc_guard} || exit 1 (#456)"

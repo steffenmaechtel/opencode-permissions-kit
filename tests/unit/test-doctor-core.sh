@@ -117,7 +117,7 @@ if [ "$_pg_tr_rc" -eq 1 ] &&
 else
     fail "pairing guard must refuse a skewed pairing (rc=$_pg_tr_rc out=$_pg_tr_out) (#413)"
 fi
-if sed 's/^[[:space:]]*#.*$//' "$DOCTOR_ENTRY" | grep -qF 'doctor_pairing_guard || exit 1'; then
+if live_src "$DOCTOR_ENTRY" | grep -qF 'doctor_pairing_guard || exit 1'; then
     pass "doctor.sh wires the guard right after the resolver (#413)"
 else
     fail "doctor.sh must call the guard after sourcing doctor-core.sh (#413)"
@@ -130,7 +130,7 @@ fi
 # in the list (_doctor_all_cleanup contains doctor_all) and a dropped
 # name would false-pass.
 _pg_missing=""
-_pg_entfns="$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR_ENTRY" |
+_pg_entfns="$(live_src "$DOCTOR_ENTRY" |
     grep -oE '^doctor_[a-z_0-9]+' | grep -v '^doctor_pairing_guard$' |
     grep -v '^doctor_ui_pairing_guard$' | sort -u)"
 # emptiness probe (#457, the #455 a C2 contract): an empty extraction
@@ -285,7 +285,7 @@ fi
 # Comment-strip rider per conventions.md ("Source-counting pins") -- a
 # commented-out site must not count. Four sites: cntrl_bad,
 # show_sanitize, load_policy, the detect write block.
-_pc=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -c 'python3 -I' || true)
+_pc=$(live_src "$LIB" | grep -c 'python3 -I' || true)
 if [ "${_pc:-0}" = 4 ]; then
     pass "sweep floor: doctor-core.sh python3 calls run -I (all $_pc sites, #249)"
 else

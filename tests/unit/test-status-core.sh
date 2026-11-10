@@ -242,7 +242,7 @@ if [ "$_pg_tr_rc" -eq 1 ] &&
 else
     fail "pairing guard must refuse a skewed pairing (rc=$_pg_tr_rc out=$_pg_tr_out) (#413)"
 fi
-if sed 's/^[[:space:]]*#.*$//' "$STATUS_ENTRY" | grep -qF 'status_pairing_guard || exit 1'; then
+if live_src "$STATUS_ENTRY" | grep -qF 'status_pairing_guard || exit 1'; then
     pass "status.sh wires the guard right after the resolver (#413)"
 else
     fail "status.sh must call the guard after sourcing status-core.sh (#413)"
@@ -314,8 +314,8 @@ fi
 # carried theirs (0.0.46a F4, #199 a W3).
 _xl_missing=""
 _xl_combined="$(
-    sed 's/^[[:space:]]*#.*$//' "$STATUS_ENTRY"
-    sed 's/^[[:space:]]*#.*$//' "$LIB"
+    live_src "$STATUS_ENTRY"
+    live_src "$LIB"
 )"
 [ -n "$_xl_combined" ] || _xl_missing="(stripped entry+core extraction empty)"
 # What THIS RUN sources: the entry resolves git-check.sh and ui.sh;
@@ -359,13 +359,13 @@ fi
 # The truncation gates this wave added, verbatim: present-but-truncated
 # libs must land in a COUNTED warn row, not a silent skip — the row
 # text is the user-visible contract (fix hint, #165 idiom).
-if printf '%s\n' "$(sed 's/^[[:space:]]*#.*$//' "$LIB")" |
+if printf '%s\n' "$(live_src "$LIB")" |
     grep -qF 'ui_kv_warn "db dumps" "not checked — kit file sh/ddev-migrate.sh outdated (fix: sudo opk update)"'; then
     pass "db-dump truncation gate renders a counted warn row (#456)"
 else
     fail "db-dump truncation gate must render a counted warn row (#456)"
 fi
-if printf '%s\n' "$(sed 's/^[[:space:]]*#.*$//' "$LIB")" |
+if printf '%s\n' "$(live_src "$LIB")" |
     grep -qF 'ui_kv_warn "ddev share" "not checked — kit file sh/ddev-handover.sh outdated (fix: sudo opk update)"'; then
     pass "share-scan truncation gate renders a counted warn row (#456)"
 else
@@ -501,7 +501,7 @@ fi
 
 # --- sweep floor: status-core's four sites run isolated (#249; the
 # tree-wide absence pin in test-update-core.sh is the ceiling) --------
-_pc=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -c 'python3 -I' || true)
+_pc=$(live_src "$LIB" | grep -c 'python3 -I' || true)
 if [ "${_pc:-0}" -ge 4 ]; then
     pass "sweep floor: status-core.sh python3 calls run -I ($_pc site(s), #249)"
 else

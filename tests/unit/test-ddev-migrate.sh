@@ -387,7 +387,7 @@ check "manifest stays a regular file through the run" \
 # 750) — pinned statically on the mechanisms (W1): chmod 3770 at setup
 # AND on resume, mkdir -m 700 for the stage. Comment-strip rider (#261,
 # the #244 g W1 class): a commented-out chmod stops counting.
-_grep_n=$(sed 's/^[[:space:]]*#.*$//' "$MIG" | grep -c 'chmod 3770 "\$DD_MIG_DUMP_DIR"' || true)
+_grep_n=$(live_src "$MIG" | grep -c 'chmod 3770 "\$DD_MIG_DUMP_DIR"' || true)
 [ "$_grep_n" -ge 1 ] &&
     check "dump dir is set sticky (3770) — group rename of root entries blocked (W1)" true ||
     check "dump dir is set sticky (3770) — group rename of root entries blocked (W1; chmod 3770 sites: $_grep_n, need >=1)" false
@@ -660,16 +660,15 @@ if [ -s "$WORK/finblock" ]; then
         sh -c "! grep -qF 'chown \"root:\$dm_ocg\" \"\$DD_MIG_DUMP_DIR/manifest.conf\"' \"\$1\"" _ "$WORK/finblock"
     check "finalize: the manifest re-take rides the find gate (S2)" \
         sh -c "grep -qF -- '-exec chown \"root:\$dm_ocg\" {} +' \"\$1\"" _ "$WORK/finblock"
+    _fm_fin_src=$(live_src "$WORK/finblock")
     check "finalize: dir lock (root takes the dir) precedes every operand op (S2/S5)" \
-        sh -c 's=$(sed "s/^[[:space:]]*#.*\$//" "$1");
-            lock_ln=$(printf "%s\n" "$s" | grep -n "^    chown \"root:\$dm_ocg\" \"\$DD_MIG_DUMP_DIR\" " | head -1 | cut -d: -f1);
-            op_ln=$(printf "%s\n" "$s" | grep -n "chmod 640" | head -1 | cut -d: -f1);
-            [ -n "$lock_ln" ] && [ -n "$op_ln" ] && [ "$lock_ln" -lt "$op_ln" ]' _ "$WORK/finblock"
+        sh -c 'lock_ln=$(printf "%s\n" "$1" | grep -n "^    chown \"root:\$dm_ocg\" \"\$DD_MIG_DUMP_DIR\" " | head -1 | cut -d: -f1);
+            op_ln=$(printf "%s\n" "$1" | grep -n "chmod 640" | head -1 | cut -d: -f1);
+            [ -n "$lock_ln" ] && [ -n "$op_ln" ] && [ "$lock_ln" -lt "$op_ln" ]' _ "$_fm_fin_src"
     check "finalize: NO operand mutation after the first agent hand-over (S2/S5)" \
-        sh -c 's=$(sed "s/^[[:space:]]*#.*\$//" "$1");
-            last_mut=$(printf "%s\n" "$s" | grep -n "chmod" | tail -1 | cut -d: -f1);
-            first_ho=$(printf "%s\n" "$s" | grep -n "chown \"\$dm_oc:" | head -1 | cut -d: -f1);
-            [ -n "$last_mut" ] && [ -n "$first_ho" ] && [ "$last_mut" -lt "$first_ho" ]' _ "$WORK/finblock"
+        sh -c 'last_mut=$(printf "%s\n" "$1" | grep -n "chmod" | tail -1 | cut -d: -f1);
+            first_ho=$(printf "%s\n" "$1" | grep -n "chown \"\$dm_oc:" | head -1 | cut -d: -f1);
+            [ -n "$last_mut" ] && [ -n "$first_ho" ] && [ "$last_mut" -lt "$first_ho" ]' _ "$_fm_fin_src"
     # behavioral end state: planted links survive untouched, dumps and
     # manifest end 640, the dir 750, the stage is gone (unprivileged:
     # chowns fail EPERM into || true — the end STATE is still exactly
@@ -720,11 +719,11 @@ check "install.sh sources ddev-migrate.sh" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh' \"\$1\"" _ "$INSTALL"
 check "install.sh fetch list includes ddev-migrate.sh" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh' \"\$1\"" _ "$INSTALL"
+_fm_exp_src=$(live_src "$INSTALL_CORE")
 check "install.sh runs the export in Step 4b (before the Step 5 handover)" \
-    sh -c 's=$(sed "s/^[[:space:]]*#.*\$//" "$1");
-        export_ln=$(printf "%s\n" "$s" | grep -n "ddev_migrate_export \"" | head -1 | cut -d: -f1);
-        hand_ln=$(printf "%s\n" "$s" | grep -n "ddev_handover_root \"" | head -1 | cut -d: -f1);
-        [ -n "$export_ln" ] && [ -n "$hand_ln" ] && [ "$export_ln" -lt "$hand_ln" ]' _ "$INSTALL_CORE"
+    sh -c 'export_ln=$(printf "%s\n" "$1" | grep -n "ddev_migrate_export \"" | head -1 | cut -d: -f1);
+        hand_ln=$(printf "%s\n" "$1" | grep -n "ddev_handover_root \"" | head -1 | cut -d: -f1);
+        [ -n "$export_ln" ] && [ -n "$hand_ln" ] && [ "$export_ln" -lt "$hand_ln" ]' _ "$_fm_exp_src"
 check "install.sh stamps DDEV_EXPORTED=1 after a successful export" \
     sh -c "grep -q 'DDEV_EXPORTED=1' \"\$1\"" _ "$INSTALL_CORE"
 check "install.sh gates the DDEV_EXPORTED stamp on zero failures" \
@@ -1024,7 +1023,7 @@ assert_eq "registry cmd: narrow root -> 1 export, 11 outside" "1 11" \
 # wiring: the outside warning + the install/status gap detectors exist
 check "export warns about registry projects outside the roots" \
     sh -c "grep -q 'OUTSIDE the given roots' \"\$1\"" _ "$MIG"
-_mig_gap_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" | grep -c '_ddev_mig_gap_warn' || true)"
+_mig_gap_n="$(live_src "$INSTALL_CORE" | grep -c '_ddev_mig_gap_warn' || true)"
 check "install.sh warns on skip branches when the registry outgrew the manifest (warn sites: $_mig_gap_n, need >=3)" \
     sh -c "grep -q '_ddev_mig_gap_warn' \"\$1\" && [ \"\$2\" -ge 3 ]" _ "$INSTALL_CORE" "$_mig_gap_n"
 check "status.sh reports INCOMPLETE dumps vs the dev registry" \

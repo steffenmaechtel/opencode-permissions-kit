@@ -1096,21 +1096,21 @@ fi
 # review a X1); config.sh counts THREE (projects add, handover,
 # refresh). The ddev_handover_root belt (a X2) and status.sh's
 # symlink report (a X4) ride the same rider'd shape.
-S245I=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" |
+S245I=$(live_src "$INSTALL_CORE" |
     grep -cF 'ui_warn "skip $root (symlink — register the target directory instead)"' || true)
 if [ "$S245I" -ge 2 ]; then
     pass "install.sh: BOTH \$PROJECTS_ROOTS loops carry the symlink skip arm (#245, a X1)"
 else
     fail "install.sh must gate both \$PROJECTS_ROOTS loops (found $S245I of 2) (#245, a X1)"
 fi
-S245C=$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" |
+S245C=$(live_src "$CONFIG" |
     grep -cF 'ui_warn "skip $p (symlink — register the target directory instead)"' || true)
 if [ "$S245C" -ge 3 ]; then
     pass "config.sh symlink skip arms wired at all three sites (add, handover, refresh) (#245)"
 else
     fail "config.sh must carry the symlink skip arm at add/handover/refresh (found $S245C of 3) (#245)"
 fi
-if sed 's/^[[:space:]]*#.*$//' "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/ddev-handover.sh" |
+if live_src "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/ddev-handover.sh" |
     grep -qF 'if [ -L "${dhr_root%/}" ]; then'; then
     pass "ddev_handover_root carries the root-operand symlink belt (#245, a X2)"
 else
@@ -1148,7 +1148,7 @@ if [ "$S245X2_RC" -ne 0 ] &&
 else
     fail "ddev_handover_root belt must refuse every dodge spelling (X2=$S245X2_RC X3=$S245X3_RC X4=$S245X4_RC X5=$S245X5_RC) (#245)"
 fi
-if sed 's/^[[:space:]]*#.*$//' "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core.sh" |
+if live_src "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core.sh" |
     grep -qF 'ui_atten "$root" "symlinked root — register the target directory instead"'; then
     pass "status.sh reports symlinked roots instead of the dead-end refresh advice (#245, a X4)"
 else
