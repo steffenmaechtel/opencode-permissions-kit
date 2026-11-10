@@ -65,7 +65,7 @@
 # project under several scan roots -- spawn one child, the project list
 # is deduped). No central registry, no project-name heuristics; 'opk
 # status' integration is deliberately deferred (#313 Q3). The full
-# contract lives in the all block below.
+# contract lives in the all block of sh/doctor-core.sh (doctor_all).
 #
 # CLI:  opk doctor [project-root]                 scan (default: cwd, walked
 #                                                  up to the nearest opk.json)
@@ -167,20 +167,27 @@ fi
 # Pairing guard (#413, the status.sh/update.sh pattern) -- LOAD-BEARING
 # here: doctor is deliberately fail-soft (set -u only, no -e; one
 # failing tree must not kill the remaining verdicts), so an undefined
-# section call does NOT abort -- it prints "not found", returns rc 127
-# and the report would silently lose the section while the summary
-# still prints (over a possibly unscanned tree). A version-skewed
-# entry/lib pairing (a core missing one renamed or newly-added
-# section) is a wiring error, not a tree failure: refuse loud, whole
-# run, before any section renders (the ui.sh-missing precedent above
-# -- a wiring abort is not a verdict and must not collide with the rc
-# contract's codes).
+# call does NOT abort -- it prints "not found", returns rc 127 and the
+# report would silently lose the section while the summary still
+# prints (over a possibly unscanned tree: a missing doctor_classify
+# renders every tree "empty (nothing classified)" and exits 0 -- a
+# lying green). The guard therefore pins EVERY function the run needs,
+# sections AND the helpers the sections call internally (#451 a M1 --
+# a sections-only list would pass a helper-level skew). A version-
+# skewed entry/lib pairing is a wiring error, not a tree failure:
+# refuse loud, whole run, before any section renders. The refusal
+# exits 1 -- the rc contract's degraded-install class (same value as
+# the ui.sh-missing precedent above; stderr names the wiring cause).
 doctor_pairing_guard() {
     for _dpg in doctor_cli doctor_all doctor_walkup doctor_opk_dispatcher \
         doctor_daemon_user doctor_ranges doctor_header doctor_policy \
-        doctor_detect doctor_scan_trees doctor_fix doctor_summary; do
+        doctor_detect doctor_scan_trees doctor_fix doctor_summary \
+        _doctor_usage doctor_cntrl_bad doctor_show_sanitize \
+        _doctor_all_cleanup _doctor_cleanup doctor_userns_ranges \
+        doctor_load_policy doctor_classify doctor_examples \
+        _doctor_detect_path_ok; do
         command -v "$_dpg" >/dev/null 2>&1 || {
-            ui_error "doctor: section '$_dpg' missing from doctor-core.sh -- version-skewed entry/lib pairing, refusing to run"
+            ui_error "doctor: function '$_dpg' missing from doctor-core.sh -- version-skewed entry/lib pairing, refusing to run"
             return 1
         }
     done

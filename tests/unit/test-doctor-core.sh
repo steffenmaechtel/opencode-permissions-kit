@@ -80,11 +80,14 @@ else
 fi
 
 # --- 3. pairing guard (#413): a version-skewed entry/lib pairing dies loud ---------
-# doctor is deliberately fail-soft (set -u only) -- an undefined section
-# call does NOT abort, the report silently loses the section while the
+# doctor is deliberately fail-soft (set -u only) -- an undefined call
+# does NOT abort, the report silently loses the section while the
 # summary still prints (over a possibly unscanned tree). The guard
-# refuses the skewed pairing before any section runs. Both directions
-# in fresh children + completeness rider over the entry's own calls.
+# refuses the skewed pairing before any section runs; it pins EVERY
+# function the run needs, sections AND helpers (#451 a M1 -- a
+# helper-level skew would render "empty (nothing classified)" and
+# exit 0). Both directions in fresh children + completeness riders
+# over the entry's own calls and the lib's own definitions.
 _pg_src="$(extract_func "$DOCTOR_ENTRY" doctor_pairing_guard)"
 if [ -n "$_pg_src" ]; then
     pass "doctor_pairing_guard extractable from the entry"
@@ -95,12 +98,12 @@ _pg_full=$(sh -c 'eval "$1"; . "$2"; doctor_pairing_guard; echo "rc=$?"' _ "$_pg
 _pg_tr_rc=0
 _pg_tr_out="$(PATH="$STUB" "$SH_BIN" -c 'eval "$1"; ui_error() { echo "error: $*" >&2; }; doctor_pairing_guard' _ "$_pg_src" 2>&1)" || _pg_tr_rc=$?
 if printf '%s' "$_pg_full" | grep -q 'rc=0'; then
-    pass "pairing guard: real lib passes (every section defined) (#413)"
+    pass "pairing guard: real lib passes (every function defined) (#413)"
 else
     fail "pairing guard must pass against the real lib (out=$_pg_full) (#413)"
 fi
 if [ "$_pg_tr_rc" -eq 1 ] &&
-    printf '%s' "$_pg_tr_out" | grep -qF "section 'doctor_cli' missing from doctor-core.sh" &&
+    printf '%s' "$_pg_tr_out" | grep -qF "function 'doctor_cli' missing from doctor-core.sh" &&
     printf '%s' "$_pg_tr_out" | grep -qF "version-skewed entry/lib pairing"; then
     pass "pairing guard: truncated lib dies loud before any section runs (#413)"
 else
@@ -123,6 +126,18 @@ if [ -z "$_pg_missing" ]; then
     pass "pairing guard list covers every section the entry calls (#413)"
 else
     fail "sections called by doctor.sh but absent from the guard:$_pg_missing (#413)"
+fi
+# completeness rider (helper direction, #451 a M1): every function the
+# LIB defines must sit in the guard's list too -- a helper missing
+# from the list is the helper-skew hole the round-a fix closes.
+_pg_hmissing=""
+for _fn in $(grep -oE '^[A-Za-z_][A-Za-z_0-9]*\(\) \{' "$LIB" | sed 's/() {//' | sort -u); do
+    printf '%s\n' "$_pg_src" | grep -qF "$_fn" || _pg_hmissing="$_pg_hmissing $_fn"
+done
+if [ -z "$_pg_hmissing" ]; then
+    pass "pairing guard list covers every function the lib defines (#451 a M1)"
+else
+    fail "functions defined by doctor-core.sh but absent from the guard:$_pg_hmissing (#451 a M1)"
 fi
 
 # --- 4. control-character gates at function level ----------------------------------

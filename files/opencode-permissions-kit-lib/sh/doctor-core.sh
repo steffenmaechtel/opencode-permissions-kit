@@ -9,15 +9,18 @@
 # (definitions and comments only), zero runtime dependencies beyond
 # the tools the run itself names. The functions execute in the
 # CALLER's shell under its `set -u` (fail-soft by design -- one
-# failing tree must not kill the remaining verdicts): they read the
-# globals the entry sets before them (DOCTOR_MODE, DOCTOR_ROOT,
-# DOCTOR_ROOT_ARG, DOCTOR_FIX_DRY, INSTALL_CONF, DOCTOR_TAB) and bump
-# their own section globals (WORK, DOCTOR_DISCOVERED, DOCTOR_RANGES,
-# UI_ROWS_* -- the ui.sh severity counters the summary tallies, in the
-# main shell). Sections self-gate on DOCTOR_MODE; the all and detect
-# sections EXIT the process per their block comments (the 0/1/2/64 rc
-# contract documented in the entry's header), the fix section falls
-# through to the summary.
+# failing tree must not kill the remaining verdicts). Globals
+# contract: the ENTRY sets INSTALL_CONF, DOCTOR_TAB and DR_CALL_DIR
+# (the anchor the opk-dispatcher resolution reads) before any section
+# runs; the lib's own doctor_cli then sets DOCTOR_MODE, DOCTOR_ROOT,
+# DOCTOR_ROOT_ARG and DOCTOR_FIX_DRY; the sections bump their own
+# globals (WORK, DOCTOR_DISCOVERED, DOCTOR_RANGES, UI_ROWS_* -- the
+# ui.sh severity counters the summary tallies, in the main shell).
+# The all and detect sections self-gate on DOCTOR_MODE (the others
+# are dispatched unconditionally and carry their mode logic
+# internally); all and detect EXIT the process per their block
+# comments (the 0/1/2/64 rc contract documented in the entry's
+# header), the fix section falls through to the summary.
 
 # doctor_cntrl_bad <string> -> rc 0 when the string carries control
 # CHARACTERS: C0, DEL, or the C1 range 0x80-0x9F -- the same set the

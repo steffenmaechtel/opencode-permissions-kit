@@ -69,8 +69,12 @@ _CF="$(strip "$CONFIG")"
 _UN="$(strip "$UNINSTALL")"
 _DR="$(strip "$DOCTOR")"
 # doctor's section functions live in sh/doctor-core.sh since #448 (the
-# #346 wave shape) -- the DOCTOR_OPK resolver moved with its section
-_DR_CORE="$(strip "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/doctor-core.sh")"
+# #346 wave shape) -- the DOCTOR_OPK resolver moved with its section.
+# DOCTOR_CORE follows the conventions.md "Unit-suite path variables"
+# rule (entry + lib share the entry's name; #451 a Q6), the stripped
+# copy keeps this suite's _XX idiom.
+DOCTOR_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/doctor-core.sh"
+_DR_CORE="$(strip "$DOCTOR_CORE")"
 _IN="$(strip "$INSTALL")"
 
 # The hardened discriminator's argv[0] read (#433; A2 fix: 2>/dev/null

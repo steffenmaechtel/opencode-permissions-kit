@@ -599,11 +599,13 @@ fi
 # entry/lib wiring (#448, the #346 wave shape): doctor.sh sources
 # sh/doctor-core.sh checkout-first (deployed fallback, loud missing-lib
 # error -- the ui.sh/#165 class) and runs the pairing guard right after
-# the resolver (#413: set -u-only fail-soft means a missing section
-# would rc-127 silently past the summary otherwise).
-if grep -qF 'DOCTOR_CORE="$DR_CALL_DIR/../sh/doctor-core.sh"' "$DOCTOR" &&
-    grep -qF '|| DOCTOR_CORE="/usr/local/lib/opencode-permissions-kit/sh/doctor-core.sh"' "$DOCTOR" &&
-    grep -qF 'doctor-core.sh not found' "$DOCTOR" &&
+# the resolver (#413: set -u-only fail-soft means a missing function
+# would rc-127 silently past the summary otherwise). Comment-strip
+# rider on every conjunct (conventions.md "Source-counting pins",
+# #451 a Q3): a commented-out resolver block must not satisfy the pin.
+if sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF 'DOCTOR_CORE="$DR_CALL_DIR/../sh/doctor-core.sh"' &&
+    sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF '|| DOCTOR_CORE="/usr/local/lib/opencode-permissions-kit/sh/doctor-core.sh"' &&
+    sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF 'doctor-core.sh not found' &&
     sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF 'doctor_pairing_guard || exit 1'; then
     pass "entry sources doctor-core.sh checkout-first + pairing guard (#448)"
 else
