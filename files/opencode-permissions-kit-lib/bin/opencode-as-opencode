@@ -79,7 +79,10 @@ fi
 # version-skewed entry/lib pairing (a lib missing one renamed or
 # newly-added section) refuses loud BEFORE any section runs -- under
 # set -e a missing section would die mid-run with a bare "not found",
-# after partial output.
+# after partial output. The list covers EVERY function the lib defines
+# (#453 a A2/B1/C5): sections AND helpers -- a helper name that went
+# missing passes a section-only guard and dies mid-run (or silently
+# degrades where its call sits in a condition), the exact #413 harm.
 wrapper_pairing_guard() {
     for _wpg in wrapper_headless_classify wrapper_validate_cwd \
         wrapper_version_passthrough wrapper_refusal wrapper_banner \
@@ -88,7 +91,9 @@ wrapper_pairing_guard() {
         wrapper_resolve_major wrapper_container_detect \
         wrapper_container_resolve wrapper_container_advisory \
         wrapper_serve_cwd_fallback wrapper_login_cwd_fallback \
-        standalone_mode; do
+        standalone_mode note _opk_timeout_ok merged_config \
+        tools_from_config stop_merged_config_service sock_reachable \
+        cwd_probe; do
         command -v "$_wpg" >/dev/null 2>&1 || {
             echo "error: as-opencode-core.sh is version-skewed ($_wpg missing) — refusing to run" >&2
             return 1

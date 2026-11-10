@@ -55,15 +55,33 @@ wrapper_container_resolve wrapper_container_advisory
 wrapper_serve_cwd_fallback wrapper_login_cwd_fallback
 openchamber_guard standalone_mode note _opk_timeout_ok merged_config
 tools_from_config stop_merged_config_service sock_reachable cwd_probe"
+# census size for the message + the guard rider below
+_ndefs="$(printf '%s\n' $_defs | wc -w | tr -d ' ')"
 _missing=""
 for _fn in $_defs; do
     sh -c '. "$1" && command -v "$2" >/dev/null' _ "$LIB" "$_fn" 2>/dev/null ||
         _missing="$_missing $_fn"
 done
 if [ -z "$_missing" ]; then
-    pass "all 23 section/helper functions defined by sourcing"
+    pass "all $_ndefs section/helper functions defined by sourcing"
 else
     fail "functions missing after sourcing:$_missing"
+fi
+
+# --- 2b. structural purity: nothing executable at col 0 (#453 a C6) -------------
+# The purity pin above observes output/rc/scratch only; a top-level
+# ASSIGNMENT or `set` flag produces none of those yet contradicts the
+# "definitions and comments only" contract. Structural twin: every
+# col-0 non-blank line must be a comment, a function opener/closer, or
+# one of the two heredoc payload/terminator lines inside
+# wrapper_advisories (col 0 by contract, unindented); INDENTED lines
+# are function-body bytes and out of this pin's scope.
+_stray="$(awk 'NF && $0 !~ /^[ \t]/ && $0 !~ /^#/ && $0 !~ /^[a-z_]+\(\) \{$/ &&
+    $0 != "}" && $0 != "EOF" && $0 != "\$ADV_HIT" && $0 != "\$ADV_HITS" {print FNR": "$0}' "$LIB")"
+if [ -z "$_stray" ]; then
+    pass "lib carries no col-0 executable lines (definitions/comments only)"
+else
+    fail "col-0 side-effect candidates in the lib: $(printf '%s' "$_stray" | head -3)"
 fi
 
 # --- 3. resolver: a missing lib refuses loud (#165 class) ------------------------
@@ -129,19 +147,20 @@ if [ -n "$_src_ln" ] && [ -n "$_guard_ln" ] && [ -n "$_first_ln" ] &&
 else
     fail "entry wiring order broken (src:$_src_ln guard:$_guard_ln first:$_first_ln)"
 fi
-# 4d. completeness rider: every section the entry calls at col 0 plus
-# the standalone_mode use is covered by the guard's list
-_calls="$(sed -n '/^# --- sections, in run order/,$p' "$ENTRY" |
-    grep -E '^(wrapper_[a-z_]+|openchamber_guard)( |$)' |
-    grep -v '^wrapper_pairing_guard$' | awk '{print $1}') standalone_mode"
+# 4d. completeness rider (#453 a A2/B1/C5): the guard's list must cover
+# EVERY function the lib defines -- sections AND helpers -- extracted
+# from the lib itself, so a future helper addition that misses the
+# guard fails here (the old rider compared entry calls only and left
+# the 7 helpers uncovered).
+_libfns="$(grep -E '^[a-z_]+\(\) \{' "$LIB" | sed 's/() {//')"
 _uncov=""
-for _c in $_calls; do
+for _c in $_libfns; do
     printf '%s' "$_pg_src" | grep -q " $_c" || _uncov="$_uncov $_c"
 done
 if [ -z "$_uncov" ]; then
-    pass "guard list covers every entry-called section ($(printf '%s' "$_calls" | wc -w | tr -d ' ') names)"
+    pass "guard list covers every lib-defined function ($(printf '%s\n' "$_libfns" | wc -l | tr -d ' ') names)"
 else
-    fail "guard list misses section(s):$_uncov"
+    fail "guard list misses function(s):$_uncov"
 fi
 
 suite_done "as-opencode-core lib tests"

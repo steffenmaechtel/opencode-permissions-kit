@@ -4,7 +4,9 @@
 # The opencode wrapper's section functions (issue #346 wave shape,
 # #449): every executable section of bin/opencode-as-opencode's <main>
 # as a function -- pure code movement, output byte-identical
-# (execution-proven old vs new). Sourced (never executed) by the
+# (execution-proven old vs new: the wave PR's purity drive, a
+# case matrix cmp over stdout/stderr/rc -- see PR #453 and its
+# review round a). Sourced (never executed) by the
 # wrapper, checkout-first (the bin/opk openchamber-core pattern, #447);
 # POSIX sh, no top-level side effects (definitions and comments only).
 # The functions execute in the CALLER's shell under its `set -e` and
@@ -657,7 +659,7 @@ wrapper_container_resolve() {
                         else
                             note "${RED}WARNING: podman-rootless socket not reachable ($sock_host).${NC}"
                             note "${YELLOW}Running WITHOUT container tools""\
-     — not downgrading to a root-equivalent path.${NC}"
+ — not downgrading to a root-equivalent path.${NC}"
                             note ""
                             CONTAINER_REQUESTED=false
                             CONTAINER_AUTO=false

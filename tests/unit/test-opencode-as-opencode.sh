@@ -37,7 +37,7 @@ validate_dir() {
             [ -z "$root" ] && continue
             [ ! -d "$root" ] && continue
             root_clean="${root%/}"
-            if [ "$CWD" = "$root_clean" ] || [ "${CWD#$root_clean/}" != "$CWD" ]; then
+            if [ "$CWD" = "$root_clean" ] || [ "${CWD#"$root_clean"/}" != "$CWD" ]; then
                 VALID=true
                 break
             fi
@@ -252,7 +252,11 @@ done
 
 # banner: drive the moved wrapper_banner and compare its banner line
 # against the replica (the section prints blank, banner, blank; the
-# replica prints the banner line only)
+# replica prints the banner line only). Shell-fidelity (#255 kcov
+# class): the replica renders colors via printf '%b', the moved code
+# via echo -- dash's echo interprets the escapes, bash's does not, so
+# the REAL output is %b-normalized before the compare (the harness
+# pass()/fail() idiom; identical bytes under sh and the coverage bash).
 _bnr="$(
     . "$CORE_LIB"
     HEADLESS=false
@@ -260,7 +264,8 @@ _bnr="$(
     wrapper_banner
 )"
 assert_eq "moved wrapper_banner matches the banner_line replica" \
-    "$(banner_line "$TMPDIR/install.conf")" "$(printf '%s\n' "$_bnr" | sed -n '2p')"
+    "$(banner_line "$TMPDIR/install.conf")" \
+    "$(printf '%b' "$(printf '%s\n' "$_bnr" | sed -n '2p')")"
 
 # --- Version/help passthrough from ANY directory (issue #91) ---
 # The official opencode installer probes `opencode --version` from $HOME
@@ -339,12 +344,18 @@ if [ -n "$(extract_func "$CORE_LIB" wrapper_headless_classify)" ]; then
     # the any-dir exec for _hr_help must ALSO precede the refusal (the
     # classification is worthless if the refusal runs first) — the exec
     # lives in the lib's wrapper_version_passthrough (second arm), the
-    # precedence is the entry's call order pinned above; here the arm
-    # itself must exist in the extracted function.
-    if printf '%s\n' "$_vp_fn" | grep -q 'if \[ "\$_hr_help" = true \]; then'; then
+    # precedence is the entry's call order pinned above. Both the arm's
+    # GATE and its EXEC are pinned here (#453 a C3): the exec count over
+    # the function must be exactly 2 — the $1 case arm and the _hr_help
+    # arm — so an arm reduced to `if …; then :; fi` fails loud (the
+    # #370 a E1 regression).
+    _vp_execs="$(printf '%s\n' "$_vp_fn" |
+        grep -c 'exec /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode "\$@"')"
+    if printf '%s\n' "$_vp_fn" | grep -q 'if \[ "\$_hr_help" = true \]; then' &&
+        [ "$_vp_execs" = 2 ]; then
         pass "the _hr_help exec arm exists in wrapper_version_passthrough (#370 a E1)"
     else
-        fail "the _hr_help exec arm missing from wrapper_version_passthrough (#370 a E1)"
+        fail "the _hr_help exec arm missing from wrapper_version_passthrough (execs:$_vp_execs) (#370 a E1)"
     fi
 else
     fail "leading-region help classifier present (#370 a E1)"
@@ -476,7 +487,10 @@ fi
 
 # The container-tools advisory must also route through note() — a raw
 # printf to stdout would pollute `opencode run --format json` output.
-if ! grep -q 'printf "  ${GREEN}opencode will run with' "$CORE_LIB"; then
+# Both-file sweep (#453 a C1): the advisory surface spans entry + lib —
+# the pre-#449 pin covered the whole monolith, one file is narrower.
+if ! grep -q 'printf "  ${GREEN}opencode will run with' "$WRAPPER_FILE" &&
+    ! grep -q 'printf "  ${GREEN}opencode will run with' "$CORE_LIB"; then
     pass "container advisory uses note() (stdout-safe for orchestrators)"
 else
     fail "container advisory prints raw to stdout"
@@ -855,6 +869,36 @@ if sed 's/^[[:space:]]*#.*$//' "$WRAPPER_FILE" | grep -q 'command -v timeout >/d
 else
     pass "no presence-only timeout gate remains in the wrapper (#248)"
 fi
+
+# --- #453 a A1: the re-wrapped "Running WITHOUT container tools" warning ---------
+# must render byte-identical to the original single-line string: the
+# house `""\` continuation idiom keeps exactly ONE content space at the
+# join (a continuation indented into the string adds bytes to the
+# rendered output -- the A1 regression, first caught in review round a
+# after the purity drive had missed this arm). Sourcing pin on
+# wrapper_container_resolve, podman-socket-unreachable arm, colors
+# blanked so the assert compares the message bytes themselves.
+_wrap_out="$(
+    . "$CORE_LIB"
+    HEADLESS=false
+    RED='' GREEN='' CYAN='' YELLOW='' NC=''
+    CONTAINER_REQUESTED=true
+    CONTAINER_BACKEND=podman-rootless
+    OPENCODE_PODMAN_SOCKET=unix:///run/podman/podman.sock
+    _w=""
+    note() {
+        if [ -n "$1" ]; then
+            if [ -n "$_w" ]; then _w="$_w
+$1"; else _w="$1"; fi
+        fi
+    }
+    sock_reachable() { return 1; }
+    wrapper_container_resolve
+    printf '%s' "$_w"
+)"
+assert_eq "wrapped container warning renders with one join space (#453 a A1)" \
+    "$(printf 'WARNING: podman-rootless socket not reachable (unix:///run/podman/podman.sock).\nRunning WITHOUT container tools — not downgrading to a root-equivalent path.')" \
+    "$_wrap_out"
 
 # functional: source the lib's detection section, stub the probe + note,
 # run the REAL parser (sourcing pin since #449, #396 accounting — same

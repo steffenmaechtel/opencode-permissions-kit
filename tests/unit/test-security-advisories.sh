@@ -261,13 +261,17 @@ fi
 # subjects; one quoting a full literal must not become the anchor). Both
 # blocks live in the lib since #449 — their relative order there mirrors
 # the entry's call order (wrapper_version_passthrough runs before
-# wrapper_advisories).
+# wrapper_advisories), and THAT order is what executes: pin the entry's
+# call lines (#453 a C2 — definition order in the lib constrains nothing).
 _verline=$(sed 's/^[[:space:]]*#.*$//' "$WRAPPER_CORE" | grep -n -m1 -- '--version | -v | -h | --help)' | cut -d: -f1)
 _advline=$(sed 's/^[[:space:]]*#.*$//' "$WRAPPER_CORE" | grep -n -m1 '/sh/advisories.sh' | cut -d: -f1)
-if [ -n "$_verline" ] && [ -n "$_advline" ] && [ "$_verline" -lt "$_advline" ]; then
+_call_pass=$(grep -n '^wrapper_version_passthrough "\$@"$' "$WRAPPER" | cut -d: -f1)
+_call_adv=$(grep -n '^wrapper_advisories$' "$WRAPPER" | cut -d: -f1)
+if [ -n "$_verline" ] && [ -n "$_advline" ] && [ "$_verline" -lt "$_advline" ] &&
+    [ -n "$_call_pass" ] && [ -n "$_call_adv" ] && [ "$_call_pass" -lt "$_call_adv" ]; then
     pass "wrapper: --version early-exec stays ahead of the advisory check"
 else
-    fail "wrapper: --version early-exec stays ahead of the advisory check ($_verline vs $_advline)"
+    fail "wrapper: --version early-exec stays ahead of the advisory check ($_verline vs $_advline; calls $_call_pass vs $_call_adv)"
 fi
 if grep -q 'timeout 5 /usr/bin/sudo -n -u opencode' "$WRAPPER_CORE" && grep -q 'bin/opencode --version' "$WRAPPER_CORE"; then
     pass "wrapper: the --version probe is timeout-bounded (wedged 2.x service, issue #80)"
