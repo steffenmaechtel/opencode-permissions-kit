@@ -180,22 +180,32 @@ fi
 # Pairing guard (#413, PR #412 round a S2 — this entry is the finding's
 # own example) — LOAD-BEARING here: uninstall is deliberately fail-soft
 # (no set -e; a failing op must not kill the remaining removals), so an
-# undefined section call does NOT abort — it prints "not found", returns
-# rc 127 and the run CONTINUES, skipping that removal silently and still
+# undefined call does NOT abort — it prints "not found", returns rc 127
+# and the run CONTINUES, skipping that removal silently and still
 # printing "Uninstall complete." at the end. A version-skewed entry/lib
-# pairing (a core missing one renamed or newly-added section — an
-# interrupted deploy, a manually mixed tree) is a wiring error, not an
-# op failure: refuse loud, before the first prompt, exit 1. prompt_yn
-# rides the list for the same reason (it lives in the core and gates
-# the consent the whole run hangs on).
+# pairing is a wiring error, not an op failure: refuse loud, before the
+# first prompt, exit 1. The guard pins every function the paired core
+# defines — the sections the entry calls AND the helpers they call
+# internally (#452, the doctor precedent: a helper-level skew skips
+# removals silently behind a green "Uninstall complete.", e.g. a
+# missing un_rc_q strands every op in the sections that drive it).
+# Functions from other sourced libs are deliberately outside this
+# guard — only the core pairing is pinned here (#455 a Q1). prompt_yn
+# rides the
+# list for the same reason (it lives in the core and gates the consent
+# the whole run hangs on). The list is kept equal to uninstall-core.sh's
+# function definitions (the test-suite completeness riders enforce both
+# directions).
 un_pairing_guard() {
     for _npg in un_context_load prompt_yn un_sudoers_remove \
         un_wrapper_remove un_cli_remove un_xdg_open_remove \
         un_tui_plugins_remove un_wsl_bridge_remove un_library_remove \
         un_umask_remove un_user_remove un_projects_revert \
-        un_config_dirs_remove un_audit_log_remove; do
+        un_config_dirs_remove un_audit_log_remove \
+        _un_revert_chown run_q un_group_membership_remove \
+        un_opencode_user_gate un_rc_q; do
         command -v "$_npg" >/dev/null 2>&1 || {
-            echo "error: section '$_npg' missing from uninstall-core.sh — version-skewed entry/lib pairing, refusing to run" >&2
+            echo "error: function '$_npg' missing from uninstall-core.sh — version-skewed entry/lib pairing, refusing to run" >&2
             return 1
         }
     done

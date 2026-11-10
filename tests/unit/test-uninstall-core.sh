@@ -16,7 +16,11 @@
 # orchestration is e2e territory (category 3, no coverage promise).
 # Covers:
 #   - sourcing purity: definitions only, zero top-level side effects
-#   - all 17 section/helper functions defined by sourcing
+#   - all 19 section/helper functions defined by sourcing
+#   - the pairing guard (#413, #452): real lib passes, truncated lib dies
+#     loud, and both completeness riders (every core call the entry
+#     makes AND every function the lib defines — comment-stripped,
+#     boundary-anchored)
 #   - the entry resolves the lib checkout-first with the deployed $LIBDIR
 #     fallback (the update.sh resolver shape — uninstall.sh runs from the
 #     deployed tree via `opk uninstall`, unlike install.sh) and calls the
@@ -60,15 +64,15 @@ fi
 _defs="prompt_yn run_q un_rc_q un_opencode_user_gate un_context_load
 un_sudoers_remove un_wrapper_remove un_cli_remove un_xdg_open_remove
 un_tui_plugins_remove un_wsl_bridge_remove un_library_remove un_umask_remove
-un_group_membership_remove un_user_remove un_projects_revert
-un_config_dirs_remove un_audit_log_remove"
+un_group_membership_remove un_projects_revert un_config_dirs_remove
+un_audit_log_remove un_user_remove _un_revert_chown"
 _missing=""
 for _fn in $_defs; do
     sh -c '. "$1" && command -v "$2" >/dev/null' _ "$LIB" "$_fn" 2>/dev/null ||
         _missing="$_missing $_fn"
 done
 if [ -z "$_missing" ]; then
-    pass "all 5 helpers + 13 section functions defined by sourcing"
+    pass "all 6 helpers + 13 section functions defined by sourcing"
 else
     fail "functions missing after sourcing:$_missing"
 fi
@@ -78,10 +82,18 @@ fi
 # fallback — the update.sh UPDATE_CORE shape, deliberately NOT
 # install.sh's kit_source-without-fallback (uninstall.sh runs from the
 # deployed tree via `opk uninstall`; install.sh never does). Loud abort
-# when both candidates miss.
-if grep -qF 'UNINSTALL_CORE="$UN_CALL_DIR/../sh/uninstall-core.sh"' "$UNINSTALL" &&
-    grep -qF 'UNINSTALL_CORE="/usr/local/lib/opencode-permissions-kit/sh/uninstall-core.sh"' "$UNINSTALL" &&
-    grep -qF 'error: uninstall-core.sh not found' "$UNINSTALL" &&
+# when both candidates miss. Comment-strip on every positive conjunct
+# (conventions.md "Source-counting pins", the #451 a Q3 shape): a
+# commented-out resolver block must not satisfy the pin. The negative
+# kit_source leg stays stripped deliberately (#455 a Q3): conventions
+# keep absence legs un-ridden, but the entry carries a prose kit_source
+# mention ("Unlike install.sh's kit_source ..." at its resolver
+# comment) that an unstripped absence leg would false-fail on.
+if sed 's/^[[:space:]]*#.*$//' "$UNINSTALL" |
+    grep -qF 'UNINSTALL_CORE="$UN_CALL_DIR/../sh/uninstall-core.sh"' &&
+    sed 's/^[[:space:]]*#.*$//' "$UNINSTALL" |
+    grep -qF 'UNINSTALL_CORE="/usr/local/lib/opencode-permissions-kit/sh/uninstall-core.sh"' &&
+    sed 's/^[[:space:]]*#.*$//' "$UNINSTALL" | grep -qF 'error: uninstall-core.sh not found' &&
     ! sed 's/^[[:space:]]*#.*$//' "$UNINSTALL" | grep -q 'kit_source'; then
     pass "entry resolver: checkout-first (anchored caller dir, update.sh parity) + \$LIBDIR fallback, loud abort"
 else
@@ -1806,21 +1818,30 @@ else
 fi
 
 # --- pairing guard (#413, the finding's own entry): skewed pairing dies loud --------
-# uninstall is fail-soft (no set -e) — an undefined section call does
-# NOT abort: it rc-127s, the removal is silently skipped and the run
-# still prints "Uninstall complete." (the #413 mechanism verbatim).
-# Both directions in fresh children + completeness rider.
+# uninstall is fail-soft (no set -e) — an undefined call does NOT
+# abort: it rc-127s, the removal is silently skipped and the run still
+# prints "Uninstall complete." (the #413 mechanism verbatim). The guard
+# pins EVERY function the run needs, sections AND helpers (#452 — a
+# helper-level skew skips removals silently behind a green completion
+# line). Both directions in fresh children + completeness riders: every
+# core call the entry makes AND every function the lib defines. Both
+# riders grep a comment-stripped copy of the guard source (#452,
+# conventions.md "Source-counting pins" over extracted blocks) and
+# match with BOUNDARY-ANCHORED EREs (plain -qF would find section names
+# as substrings of helper names in the list and a dropped name would
+# false-pass).
 _pg_src="$(extract_func "$UNINSTALL" un_pairing_guard)"
+_pg_src_s="$(printf '%s\n' "$_pg_src" | sed 's/^[[:space:]]*#.*$//')"
 _pg_full=$(sh -c 'eval "$1"; . "$2"; un_pairing_guard; echo "rc=$?"' _ "$_pg_src" "$LIB" 2>&1)
 _pg_tr_rc=0
 _pg_tr_out="$(sh -c 'eval "$1"; un_pairing_guard' _ "$_pg_src" 2>&1)" || _pg_tr_rc=$?
 if printf '%s' "$_pg_full" | grep -q 'rc=0'; then
-    pass "pairing guard: real lib passes (every section defined) (#413)"
+    pass "pairing guard: real lib passes (every function defined) (#413)"
 else
     fail "pairing guard must pass against the real lib (out=$_pg_full) (#413)"
 fi
 if [ "$_pg_tr_rc" -eq 1 ] &&
-    printf '%s' "$_pg_tr_out" | grep -qF "section 'un_context_load' missing from uninstall-core.sh" &&
+    printf '%s' "$_pg_tr_out" | grep -qF "function 'un_context_load' missing from uninstall-core.sh" &&
     printf '%s' "$_pg_tr_out" | grep -qF "version-skewed entry/lib pairing"; then
     pass "pairing guard: truncated lib dies loud before the first prompt (#413)"
 else
@@ -1834,12 +1855,32 @@ fi
 _pg_missing=""
 for _fn in $(grep -oE '^[[:space:]]*(un_[a-z_0-9]+|prompt_yn)[[:space:]]*$' "$UNINSTALL" |
     awk '{gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print}' | sort -u); do
-    printf '%s\n' "$_pg_src" | grep -qF "$_fn" || _pg_missing="$_pg_missing $_fn"
+    printf '%s\n' "$_pg_src_s" | grep -qE "(^|[[:space:]])$_fn([[:space:];]|\$)" ||
+        _pg_missing="$_pg_missing $_fn"
 done
 if [ -z "$_pg_missing" ]; then
     pass "pairing guard list covers every core call the entry makes (#413)"
 else
     fail "core calls in uninstall.sh but absent from the guard:$_pg_missing (#413)"
+fi
+# completeness rider (helper direction, #452): every function the LIB
+# defines must sit in the guard's list too — a helper missing from the
+# list is the helper-skew hole the guard-list fix closes. Same boundary
+# anchor, same stripped source. The extraction carries an emptiness
+# probe (#455 a C2): an empty list would run the loop zero times and
+# pass vacuously, and the harness contract puts that probe on the
+# caller.
+_pg_hmissing=""
+_pg_libfns="$(grep -oE '^[A-Za-z_][A-Za-z_0-9]*\(\) \{' "$LIB" | sed 's/() {//' | sort -u)"
+[ -n "$_pg_libfns" ] || _pg_hmissing="(lib function extraction empty)"
+for _fn in $_pg_libfns; do
+    printf '%s\n' "$_pg_src_s" | grep -qE "(^|[[:space:]])$_fn([[:space:];]|\$)" ||
+        _pg_hmissing="$_pg_hmissing $_fn"
+done
+if [ -z "$_pg_hmissing" ]; then
+    pass "pairing guard list covers every function the lib defines (#452)"
+else
+    fail "functions defined by uninstall-core.sh but absent from the guard:$_pg_hmissing (#452, #455 a C2)"
 fi
 
 _unc_pi=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -c 'python3 -I' || true)
