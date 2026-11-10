@@ -9,6 +9,7 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 KIT="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opk"
 HOCORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/handover-core.sh"
+OCCORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/openchamber-core.sh"
 
 # Shared harness (issue #394 adoption, #415 ride-along): pass/fail,
 # assert_eq, extract_func + the counters live in lib/harness.sh now;
@@ -35,6 +36,9 @@ mkdir -p "$LIB/management"
 # dies on the resolver's loud abort.
 mkdir -p "$LIB/sh"
 cp "$HOCORE" "$LIB/sh/handover-core.sh"
+# openchamber-secure's arm sources the REAL openchamber-core.sh since
+# the #415 wave-1 extraction — same coupling as handover above.
+cp "$OCCORE" "$LIB/sh/openchamber-core.sh"
 for s in status doctor config update uninstall; do
     cat >"$LIB/management/$s.sh" <<EOF
 #!/bin/sh
@@ -166,26 +170,32 @@ out="$(run_kit uninstall --dry-run)" || true
 assert_eq "uninstall passes flags" "uninstall:euid=$(id -u):args=--dry-run" "$out"
 
 # --- openchamber-secure (issue #154, Tier 3) -----------------------------------
-# Inline command: static wiring pins (functional run needs root + /etc —
-# covered by the e2e suite instead).
+# Static wiring pins (functional run needs root + /etc — covered by the
+# e2e suite instead). The arm's body lives in sh/openchamber-core.sh
+# since the #415 wave-1 extraction (#396 accounting: the pins that
+# grep'd the arm body in bin/opk re-target the lib; the dispatcher
+# pins stay on $KIT). oc_bypass_bin stays in bin/opk (dispatcher-level
+# helper): its definition is pinned on $KIT, its USE sites on $OCCORE.
 check "openchamber-secure dispatch exists" grep -q '    openchamber-secure)' "$KIT"
-check "openchamber-secure auto-elevates with flags intact" grep -qF 'exec sudo sh "$LIBDIR/bin/opk" openchamber-secure "$@"' "$KIT"
-grep -qF 'mv -f "$_ocp_tmp" /etc/openchamber/policy.json' "$KIT" &&
-    check "openchamber-secure writes the pin (atomic) + records the opt-in" grep -qF 'mv -f "$_ocp_tmp" /etc/openchamber/policy.json' "$KIT" grep -qF 'OPENCHAMBER_POLICY=yes' "$KIT"
+check "openchamber-secure auto-elevates with flags intact" grep -qF 'exec sudo sh "$LIBDIR/bin/opk" openchamber-secure "$@"' "$OCCORE"
+grep -qF 'mv -f "$_ocp_tmp" /etc/openchamber/policy.json' "$OCCORE" &&
+    check "openchamber-secure writes the pin (atomic) + records the opt-in" grep -qF 'mv -f "$_ocp_tmp" /etc/openchamber/policy.json' "$OCCORE" grep -qF 'OPENCHAMBER_POLICY=yes' "$OCCORE"
 # 0.0.47a F1: replacing divergent policy content is announced, never silent
-check "openchamber-secure announces replacing divergent content (F1)" grep -qF 'diverges from the kit pin — replacing it' "$KIT"
+check "openchamber-secure announces replacing divergent content (F1)" grep -qF 'diverges from the kit pin — replacing it' "$OCCORE"
 # 0.0.47a F3: the kit-symlink exemption helper exists and is used at the
 # detection, listing and removal sites
 # Comment-strip riders (#261, the #244 g W1 class): commented-out lines
 # must not count. Full-line comments only (#244 h W6 residual): a
 # trailing comment after a live line still counts.
-_ocb_n="$(sed 's/^[[:space:]]*#.*$//' "$KIT" | grep -c 'oc_bypass_bin' || true)"
-check "openchamber-secure exempts kit-owned symlinks (F3)" [ "$_ocb_n" -ge 4 ]
+_ocb_def="$(sed 's/^[[:space:]]*#.*$//' "$KIT" | grep -c 'oc_bypass_bin' || true)"
+check "openchamber-secure's probe helper stays dispatcher-level (#447)" [ "$_ocb_def" -ge 1 ]
+_ocb_n="$(sed 's/^[[:space:]]*#.*$//' "$OCCORE" | grep -c 'oc_bypass_bin' || true)"
+check "openchamber-secure exempts kit-owned symlinks (F3)" [ "$_ocb_n" -ge 3 ]
 # 0.0.47c C2: every completing path of openchamber-secure ends with the
 # restart hint (getent-skip, nothing-found, decline, full run — the
 # oc_bypass_bin count precedent; behavioral pinning of the decline path
 # would need an interactive ui_confirm, static count is the proxy)
-_rh_n="$(sed 's/^[[:space:]]*#.*$//' "$KIT" | grep -c 'restart OpenChamber if it is running' || true)"
+_rh_n="$(sed 's/^[[:space:]]*#.*$//' "$OCCORE" | grep -c 'restart OpenChamber if it is running' || true)"
 check "openchamber-secure prints the restart hint on every completing path (0.0.47c C2)" [ "$_rh_n" -ge 4 ]
 
 # unknown flag for openchamber-secure aborts before elevation (runs as
@@ -201,6 +211,33 @@ case "$errout" in
         ;;
 esac
 
+# --- #415 wave-1 extraction wiring: resolver loud abort + pairing guard ----------
+# A damaged library (openchamber-core.sh missing) must refuse loud,
+# never fall through to "not found" + rc 0 semantics (bin/opk sets no
+# set -e); a version-skewed lib (file present, function missing) hits
+# the pairing guard with its own cause. Same shape as the #415
+# handover wiring block above.
+OC_NOLIB="$WORK/oc-nolib"
+mkdir -p "$OC_NOLIB/bin" "$OC_NOLIB/sh"
+cp "$BIN/opk" "$OC_NOLIB/bin/opk"
+_no_rc=0
+_no_out="$(OPK_INSTALL_CONF="$WORK/install.conf" "$OC_NOLIB/bin/opk" openchamber-secure --yes 2>&1 >/dev/null)" || _no_rc=$?
+if [ "$_no_rc" -ne 0 ] &&
+    printf '%s' "$_no_out" | grep -qF "openchamber-core.sh not found"; then
+    pass "resolver: a missing openchamber-core.sh refuses loud (#447, #165 class)"
+else
+    fail "resolver: a missing openchamber-core.sh must refuse loud (rc=$_no_rc got: $_no_out) (#447)"
+fi
+printf '# stub lib without the function\n' >"$OC_NOLIB/sh/openchamber-core.sh"
+_sk_rc=0
+_sk_out="$(OPK_INSTALL_CONF="$WORK/install.conf" "$OC_NOLIB/bin/opk" openchamber-secure --yes 2>&1 >/dev/null)" || _sk_rc=$?
+if [ "$_sk_rc" -ne 0 ] &&
+    printf '%s' "$_sk_out" | grep -qF "version-skewed"; then
+    pass "pairing guard: a function-less lib refuses with its own cause (#447)"
+else
+    fail "pairing guard: a function-less lib must refuse with its own cause (rc=$_sk_rc got: $_sk_out) (#447)"
+fi
+
 # (#370 a E3): the bypass-removal prompt defaults to n (the
 # conventions' system-change default, agent/conventions.md
 # "Interactive prompts"; under the old y default an unattended EOF
@@ -208,7 +245,10 @@ esac
 # fallback ui_confirm header no longer claims "fails closed" (EOF
 # follows the caller's default — sh/ui.sh documents the true
 # semantics). Comment-strip ridden: a commented-out call must not count.
-if sed 's/^[[:space:]]*#.*$//' "$KIT" | grep -qF 'ui_confirm "Remove them now?" "n"'; then
+# The prompt call moved to openchamber-core.sh with the #415 wave-1
+# extraction; the fallback ui_confirm header pin below stays on $KIT
+# (the fallback helper is dispatcher-level).
+if sed 's/^[[:space:]]*#.*$//' "$OCCORE" | grep -qF 'ui_confirm "Remove them now?" "n"'; then
     pass "bypass-removal prompt defaults to n (#370 a E3)"
 else
     fail "bypass-removal prompt defaults to n (#370 a E3)"
@@ -1414,10 +1454,12 @@ fi
 # asymmetry arms — the compound is extracted from opk (the F24 idiom)
 # and driven with PATH-fixing sudo shims over a binary farm (the
 # test-tui-mode arm idiom).
-OCW2_BLOCK="$(sed -n '/#244 f W2/,/^            fi$/p' "$KIT")"
+OCW2_BLOCK="$(sed -n '/#244 f W2/,/^        fi$/p' "$OCCORE")"
 # Bound is 38 lines: 33 (the #244 f W2 compound) + 2 for pr-00263 c C2
 # (the else branch exits 1 instead of falling through to exit 0) + 3
-# for the #249 isolation note (review a C2).
+# for the #249 isolation note (review a C2). (End anchor re-dented
+# with the body by the #415 wave-1 extraction: the compound's closing
+# fi sits at 8 spaces in the lib, was 12 in the bin/opk arm.)
 if [ -n "$OCW2_BLOCK" ] &&
     [ "$(printf '%s\n' "$OCW2_BLOCK" | wc -l)" -le 38 ] &&
     printf '%s\n' "$OCW2_BLOCK" |
@@ -1535,7 +1577,7 @@ fi
 # added the else-exit). Direct behavioral pins on the extracted
 # heredoc script — both directions, python3 hard-required (labels
 # say so; the check-host make-test contract).
-OPYSCR="$(sed -n '/opk-settings-edit/,/^PYEOF$/p' "$KIT" | sed '1d;$d')"
+OPYSCR="$(sed -n '/opk-settings-edit/,/^PYEOF$/p' "$OCCORE" | sed '1d;$d')"
 if [ -z "$OPYSCR" ] || ! printf '%s\n' "$OPYSCR" | grep -qF 'del d["opencodeBinary"]' ||
     ! printf '%s\n' "$OPYSCR" | grep -qF 'sys.exit(1)'; then
     fail "settings-edit python script extractable (anchors: del d[\"opencodeBinary\"], sys.exit(1)) (#244 g S1)"
@@ -1572,14 +1614,14 @@ fi
 # pr-00263 a F21: the settings-edit failure message names the entry as
 # key-or-value — the grep can match the literal as a VALUE, "remove the
 # line" was wrong for that arm.
-check "settings-edit failure names key-or-value (pr-00263 a F21)" grep -qF 'entry (key or value) by hand' "$KIT"
+check "settings-edit failure names key-or-value (pr-00263 a F21)" grep -qF 'entry (key or value) by hand' "$OCCORE"
 
 echo ""
-_kit_pi=$(sed 's/^[[:space:]]*#.*$//' "$KIT" | grep -c 'python3 -I' || true)
+_kit_pi=$(sed 's/^[[:space:]]*#.*$//' "$OCCORE" | grep -c 'python3 -I' || true)
 if [ "${_kit_pi:-0}" -ge 1 ]; then
-    pass "opk's python3 site runs -I (settings edit, $_kit_pi found) (#249, review a C2)"
+    pass "openchamber-core's settings edit runs python3 -I ($_kit_pi found) (#249, moved with the #415 wave-1 extraction)"
 else
-    fail "opk must run its python3 site with -I (found ${_kit_pi:-0}) (#249, review a C2)"
+    fail "openchamber-core must run its settings edit with python3 -I (found ${_kit_pi:-0}) (#249)"
 fi
 _kit_hc_pi=$(sed 's/^[[:space:]]*#.*$//' "$HOCORE" | grep -c 'python3 -I' || true)
 if [ "${_kit_hc_pi:-0}" -ge 1 ]; then
@@ -1587,11 +1629,11 @@ if [ "${_kit_hc_pi:-0}" -ge 1 ]; then
 else
     fail "handover-core must run its opk.json reader with python3 -I (found ${_kit_hc_pi:-0}) (#249)"
 fi
-_kit_exec_pi=$(sed 's/^[[:space:]]*#.*$//' "$KIT" | grep -c 'exec python3 -I' || true)
+_kit_exec_pi=$(sed 's/^[[:space:]]*#.*$//' "$OCCORE" | grep -c 'exec python3 -I' || true)
 if [ "${_kit_exec_pi:-0}" -ge 1 ]; then
-    pass "opk's settings-edit exec runs python3 -I (review a C2)"
+    pass "openchamber-core's settings-edit exec runs python3 -I (review a C2, moved with the #415 wave-1 extraction)"
 else
-    fail "the settings-edit exec must run python3 -I (review a C2)"
+    fail "the settings-edit exec must run python3 -I (found ${_kit_exec_pi:-0}) (review a C2)"
 fi
 
 suite_done "CLI dispatcher tests"

@@ -169,6 +169,9 @@ opencode-permissions-kit-lib/sh/uninstall-core.sh 644
 # handover-core.sh: the opk handover subcommand (issue #415 ride-along on
 # #346), sourced by bin/opk through its SELF-resolved $LIBDIR
 opencode-permissions-kit-lib/sh/handover-core.sh 644
+# openchamber-core.sh: the opk openchamber-secure subcommand (#415 wave 1,
+# the #346 wave shape), sourced by bin/opk through its SELF-resolved $LIBDIR
+opencode-permissions-kit-lib/sh/openchamber-core.sh 644
 opencode-permissions-kit-lib/sh/render-agent-config.sh 644
 opencode-permissions-kit-lib/sh/secure-binary.sh 644
 opencode-permissions-kit-lib/sh/shell-warn.sh 644

@@ -167,6 +167,7 @@ The deployed library mirrors the repository layout
 | `/usr/local/lib/opencode-permissions-kit/sh/update-core.sh` | Shared helper: the update run's phase functions |
 | `/usr/local/lib/opencode-permissions-kit/sh/uninstall-core.sh` | Shared helper: the uninstall run's sections |
 | `/usr/local/lib/opencode-permissions-kit/sh/handover-core.sh` | Shared helper: the `opk handover` subcommand |
+| `/usr/local/lib/opencode-permissions-kit/sh/openchamber-core.sh` | Shared helper: `opk openchamber-secure` |
 | `/usr/local/lib/opencode-permissions-kit/management/config.sh` | Management: projects, git-config, backend, refresh |
 | `/usr/local/lib/opencode-permissions-kit/management/doctor.sh` | Management: ownership diagnosis + guided fix |
 | `/usr/local/lib/opencode-permissions-kit/management/update.sh` | Management: re-deploy, binary upgrades |
