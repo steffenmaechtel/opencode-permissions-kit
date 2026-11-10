@@ -162,6 +162,7 @@ fetch_kit() {
         opencode-permissions-kit-lib/sh/ddev-hosts.sh \
         opencode-permissions-kit-lib/sh/fs-baseline.sh \
         opencode-permissions-kit-lib/sh/git-check.sh \
+        opencode-permissions-kit-lib/sh/doctor-core.sh \
         opencode-permissions-kit-lib/sh/status-core.sh \
         opencode-permissions-kit-lib/sh/staged-write.sh \
         opencode-permissions-kit-lib/sh/sudoers-deploy.sh \

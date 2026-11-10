@@ -158,6 +158,9 @@ opencode-permissions-kit-lib/sh/log.sh 644
 # recursive group baseline; sourced by install.sh and config.sh with
 # fail-closed stubs.
 opencode-permissions-kit-lib/sh/path-sane.sh 644
+# doctor-core.sh: the doctor run's section functions (issue #346 wave
+# shape, #448), sourced checkout-first by management/doctor.sh
+opencode-permissions-kit-lib/sh/doctor-core.sh 644
 # install-core.sh: the install run's phase functions (issue #346), sourced
 # by install.sh from its checkout/fetch tree (kit_source, no LIBDIR
 # fallback — install.sh never runs from the installed tree)
