@@ -827,9 +827,12 @@ kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/install-core.sh"
 # under set -e that aborts, but with a cryptic "not found" and no named
 # cause — mid-install, after earlier phases already ran. The guard
 # converts it into a diagnosed abort BEFORE any phase runs, and pins
-# EVERY function the run needs — the phases the entry calls AND the
-# helpers they call internally (#452, the doctor precedent: a
-# helper-level skew aborts mid-install after partial work). The list is
+# every function the paired core defines — the phases the entry calls
+# AND the helpers they call internally (#452, the doctor precedent: a
+# helper-level skew aborts mid-install after partial work). Functions
+# from other sourced libs (ddev-handover.sh, fs-baseline.sh, ...) are
+# deliberately outside this guard — only the core pairing is pinned
+# here (#455 a Q1). The list is
 # kept equal to install-core.sh's function definitions (the test-suite
 # completeness riders enforce both directions; a phase added to the
 # core without the entry calling it is equally a wiring bug this list

@@ -169,10 +169,13 @@ fi
 # loud, whole report, before any section renders (exit 1, the
 # ui.sh-missing precedent above — a wiring abort is not a verdict and
 # must not collide with the --short contract's probe codes). The guard
-# therefore pins EVERY function the run needs, sections AND the helpers
-# the sections call internally (#452, the doctor precedent — a missing
-# helper degraded rows silently behind a green summary, e.g. a missing
-# _st_ddev_scan skipped whole scan verdicts). The list is kept equal to
+# therefore pins every function the paired core defines, sections AND
+# the helpers the sections call internally (#452, the doctor precedent:
+# a missing helper degraded rows silently behind a green summary, e.g.
+# a missing _st_ddev_scan skipped whole scan verdicts). Functions from
+# other sourced libs — ui.sh included, see the resolver note above —
+# are deliberately outside this guard; only the core pairing is pinned
+# (#455 a Q1). The list is kept equal to
 # status-core.sh's function definitions (the test-suite completeness
 # riders enforce both directions).
 status_pairing_guard() {

@@ -828,11 +828,14 @@ fi
 # entry/lib pairing makes a bare call into the core fail with rc 127,
 # and under set -e that aborts cryptically mid-update ("not found", no
 # named cause) after earlier phases already ran. The guard converts it
-# into a diagnosed abort BEFORE any phase runs and pins EVERY function
-# the run needs — the phases the entry calls AND the helpers they call
-# internally (#452, the doctor precedent: a helper-level skew aborts
-# mid-update after partial work, e.g. a missing install_binary strands
-# the upgrade after the download). The list is kept equal to
+# into a diagnosed abort BEFORE any phase runs and pins every function
+# the paired core defines — the phases the entry calls AND the helpers
+# they call internally (#452, the doctor precedent: a helper-level skew
+# aborts mid-update after partial work, e.g. a missing install_binary
+# strands the upgrade after the download). Functions from other sourced
+# libs — ui.sh included, see the resolver note above — are deliberately
+# outside this guard; only the core pairing is pinned (#455 a Q1). The
+# list is kept equal to
 # update-core.sh's function definitions (the test-suite completeness
 # riders enforce both directions; a phase added to the core without the
 # entry calling it is equally a wiring bug this list makes reviewable).

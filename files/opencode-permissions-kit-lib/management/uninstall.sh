@@ -184,11 +184,14 @@ fi
 # and the run CONTINUES, skipping that removal silently and still
 # printing "Uninstall complete." at the end. A version-skewed entry/lib
 # pairing is a wiring error, not an op failure: refuse loud, before the
-# first prompt, exit 1. The guard pins EVERY function the run needs —
-# the sections the entry calls AND the helpers they call internally
-# (#452, the doctor precedent: a helper-level skew skips removals
-# silently behind a green "Uninstall complete.", e.g. a missing un_rc_q
-# strands every op in the sections that drive it). prompt_yn rides the
+# first prompt, exit 1. The guard pins every function the paired core
+# defines — the sections the entry calls AND the helpers they call
+# internally (#452, the doctor precedent: a helper-level skew skips
+# removals silently behind a green "Uninstall complete.", e.g. a
+# missing un_rc_q strands every op in the sections that drive it).
+# Functions from other sourced libs are deliberately outside this
+# guard — only the core pairing is pinned here (#455 a Q1). prompt_yn
+# rides the
 # list for the same reason (it lives in the core and gates the consent
 # the whole run hangs on). The list is kept equal to uninstall-core.sh's
 # function definitions (the test-suite completeness riders enforce both

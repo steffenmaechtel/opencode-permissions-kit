@@ -7,7 +7,7 @@
 # pins what only the DECOMPOSED shape can pin:
 #   - sourcing purity: definitions only, zero top-level side effects
 #   - every section entry point + helper is defined by sourcing
-#   - the pairing guard (#413): real lib passes, truncated lib dies
+#   - the pairing guard (#413, #452): real lib passes, truncated lib dies
 #     loud, and both completeness riders (every call the entry makes
 #     AND every function the lib defines — comment-stripped,
 #     boundary-anchored)
@@ -225,7 +225,7 @@ STATUS_ENTRY="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/st
 _pg_src="$(extract_func "$STATUS_ENTRY" status_pairing_guard)"
 # comment-stripped copy of the guard source for the riders below
 # (#452, conventions.md "Source-counting pins" over extracted blocks):
-# a comment inside the guard naming a function must not count.
+# a full-line comment inside the guard naming a function must not count.
 _pg_src_s="$(printf '%s\n' "$_pg_src" | sed 's/^[[:space:]]*#.*$//')"
 _pg_full=$(sh -c 'eval "$1"; . "$2"; status_pairing_guard; echo "rc=$?"' _ "$_pg_src" "$LIB" 2>&1)
 _pg_tr_rc=0
@@ -267,16 +267,21 @@ fi
 # completeness rider (helper direction, #452): every function the LIB
 # defines must sit in the guard's list too — a helper missing from the
 # list is the helper-skew hole the guard-list fix closes. Same boundary
-# anchor, same stripped source.
+# anchor, same stripped source. The extraction carries an emptiness
+# probe (#455 a C2): an empty list would run the loop zero times and
+# pass vacuously, and the harness contract puts that probe on the
+# caller.
 _pg_hmissing=""
-for _fn in $(grep -oE '^[A-Za-z_][A-Za-z_0-9]*\(\) \{' "$LIB" | sed 's/() {//' | sort -u); do
+_pg_libfns="$(grep -oE '^[A-Za-z_][A-Za-z_0-9]*\(\) \{' "$LIB" | sed 's/() {//' | sort -u)"
+[ -n "$_pg_libfns" ] || _pg_hmissing="(lib function extraction empty)"
+for _fn in $_pg_libfns; do
     printf '%s\n' "$_pg_src_s" | grep -qE "(^|[[:space:]])$_fn([[:space:];]|\$)" ||
         _pg_hmissing="$_pg_hmissing $_fn"
 done
 if [ -z "$_pg_hmissing" ]; then
     pass "pairing guard list covers every function the lib defines (#452)"
 else
-    fail "functions defined by status-core.sh but absent from the guard:$_pg_hmissing (#452)"
+    fail "functions defined by status-core.sh but absent from the guard:$_pg_hmissing (#452, #455 a C2)"
 fi
 
 # --- progress tee under hostile PYTHONHOME (#249) ---------------------------------
