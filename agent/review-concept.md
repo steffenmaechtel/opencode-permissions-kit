@@ -543,6 +543,23 @@ Four places carry review knowledge, each with exactly one job:
   per "Parallel reviewer agents". When a prior round's verdict was
   reached by reasoning alone, the successor executes at least one
   representative failure path of it. (RM-0112)
+- Sabotage spot-checks run only against SECURED work — a PER-CYCLE
+  invariant, not one-time phase preparation: every single cycle starts
+  from a verified-clean tree (`git status --porcelain` empty for the
+  target file; commit or `git stash` uncommitted work first). A
+  restore (`git checkout --`/`git restore`) resets the file to its
+  INDEX state and silently wipes every edit since the last commit —
+  PR #441 round b D1 lost a fix exactly that way, in the SECOND cycle:
+  the first was committed, then a fresh marker edit landed between
+  cycles. Restore verification is content-based, never rc-based: grep
+  the construct the fix introduced — rc 0 holds for the pre-fix and
+  post-fix version alike, rc cannot see the wipe by construction; and
+  an `--amend` that commits nothing new after an edit means the edit
+  was already wiped — grep before amending. The full rule lives in
+  AGENTS.md Testing ("Sabotage-verify only against secured work"),
+  sharpened 2026-11-10 after the PR-#441 recurrence and restated here
+  and in [learnings.md](learnings.md) L4, the pages the mutating
+  session reads. (RM-0139)
 
 ## Suites are the standing review
 
