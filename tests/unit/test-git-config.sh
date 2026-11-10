@@ -409,7 +409,7 @@ case "$acr_out" in *rc=1*) pass "render: unknown mode rejected (rc=1)" ;; *) fai
 # the real git_config_apply, inject an uncreatable TMPDIR
 # (uid-independent failure injection), stub the collaborators: die
 # fires in the family wording BEFORE any render/write/track runs.
-_gcag_block="$(sed -n '/^git_config_apply() {/,/^}/p' "$CONFIG")"
+_gcag_block="$(extract_func "$CONFIG" git_config_apply)"
 if [ -n "$_gcag_block" ]; then
     pass "git_config_apply extractable (#431)"
     _gcag_rc=0
