@@ -121,8 +121,17 @@ run_case() {
     (
         # Everything inside: PATH (with the shims below), set -u (the B1
         # regression needs it), and the install.conf variables status.sh
-        # would have sourced by now.
-        PATH="$WORK:$PATH"
+        # would have sourced by now. A 4th argument replaces the PATH
+        # with JUST that directory (#440): the podman-CLI legs must not
+        # inherit the host PATH — a host podman would flip the
+        # NOT-installed leg exactly the way a host openchamber flipped
+        # the verdict matrix (the 0.0.46a F2 class; hermetic bin there
+        # since 0.0.48).
+        if [ -n "${4:-}" ]; then
+            PATH="$4"
+        else
+            PATH="$WORK:$PATH"
+        fi
         export PATH
         # Mirror status.sh's own shell flags: set -u yes (that is the B1
         # regression), but NOT set -e — the subshell inherits errexit from
@@ -178,18 +187,34 @@ fi
 #    shim fails the test. NOTE: the shim must actually be IN the PATH of
 #    run_case's subshell (see run_case) — a `PATH=... cmd; f` prefix would
 #    apply the assignment only to `cmd`, never to f.
+# The shim's prompt marker ($SUDO_PROMPT_MARKER, #440) is the observable
+# channel for "no interactive sudo": the arm's own 2>/dev/null on the
+# sudo call swallows the shim's stderr echo, so judging the captured
+# output would prove nothing (the 0.0.46b W1 class — observe the message
+# the way production does). Every leg that can reach sudo deletes the
+# marker first and asserts it never appeared.
+SUDO_PROMPT_MARKER="$WORK/sudo-prompt.marker"
+export SUDO_PROMPT_MARKER
+rm -f "$SUDO_PROMPT_MARKER"
 cat >"$WORK/sudo" <<'EOF'
 #!/bin/sh
-# fail on any interactive sudo attempt: -n must already be in the args
+# fail on any interactive sudo attempt: -n must already be in the args;
+# a prompt attempt also touches $SUDO_PROMPT_MARKER so callers that
+# discard stderr stay observable
 case " $* " in
     *" -n "*) exit 1 ;;
-    *) echo "PROMPT-ATTEMPT" >&2; exit 42 ;;
+    *)
+        echo "PROMPT-ATTEMPT" >&2
+        : >"${SUDO_PROMPT_MARKER:?}"
+        exit 42
+        ;;
 esac
 EOF
 chmod +x "$WORK/sudo"
 out=$(run_case "docker-rootless" "unix:///run/user/99999/docker.sock" "" || true)
 if printf '%s' "$out" | grep -q "NOT reachable" &&
-    ! printf '%s' "$out" | grep -qE 'PROMPT-ATTEMPT|parameter not set'; then
+    ! printf '%s' "$out" | grep -q "parameter not set" &&
+    [ ! -f "$SUDO_PROMPT_MARKER" ]; then
     pass "docker-rootless: unreachable socket reported without sudo prompt"
 else
     fail "docker-rootless: unreachable socket reported without sudo prompt (out=$out)"
@@ -203,15 +228,105 @@ fi
 mkdir -p "$WORK/locked-runtime"
 chmod 700 "$WORK/locked-runtime" # 700 of a nonexistent other user is untestable; 000 works for everyone
 chmod 000 "$WORK/locked-runtime"
+rm -f "$SUDO_PROMPT_MARKER"
 out=$(run_case "docker-rootless" "unix://$WORK/locked-runtime/docker.sock" "" || true)
 if printf '%s' "$out" | grep -q "unknown — needs root to check" &&
     ! printf '%s' "$out" | grep -q "NOT reachable" &&
-    ! printf '%s' "$out" | grep -qE 'PROMPT-ATTEMPT|parameter not set'; then
+    ! printf '%s' "$out" | grep -q "parameter not set" &&
+    [ ! -f "$SUDO_PROMPT_MARKER" ]; then
     pass "docker-rootless: socket in inaccessible runtime dir reports unknown (needs root)"
 else
     fail "docker-rootless: socket in inaccessible runtime dir reports unknown (needs root) (out=$out)"
 fi
 chmod 755 "$WORK/locked-runtime" 2>/dev/null || true
+
+# e)–h) podman-rootless run_case legs (issue #440): the podman arm of
+#    status_section_backend — the backend row, the optional socket probe
+#    with the docker twin's unknown-vs-red geometry, and the daemonless
+#    podman-CLI fallback — was pinned structurally only
+#    (test-container-backend.sh rows/dispatch, #403/#439); no behavioral
+#    leg executed the arm, so probe-logic drift from the docker twin or
+#    a set -u crash inside the arm (the B1 class this harness exists
+#    for) would ship green for podman. Legs mirror the docker-rootless
+#    geometry of c)/d) above.
+
+# e) podman + configured socket that does not exist: NOT reachable, and
+#    the probe must not prompt (sudo -n — same shim and marker channel
+#    as the docker twin).
+rm -f "$SUDO_PROMPT_MARKER"
+out=$(run_case "podman-rootless" "" "unix:///run/user/99999/podman.sock" || true)
+if printf '%s' "$out" | grep -q "NOT reachable" &&
+    ! printf '%s' "$out" | grep -q "parameter not set" &&
+    [ ! -f "$SUDO_PROMPT_MARKER" ]; then
+    pass "podman-rootless: unreachable socket reported without sudo prompt"
+else
+    fail "podman-rootless: unreachable socket reported without sudo prompt (out=$out)"
+fi
+
+# f) podman + socket inside a NON-TRAVERSABLE runtime dir: unknown —
+#    needs root, never red (same production geometry as the docker twin:
+#    000 works for every non-root caller; the suite itself must not run
+#    as root for the same reason).
+mkdir -p "$WORK/locked-runtime-podman"
+chmod 000 "$WORK/locked-runtime-podman"
+rm -f "$SUDO_PROMPT_MARKER"
+out=$(run_case "podman-rootless" "" "unix://$WORK/locked-runtime-podman/podman.sock" || true)
+if printf '%s' "$out" | grep -q "unknown — needs root to check" &&
+    ! printf '%s' "$out" | grep -q "NOT reachable" &&
+    ! printf '%s' "$out" | grep -q "parameter not set" &&
+    [ ! -f "$SUDO_PROMPT_MARKER" ]; then
+    pass "podman-rootless: socket in inaccessible runtime dir reports unknown (needs root)"
+else
+    fail "podman-rootless: socket in inaccessible runtime dir reports unknown (needs root) (out=$out)"
+fi
+chmod 755 "$WORK/locked-runtime-podman" 2>/dev/null || true
+
+# The podman-CLI legs (g/h) run WITHOUT the host PATH: a host podman
+# (the maintainer machine develops podman-rootless support) would flip
+# the NOT-installed leg exactly the way a host openchamber flipped the
+# verdict matrix (0.0.46a F2 class, hermetic bin since 0.0.48). The bin
+# carries just the --version pipeline's externals (sed/head); the
+# socket-less arm calls no sudo, so no shim is needed. run_case's 4th
+# argument switches its subshell to this PATH alone.
+PODMAN_HERMIT="$WORK/podman-hermit-bin"
+mkdir -p "$PODMAN_HERMIT"
+_hmiss=""
+for _t in sed head; do
+    if _tp="$(command -v "$_t" 2>/dev/null)"; then
+        ln -s "$_tp" "$PODMAN_HERMIT/$_t"
+    else
+        _hmiss="$_t $_hmiss"
+    fi
+done
+if [ -z "$_hmiss" ]; then
+    pass "podman hermetic bin complete (sed/head linked)"
+else
+    fail "podman hermetic bin incomplete: $_hmiss"
+fi
+
+# g) podman + no socket + podman CLI absent from the hermetic PATH: the
+#    red NOT-installed row (daemonless podman is the only way ddev
+#    could run on this backend — its absence is a finding).
+out=$(run_case "podman-rootless" "" "" "$PODMAN_HERMIT" || true)
+if printf '%s' "$out" | grep -qE 'podman CLI[[:space:]]+NOT installed' &&
+    ! printf '%s' "$out" | grep -q "parameter not set"; then
+    pass "podman-rootless: no socket + no podman CLI reports NOT installed"
+else
+    fail "podman-rootless: no socket + no podman CLI reports NOT installed (out=$out)"
+fi
+
+# h) control: the same leg with a stub podman on the hermetic PATH —
+#    the installed row must carry the version parsed from --version.
+printf '#!/bin/sh\necho "podman version 5.4.2"\n' >"$PODMAN_HERMIT/podman"
+chmod +x "$PODMAN_HERMIT/podman"
+out=$(run_case "podman-rootless" "" "" "$PODMAN_HERMIT" || true)
+if printf '%s' "$out" | grep -qE 'podman CLI[[:space:]]+installed[[:space:]]+\(5\.4\.2\)' &&
+    ! printf '%s' "$out" | grep -q 'NOT installed' &&
+    ! printf '%s' "$out" | grep -q "parameter not set"; then
+    pass "podman-rootless: daemonless install reported via stub podman --version"
+else
+    fail "podman-rootless: daemonless install reported via stub podman --version (out=$out)"
+fi
 
 # --- 1b. root-equivalent access audit (issue #37) --------------------------------
 # The audit ships two pure helpers (stat math only); they are extracted and
