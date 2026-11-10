@@ -339,12 +339,18 @@ grep -q 'pre-install exception: full mode exits 0' "$REPO_ROOT/docs/reference/cl
 # child stops at the guard, before any check -- the re-run is cheap).
 # Sabotage discriminator: with the guard deleted the child exits 0 and
 # prints the silent OK -- exactly the silent-green this pin forbids.
-_b1_rc=0
-_b1_out="$(TMPDIR="$REPO_ROOT/.no-such-tmp-opk-441" sh "$SCRIPT_DIR/test-docs.sh" 2>&1)" ||
-    _b1_rc=$?
-if [ "$_b1_rc" -ne 1 ] ||
-    ! printf '%s' "$_b1_out" | grep -qF 'scratch creation failed'; then
-    echo "FAIL test-docs itself: dead-TMPDIR run must abort loud, not pass silently (rc=$_b1_rc out=$_b1_out) (#441 a B1)" >>"$TMP"
+# The OPK_DOCS_B1_CHILD marker is the recursion break (#441 b D1):
+# with the guard deleted -- or the sentinel dir accidentally existing
+# -- the child would otherwise reach THIS pin and spawn another child
+# forever (the round-a draft hang; each level is a full suite run).
+if [ -z "${OPK_DOCS_B1_CHILD:-}" ]; then
+    _b1_rc=0
+    _b1_out="$(OPK_DOCS_B1_CHILD=1 TMPDIR="$REPO_ROOT/.no-such-tmp-opk-441" \
+        sh "$SCRIPT_DIR/test-docs.sh" 2>&1)" || _b1_rc=$?
+    if [ "$_b1_rc" -ne 1 ] ||
+        ! printf '%s' "$_b1_out" | grep -qF 'scratch creation failed'; then
+        echo "FAIL test-docs itself: dead-TMPDIR run must abort loud, not pass silently (rc=$_b1_rc out=$_b1_out) (#441 a B1)" >>"$TMP"
+    fi
 fi
 
 if [ -s "$TMP" ]; then
