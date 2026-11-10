@@ -465,6 +465,42 @@ else
     fail "functions defined by install-core.sh but absent from the guard:$_pg_hmissing (#452, #455 a C2)"
 fi
 
+# --- 9b. cross-lib stub rider (#456): core-called lib functions stay stubbed ------
+# The #250 stub sweep covered the functions the ENTRY calls from the
+# kit_source'd libs; #456 closes the twin it missed: functions the CORE
+# calls from those same libs (agent_home_sane was the live example — 14
+# gated call sites, no stub: a truncated staged-write.sh would have
+# rc-127'd the ddev phase under set -e). STRONGEST form — every
+# function defined by ANY sh/ lib (ui.sh exempt: its surface is the
+# used-set guard's, own rider in test-ui.sh) and CALLED by entry or
+# core (word-boundary, not the definition paren) must be DEFINED in
+# install.sh itself — a stub arm or fallback — so a present-but-
+# truncated lib can never rc-127 a bare call, and a call into a lib
+# nothing sources fails the same way. Comment-stripped both sides
+# (conventions.md "Source-counting pins"); stub-only names (defined,
+# never called) are out of scope — staleness, not a gap.
+_xl_missing=""
+_xl_combined="$(
+    sed 's/^[[:space:]]*#.*$//' "$INSTALL"
+    sed 's/^[[:space:]]*#.*$//' "$LIB"
+)"
+_xl_entry_s="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL")"
+[ -n "$_xl_combined" ] || _xl_missing="(stripped entry+core extraction empty)"
+for _xl_lib in "$SCRIPT_DIR"/../../files/opencode-permissions-kit-lib/sh/*.sh; do
+    case $_xl_lib in */ui.sh) continue ;; esac
+    for _xl_fn in $(grep -oE '^[[:space:]]*[a-zA-Z_][a-zA-Z0-9_]*\(\)' "$_xl_lib" | tr -d '[:space:]()'); do
+        printf '%s\n' "$_xl_combined" | grep -qE "(^|[^a-zA-Z0-9_])${_xl_fn}([^a-zA-Z0-9_(]|$)" ||
+            continue
+        printf '%s\n' "$_xl_entry_s" | grep -qE "(^|[|;[:space:]])${_xl_fn}\(\)" ||
+            _xl_missing="$_xl_missing $_xl_fn"
+    done
+done
+if [ -z "$_xl_missing" ]; then
+    pass "every lib function entry-or-core calls is stubbed in install.sh (#456)"
+else
+    fail "lib functions called but not stubbed in install.sh:$_xl_missing (#456)"
+fi
+
 # --- 8. LOWS-1 (#371/#372/#340): install.sh residual hygiene ----------------------
 
 # A1 + review a S1/P4 (#424 a): the agent-user gitconfig backup is

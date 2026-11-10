@@ -39,8 +39,9 @@ PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
 
 # Shared UI helpers (checkout-first, 0.0.46a F4 pattern like ddev-handover
 # below): the checkout's status.sh needs its OWN ui.sh — the deployed one
-# can predate ui_kv_ok/ui_kv_bad (issue #158) and would drop those rows.
-# A deployed run resolves to the identical file anyway.
+# can predate ui_kv_ok/ui_kv_bad (issue #158) and would drop those rows
+# (a skew the used-set guard right after the resolver now refuses loud,
+# #456). A deployed run resolves to the identical file anyway.
 # Caller-dir anchor (#405; #434 readlink alignment, #433 hardening): the
 # lib resolvers below are checkout-first (a checkout status.sh renders
 # its own libs). The dir resolves through readlink -f like uninstall.sh's
@@ -76,6 +77,29 @@ else
     echo "error: ui.sh not found (expected $LIBDIR/sh/ui.sh or next to status.sh in a checkout)" >&2
     exit 1
 fi
+
+# UI used-set guard (#456, the #455 a Q1 mechanism): the resolver above
+# dies loud on a MISSING ui.sh, but a PRESENT-but-older one (the issue
+# #158 shape — a deployed ui.sh predating ui_kv_ok/ui_kv_bad, e.g. after
+# a partial update) used to pass silently: status is fail-soft, so every
+# missing ui_* call just rc-127s, the verdict rows vanish AND the
+# UI_ROWS_* counters they bump vanish with them — the summary tallies a
+# broken report green. That is a wiring error, not a probe failure, and
+# gets the same answer as status_pairing_guard below: refuse loud,
+# whole report, before any section renders (exit 1 — a wiring abort is
+# not a verdict and must not collide with the --short probe codes). The
+# list is every ui function the entry AND status-core call (the
+# test-suite riders enforce both directions).
+status_ui_pairing_guard() {
+    for _sup in ui_info ui_warn ui_detail ui_section ui_banner \
+        ui_have ui_atten ui_miss ui_kv ui_kv_warn ui_kv_ok ui_kv_bad; do
+        command -v "$_sup" >/dev/null 2>&1 || {
+            echo "error: function '$_sup' missing from ui.sh — version-skewed (older or truncated), refusing to run" >&2
+            return 1
+        }
+    done
+}
+status_ui_pairing_guard || exit 1
 
 # Shared git check (issue #118): the soft tested floor for the Core row.
 # Checkout-first for the same reason as ui.sh above: an older deployed
@@ -173,9 +197,11 @@ fi
 # the helpers the sections call internally (#452, the doctor precedent:
 # a missing helper degraded rows silently behind a green summary, e.g.
 # a missing _st_ddev_scan skipped whole scan verdicts). Functions from
-# other sourced libs — ui.sh included, see the resolver note above —
-# are deliberately outside this guard; only the core pairing is pinned
-# (#455 a Q1). The list is kept equal to
+# other sourced libs sit outside this guard by design — the core
+# pairing is what is pinned here; the ui.sh surface is pinned by the
+# used-set guard after the resolver above, the git-check row by its
+# command -v call site (#456, closing the #455 a Q1 boundary). The
+# list is kept equal to
 # status-core.sh's function definitions (the test-suite completeness
 # riders enforce both directions).
 status_pairing_guard() {

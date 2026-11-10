@@ -861,7 +861,14 @@ _st_ddev_share_scan() {
     if [ -f "$_st_dhl" ] && [ "$(id -u)" != "$(id -u "$OPENCODE_USER" 2>/dev/null || echo 1)" ]; then
         # shellcheck disable=SC1090  # checkout or deployed lib, resolved above
         . "$_st_dhl"
-        if [ -f "$PROJECTS_CONF" ] && [ -s "$PROJECTS_CONF" ]; then
+        # Truncation gate (#456, the db-dump gate's pattern): a
+        # present-but-truncated ddev-handover.sh would rc-127 the probe
+        # under every project — each `|| continue` swallows the failure
+        # and the whole scan vanishes behind a green summary. One
+        # counted warn row instead (#165 class).
+        if ! command -v ddev_reshare_needed >/dev/null 2>&1; then
+            ui_kv_warn "ddev share" "not checked — kit file sh/ddev-handover.sh outdated (fix: sudo opk update)"
+        elif [ -f "$PROJECTS_CONF" ] && [ -s "$PROJECTS_CONF" ]; then
             while IFS= read -r _st_root; do
                 [ -z "$_st_root" ] && continue
                 [ -d "$_st_root" ] || continue
@@ -1044,27 +1051,38 @@ _st_ddev_db_dumps() {
     if [ -n "$DEFAULT_USER" ] && [ -f "$LIBDIR/sh/ddev-migrate.sh" ]; then
         # shellcheck disable=SC1090
         . "$LIBDIR/sh/ddev-migrate.sh"
-        # Roots ride positional parameters, one per line from projects.conf
-        # (0.0.44a V18): the old `tr '\n' ' '` + unquoted call word-split a
-        # spaced root (hand-edited conf) into bogus "roots" and spurious
-        # INCOMPLETE/NONE diagnostics. ddev_migrate_gap/ddev_migrate_projects
-        # take roots one-per-argument; the function keeps the script's own
-        # "$@" intact and skips empty lines.
-        if [ -f "$PROJECTS_CONF" ]; then
-            # Redirect, not a pipe (issue #158): _st_dbdump_gap's ui_kv_warn
-            # rows must run in the MAIN shell so the summary's severity
-            # counters see them — a `grep | _st_dbdump_gap` pipeline would
-            # count inside the pipe's subshell and lose the tally.
-            # 0.0.48b W2: same fail-loud rule as the share scan — never a
-            # /dev/null fallback for a failed mktemp.
-            _st_gap_roots=$(mktemp) || _st_gap_roots=""
-            if [ -z "$_st_gap_roots" ]; then
-                ui_kv_warn "db dumps" "gap scan skipped — mktemp failed (check TMPDIR / /tmp)"
-            else
-                grep -v '^[[:space:]]*$' "$PROJECTS_CONF" 2>/dev/null >"$_st_gap_roots" || true
-                _st_dbdump_gap "$DEFAULT_USER" <"$_st_gap_roots" || true
-                rm -f "$_st_gap_roots"
+        # Truncation gate (#456, the git_status_row pattern above): a
+        # PRESENT-but-truncated ddev-migrate.sh would rc-127 the gap
+        # probe silently — the row and its severity counter vanish
+        # behind a green summary. A counted warn row instead, exactly
+        # like the missing-file arm below (#165 class).
+        if command -v ddev_migrate_gap >/dev/null 2>&1 &&
+            command -v ddev_migrate_projects >/dev/null 2>&1 &&
+            command -v ddev_migrate_home >/dev/null 2>&1; then
+            # Roots ride positional parameters, one per line from projects.conf
+            # (0.0.44a V18): the old `tr '\n' ' '` + unquoted call word-split a
+            # spaced root (hand-edited conf) into bogus "roots" and spurious
+            # INCOMPLETE/NONE diagnostics. ddev_migrate_gap/ddev_migrate_projects
+            # take roots one-per-argument; the function keeps the script's own
+            # "$@" intact and skips empty lines.
+            if [ -f "$PROJECTS_CONF" ]; then
+                # Redirect, not a pipe (issue #158): _st_dbdump_gap's ui_kv_warn
+                # rows must run in the MAIN shell so the summary's severity
+                # counters see them — a `grep | _st_dbdump_gap` pipeline would
+                # count inside the pipe's subshell and lose the tally.
+                # 0.0.48b W2: same fail-loud rule as the share scan — never a
+                # /dev/null fallback for a failed mktemp.
+                _st_gap_roots=$(mktemp) || _st_gap_roots=""
+                if [ -z "$_st_gap_roots" ]; then
+                    ui_kv_warn "db dumps" "gap scan skipped — mktemp failed (check TMPDIR / /tmp)"
+                else
+                    grep -v '^[[:space:]]*$' "$PROJECTS_CONF" 2>/dev/null >"$_st_gap_roots" || true
+                    _st_dbdump_gap "$DEFAULT_USER" <"$_st_gap_roots" || true
+                    rm -f "$_st_gap_roots"
+                fi
             fi
+        else
+            ui_kv_warn "db dumps" "not checked — kit file sh/ddev-migrate.sh outdated (fix: sudo opk update)"
         fi
     elif [ -n "$DEFAULT_USER" ]; then
         # Issue #165: same broken-kit class as the other lib guards — the

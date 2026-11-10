@@ -748,44 +748,51 @@ else
 fi
 rm -rf "$_pb_w"
 
-# --- ui.sh-less fallback (0.0.45c C5) --------------------------------------------
-# A --yes run never prompts, so the fallback must carry EVERY output
-# helper for its whole run — the old block lacked ui_have/ui_atten/
-# ui_add/ui_miss and a ui.sh-less --yes install died rc 127 at the
-# inventory's first ui_have, before any prompt. The local _ui_read
-# fallback was dead code (only ui.sh's prompt helpers call it) and is
-# gone with them.
-_uifb=$(sed -n '/^    ui_info() { echo "  info     $1"; }$/,/^    UI_GREEN=/p' "$INSTALL")
-if [ -n "$_uifb" ]; then
-    if printf '%s\n' "$_uifb" | grep -q 'ui_have()' &&
-        printf '%s\n' "$_uifb" | grep -q 'ui_atten()' &&
-        printf '%s\n' "$_uifb" | grep -q 'ui_add()' &&
-        printf '%s\n' "$_uifb" | grep -q 'ui_miss()'; then
-        pass "ui.sh-less fallback defines the inventory helpers (C5)"
-    else
-        fail "ui.sh-less fallback defines the inventory helpers (C5)"
-    fi
-    if printf '%s\n' "$_uifb" | grep -q '_ui_read'; then
-        fail "dead local _ui_read fallback removed (C5)"
-    else
-        pass "dead local _ui_read fallback removed (C5)"
-    fi
-    # Process-log label alignment (maintainer PR review 2026-10-08): ui.sh's
-    # _ui_label prints a 7-char label field + 2 separator spaces, so the
-    # message starts at column 11 — the echo stubs must match that exactly,
-    # or a degraded (ui.sh-less) run misaligns its lines against the ui.sh
-    # path. Verbatim pin: c80da5d slipped a stray space into ui_error's
-    # label (unlisted in its message, unseen by reviews b–f).
-    if printf '%s\n' "$_uifb" | grep -qF 'ui_info() { echo "  info     $1"; }' &&
-        printf '%s\n' "$_uifb" | grep -qF 'ui_success() { echo "  success  $1"; }' &&
-        printf '%s\n' "$_uifb" | grep -qF 'ui_warn() { echo "  warn     $1"; }' &&
-        printf '%s\n' "$_uifb" | grep -qF 'ui_error() { echo "  error    $1" >&2; }'; then
-        pass "fallback process-log labels match ui.sh's column-11 alignment (PR review)"
-    else
-        fail "fallback process-log labels match ui.sh's column-11 alignment (PR review)"
-    fi
+# --- ui.sh resolution (#456: kit_source + used-set guard) -------------------------
+# The 0.0.45c C5 fallback is RETIRED: ui.sh rides the same fetch as the
+# twelve other kit_source'd libs, so a ui.sh-less tree is a broken fetch
+# and must refuse loud (kit_source's missing-lib error) instead of
+# proceeding with degraded output helpers behind a green run — the #165
+# silent-degradation class. The used-set guard closes the twin C5 could
+# not see: a PRESENT-but-truncated/older ui.sh (fallback stubs never
+# fire, bare ui_* calls rc-127 under set -e mid-install).
+if sed 's/^[[:space:]]*#.*$//' "$INSTALL" |
+    grep -qF 'kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ui.sh"'; then
+    pass "ui.sh rides kit_source — a ui.sh-less run dies loud as a broken fetch (#456)"
 else
-    fail "ui.sh-less fallback block extractable (C5)"
+    fail "install.sh must kit_source ui.sh like every other lib (#456)"
+fi
+if sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -q 'ui_info() { echo'; then
+    fail "the retired C5 output-stub fallback is fully removed (#456)"
+else
+    pass "the retired C5 output-stub fallback is fully removed (#456)"
+fi
+_uig_src="$(extract_func "$INSTALL" install_ui_pairing_guard)"
+if [ -n "$_uig_src" ]; then
+    pass "install_ui_pairing_guard extractable from install.sh (#456)"
+else
+    fail "install_ui_pairing_guard extractable from install.sh (#456)"
+fi
+_uig_rc=0
+_uig_out="$(sh -c 'eval "$1"; install_ui_pairing_guard' _ "$_uig_src" 2>&1)" || _uig_rc=$?
+if [ "$_uig_rc" -eq 1 ] &&
+    printf '%s' "$_uig_out" | grep -qF "function 'ui_info' missing from ui.sh" &&
+    printf '%s' "$_uig_out" | grep -qF "version-skewed"; then
+    pass "ui guard refuses a skewed/truncated ui.sh naming the function (#456)"
+else
+    fail "ui guard must refuse a skewed ui.sh (rc=$_uig_rc out=$_uig_out) (#456)"
+fi
+_uig_full=$(sh -c 'eval "$1"; . "$2"; install_ui_pairing_guard; echo "rc=$?"' _ \
+    "$_uig_src" "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/ui.sh" 2>&1)
+if printf '%s' "$_uig_full" | grep -q 'rc=0'; then
+    pass "ui guard passes against the real ui.sh (every used function defined) (#456)"
+else
+    fail "ui guard must pass against the real ui.sh (out=$_uig_full) (#456)"
+fi
+if sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -qF 'install_ui_pairing_guard || exit 1'; then
+    pass "install.sh wires the ui guard right after the ui.sh kit_source (#456)"
+else
+    fail "install.sh must call the ui guard after sourcing ui.sh (#456)"
 fi
 
 # --- root-shell guard (issue #192) ---------------------------------------------
