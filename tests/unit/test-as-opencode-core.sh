@@ -147,22 +147,67 @@ if [ -n "$_src_ln" ] && [ -n "$_guard_ln" ] && [ -n "$_first_ln" ] &&
 else
     fail "entry wiring order broken (src:$_src_ln guard:$_guard_ln first:$_first_ln)"
 fi
-# 4d. completeness rider (#453 a A2/B1/C5): the guard's list must cover
-# EVERY function the lib defines -- sections AND helpers -- extracted
-# from the lib itself, so a future helper addition that misses the
-# guard fails here (the old rider compared entry calls only and left
-# the 7 helpers uncovered).
-_libfns="$(grep -E '^[a-z_]+\(\) \{' "$LIB" | sed 's/() {//')"
-_uncov=""
-for _c in $_libfns; do
-    # trailing space-or-semicolon closes the prefix window (#453 b D1):
-    # a name that is a strict PREFIX of a listed one must not match
-    printf '%s' "$_pg_src" | grep -q " $_c[ ;]" || _uncov="$_uncov $_c"
+# 4d. completeness riders (#453 a A2/B1/C5, brought to the four-suite
+# standard by #457): the guard's list must cover EVERY function the lib
+# defines -- sections AND helpers -- extracted from the lib itself, so
+# a future helper addition that misses the guard fails here (the old
+# rider compared entry calls only and left the 7 helpers uncovered).
+# #457 fixes the substandard mechanics: the match source is a
+# comment-stripped copy of the guard source (the comment-survivor
+# trap was armed -- a comment inside wrapper_pairing_guard naming a
+# dropped function would have counted as coverage; no such comment
+# exists today, the raw-source match was the latent hazard, #459 a
+# B2), the extraction uses the family ERE (digit-bearing and
+# uppercase names visible, latent -- no such name exists among
+# today's 24 defs; the old '^[a-z_]+' form was blind to them), the
+# match is BOUNDARY-ANCHORED
+# (the old " $_c[ ;]" prefix shape let a strict-prefix name of a listed
+# one match, #453 b D1), and the extraction carries an emptiness probe
+# (#455 a C2 contract): an empty list must fail loud, not run the loop
+# zero times and pass vacuously.
+_pg_src_s="$(printf '%s\n' "$_pg_src" | sed 's/^[[:space:]]*#.*$//')"
+_pg_hmissing=""
+_pg_libfns="$(grep -oE '^[A-Za-z_][A-Za-z_0-9]*\(\) \{' "$LIB" | sed 's/() {//' | sort -u)"
+[ -n "$_pg_libfns" ] || _pg_hmissing="(lib function extraction empty)"
+for _fn in $_pg_libfns; do
+    printf '%s\n' "$_pg_src_s" | grep -qE "(^|[[:space:]])$_fn([[:space:];]|\$)" ||
+        _pg_hmissing="$_pg_hmissing $_fn"
 done
-if [ -z "$_uncov" ]; then
-    pass "guard list covers every lib-defined function ($(printf '%s\n' "$_libfns" | wc -l | tr -d ' ') names)"
+if [ -z "$_pg_hmissing" ]; then
+    pass "guard list covers every lib-defined function ($(printf '%s\n' "$_pg_libfns" | wc -l | tr -d ' ') names)"
 else
-    fail "guard list misses function(s):$_uncov"
+    fail "guard list misses function(s):$_pg_hmissing"
+fi
+# 4e. completeness rider (entry direction, #457): every function the
+# ENTRY calls at col 0 (the run sequence) plus the standalone_mode
+# gate -- whose call shape `case $(standalone_mode "$@") in` does NOT
+# put the name at col 0, so the extraction normalizes it first
+# (#459 a B1: the original form claimed the gate while the anchored
+# grep could never see it; class sweep: this is the only non-col-0
+# call of a covered function in THIS entry -- the sibling entries are
+# covered by their own extraction shapes: update's and uninstall's
+# riders tolerate indentation / whole-line calls, uninstall's one
+# mid-line call `ans=$(prompt_yn ...)` escapes its entry rider but
+# is forced into the guard by the lib-defs rider, #459 b C1) -- must
+# sit in the guard's list too. The #453 fix had replaced the old
+# entry-calls rider with the lib-defs rider above, so the wrapper's
+# own calls were enforced by nothing (latent: no unguarded call
+# exists today, verified at #457 filing). Same stripped guard source,
+# same boundary anchor, same emptiness probe as 4d.
+_pg_missing=""
+_pg_entfns="$(sed 's/^[[:space:]]*#.*$//' "$ENTRY" |
+    sed 's/^case \$(standalone_mode.*/standalone_mode/' |
+    grep -oE '^(wrapper_[a-z_0-9]+|openchamber_guard|standalone_mode)' |
+    grep -v '^wrapper_pairing_guard$' | sort -u)"
+[ -n "$_pg_entfns" ] || _pg_missing="(entry call extraction empty)"
+for _fn in $_pg_entfns; do
+    printf '%s\n' "$_pg_src_s" | grep -qE "(^|[[:space:]])$_fn([[:space:];]|\$)" ||
+        _pg_missing="$_pg_missing $_fn"
+done
+if [ -z "$_pg_missing" ]; then
+    pass "guard list covers every function the entry calls (#457)"
+else
+    fail "functions called by opencode-as-opencode but absent from the guard:$_pg_missing (#457)"
 fi
 
 suite_done "as-opencode-core lib tests"

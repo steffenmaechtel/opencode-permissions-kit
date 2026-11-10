@@ -170,8 +170,14 @@ legs) counts behind a comment-strip rider —
 commented-out construct stops counting (the survivor trap, #261/#244 g
 W1). Absence pins (`= 0`) are out of scope — a commented-out forbidden
 line SHOULD keep counting there — and so are deliberate bare control
-arms (the #261 pin's own un-ridden leg). Full-line strip only (#244 h
-W6 residual: trailing comments after live lines still count). Piped
+arms (the #261 pin's own un-ridden leg). A presence pin whose pinned
+literal is itself a full-line comment is the recorded INVERSION of
+this rule: the rider would delete the pinned bytes and make the pin
+unmatchable — such a site (the documented-disposition marker pin
+`'#428 disposition'` in `test-install-core.sh`) carries an in-place
+annotation naming the inversion instead of the rider (#459 a B3).
+Full-line strip only (#244 h W6 residual: trailing comments after
+live lines still count). Piped
 shapes (`grep -c … | grep -q "^[N-M]$"`) carry the rider but no
 `|| true`: the rc must come from the final `grep -q` so the check can
 fail; extraction-leg pipelines ending in a consumer (`cut -d: -f1`)

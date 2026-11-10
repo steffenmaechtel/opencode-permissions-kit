@@ -132,10 +132,16 @@ else
     fail "entry section order (first offender: $_fn)"
 fi
 # the projects guard stays in the entry around the call (the lib function
-# reads UNINSTALL_PROJECTS_CONF; the entry owns the conf existence check)
-if grep -qF 'if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then' "$UNINSTALL" &&
-    grep -qF '    un_projects_revert' "$UNINSTALL" &&
-    grep -qF 'done <"$UNINSTALL_PROJECTS_CONF"' "$LIB"; then
+# reads UNINSTALL_PROJECTS_CONF; the entry owns the conf existence check).
+# All three legs carry comment-strip riders (#458; the two $UNINSTALL
+# legs are the beyond-census sweep finds -- same class, same statement,
+# conventions.md "Source-counting pins" covers shipped sources, not
+# only $LIB): a commented-out wiring line must not count.
+if sed 's/^[[:space:]]*#.*$//' "$UNINSTALL" |
+    grep -qF 'if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then' &&
+    sed 's/^[[:space:]]*#.*$//' "$UNINSTALL" | grep -qF '    un_projects_revert' &&
+    sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    grep -qF 'done <"$UNINSTALL_PROJECTS_CONF"'; then
     pass "projects guard in the entry, conf redirect in the lib function"
 else
     fail "projects guard wiring (entry if + lib redirect)"
@@ -779,8 +785,9 @@ fi
 # when the invoking user could not read the agent home (group dropped,
 # different DEFAULT_USER), and userdel -r then deleted .agents/.claude
 # without the warning. An unreadable dir counts as NON-EMPTY now.
-if grep -qF 'sudo ls -A "$_un_ag_src"' "$LIB" &&
-    grep -qF '_un_ag_ls="probe-failed"' "$LIB"; then
+# Comment-strip riders (#458): commented-out gate lines must not count.
+if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'sudo ls -A "$_un_ag_src"' &&
+    sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF '_un_ag_ls="probe-failed"'; then
     pass "agents-backup gate: privileged probe + fail-safe on unreadable (C6)"
 else
     fail "agents-backup gate: privileged probe + fail-safe on unreadable (C6)"
@@ -793,8 +800,10 @@ fi
 # (different DEFAULT_USER, dropped membership in a fresh session): the
 # block was skipped silently and userdel -r deleted the resources with
 # no backup and no warning. Static pin: the privileged existence gate
-# is in, the unprivileged one is gone.
-if grep -qF 'if sudo test -d "$_un_ag_src"; then' "$LIB" &&
+# is in, the unprivileged one is gone. The positive leg carries a
+# comment-strip rider (#458); the absence leg stays un-ridden by
+# design (a commented-out forbidden line SHOULD keep counting).
+if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'if sudo test -d "$_un_ag_src"; then' &&
     ! grep -qF 'if [ -d "$_un_ag_src" ]; then' "$LIB"; then
     pass "agents-backup gate: existence probe rides sudo (W2)"
 else
@@ -893,10 +902,14 @@ if printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -x g:60002' &&
 else
     fail "ACL revert must remove BOTH principals (opencode group + dev group) via numeric gids (0.0.42g S1)"
 fi
-if grep -qF 'UN_DEV_GID=$(id -g "$DEFAULT_USER"' "$LIB" &&
-    grep -qF 'for _un_acl_pair in "opencode group:$UN_OC_GID" "dev group:$UN_DEV_GID"' "$LIB" &&
-    grep -qF 'project revert PARTIALLY completed' "$LIB" &&
-    grep -qF 'id unknown — its ACL entries left in place' "$LIB"; then
+# Comment-strip riders on all four legs (#458): the loop, the capture
+# line and both log literals must count only in live lines.
+if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'UN_DEV_GID=$(id -g "$DEFAULT_USER"' &&
+    sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    grep -qF 'for _un_acl_pair in "opencode group:$UN_OC_GID" "dev group:$UN_DEV_GID"' &&
+    sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'project revert PARTIALLY completed' &&
+    sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    grep -qF 'id unknown — its ACL entries left in place'; then
     pass "ACL revert: both gids captured, principal loop, loud per-principal skip + partial log (0.0.42f C2 + 0.0.42g S1 + 0.0.42h S1 + #218)"
 else
     fail "ACL revert: principal loop + loud skip + partial-log branch required (0.0.42h S1, #218)"
@@ -1260,9 +1273,12 @@ fi
 # rm fails — exactly the discrimination S2 needs.
 # #396 payoff: the section is un_config_dirs_remove now — sourced and
 # called below; the extraction pin became this def+content check.
+# Comment-strip riders (#458): commented-out section content must not
+# satisfy the pin.
 if command -v un_config_dirs_remove >/dev/null &&
-    grep -qF 'un_rc_q "rm /etc/opencode-permissions-kit"' "$LIB" &&
-    grep -qF 'openchamber policy pin removal FAILED' "$LIB"; then
+    sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'un_rc_q "rm /etc/opencode-permissions-kit"' &&
+    sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    grep -qF 'openchamber policy pin removal FAILED'; then
     pass "config-dirs section present + rc-observing (#243 a S1/S2)"
 else
     fail "config-dirs section content/rc observation (#243 a S1/S2)"
@@ -1365,8 +1381,11 @@ fi
 # #396 payoff: prompt_yn is sourced from the lib (PY_SRC below) — the
 # pty driver calls the real function; the [y/n] arms are pinned by the
 # py_pin legs. The [?] marker sweep covers BOTH files now (prompt_yn
-# lives in the lib; the entry must stay marker-free too).
-if grep -qF 'n | no)' "$LIB" && ! grep -qF '[?]' "$LIB" && ! grep -qF '[?]' "$UNINSTALL"; then
+# lives in the lib; the entry must stay marker-free too). The positive
+# leg carries a comment-strip rider (#458); the two [?] absence legs
+# stay un-ridden by design.
+if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'n | no)' &&
+    ! grep -qF '[?]' "$LIB" && ! grep -qF '[?]' "$UNINSTALL"; then
     pass "prompt_yn in the lib with n|no arm, no [?] marker anywhere"
 else
     fail "prompt_yn arms / [?] marker sweep (lib+entry)"
@@ -1853,8 +1872,13 @@ else
     fail "uninstall.sh must call the guard after sourcing uninstall-core.sh (#413)"
 fi
 _pg_missing=""
-for _fn in $(grep -oE '^[[:space:]]*(un_[a-z_0-9]+|prompt_yn)[[:space:]]*$' "$UNINSTALL" |
-    awk '{gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print}' | sort -u); do
+_pg_entfns="$(grep -oE '^[[:space:]]*(un_[a-z_0-9]+|prompt_yn)[[:space:]]*$' "$UNINSTALL" |
+    awk '{gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print}' | sort -u)"
+# emptiness probe (#457, the #455 a C2 contract -- the sibling-note
+# sweep): an empty extraction would run the loop zero times and the
+# rider would pass vacuously.
+[ -n "$_pg_entfns" ] || _pg_missing="(entry call extraction empty)"
+for _fn in $_pg_entfns; do
     printf '%s\n' "$_pg_src_s" | grep -qE "(^|[[:space:]])$_fn([[:space:];]|\$)" ||
         _pg_missing="$_pg_missing $_fn"
 done

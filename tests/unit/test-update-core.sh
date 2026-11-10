@@ -365,8 +365,13 @@ else
     fail "update.sh must call the guard after sourcing update-core.sh (#413)"
 fi
 _pg_missing=""
-for _fn in $(grep -oE '^[[:space:]]*update_[a-z_]+[[:space:]]*$' "$UPDATE" |
-    awk '{gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print}' | sort -u); do
+_pg_entfns="$(grep -oE '^[[:space:]]*update_[a-z_]+[[:space:]]*$' "$UPDATE" |
+    awk '{gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print}' | sort -u)"
+# emptiness probe (#457, the #455 a C2 contract -- the sibling-note
+# sweep): an empty extraction would run the loop zero times and the
+# rider would pass vacuously.
+[ -n "$_pg_entfns" ] || _pg_missing="(entry call extraction empty)"
+for _fn in $_pg_entfns; do
     printf '%s\n' "$_pg_src_s" | grep -qE "(^|[[:space:]])$_fn([[:space:];]|\$)" ||
         _pg_missing="$_pg_missing $_fn"
 done
@@ -545,8 +550,12 @@ if printf '%s\n' "$_b3p_out" | grep -qF 'warn: no durable backup dir available â
 else
     fail "binary upgrade backup base regression (out=$_b3p_out) (#376 B3)"
 fi
+# Comment-strip rider (conventions.md "Source-counting pins",
+# #458): the literal must count only in live lines -- a commented-out
+# backup line must not satisfy the pin. The pipeline rides inside the
+# sh -c (the check helper takes argv, not a pipe).
 check "binary upgrade backs up into the durable update dir (#377-less, #376 B3')" \
-    sh -c 'grep -qF "BACKUP_DIR=\"\$UPD_BACKUP_DIR/bin\"" "$1"' _ "$LIB"
+    sh -c 'sed "s/^[[:space:]]*#.*$//" "$1" | grep -qF "BACKUP_DIR=\"\$UPD_BACKUP_DIR/bin\""' _ "$LIB"
 # B4 class sweep: the upgrade flow's OWN mktemp (the candidate download
 # staging dir) gets the named-cause guard â€” set -e would abort the whole
 # update on the raw error; the guard degrades to the best-effort skip
