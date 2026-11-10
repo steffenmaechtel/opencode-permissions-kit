@@ -24,6 +24,31 @@
 #   assert_eq <desc> <expected> <actual>
 #                        string-equality assertion with expected/got
 #                        output on failure
+#   live_src <file>...   the canonical comment-strip rider (#460):
+#                        prints each file with full-line comments
+#                        stripped, concatenated in argument order. A
+#                        presence/count pin over a shipped or
+#                        repo-internal source observes only LIVE lines
+#                        (the survivor trap, #261/#244 g W1: a
+#                        temporarily commented-out pinned construct
+#                        stops counting). Full-line strip only --
+#                        trailing comments after live lines still count
+#                        (#244 h W6 residual, deliberate). The consumer
+#                        owns the rc: sed's own error surfaces on a
+#                        missing file, the downstream grep sees empty
+#                        input and the pin fails loud (no silent pass;
+#                        unlike extract_func there is no emptiness
+#                        ambiguity a -f guard would resolve).
+#   check_live <desc> <file> <grep-args...>
+#                        pass/fail around grep over the file's LIVE
+#                        lines -- the dominant single-file presence
+#                        shape (#460). The grep flags and pattern pass
+#                        through verbatim (-qF, -Eq, -c, --, …): call
+#                        sites keep their exact matching semantics,
+#                        only the rider moves inside. Multi-file shapes
+#                        stay `check … sh -c 'live_src "$1" "$2" |
+#                        grep …' _ A B` (boundary: one canonical
+#                        single-file sugar, no separator parsing).
 #   extract_func <file> <name>
 #                        print a top-level `name() { … }` definition
 #                        block from <file> (issue #396 — consolidating
@@ -104,6 +129,45 @@ check() {
 assert_eq() {
     _d="$1" _e="$2" _a="$3"
     if [ "$_e" = "$_a" ]; then pass "$_d"; else fail "$_d (expected [$_e] got [$_a])"; fi
+}
+
+# --- live_src / check_live (#460) ------------------------------------------------
+#
+# The comment-strip rider the conventions rule "Source-counting pins"
+# names canonical: BEFORE #460 the rider was a 40-byte magic sed string
+# duplicated inline at 200+ pin sites -- unauditable (the round-a
+# census needed a joined-continuation parser to find ~40 true positives
+# among 411 raw candidates), and every future rider-semantics change
+# (the deferred JSONC `//` decision) would have been another
+# cross-suite sweep. One named primitive makes the un-ridden census
+# class greppable and the semantics changeable in one place.
+live_src() {
+    # $@ = source files, stripped and concatenated in argument order.
+    # The strip expression is byte-identical to the historical inline
+    # rider; the multi-file loop concatenates so `grep -qF pat` matches
+    # if ANY file carries the live construct (presence semantics of
+    # `grep -qF pat A B`); count pins over several files stay per-file
+    # calls -- a concatenation sums them.
+    local _ls_f
+    for _ls_f in "$@"; do
+        sed 's/^[[:space:]]*#.*$//' "$_ls_f"
+    done
+}
+
+check_live() {
+    local _cl_desc="$1" _cl_file="$2"
+    shift 2
+    # Mirror of check's F6 guard: a conversion slip dropping the grep
+    # arguments must fail loud, never vacuously pass.
+    if [ "$#" -eq 0 ]; then
+        fail "$_cl_desc (check_live: no grep arguments given)"
+        return
+    fi
+    if live_src "$_cl_file" | grep "$@"; then
+        pass "$_cl_desc"
+    else
+        fail "$_cl_desc"
+    fi
 }
 
 extract_func() {
