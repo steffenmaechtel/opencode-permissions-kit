@@ -11,6 +11,10 @@
 # shape can pin:
 #   - sourcing purity: definitions only, zero top-level side effects
 #   - the three phases + the four wrapped helpers are defined by sourcing
+#   - the pairing guard (#413): real lib passes, truncated lib dies
+#     loud, and both completeness riders (every phase the entry calls
+#     AND every function the lib defines — comment-stripped,
+#     boundary-anchored)
 #   - install.sh resolves the lib via kit_source from $SCRIPT_DIR (the
 #     checkout/fetched tree) and has NO $LIBDIR fallback — install.sh
 #     never runs from the installed tree (presence-level; driving the
@@ -63,7 +67,13 @@ fi
 # install.sh never runs from the installed tree (re-deploys go through
 # update.sh), so a deployed-lib fallback could feed stale phases to a
 # newer streamed script — the resolver must stay kit_source/$SCRIPT_DIR.
-if grep -qF 'kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/install-core.sh"' "$INSTALL" &&
+# Comment-strip on the positive conjunct (conventions.md
+# "Source-counting pins", the #451 a Q3 shape): a commented-out
+# kit_source line must not satisfy the pin. The no-fallback ABSENCE leg
+# stays un-ridden (absence pins are out of scope — a commented-out
+# forbidden line SHOULD keep counting there).
+if sed 's/^[[:space:]]*#.*$//' "$INSTALL" |
+    grep -qF 'kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/install-core.sh"' &&
     ! grep -q 'LIBDIR/sh/install-core' "$INSTALL"; then
     pass "install.sh kit_sources install-core.sh from \$SCRIPT_DIR, no \$LIBDIR fallback"
 else
@@ -387,22 +397,31 @@ fi
 # --- 9. pairing guard (#413): a version-skewed entry/lib pairing dies loud -----------
 # kit_source dies loud on a missing FILE; the guard closes the
 # missing-FUNCTION twin (a truncated/incompletely-deployed core would
-# rc-127 the bare phase calls — a cryptic not-found abort). extract_func
-# pulls the guard from the entry; both directions in fresh children,
-# plus the completeness rider over the entry's own phase calls.
+# rc-127 the bare phase calls — a cryptic not-found abort, set -e
+# mid-install AFTER earlier phases ran). extract_func pulls the guard
+# from the entry; both directions in fresh children. The guard pins
+# EVERY function the run needs, phases AND helpers (#452 — a
+# helper-level skew aborts mid-install after partial work), plus two
+# completeness riders: every phase the entry calls AND every function
+# the lib defines. Both riders grep a comment-stripped copy of the
+# guard source (#452, conventions.md "Source-counting pins" over
+# extracted blocks) and match with BOUNDARY-ANCHORED EREs (plain -qF
+# would find phase names as substrings of helper names in the list and
+# a dropped name would false-pass).
 _pg_src="$(extract_func "$INSTALL" install_pairing_guard)"
+_pg_src_s="$(printf '%s\n' "$_pg_src" | sed 's/^[[:space:]]*#.*$//')"
 _pg_full=$(sh -c 'eval "$1"; . "$2"; install_pairing_guard; echo "rc=$?"' _ "$_pg_src" "$LIB" 2>&1)
 _pg_tr_rc=0
 _pg_tr_out="$(sh -c 'eval "$1"; install_pairing_guard' _ "$_pg_src" 2>&1)" || _pg_tr_rc=$?
 if printf '%s' "$_pg_full" | grep -q 'rc=0'; then
-    pass "pairing guard: real lib passes (every phase defined) (#413)"
+    pass "pairing guard: real lib passes (every function defined) (#413)"
 else
     fail "pairing guard must pass against the real lib (out=$_pg_full) (#413)"
 fi
 if [ "$_pg_tr_rc" -eq 1 ] &&
-    printf '%s' "$_pg_tr_out" | grep -qF "phase 'do_plan_phase' missing from install-core.sh" &&
+    printf '%s' "$_pg_tr_out" | grep -qF "function 'do_plan_phase' missing from install-core.sh" &&
     printf '%s' "$_pg_tr_out" | grep -qF "version-skewed entry/lib pairing"; then
-    pass "pairing guard: truncated lib dies loud naming the first missing phase (#413)"
+    pass "pairing guard: truncated lib dies loud naming the first missing function (#413)"
 else
     fail "pairing guard must refuse a skewed pairing (rc=$_pg_tr_rc out=$_pg_tr_out) (#413)"
 fi
@@ -413,12 +432,27 @@ else
 fi
 _pg_missing=""
 for _fn in $(grep -oE '^do_[a-z_]+$' "$INSTALL" | sort -u); do
-    printf '%s\n' "$_pg_src" | grep -qF "$_fn" || _pg_missing="$_pg_missing $_fn"
+    printf '%s\n' "$_pg_src_s" | grep -qE "(^|[[:space:]])$_fn([[:space:];]|\$)" ||
+        _pg_missing="$_pg_missing $_fn"
 done
 if [ -z "$_pg_missing" ]; then
     pass "pairing guard list covers every phase the entry calls (#413)"
 else
     fail "phases called by install.sh but absent from the guard:$_pg_missing (#413)"
+fi
+# completeness rider (helper direction, #452): every function the LIB
+# defines must sit in the guard's list too — a helper missing from the
+# list is the helper-skew hole the guard-list fix closes. Same boundary
+# anchor, same stripped source.
+_pg_hmissing=""
+for _fn in $(grep -oE '^[A-Za-z_][A-Za-z_0-9]*\(\) \{' "$LIB" | sed 's/() {//' | sort -u); do
+    printf '%s\n' "$_pg_src_s" | grep -qE "(^|[[:space:]])$_fn([[:space:];]|\$)" ||
+        _pg_hmissing="$_pg_hmissing $_fn"
+done
+if [ -z "$_pg_hmissing" ]; then
+    pass "pairing guard list covers every function the lib defines (#452)"
+else
+    fail "functions defined by install-core.sh but absent from the guard:$_pg_hmissing (#452)"
 fi
 
 # --- 8. LOWS-1 (#371/#372/#340): install.sh residual hygiene ----------------------

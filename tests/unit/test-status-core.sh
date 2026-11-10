@@ -7,6 +7,10 @@
 # pins what only the DECOMPOSED shape can pin:
 #   - sourcing purity: definitions only, zero top-level side effects
 #   - every section entry point + helper is defined by sourcing
+#   - the pairing guard (#413): real lib passes, truncated lib dies
+#     loud, and both completeness riders (every call the entry makes
+#     AND every function the lib defines — comment-stripped,
+#     boundary-anchored)
 #   - the Management section's --short gating, at function level
 #   - the Core section's missing-lib fallback row (git-check absent)
 #   - the Leak scan section's three verdict legs against a scratch
@@ -209,23 +213,30 @@ else
 fi
 
 # --- 7. pairing guard (#413): a version-skewed entry/lib pairing dies loud -----------
-# status is deliberately fail-soft (set -u only) — an undefined section
-# call does NOT abort, the report silently loses the section while the
+# status is deliberately fail-soft (set -u only) — an undefined call
+# does NOT abort, the report silently loses the section while the
 # summary still prints. The guard refuses the skewed pairing before any
-# section renders. Both directions in fresh children + completeness
-# rider over the entry's own section calls.
+# section renders; it pins EVERY function the run needs, sections AND
+# helpers (#452 — a helper-level skew would degrade rows silently
+# behind a green summary). Both directions in fresh children +
+# completeness riders over the entry's own calls and the lib's own
+# definitions.
 STATUS_ENTRY="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/status.sh"
 _pg_src="$(extract_func "$STATUS_ENTRY" status_pairing_guard)"
+# comment-stripped copy of the guard source for the riders below
+# (#452, conventions.md "Source-counting pins" over extracted blocks):
+# a comment inside the guard naming a function must not count.
+_pg_src_s="$(printf '%s\n' "$_pg_src" | sed 's/^[[:space:]]*#.*$//')"
 _pg_full=$(sh -c 'eval "$1"; . "$2"; status_pairing_guard; echo "rc=$?"' _ "$_pg_src" "$LIB" 2>&1)
 _pg_tr_rc=0
 _pg_tr_out="$(sh -c 'eval "$1"; status_pairing_guard' _ "$_pg_src" 2>&1)" || _pg_tr_rc=$?
 if printf '%s' "$_pg_full" | grep -q 'rc=0'; then
-    pass "pairing guard: real lib passes (every section defined) (#413)"
+    pass "pairing guard: real lib passes (every function defined) (#413)"
 else
     fail "pairing guard must pass against the real lib (out=$_pg_full) (#413)"
 fi
 if [ "$_pg_tr_rc" -eq 1 ] &&
-    printf '%s' "$_pg_tr_out" | grep -qF "section 'status_section_core' missing from status-core.sh" &&
+    printf '%s' "$_pg_tr_out" | grep -qF "function 'status_section_core' missing from status-core.sh" &&
     printf '%s' "$_pg_tr_out" | grep -qF "version-skewed entry/lib pairing"; then
     pass "pairing guard: truncated lib dies loud before any section renders (#413)"
 else
@@ -236,15 +247,36 @@ if sed 's/^[[:space:]]*#.*$//' "$STATUS_ENTRY" | grep -qF 'status_pairing_guard 
 else
     fail "status.sh must call the guard after sourcing status-core.sh (#413)"
 fi
+# completeness rider (entry direction): every section the entry CALLS
+# (the report order) must sit in the guard's list — a section added to
+# the run order without the guard is exactly the wiring bug #413
+# describes. The grep is BOUNDARY-ANCHORED (#452): plain -qF would find
+# section names as substrings of helper names in the list and a dropped
+# name would false-pass.
 _pg_missing=""
 for _fn in $(grep -oE '^[[:space:]]*status_section_[a-z_0-9]+[[:space:]]*$' "$STATUS_ENTRY" |
     awk '{gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print}' | sort -u); do
-    printf '%s\n' "$_pg_src" | grep -qF "$_fn" || _pg_missing="$_pg_missing $_fn"
+    printf '%s\n' "$_pg_src_s" | grep -qE "(^|[[:space:]])$_fn([[:space:];]|\$)" ||
+        _pg_missing="$_pg_missing $_fn"
 done
 if [ -z "$_pg_missing" ]; then
     pass "pairing guard list covers every section the entry calls (#413)"
 else
     fail "sections called by status.sh but absent from the guard:$_pg_missing (#413)"
+fi
+# completeness rider (helper direction, #452): every function the LIB
+# defines must sit in the guard's list too — a helper missing from the
+# list is the helper-skew hole the guard-list fix closes. Same boundary
+# anchor, same stripped source.
+_pg_hmissing=""
+for _fn in $(grep -oE '^[A-Za-z_][A-Za-z_0-9]*\(\) \{' "$LIB" | sed 's/() {//' | sort -u); do
+    printf '%s\n' "$_pg_src_s" | grep -qE "(^|[[:space:]])$_fn([[:space:];]|\$)" ||
+        _pg_hmissing="$_pg_hmissing $_fn"
+done
+if [ -z "$_pg_hmissing" ]; then
+    pass "pairing guard list covers every function the lib defines (#452)"
+else
+    fail "functions defined by status-core.sh but absent from the guard:$_pg_hmissing (#452)"
 fi
 
 # --- progress tee under hostile PYTHONHOME (#249) ---------------------------------

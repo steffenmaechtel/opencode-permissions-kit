@@ -162,21 +162,31 @@ fi
 
 # Pairing guard (#413, PR #412 round a S2) — LOAD-BEARING here: status
 # is deliberately fail-soft (set -u only, no set -e; one failing probe
-# must not kill the report), so an undefined section call does NOT
-# abort — it prints "not found", returns rc 127 and the report simply
-# loses that section silently while the summary still prints. A
-# version-skewed entry/lib pairing (a core missing one renamed or
-# newly-added section) is a wiring error, not a probe failure: refuse
+# must not kill the report), so an undefined call does NOT abort — it
+# prints "not found", returns rc 127 and the report simply loses that
+# section silently while the summary still prints. A version-skewed
+# entry/lib pairing is a wiring error, not a probe failure: refuse
 # loud, whole report, before any section renders (exit 1, the
 # ui.sh-missing precedent above — a wiring abort is not a verdict and
-# must not collide with the --short contract's probe codes).
+# must not collide with the --short contract's probe codes). The guard
+# therefore pins EVERY function the run needs, sections AND the helpers
+# the sections call internally (#452, the doctor precedent — a missing
+# helper degraded rows silently behind a green summary, e.g. a missing
+# _st_ddev_scan skipped whole scan verdicts). The list is kept equal to
+# status-core.sh's function definitions (the test-suite completeness
+# riders enforce both directions).
 status_pairing_guard() {
     for _spg in status_section_core status_section_advisories \
         status_section_projects status_section_backend status_section_ddev \
         status_section_wsl2 status_section_root_equiv \
-        status_section_leak_scan status_section_management; do
+        status_section_leak_scan status_section_management \
+        _opk_timeout_ok _st_ancestor_grants_x _st_dbdump_gap \
+        _st_ddev_basic _st_ddev_db_dumps _st_ddev_mkcert_ca \
+        _st_ddev_router_ports _st_ddev_scan _st_ddev_share_scan \
+        _st_ddev_version _st_ddev_win_hosts _st_progress_tee \
+        _st_root_blocker status_groups_hits status_sock_agent_reachable; do
         command -v "$_spg" >/dev/null 2>&1 || {
-            echo "error: section '$_spg' missing from status-core.sh — version-skewed entry/lib pairing, refusing to run" >&2
+            echo "error: function '$_spg' missing from status-core.sh — version-skewed entry/lib pairing, refusing to run" >&2
             return 1
         }
     done

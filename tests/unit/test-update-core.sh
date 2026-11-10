@@ -7,6 +7,10 @@
 # suite pins what only the DECOMPOSED shape can pin:
 #   - sourcing purity: definitions only, zero top-level side effects
 #   - every phase function + moved helper is defined by sourcing
+#   - the pairing guard (#413): real lib passes, truncated lib dies
+#     loud, and both completeness riders (every phase the entry calls
+#     AND every function the lib defines — comment-stripped,
+#     boundary-anchored)
 #   - update.sh resolves the lib checkout-first and errors loud when
 #     it is missing (presence-level; driving the error needs the whole
 #     fetch flow — deliberately not pinned, pin-cost budget)
@@ -70,12 +74,22 @@ fi
 # --- 3. update.sh resolves the lib checkout-first, loud when missing --------------
 # Presence-level pin (the resolver mirrors status.sh's status-core
 # resolution, wave 1): the sequencer must not run when the lib is gone.
-check "update.sh sources update-core.sh checkout-first" \
-    sh -c 'grep -qF "UPDATE_CORE=\"\$SCRIPT_DIR/../sh/update-core.sh\"" "$1" \
-        && grep -qF "[ -f \"\$UPDATE_CORE\" ] || UPDATE_CORE=\"\$LIBDIR/sh/update-core.sh\"" "$1" \
-        && grep -qF ". \"\$UPDATE_CORE\"" "$1"' _ "$UPDATE"
-check "update.sh errors loud on a missing lib (no silent phase drops)" \
-    sh -c 'grep -qF "error: update-core.sh not found" "$1"' _ "$UPDATE"
+# Comment-strip on every positive conjunct (conventions.md
+# "Source-counting pins", the #451 a Q3 shape): a commented-out
+# resolver block must not satisfy the pin.
+if sed 's/^[[:space:]]*#.*$//' "$UPDATE" | grep -qF 'UPDATE_CORE="$SCRIPT_DIR/../sh/update-core.sh"' &&
+    sed 's/^[[:space:]]*#.*$//' "$UPDATE" |
+    grep -qF '[ -f "$UPDATE_CORE" ] || UPDATE_CORE="$LIBDIR/sh/update-core.sh"' &&
+    sed 's/^[[:space:]]*#.*$//' "$UPDATE" | grep -qF '. "$UPDATE_CORE"'; then
+    pass "update.sh sources update-core.sh checkout-first"
+else
+    fail "update.sh must resolve update-core.sh checkout-first (entry + \$LIBDIR fallback + sourcing)"
+fi
+if sed 's/^[[:space:]]*#.*$//' "$UPDATE" | grep -qF 'error: update-core.sh not found'; then
+    pass "update.sh errors loud on a missing lib (no silent phase drops)"
+else
+    fail "update.sh must error loud on a missing lib"
+fi
 check "update.sh sequences the phases in run order" \
     sh -c '_tail=$(sed -n "/# --- phases, in run order/,\$p" "$1")
         _l1=$(printf "%s\n" "$_tail" | grep -nF "    update_redeploy_library" | head -1 | cut -d: -f1)
@@ -310,41 +324,70 @@ fi
 # --- 16. pairing guard (#413): a version-skewed entry/lib pairing dies loud ----------
 # The resolver (section 3) dies loud on a missing FILE; the guard closes
 # the missing-FUNCTION twin — a core missing one renamed/newly-added
-# section would rc-127 the bare section calls (cryptic abort at best,
-# mid-update AFTER earlier sections ran). extract_func pulls the guard
-# from the ENTRY; both directions run in fresh children: the real lib
-# defines every section (rc 0), a truncated lib defining NOTHING fails
-# on the FIRST section with the diagnosis line. The completeness rider
-# derives the entry's own call list and requires every name inside the
-# guard body — a section call added to the entry without the guard list
-# cannot pass silently.
+# function would abort the bare calls (cryptic rc 127 at best, set -e
+# mid-update AFTER earlier phases ran; fail-soft silent skips are the
+# uninstall shape). extract_func pulls the guard from the ENTRY; both
+# directions run in fresh children: the real lib defines every function
+# (rc 0), a truncated lib defining NOTHING fails on the FIRST name with
+# the diagnosis line. The guard pins EVERY function the run needs,
+# phases AND helpers (#452 — a helper-level skew aborts mid-update
+# after partial work). The completeness riders derive the entry's own
+# call list and the lib's own definitions and require every name inside
+# the guard body — a function added to either side without the guard
+# list cannot pass silently. Both riders grep a comment-stripped copy
+# of the guard source (#452, conventions.md "Source-counting pins" over
+# extracted blocks) and match with BOUNDARY-ANCHORED EREs (plain -qF
+# would find section names as substrings of helper names in the list
+# and a dropped name would false-pass).
 _pg_src="$(extract_func "$UPDATE" update_pairing_guard)"
+_pg_src_s="$(printf '%s\n' "$_pg_src" | sed 's/^[[:space:]]*#.*$//')"
 _pg_full=$(sh -c 'eval "$1"; . "$2"; update_pairing_guard; echo "rc=$?"' _ "$_pg_src" "$LIB" 2>&1)
 _pg_tr_rc=0
 _pg_tr_out="$(sh -c 'eval "$1"; update_pairing_guard' _ "$_pg_src" 2>&1)" || _pg_tr_rc=$?
 if printf '%s' "$_pg_full" | grep -q 'rc=0'; then
-    pass "pairing guard: real lib passes (every section defined) (#413)"
+    pass "pairing guard: real lib passes (every function defined) (#413)"
 else
     fail "pairing guard must pass against the real lib (out=$_pg_full) (#413)"
 fi
 if [ "$_pg_tr_rc" -eq 1 ] &&
-    printf '%s' "$_pg_tr_out" | grep -qF "section 'update_redeploy_library' missing from update-core.sh" &&
+    printf '%s' "$_pg_tr_out" | grep -qF "function 'update_redeploy_library' missing from update-core.sh" &&
     printf '%s' "$_pg_tr_out" | grep -qF "version-skewed entry/lib pairing"; then
-    pass "pairing guard: truncated lib dies loud naming the first missing section (#413)"
+    pass "pairing guard: truncated lib dies loud naming the first missing function (#413)"
 else
     fail "pairing guard must refuse a skewed pairing (rc=$_pg_tr_rc out=$_pg_tr_out) (#413)"
 fi
-check "update.sh wires the guard right after the resolver" \
-    sh -c 'grep -qF "update_pairing_guard || exit 1" "$1"' _ "$UPDATE"
+# Comment-strip rider (conventions.md "Source-counting pins", the #451
+# a Q3 shape): a commented-out guard wiring line must not satisfy the
+# pin.
+if sed 's/^[[:space:]]*#.*$//' "$UPDATE" | grep -qF 'update_pairing_guard || exit 1'; then
+    pass "update.sh wires the guard right after the resolver (#413)"
+else
+    fail "update.sh must call the guard after sourcing update-core.sh (#413)"
+fi
 _pg_missing=""
 for _fn in $(grep -oE '^[[:space:]]*update_[a-z_]+[[:space:]]*$' "$UPDATE" |
     awk '{gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print}' | sort -u); do
-    printf '%s\n' "$_pg_src" | grep -qF "$_fn" || _pg_missing="$_pg_missing $_fn"
+    printf '%s\n' "$_pg_src_s" | grep -qE "(^|[[:space:]])$_fn([[:space:];]|\$)" ||
+        _pg_missing="$_pg_missing $_fn"
 done
 if [ -z "$_pg_missing" ]; then
-    pass "pairing guard list covers every section the entry calls (#413)"
+    pass "pairing guard list covers every phase the entry calls (#413)"
 else
-    fail "sections called by update.sh but absent from the guard:$_pg_missing (#413)"
+    fail "phases called by update.sh but absent from the guard:$_pg_missing (#413)"
+fi
+# completeness rider (helper direction, #452): every function the LIB
+# defines must sit in the guard's list too — a helper missing from the
+# list is the helper-skew hole the guard-list fix closes. Same boundary
+# anchor, same stripped source.
+_pg_hmissing=""
+for _fn in $(grep -oE '^[A-Za-z_][A-Za-z_0-9]*\(\) \{' "$LIB" | sed 's/() {//' | sort -u); do
+    printf '%s\n' "$_pg_src_s" | grep -qE "(^|[[:space:]])$_fn([[:space:];]|\$)" ||
+        _pg_hmissing="$_pg_hmissing $_fn"
+done
+if [ -z "$_pg_hmissing" ]; then
+    pass "pairing guard list covers every function the lib defines (#452)"
+else
+    fail "functions defined by update-core.sh but absent from the guard:$_pg_hmissing (#452)"
 fi
 
 # LOWS-1 (#371 A5, class sweep from install.sh): the pre-upgrade binary

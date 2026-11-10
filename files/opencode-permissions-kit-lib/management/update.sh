@@ -825,13 +825,17 @@ fi
 
 # Pairing guard (#413, PR #412 round a S2): the resolver dies loud on a
 # missing FILE; this closes the missing-FUNCTION twin — a version-skewed
-# entry/lib pairing (a core missing one renamed or newly-added section)
-# makes the bare section calls below fail with rc 127, and under set -e
-# that aborts cryptically mid-update ("not found", no named cause) after
-# earlier sections already ran. The guard converts it into a diagnosed
-# abort BEFORE any section runs and pins the section list the entry
-# expects (a section added to the core without the entry calling it is
-# equally a wiring bug this list makes reviewable).
+# entry/lib pairing makes a bare call into the core fail with rc 127,
+# and under set -e that aborts cryptically mid-update ("not found", no
+# named cause) after earlier phases already ran. The guard converts it
+# into a diagnosed abort BEFORE any phase runs and pins EVERY function
+# the run needs — the phases the entry calls AND the helpers they call
+# internally (#452, the doctor precedent: a helper-level skew aborts
+# mid-update after partial work, e.g. a missing install_binary strands
+# the upgrade after the download). The list is kept equal to
+# update-core.sh's function definitions (the test-suite completeness
+# riders enforce both directions; a phase added to the core without the
+# entry calling it is equally a wiring bug this list makes reviewable).
 update_pairing_guard() {
     for _upg in update_redeploy_library update_redeploy_wsl_bridge \
         update_redeploy_cli_links \
@@ -842,9 +846,13 @@ update_pairing_guard() {
         update_binary_upgrade update_redeploy_xdg_shim \
         update_finalize_opencode_home \
         update_finalize_default_config update_finalize_ddev_stamp \
-        update_finalize_install_conf update_finalize_tui_files; do
+        update_finalize_install_conf update_finalize_tui_files \
+        _opk_timeout_ok current_opencode_major detect_target \
+        fetch_opencode_version install_binary opencode_version_line \
+        resolve_latest_opencode_version sync_tui_registration \
+        update_ensure_backup_dir version_major; do
         command -v "$_upg" >/dev/null 2>&1 || {
-            echo "error: section '$_upg' missing from update-core.sh — version-skewed entry/lib pairing, aborting" >&2
+            echo "error: function '$_upg' missing from update-core.sh — version-skewed entry/lib pairing, aborting" >&2
             return 1
         }
     done

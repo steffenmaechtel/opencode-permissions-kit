@@ -823,17 +823,23 @@ kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/install-core.sh"
 
 # Pairing guard (#413, PR #412 round a S2): kit_source dies loud on a
 # missing FILE; this closes the missing-FUNCTION twin. A version-skewed
-# entry/lib pairing (a core missing one renamed or newly-added phase —
-# an interrupted deploy, a manually mixed tree) makes the bare phase
-# calls below fail with rc 127; under set -e that aborts, but with a
-# cryptic "not found" and no named cause. The guard converts it into a
-# diagnosed abort BEFORE any phase runs, and pins the phase list the
-# entry expects — a phase added to the core without the entry calling
-# it is equally a wiring bug this list makes reviewable.
+# entry/lib pairing makes a bare call into the core fail with rc 127;
+# under set -e that aborts, but with a cryptic "not found" and no named
+# cause — mid-install, after earlier phases already ran. The guard
+# converts it into a diagnosed abort BEFORE any phase runs, and pins
+# EVERY function the run needs — the phases the entry calls AND the
+# helpers they call internally (#452, the doctor precedent: a
+# helper-level skew aborts mid-install after partial work). The list is
+# kept equal to install-core.sh's function definitions (the test-suite
+# completeness riders enforce both directions; a phase added to the
+# core without the entry calling it is equally a wiring bug this list
+# makes reviewable).
 install_pairing_guard() {
-    for _ipg in do_plan_phase do_ddev_phase do_deploy_phase; do
+    for _ipg in do_plan_phase do_ddev_phase do_deploy_phase \
+        install_agents_form_normalize install_project_roots_select \
+        install_reuse_group_guard install_reuse_home_guard; do
         command -v "$_ipg" >/dev/null 2>&1 || {
-            echo "error: phase '$_ipg' missing from install-core.sh — version-skewed entry/lib pairing, aborting" >&2
+            echo "error: function '$_ipg' missing from install-core.sh — version-skewed entry/lib pairing, aborting" >&2
             return 1
         }
     done
