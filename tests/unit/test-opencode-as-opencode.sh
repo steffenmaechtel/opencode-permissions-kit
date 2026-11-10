@@ -487,10 +487,14 @@ fi
 
 # The container-tools advisory must also route through note() — a raw
 # printf to stdout would pollute `opencode run --format json` output.
-# Both-file sweep (#453 a C1): the advisory surface spans entry + lib —
-# the pre-#449 pin covered the whole monolith, one file is narrower.
-if ! grep -q 'printf "  ${GREEN}opencode will run with' "$WRAPPER_FILE" &&
-    ! grep -q 'printf "  ${GREEN}opencode will run with' "$CORE_LIB"; then
+# Both-file sweep (#453 a C1) over BOTH anchor spellings (#453 b D3):
+# the historical raw-printf line (two leading spaces, gone with the
+# note() rewrite) AND the current advisory wording (no leading spaces)
+# — a plain note->printf flip on the live line must fail this pin.
+if ! grep -qF 'printf "  ${GREEN}opencode will run with' "$WRAPPER_FILE" &&
+    ! grep -qF 'printf "  ${GREEN}opencode will run with' "$CORE_LIB" &&
+    ! grep -qF 'printf "${GREEN}opencode will run with' "$WRAPPER_FILE" &&
+    ! grep -qF 'printf "${GREEN}opencode will run with' "$CORE_LIB"; then
     pass "container advisory uses note() (stdout-safe for orchestrators)"
 else
     fail "container advisory prints raw to stdout"

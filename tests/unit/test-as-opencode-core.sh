@@ -77,7 +77,7 @@ fi
 # wrapper_advisories (col 0 by contract, unindented); INDENTED lines
 # are function-body bytes and out of this pin's scope.
 _stray="$(awk 'NF && $0 !~ /^[ \t]/ && $0 !~ /^#/ && $0 !~ /^[a-z_]+\(\) \{$/ &&
-    $0 != "}" && $0 != "EOF" && $0 != "\$ADV_HIT" && $0 != "\$ADV_HITS" {print FNR": "$0}' "$LIB")"
+    $0 !~ /^(}|\$ADV_HIT|\$ADV_HITS|EOF)$/ {print FNR": "$0}' "$LIB")"
 if [ -z "$_stray" ]; then
     pass "lib carries no col-0 executable lines (definitions/comments only)"
 else
@@ -155,7 +155,9 @@ fi
 _libfns="$(grep -E '^[a-z_]+\(\) \{' "$LIB" | sed 's/() {//')"
 _uncov=""
 for _c in $_libfns; do
-    printf '%s' "$_pg_src" | grep -q " $_c" || _uncov="$_uncov $_c"
+    # trailing space-or-semicolon closes the prefix window (#453 b D1):
+    # a name that is a strict PREFIX of a listed one must not match
+    printf '%s' "$_pg_src" | grep -q " $_c[ ;]" || _uncov="$_uncov $_c"
 done
 if [ -z "$_uncov" ]; then
     pass "guard list covers every lib-defined function ($(printf '%s\n' "$_libfns" | wc -l | tr -d ' ') names)"
