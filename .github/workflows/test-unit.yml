@@ -76,6 +76,8 @@ jobs:
         run: sh tests/tsx-syntax-gate.sh
       - name: Run wrapper validation tests
         run: ./tests/unit/test-opencode-as-opencode.sh
+      - name: Run wrapper core lib tests
+        run: ./tests/unit/test-as-opencode-core.sh
       - name: Run JSONC parser edge-case tests
         run: ./tests/unit/test-jsonc-parser.sh
       - name: Run template bash rule tests

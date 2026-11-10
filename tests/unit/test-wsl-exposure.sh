@@ -22,6 +22,9 @@ UPDATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.s
 UPDATE_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/update-core.sh"
 DEPLOYLIB="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 WRAPPER="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
+# Wrapper core lib since #449 (the #346 wave shape): the WSL checks
+# moved into its wrapper_wsl_checks section — pins target the lib.
+WRAPPER_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/as-opencode-core.sh"
 OPK="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opk"
 
 # Shared harness (issue #394 adoption): pass/fail, colors, counters
@@ -85,25 +88,28 @@ check "install.sh points WSL users at the opt-in bridge command" \
     sh -c "grep -q 'opk wsl-add-opencode-1-fix' \"\$1\"" _ "$INSTALL_CORE"
 
 # --- wrapper startup warning ------------------------------------------------------
+# The WSL checks live in the lib's wrapper_wsl_checks since #449; both
+# files must stay parseable and the markers target the lib.
 check "wrapper passes sh -n" sh -n "$WRAPPER"
+check "wrapper core lib passes sh -n" sh -n "$WRAPPER_CORE"
 check "wrapper gates the warning on /mnt/c existing" \
-    sh -c "grep -qF '[ -d /mnt/c ]' \"\$1\"" _ "$WRAPPER"
+    sh -c "grep -qF '[ -d /mnt/c ]' \"\$1\"" _ "$WRAPPER_CORE"
 check "wrapper checks the world-readable (other) bit of the mount mode" \
-    sh -c "grep -q '0004' \"\$1\"" _ "$WRAPPER"
+    sh -c "grep -q '0004' \"\$1\"" _ "$WRAPPER_CORE"
 check "wrapper warns about the world-readable /mnt/c on every start" \
-    sh -c "grep -q 'WARNING: /mnt/c is world-readable' \"\$1\"" _ "$WRAPPER"
+    sh -c "grep -q 'WARNING: /mnt/c is world-readable' \"\$1\"" _ "$WRAPPER_CORE"
 check "wrapper shows the wsl.conf automount fix" \
-    sh -c "grep -qF '[automount]' \"\$1\" && grep -q 'dmask=027,fmask=037' \"\$1\"" _ "$WRAPPER"
+    sh -c "grep -qF '[automount]' \"\$1\" && grep -q 'dmask=027,fmask=037' \"\$1\"" _ "$WRAPPER_CORE"
 check "wrapper names the activation step (wsl --shutdown)" \
-    sh -c "grep -q 'wsl --shutdown' \"\$1\"" _ "$WRAPPER"
+    sh -c "grep -q 'wsl --shutdown' \"\$1\"" _ "$WRAPPER_CORE"
 check "wrapper points at the opt-in bridge command" \
-    sh -c "grep -q 'opk wsl-add-opencode-1-fix' \"\$1\"" _ "$WRAPPER"
+    sh -c "grep -q 'opk wsl-add-opencode-1-fix' \"\$1\"" _ "$WRAPPER_CORE"
 check "wrapper detects a configured-but-pending restriction" \
-    sh -c "grep -q 'PENDING' \"\$1\" && grep -q \"options *=.*dmask\" \"\$1\"" _ "$WRAPPER"
+    sh -c "grep -q 'PENDING' \"\$1\" && grep -q \"options *=.*dmask\" \"\$1\"" _ "$WRAPPER_CORE"
 check "wrapper stays silent when the mount is restricted (other bit off)" \
-    sh -c "! awk '/if \[ -d \/mnt\/c \]/,/^fi/' \"\$1\" | grep -q 'already restricted'" _ "$WRAPPER"
+    sh -c "! awk '/if \[ -d \/mnt\/c \]/,/^    fi$/' \"\$1\" | grep -q 'already restricted'" _ "$WRAPPER_CORE"
 check "wrapper skips the bridge warning for open@11 versions (1.18.33 / 2.0.18)" \
-    sh -c "grep -qF 'advisories_version_cmp' \"\$1\" && grep -qF '1.18.33' \"\$1\" && grep -qF '2.0.18' \"\$1\"" _ "$WRAPPER"
+    sh -c "grep -qF 'advisories_version_cmp' \"\$1\" && grep -qF '1.18.33' \"\$1\" && grep -qF '2.0.18' \"\$1\"" _ "$WRAPPER_CORE"
 
 # --- update.sh report-only hint (the section lives in sh/update-core.sh,
 # #346 wave 2) ------------------------------------------------------------------

@@ -17,6 +17,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="$SCRIPT_DIR/../.."
 LIB="$REPO/files/opencode-permissions-kit-lib/sh/update-check.sh"
 WRAPPER="$REPO/files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
+# Wrapper core lib since #449 (the #346 wave shape): pins on moved
+# wrapper code target the lib.
+WRAPPER_CORE="$REPO/files/opencode-permissions-kit-lib/sh/as-opencode-core.sh"
 STATUS="$REPO/files/opencode-permissions-kit-lib/management/status.sh"
 STATUS_CORE="$REPO/files/opencode-permissions-kit-lib/sh/status-core.sh"
 INSTALL="$REPO/files/install.sh"
@@ -493,13 +496,13 @@ case "$_out" in
 esac
 
 echo "-- wiring: wrapper banner --"
-grep -q 'sh/update-check.sh' "$WRAPPER" &&
+grep -q 'sh/update-check.sh' "$WRAPPER_CORE" &&
     pass "wrapper: sources the update-check lib" ||
     fail "wrapper: update-check lib not wired"
-grep -q 'KIT_UPDATE_NOTE=\$(kit_update_daily_note' "$WRAPPER" &&
+grep -q 'KIT_UPDATE_NOTE=\$(kit_update_daily_note' "$WRAPPER_CORE" &&
     pass "wrapper: banner note rides kit_update_daily_note" ||
     fail "wrapper: banner note call missing"
-grep -q '\[ "\$HEADLESS" != true \] && \[ -f /usr/local/lib/opencode-permissions-kit/sh/update-check.sh \]' "$WRAPPER" &&
+grep -q '\[ "\$HEADLESS" != true \] && \[ -f /usr/local/lib/opencode-permissions-kit/sh/update-check.sh \]' "$WRAPPER_CORE" &&
     pass "wrapper: check guarded to interactive starts (headless never runs it)" ||
     fail "wrapper: interactive guard missing"
 
