@@ -177,7 +177,10 @@ err:find-rc=$_frc $_d"
 # FAIL branch of lint_skills has a fixture that executes it (#235 a
 # S2: four branches used to have none).
 
-WORK="$(work_new)"
+WORK="$(work_new)" || {
+    echo "skills lint: FAILED - scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
 # registered at creation (issue #395) -- the #283 comment block on the
 # old suite-wide trap is obsolete: the registry collects WORK, F16W and
 # the TMP fail-rows file centrally.
@@ -400,7 +403,10 @@ lint_skills .agents/skills >>"$TMP" 2>&1
 # pr-00263 a F16: a bare file at the skills root FAILs loudly — the
 # loop used to examine directories only, so a bare file (which the
 # loader picks up) was silently unexamined.
-F16W="$(work_new)"
+F16W="$(work_new)" || {
+    echo "skills lint: FAILED - scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
 mkdir -p "$F16W/skills/opk-ok"
 cat >"$F16W/skills/opk-ok/SKILL.md" <<'EOF'
 ---
@@ -415,6 +421,26 @@ case "$_out16" in
     *"FAIL bare-at-root.md: bare file at the skills root"*) : ;;
     *) echo "  PIN BROKEN: bare file at the skills root unexamined (pr-00263 a F16)" >>"$TMP" ;;
 esac
+
+# --- #454 a C1: scratch-creation failure fails loud, not silent-green ------
+# Hermetic self-re-execution: the suite as a child process under a dead
+# TMPDIR must abort rc 1 at the FIRST scratch guard with the loud guard
+# message (the child stops before any fixture work -- the re-run is
+# cheap). Sabotage discriminator: with the guards deleted the child
+# proceeds into degenerate fixture writes instead of exiting 1. The
+# OPK_SKILLS_LINT_CHILD marker is the recursion break: a guard-deleted
+# child reaches THIS pin section again and must not spawn a grandchild.
+if [ -z "${OPK_SKILLS_LINT_CHILD:-}" ]; then
+    _c1_rc=0
+    _c1_out="$(OPK_SKILLS_LINT_CHILD=1 TMPDIR="$REPO_ROOT/.no-such-tmp-opk-454" \
+        sh "$0" 2>&1)" || _c1_rc=$?
+    if [ "$_c1_rc" -ne 1 ] ||
+        ! printf '%s' "$_c1_out" | grep -qF 'scratch creation failed'; then
+        echo "  PIN BROKEN: dead-TMPDIR run must abort loud at the scratch guard (rc=$_c1_rc out=$_c1_out) (#454 a C1)" >>"$TMP"
+    else
+        echo "  pin ok: dead-TMPDIR run aborts loud at the scratch guard (C1)"
+    fi
+fi
 
 if [ -s "$TMP" ]; then
     echo "FAIL skills lint:"

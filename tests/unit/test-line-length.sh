@@ -156,11 +156,11 @@ fi
 # set -e here, so a failed work_new_file would leave TMP_CUR empty and
 # every redirect would degenerate to a root-level literal. Abort loud.
 TMP_CUR="$(work_new_file)" || {
-    echo "line length ratchet: FAILED (scratch creation failed, TMPDIR=${TMPDIR:-unset})"
+    echo "line length ratchet: FAILED (scratch creation failed, TMPDIR=${TMPDIR:-unset})" >&2
     exit 1
 }
 TMP_PROBE="$(work_new_file)" || {
-    echo "line length ratchet: FAILED (scratch creation failed, TMPDIR=${TMPDIR:-unset})"
+    echo "line length ratchet: FAILED (scratch creation failed, TMPDIR=${TMPDIR:-unset})" >&2
     exit 1
 }
 
@@ -184,7 +184,7 @@ TMP_PROBE="$(work_new_file)" || {
 # length (130 in-span, 131 post-close) so the asserted sum pins
 # WHICH line was counted, not just how many (#235 c S2).
 PROBE_DIR="$(work_new)" || {
-    echo "line length ratchet: FAILED (scratch creation failed, TMPDIR=${TMPDIR:-unset})"
+    echo "line length ratchet: FAILED (scratch creation failed, TMPDIR=${TMPDIR:-unset})" >&2
     exit 1
 }
 printf -- '---\nname: probe\ndescription: %s\n---\nshort prose line\n' \

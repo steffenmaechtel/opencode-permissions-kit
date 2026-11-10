@@ -321,7 +321,7 @@ OUT=$(cd "$SCRATCH" && RM_AUDIT_ROOT="$SCRATCH" FORCE_TODAY=2026-10-16 \
 RC=$?
 if [ "$RC" -eq 1 ]; then
     case "$OUT" in
-        *'[meta-tree] worklist pipeline failed'*) pass ;;
+        *'[meta-tree] worklist pipeline failed'*) pass "#323 sort rc: worklist pipeline block fired" ;;
         *) fail "#323 sort rc: rc=1 but no worklist pipeline block: $OUT" ;;
     esac
 else
@@ -360,7 +360,7 @@ OUT=$(cd "$SCRATCH" && RM_AUDIT_ROOT="$SCRATCH" FORCE_TODAY=2026-10-16 \
 RC=$?
 if [ "$RC" -eq 1 ]; then
     case "$OUT" in
-        *'[meta-tree] refids pipeline failed'*) pass ;;
+        *'[meta-tree] refids pipeline failed'*) pass "#341 refids rc: refids pipeline block fired" ;;
         *) fail "#341 refids rc: rc=1 but no refids pipeline block: $OUT" ;;
     esac
 else

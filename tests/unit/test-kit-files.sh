@@ -290,23 +290,47 @@ chmod +x "$WORK/fakebin/curl"
 sed -n '/^KIT_FILES="/,/"$/p' "$UPDATE" >"$WORK/kitfiles.env"
 extract_func "$UPDATE" fetch_kit >"$WORK/fetchkit.fn"
 # fetch_kit reports the tree via the _FK_DIR global (no stdout — a
-# command-substitution call would void the trap registrations); the inner
-# shell echoes it deliberately for this test.
-_fk_dir="$(PATH="$WORK/fakebin:$PATH" sh -c '
+# command-substitution call would void the trap registrations); the
+# inner shell echoes it deliberately for this test. The dump contract is
+# two stdout lines: ALWAYS the staging base first (_FETCH_TREE, set by
+# the extracted function before any fetch step -- on a FAILED fetch
+# nothing else reaches stdout, and without the base line the partial
+# tree had no handle to register, #454 a C2), then the fetched tree
+# (_FK_DIR) only on success. No inner trap: the sandbox floor reads any
+# line-start trap statement as the suite's own and reds the
+# work-registry mix (check 4b).
+_fk_out="$(PATH="$WORK/fakebin:$PATH" sh -c '
     . "$1"
     eval "$(cat "$2")"
-    fetch_kit && printf "%s\n" "$_FK_DIR"
+    fetch_kit
+    _fk_rc=$?
+    printf "%s\n" "${_FETCH_TREE:-}"
+    [ "$_fk_rc" -eq 0 ] && printf "%s\n" "$_FK_DIR"
 ' _ "$WORK/kitfiles.env" "$WORK/fetchkit.fn" 2>/dev/null || true)"
-# Register the staged tree (#443): inside the inner shell fetch_kit's
-# `mktemp -d` base has no cleanup of its own (the inner shell loads only
-# KIT_FILES plus the extracted function -- update.sh's _tmp_track
-# registry and its trap are not there), and the parent never collected
-# it either: one tmp.<X> directory leaked per run. The receiver is the
-# mktemp BASE (the parent of _FK_DIR, incl. the fetched VERSION);
-# unset-safe: an empty _fk_dir is the failed-fetch case the check below
-# reports red -- registering dirname("") would target ".".
-_fk_base="$(dirname "$_fk_dir")"
-[ -n "$_fk_dir" ] && work_register "$_fk_base"
+# The staging BASE is the receiver (#443): inside the inner shell
+# fetch_kit's `mktemp -d` base has no cleanup of its own (the inner shell
+# loads only KIT_FILES plus the extracted function -- update.sh's
+# _tmp_track registry and its trap are not there), and the parent never
+# collected it either: one tmp.<X> directory leaked per run. On success
+# the base is dirname of _FK_DIR (VERSION lands at $base/VERSION); on a
+# failed fetch the dump line names the partial tree. An empty base means
+# nothing was created -- nothing to register; a REGISTRATION failure must
+# not ride silently or the leak returns on a green run (#454 a A1: the
+# swallowed work_register rc used to leak the tree while the suite exited
+# green).
+_fk_base="$(printf '%s\n' "$_fk_out" | sed -n 1p)"
+_fk_dir="$(printf '%s\n' "$_fk_out" | sed -n 2p)"
+if [ -z "$_fk_base" ] && [ -n "$_fk_dir" ]; then
+    # fallback for a truncated dump; guarded so dirname("") can never
+    # degenerate to "." and distort the missing-list (#454 a A2)
+    _fk_base="$(dirname "$_fk_dir")"
+fi
+if [ -n "$_fk_base" ]; then
+    work_register "$_fk_base" || {
+        echo "kit file list tests: staging-tree registration failed (TMPDIR=${TMPDIR:-unset})" >&2
+        exit 1
+    }
+fi
 _fk_missing=""
 for f in $update_list; do
     if [ "$f" = "VERSION" ]; then p="$_fk_base/VERSION"; else p="$_fk_dir/$f"; fi
@@ -316,6 +340,54 @@ if [ -z "$_fk_missing" ] && [ -n "$_fk_dir" ]; then
     pass "functional: fake-curl fetch_kit writes every listed file incl. nested dirs"
 else
     fail "functional: fake-curl fetch_kit writes every listed file (missing:$_fk_missing)"
+fi
+
+# #454 a C2/A2 canary: a FAILING curl stub must leave (a) the fetch red
+# with every listed file honestly missing incl. VERSION (the base from
+# the dump is the real staging tree, never a cwd-relative "."), and
+# (b) the partial staging base captured on the dump's first line for the
+# registration above -- the #443 leak's failure branch. Reuses the
+# suite's fakebin by swapping the stub for a failing one; the canary's
+# own staging tree registers like the main arm's.
+cat >"$WORK/fakebin/curl" <<'FAKE'
+#!/bin/sh
+exit 1
+FAKE
+_fk2_out="$(PATH="$WORK/fakebin:$PATH" sh -c '
+    . "$1"
+    eval "$(cat "$2")"
+    fetch_kit
+    _fk_rc=$?
+    printf "%s\n" "${_FETCH_TREE:-}"
+    [ "$_fk_rc" -eq 0 ] && printf "%s\n" "$_FK_DIR"
+' _ "$WORK/kitfiles.env" "$WORK/fetchkit.fn" 2>/dev/null || true)"
+_fk2_base="$(printf '%s\n' "$_fk2_out" | sed -n 1p)"
+_fk2_dir="$(printf '%s\n' "$_fk2_out" | sed -n 2p)"
+if [ -n "$_fk2_base" ]; then
+    work_register "$_fk2_base" || {
+        echo "kit file list tests: staging-tree registration failed (TMPDIR=${TMPDIR:-unset})" >&2
+        exit 1
+    }
+fi
+_fk2_missing=""
+for f in $update_list; do
+    if [ "$f" = "VERSION" ]; then p="$_fk2_base/VERSION"; else p="$_fk2_dir/$f"; fi
+    [ -f "$p" ] || _fk2_missing="$_fk2_missing $f"
+done
+_fk2_ok=1
+case " $_fk2_missing " in
+    "  ") _fk2_ok=0 ;; # nothing missing is not the red this canary wants
+esac
+for f in $update_list; do
+    case " $_fk2_missing " in
+        *" $f "*) ;;
+        *) _fk2_ok=0 ;;
+    esac
+done
+if [ -z "$_fk2_dir" ] && [ -n "$_fk2_base" ] && [ "$_fk2_ok" -eq 1 ]; then
+    pass "canary: failing-curl fetch aborts red with every file missing, staging base captured (C2/A2)"
+else
+    fail "canary: failing-curl fetch arms (dir='$_fk2_dir' base='$_fk2_base' missing='$_fk2_missing') (C2/A2)"
 fi
 
 echo ""

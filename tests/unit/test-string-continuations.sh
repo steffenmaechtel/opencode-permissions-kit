@@ -66,7 +66,7 @@ sh/update-core.sh|'),gid=
 "
 
 TMP="$(work_new_file)" || {
-    echo "string-continuation guard: FAILED (scratch creation failed, TMPDIR=${TMPDIR:-unset})"
+    echo "string-continuation guard: FAILED (scratch creation failed, TMPDIR=${TMPDIR:-unset})" >&2
     exit 1
 }
 
@@ -189,7 +189,7 @@ fi
 # REPO_ROOT from its own location; the copy in the scratch dir scans
 # the probe files). Both probes MUST fail with the expected seams.
 _pdir="$(work_new)" || {
-    echo "string-continuation guard: FAILED (probe scratch creation failed, TMPDIR=${TMPDIR:-unset})"
+    echo "string-continuation guard: FAILED (probe scratch creation failed, TMPDIR=${TMPDIR:-unset})" >&2
     exit 1
 }
 mkdir -p "$_pdir/files/etc" "$_pdir/files/opencode-permissions-kit-lib/bin" \
