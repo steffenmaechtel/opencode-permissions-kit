@@ -9,7 +9,9 @@
 #   - every section entry point + helper is defined by sourcing
 #   - the pairing guard (#413): real lib passes, truncated lib dies
 #     loud, the entry wires the guard after the resolver, and the
-#     guard list covers every section the entry calls
+#     guard list covers every section the entry calls AND every
+#     function the lib defines (both riders comment-stripped and
+#     boundary-anchored)
 #   - the control-character gates at function level (doctor_cntrl_bad /
 #     doctor_show_sanitize): C0/DEL/C1 detect, UTF-8 passes clean
 #   - the report header at function level (doctor_header): verified and
@@ -94,6 +96,10 @@ if [ -n "$_pg_src" ]; then
 else
     fail "doctor_pairing_guard extractable from the entry"
 fi
+# comment-stripped copy of the guard source for the riders below
+# (#451 b B3, conventions.md "Source-counting pins" over extracted
+# blocks): a comment inside the guard naming a function must not count.
+_pg_src_s="$(printf '%s\n' "$_pg_src" | sed 's/^[[:space:]]*#.*$//')"
 _pg_full=$(sh -c 'eval "$1"; . "$2"; doctor_pairing_guard; echo "rc=$?"' _ "$_pg_src" "$LIB" 2>&1)
 _pg_tr_rc=0
 _pg_tr_out="$(PATH="$STUB" "$SH_BIN" -c 'eval "$1"; ui_error() { echo "error: $*" >&2; }; doctor_pairing_guard' _ "$_pg_src" 2>&1)" || _pg_tr_rc=$?
@@ -114,13 +120,18 @@ if sed 's/^[[:space:]]*#.*$//' "$DOCTOR_ENTRY" | grep -qF 'doctor_pairing_guard 
 else
     fail "doctor.sh must call the guard after sourcing doctor-core.sh (#413)"
 fi
-# completeness rider: every section the entry CALLS at col 0 (the run
-# sequence) must sit in the guard's list -- a section added to the run
-# order without the guard is exactly the wiring bug #413 describes.
+# completeness rider (entry direction): every section the entry CALLS
+# at col 0 (the run sequence) must sit in the guard's list -- a
+# section added to the run order without the guard is exactly the
+# wiring bug #413 describes. The grep is BOUNDARY-ANCHORED (#451 b B2):
+# plain -qF would find section names as substrings of the helper names
+# in the list (_doctor_all_cleanup contains doctor_all) and a dropped
+# name would false-pass.
 _pg_missing=""
 for _fn in $(sed 's/^[[:space:]]*#.*$//' "$DOCTOR_ENTRY" |
     grep -oE '^doctor_[a-z_0-9]+' | grep -v '^doctor_pairing_guard$' | sort -u); do
-    printf '%s\n' "$_pg_src" | grep -qF "$_fn" || _pg_missing="$_pg_missing $_fn"
+    printf '%s\n' "$_pg_src_s" | grep -qE "(^|[[:space:]])$_fn([[:space:];]|\$)" ||
+        _pg_missing="$_pg_missing $_fn"
 done
 if [ -z "$_pg_missing" ]; then
     pass "pairing guard list covers every section the entry calls (#413)"
@@ -129,10 +140,12 @@ else
 fi
 # completeness rider (helper direction, #451 a M1): every function the
 # LIB defines must sit in the guard's list too -- a helper missing
-# from the list is the helper-skew hole the round-a fix closes.
+# from the list is the helper-skew hole the round-a fix closes. Same
+# boundary anchor (#451 b B2), same stripped source (B3).
 _pg_hmissing=""
 for _fn in $(grep -oE '^[A-Za-z_][A-Za-z_0-9]*\(\) \{' "$LIB" | sed 's/() {//' | sort -u); do
-    printf '%s\n' "$_pg_src" | grep -qF "$_fn" || _pg_hmissing="$_pg_hmissing $_fn"
+    printf '%s\n' "$_pg_src_s" | grep -qE "(^|[[:space:]])$_fn([[:space:];]|\$)" ||
+        _pg_hmissing="$_pg_hmissing $_fn"
 done
 if [ -z "$_pg_hmissing" ]; then
     pass "pairing guard list covers every function the lib defines (#451 a M1)"

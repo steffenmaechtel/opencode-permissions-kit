@@ -177,7 +177,8 @@ fi
 # skewed entry/lib pairing is a wiring error, not a tree failure:
 # refuse loud, whole run, before any section renders. The refusal
 # exits 1 -- the rc contract's degraded-install class (same value as
-# the ui.sh-missing precedent above; stderr names the wiring cause).
+# the ui.sh-missing precedent above); the refusal row names the
+# wiring cause.
 doctor_pairing_guard() {
     for _dpg in doctor_cli doctor_all doctor_walkup doctor_opk_dispatcher \
         doctor_daemon_user doctor_ranges doctor_header doctor_policy \
