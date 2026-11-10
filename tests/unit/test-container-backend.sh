@@ -13,10 +13,6 @@
 #       setup-container-backend, and the git exec bit.
 set -e
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[m'
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="$SCRIPT_DIR/../.."
 WRAPPER="$REPO/files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
@@ -33,32 +29,11 @@ UNINSTALL_CORE="$REPO/files/opencode-permissions-kit-lib/sh/uninstall-core.sh"
 SUDOERS="$REPO/files/opencode-permissions-kit-lib/templates/sudoers.template"
 TEST_YML="$REPO/.github/workflows/test-unit.yml"
 
-failures=0
-passed=0
-
-check() {
-    local desc="$1"
-    shift
-    if "$@"; then
-        echo "  ${GREEN}PASS${NC}  $desc"
-        passed=$((passed + 1))
-    else
-        echo "  ${RED}FAIL${NC}  $desc"
-        failures=$((failures + 1))
-    fi
-}
-
-assert_eq() {
-    local desc="$1" expected="$2" actual="$3"
-    if [ "$expected" = "$actual" ]; then
-        echo "  ${GREEN}PASS${NC}  $desc"
-        passed=$((passed + 1))
-    else
-        echo "  ${RED}FAIL${NC}  $desc"
-        echo "        expected: [$expected]  got: [$actual]"
-        failures=$((failures + 1))
-    fi
-}
+# Shared harness (issue #417 adoption, the #394 pattern): pass/fail,
+# assert_eq, extract_func + the counters live in lib/harness.sh now;
+# the work registry (issue #395) owns cleanup -- this suite carries no
+# trap of its own (a local trap would disarm the harness registry).
+. "$SCRIPT_DIR/lib/harness.sh"
 
 grep_absent() { ! grep "$@"; }
 
@@ -97,9 +72,14 @@ resolve_backend() {
     esac
 }
 
-TMPDIR=$(mktemp -d)
-# widen to the bare F10/F13/F16 receivers + signal arms (#283)
-trap 'rm -rf "${TMPDIR:-}" "${F10:-}" "${F13:-}" "${F16:-}"' EXIT INT TERM
+# Scratch receiver via the work registry (issue #395). The TMPDIR
+# reassignment shape (harness round A A6): the registry path froze at
+# harness SOURCE time, so the reassigned TMPDIR's scratch must itself
+# be a work_* receiver -- work_new registers it, the central EXIT INT
+# TERM trap collects it. The F10/F13/F16 receivers below register the
+# same way (they land inside this scratch; their mid-suite rm lines
+# leave stale registry paths, which the cleanup rm treats as no-ops).
+TMPDIR="$(work_new)"
 
 echo ""
 echo "Container Backend Tests (DDEV-WORKING)"
@@ -334,8 +314,7 @@ check "setup reads opencode user from install.conf" grep -Fq 'OPENCODE_USER="ope
 check "setup checks systemd for docker-rootless" grep -Fq 'systemctl --user is-active dbus' "$SETUP"
 
 echo ""
-echo "===================================="
-echo "  ${GREEN}Passed: $passed${NC}"
+echo "-- late pins (arg no-op, daemon-start rc) --"
 # --yes is an accepted no-op (0.0.44b W16/V28)
 _v28_out=$(sh "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/setup-container-backend" --yes 2>&1 || true)
 case "$_v28_out" in
@@ -352,11 +331,10 @@ esac
 # Pin: the REAL function against a scratch conf — the key survives a
 # switch TO podman-rootless and clears when switching away — plus the
 # caller-side carry-over wiring.
-_f10_fn="$(sed -n '/^update_install_conf_backend() {/,/^}/p' \
-    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh")"
+_f10_fn="$(extract_func "$CONFIG" update_install_conf_backend)"
 if [ -n "$_f10_fn" ]; then
     check "update_install_conf_backend extractable (#211 a F10)" true
-    F10=$(mktemp -d)
+    F10="$(work_new)"
     printf 'DEFAULT_USER=dev\nOPENCODE_PODMAN_SOCKET=unix:///run/user/1000/podman/podman.sock\nCONTAINER_BACKEND=docker-rootless\n' \
         >"$F10/install.conf"
     _f10_run() {
@@ -396,8 +374,7 @@ if [ -n "$_f10_fn" ]; then
         check "socket key clears when switching away (documented direction)" true
     fi
     rm -rf "$F10"
-    if grep -q 'podman_socket=\$(sed -n .s/\^OPENCODE_PODMAN_SOCKET=//p' \
-        "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh"; then
+    if grep -q 'podman_socket=\$(sed -n .s/\^OPENCODE_PODMAN_SOCKET=//p' "$CONFIG"; then
         check "caller carries the pre-existing key over (#211 a F10 wiring)" true
     else
         check "caller carries the pre-existing key over (#211 a F10 wiring)" false
@@ -412,11 +389,10 @@ fi
 # the rootless daemon died at logout and ddev "randomly" lost its
 # backend. Extract the REAL enable_linger and drive it with stubbed
 # loginctl: ok -> success, fail -> warn + retry hint, absent -> silent.
-_f13_fn="$(sed -n '/^enable_linger() {/,/^}$/p' \
-    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/setup-container-backend")"
+_f13_fn="$(extract_func "$SETUP" enable_linger)"
 if [ -n "$_f13_fn" ]; then
     check "enable_linger extractable (#211 a F13)" true
-    F13=$(mktemp -d)
+    F13="$(work_new)"
     mkdir -p "$F13/bin"
     printf '#!/bin/sh\nexit 0\n' >"$F13/bin/loginctl"
     chmod +x "$F13/bin/loginctl"
@@ -458,11 +434,10 @@ fi
 # Pin: the REAL function against a scratch file carrying one good and
 # three malformed lines — warns for the bad ones, correct allocation
 # past the good range, rc 0.
-_f16_fn="$(sed -n '/^allocate_range() {/,/^}$/p' \
-    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/setup-container-backend")"
+_f16_fn="$(extract_func "$SETUP" allocate_range)"
 if [ -n "$_f16_fn" ]; then
     check "allocate_range extractable (#211 a F16)" true
-    F16=$(mktemp -d)
+    F16="$(work_new)"
     printf 'gooduser:100000:65536\njunk:12abc:100\nzeros:010:100\nalpha:abc:100\nzerocount:1000:09\noverflow:99999999999999999999:1\nu32max:9999999999:100\nzerostart:0:1000\n' >"$F16/subuid"
     _out=$(F16FILE="$F16/subuid" sh -c '
         log() { :; }
@@ -510,9 +485,4 @@ _dcsrc_n="$(sed 's/^[[:space:]]*#.*$//' "$SETUP" | grep -c "_dc_start_rc" || tru
 check "daemon start rc observed at every site, exactly 5 (pr-00263 a F13 + d W4; observed: $_dcsrc_n)" \
     [ "$_dcsrc_n" = 5 ]
 
-if [ "$failures" -gt 0 ]; then
-    echo "  ${RED}Failed: $failures${NC}"
-    exit 1
-fi
-echo "  All tests passed."
-echo ""
+suite_done "container backend tests"

@@ -8,11 +8,20 @@
 #
 # Run: sh tests/unit/test-docs.sh
 
-REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$REPO_ROOT" || exit 1
 
-TMP="$(mktemp)"
-trap 'rm -f "$TMP"' EXIT INT TERM
+# Shared harness (issue #417 adoption, scoped): this suite is a FAIL-
+# rows checker, not a pass/fail-row suite -- it has no local rows or
+# counters to migrate, so adoption here covers what it DOES duplicate:
+# extract_func for the parse_args extraction legs and the work
+# registry (issue #395) for the scratch receiver (the local trap is
+# gone; a local trap would disarm the harness registry). The FAIL-file
+# gate and the one-line verdict output stay the suite's own.
+. "$SCRIPT_DIR/lib/harness.sh"
+
+TMP="$(work_new_file)"
 
 # GitHub anchor normalization: lowercase; remove anything that is not a
 # letter, number, space, or hyphen; spaces -> hyphens; trim edge hyphens.
@@ -155,7 +164,7 @@ records_status_check
 # pin shipped W2 exactly this way: a documented `-y` the parser
 # rejected was invisible to it.
 _cli_md="$REPO_ROOT/docs/reference/cli.md"
-_f36_flags="$(sed -n '/^parse_args()/,/^}/p' "$REPO_ROOT/files/install.sh" |
+_f36_flags="$(extract_func "$REPO_ROOT/files/install.sh" parse_args |
     grep -oE '\-\-[a-z0-9-]+' | sort -u)"
 if [ -z "$_f36_flags" ]; then
     echo "FAIL cli.md: parse_args extraction empty — anchor drift? (#211 b W28)" >>"$TMP"
@@ -183,7 +192,7 @@ for _f36_df in $_f36_docflags; do
                 echo "FAIL cli.md: documented install flag '$_f36_df' not in the parser (#211 b W30)" >>"$TMP"
             ;;
         -?)
-            sed -n '/^parse_args()/,/^}/p' "$REPO_ROOT/files/install.sh" |
+            extract_func "$REPO_ROOT/files/install.sh" parse_args |
                 grep -qF -- "| $_f36_df)" ||
                 echo "FAIL cli.md: documented alias '$_f36_df' not in the parser (#211 b W30)" >>"$TMP"
             ;;
