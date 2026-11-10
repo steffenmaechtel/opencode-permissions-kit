@@ -184,12 +184,16 @@ fi
 # put the name at col 0, so the extraction normalizes it first
 # (#459 a B1: the original form claimed the gate while the anchored
 # grep could never see it; class sweep: this is the only non-col-0
-# call of a covered function across all six entries) -- must sit in
-# the guard's list too. The #453 fix had replaced the old entry-calls
-# rider with the lib-defs rider above, so the wrapper's own calls
-# were enforced by nothing (latent: no unguarded call exists today,
-# verified at #457 filing). Same stripped guard source, same boundary
-# anchor, same emptiness probe as 4d.
+# call of a covered function in THIS entry -- the sibling entries are
+# covered by their own extraction shapes: update's and uninstall's
+# riders tolerate indentation / whole-line calls, uninstall's one
+# mid-line call `ans=$(prompt_yn ...)` escapes its entry rider but
+# is forced into the guard by the lib-defs rider, #459 b C1) -- must
+# sit in the guard's list too. The #453 fix had replaced the old
+# entry-calls rider with the lib-defs rider above, so the wrapper's
+# own calls were enforced by nothing (latent: no unguarded call
+# exists today, verified at #457 filing). Same stripped guard source,
+# same boundary anchor, same emptiness probe as 4d.
 _pg_missing=""
 _pg_entfns="$(sed 's/^[[:space:]]*#.*$//' "$ENTRY" |
     sed 's/^case \$(standalone_mode.*/standalone_mode/' |
