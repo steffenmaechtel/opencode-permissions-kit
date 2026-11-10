@@ -68,6 +68,13 @@ _ST="$(strip "$STATUS")"
 _CF="$(strip "$CONFIG")"
 _UN="$(strip "$UNINSTALL")"
 _DR="$(strip "$DOCTOR")"
+# doctor's section functions live in sh/doctor-core.sh since #448 (the
+# #346 wave shape) -- the DOCTOR_OPK resolver moved with its section.
+# DOCTOR_CORE follows the conventions.md "Unit-suite path variables"
+# rule (entry + lib share the entry's name; #451 a Q6), the stripped
+# copy keeps this suite's _XX idiom.
+DOCTOR_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/doctor-core.sh"
+_DR_CORE="$(strip "$DOCTOR_CORE")"
 _IN="$(strip "$INSTALL")"
 
 # The hardened discriminator's argv[0] read (#433; A2 fix: 2>/dev/null
@@ -309,10 +316,13 @@ check "uninstall.sh keeps the /proc-less fallback arm (#433)" \
     has "$_UN" "$_ELIF"
 
 # --- 6. wiring: doctor.sh rides the same anchor (review a A2, #433/#434) -----------
+# (#448: the entry keeps the anchor and the ui.sh resolution; the
+# DOCTOR_OPK resolver rides its section in sh/doctor-core.sh -- its
+# conjunct reads the stripped lib.)
 check "doctor.sh anchors stdin runs to the deployed library (review a A2)" \
     sh -c 'printf "%s" "$1" | grep -qF "DR_CALL_DIR=\"/usr/local/lib/opencode-permissions-kit/management\"" &&
         printf "%s" "$1" | grep -qF "UI_LIB=\"\$DR_CALL_DIR/../sh/ui.sh\"" &&
-        printf "%s" "$1" | grep -qF "DOCTOR_OPK=\"\$DR_CALL_DIR/../bin/opk\""' _ "$_DR"
+        printf "%s" "$2" | grep -qF "DOCTOR_OPK=\"\$DR_CALL_DIR/../bin/opk\""' _ "$_DR" "$_DR_CORE"
 check "doctor.sh carries the argv[0] discriminator (#433)" \
     has "$_DR" "$_ARGV0"
 check "doctor.sh keeps no standalone #405 file-probe condition (#433)" \

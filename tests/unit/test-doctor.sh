@@ -16,6 +16,10 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DOCTOR="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/doctor.sh"
+# The section functions live in the sourced core lib since #448 (the
+# #346 wave shape) -- entry+lib variable pair per conventions.md
+# ("Unit-suite path variables").
+DOCTOR_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/doctor-core.sh"
 # Shared harness (issue #394): pass/fail, colors, counters
 # (and check/assert_eq where present) live in lib/harness.sh now.
 . "$SCRIPT_DIR/lib/harness.sh"
@@ -134,17 +138,25 @@ grep_last_out() {
 echo "=== doctor.sh unit tests ==="
 
 # --- 1. doctor_userns_ranges: the live-map shape filter (#313) --------------------
-RANGES_FN="$WORK/userns-fn.sh"
-extract_func "$DOCTOR" doctor_userns_ranges >"$RANGES_FN"
-[ -s "$RANGES_FN" ] &&
-    pass "doctor_userns_ranges extractable" ||
-    fail "doctor_userns_ranges extractable"
+RANGES_FN="$DOCTOR_CORE"
+# Sourcing leg (#448, the #346 wave shape): the function lives in
+# sh/doctor-core.sh now -- sourcing defines it and nothing else (the
+# lib's zero-top-level-side-effect contract, pinned in
+# test-doctor-core.sh). #396 accounting: conversion, no new extraction
+# shapes.
+if sh -c '. "$1" && command -v doctor_userns_ranges >/dev/null' _ "$RANGES_FN" 2>/dev/null; then
+    pass "doctor_userns_ranges sourceable from sh/doctor-core.sh"
+else
+    fail "doctor_userns_ranges sourceable from sh/doctor-core.sh"
+fi
 
 usrng() { # <daemon-uid> -> sorted range lines from the fixture tree
     (
-        # the extracted block is builtins only — this subshell adds
-        # nothing to PATH on purpose (the test-sandbox rule in
-        # agent/conventions.md: extracted code runs on a controlled PATH)
+        # the sourced lib DEFINES functions only (no probes run at
+        # source time) and the called one is builtins only -- this
+        # subshell adds nothing to PATH on purpose (the test-sandbox
+        # rule in agent/conventions.md: sourced code runs on a
+        # controlled PATH)
         . "$RANGES_FN"
         doctor_userns_ranges "$PROCFIX" "$1" 2>/dev/null | sort -u
     )
@@ -198,12 +210,16 @@ else
 fi
 
 # --- 2. doctor_classify / doctor_examples: uid classification ---------------------
-CLS_FN="$WORK/cls-fn.sh"
-extract_func "$DOCTOR" doctor_classify >"$CLS_FN"
-extract_func "$DOCTOR" doctor_examples >>"$CLS_FN"
-[ -s "$CLS_FN" ] &&
-    pass "doctor_classify/doctor_examples extractable" ||
-    fail "doctor_classify/doctor_examples extractable"
+CLS_FN="$DOCTOR_CORE"
+# Sourcing leg (#448): both functions come from the core lib; the runs
+# below source it under the controlled PATH (definitions only -- the
+# awk externals are the called functions' own).
+if sh -c '. "$1" && command -v doctor_classify >/dev/null && command -v doctor_examples >/dev/null' \
+    _ "$CLS_FN" 2>/dev/null; then
+    pass "doctor_classify/doctor_examples sourceable from sh/doctor-core.sh"
+else
+    fail "doctor_classify/doctor_examples sourceable from sh/doctor-core.sh"
+fi
 
 # controlled PATH with the block's one external (awk) — the test-sandbox
 # rule in agent/conventions.md (extracted code, controlled PATH)
@@ -275,11 +291,14 @@ _out="$(_ex_run "$WORK/extsv" 1001 "165536 65536" | tr '\n' ' ')"
     }
 
 # --- 3. doctor_load_policy: opk.json validation (strict JSON) ---------------------
-POL_FN="$WORK/pol-fn.sh"
-extract_func "$DOCTOR" doctor_load_policy >"$POL_FN"
-[ -s "$POL_FN" ] &&
-    pass "doctor_load_policy extractable" ||
-    fail "doctor_load_policy extractable"
+POL_FN="$DOCTOR_CORE"
+# Sourcing leg (#448): the validator comes from the core lib; the pol()
+# harness below sources it under the controlled PATH (python3).
+if sh -c '. "$1" && command -v doctor_load_policy >/dev/null' _ "$POL_FN" 2>/dev/null; then
+    pass "doctor_load_policy sourceable from sh/doctor-core.sh"
+else
+    fail "doctor_load_policy sourceable from sh/doctor-core.sh"
+fi
 ln -s "$(command -v python3)" "$SCRATCHBIN/python3"
 
 pol() { # <json-string> -> TSV on stdout; stderr lands in $WORK/pol.err
@@ -551,9 +570,11 @@ rm -rf "${A1BIN:?}"
 
 # static order pin (stripped source, the B1 precedent): the walk-up
 # must sit BEFORE the detect gates -- a discovered root of '/' must hit
-# the detect refusal, not slip past a gate that ran on the start dir
-_wu_block=$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -nF 'case "$DOCTOR_ROOT_ARG" in' | head -1 | cut -d: -f1)
-_wu_gate=$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -nF "refusing to walk the whole filesystem" | head -1 | cut -d: -f1)
+# the detect refusal, not slip past a gate that ran on the start dir.
+# (#448: both markers moved with the section into sh/doctor-core.sh --
+# doctor_walkup carries them in order.)
+_wu_block=$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR_CORE" | grep -nF 'case "$DOCTOR_ROOT_ARG" in' | head -1 | cut -d: -f1)
+_wu_gate=$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR_CORE" | grep -nF "refusing to walk the whole filesystem" | head -1 | cut -d: -f1)
 if [ -n "$_wu_block" ] && [ -n "$_wu_gate" ] && [ "$_wu_block" -lt "$_wu_gate" ]; then
     pass "walk-up resolves before the detect '/' gate (static order)"
 else
@@ -573,6 +594,22 @@ if [ -n "$_nl_uilib" ] && [ -n "$_nl_pslib" ] && [ "$_nl_uilib" -lt "$_nl_pslib"
     pass "path-sane sourcing sits after ui.sh (its error row needs ui_error)"
 else
     fail "path-sane sourcing sits after ui.sh (ui=$_nl_uilib ps=$_nl_pslib)"
+fi
+
+# entry/lib wiring (#448, the #346 wave shape): doctor.sh sources
+# sh/doctor-core.sh checkout-first (deployed fallback, loud missing-lib
+# error -- the ui.sh/#165 class) and runs the pairing guard right after
+# the resolver (#413: set -u-only fail-soft means a missing function
+# would rc-127 silently past the summary otherwise). Comment-strip
+# rider on every conjunct (conventions.md "Source-counting pins",
+# #451 a Q3): a commented-out resolver block must not satisfy the pin.
+if sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF 'DOCTOR_CORE="$DR_CALL_DIR/../sh/doctor-core.sh"' &&
+    sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF '|| DOCTOR_CORE="/usr/local/lib/opencode-permissions-kit/sh/doctor-core.sh"' &&
+    sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF 'doctor-core.sh not found' &&
+    sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF 'doctor_pairing_guard || exit 1'; then
+    pass "entry sources doctor-core.sh checkout-first + pairing guard (#448)"
+else
+    fail "entry sources doctor-core.sh checkout-first + pairing guard (#448)"
 fi
 
 # invalid opk.json end-to-end (python stderr passes through, rc 1)
@@ -1090,8 +1127,9 @@ fi
 # static source pins (comment-strip rider, the canonical shape): the
 # default roots are the vhosts layout plus the kit's own registry, at
 # the design's depth -- hermetic execution of the DEFAULT arm would scan
-# the host's real tree, so the claim is source-pinned instead
-_nl_src="$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR")"
+# the host's real tree, so the claim is source-pinned instead. (#448:
+# the literals moved with the all block into sh/doctor-core.sh.)
+_nl_src="$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR_CORE")"
 if printf '%s' "$_nl_src" | grep -qF '[ -d /var/www/vhosts ]' &&
     printf '%s' "$_nl_src" | grep -qF 'projects.conf' &&
     printf '%s' "$_nl_src" | grep -qF -- '-maxdepth 3'; then
@@ -1423,13 +1461,13 @@ RD_OPK=""
 # any period matched; #344 c Q1: the b-wave fragments left the
 # absolute and backslash arms unpinned — mutation-verified in the
 # round-b/c reviews, records on this PR's timeline)
-sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF "trap '_doctor_cleanup; exit 1' INT TERM" &&
-    sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF 'trap _doctor_cleanup EXIT' &&
+sed 's/^[[:space:]]*#.*$//' "$DOCTOR_CORE" | grep -qF "trap '_doctor_cleanup; exit 1' INT TERM" &&
+    sed 's/^[[:space:]]*#.*$//' "$DOCTOR_CORE" | grep -qF 'trap _doctor_cleanup EXIT' &&
     pass "signal handlers exit (#344 a C1 house shape, stripped source)" ||
     fail "signal handlers exit (#344 a C1 house shape, stripped source)"
-sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF '/* | */ | . | ./* | .. | ../* | ' &&
-    sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF '*/. | */./* | */.. | */../* | ' &&
-    sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF '*//* | *\\*)' &&
+sed 's/^[[:space:]]*#.*$//' "$DOCTOR_CORE" | grep -qF '/* | */ | . | ./* | .. | ../* | ' &&
+    sed 's/^[[:space:]]*#.*$//' "$DOCTOR_CORE" | grep -qF '*/. | */./* | */.. | */../* | ' &&
+    sed 's/^[[:space:]]*#.*$//' "$DOCTOR_CORE" | grep -qF '*//* | *\\*)' &&
     pass "belt case pinned end-to-end: absolute, trailing/dot/dotdot/empty forms, backslash (#344 a S5 + b R1 + c Q1)" ||
     fail "belt case pinned end-to-end: absolute, trailing/dot/dotdot/empty forms, backslash (#344 a S5 + b R1 + c Q1)"
 
@@ -1821,9 +1859,9 @@ rc_doctor "B4+a A1: C1-byte root refused for detect (rc 64)" 64 detect "$C1_PROJ
 # test-kit-cli.sh. The mid-run swap itself is not fixture-able without
 # window injection; the mechanism was mechanically verified in round a
 # (verdicts-v1, reproduced by main on the verbatim awk).
-_b1_gate=$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -nF 'if [ -L "$_dt_tmp" ]; then' | head -1 | cut -d: -f1)
-_b1_chmod=$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -nF 'chmod "$_dt_mode" "$_dt_tmp"' | head -1 | cut -d: -f1)
-_b1_mv=$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -nF '[ ! -L "$_dt_tmp" ] && [ ! -L "$DOCTOR_ROOT/opk.json" ] && [ ! -d' | head -1 | cut -d: -f1)
+_b1_gate=$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR_CORE" | grep -nF 'if [ -L "$_dt_tmp" ]; then' | head -1 | cut -d: -f1)
+_b1_chmod=$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR_CORE" | grep -nF 'chmod "$_dt_mode" "$_dt_tmp"' | head -1 | cut -d: -f1)
+_b1_mv=$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR_CORE" | grep -nF '[ ! -L "$_dt_tmp" ] && [ ! -L "$DOCTOR_ROOT/opk.json" ] && [ ! -d' | head -1 | cut -d: -f1)
 if [ -n "$_b1_gate" ] && [ -n "$_b1_chmod" ] && [ -n "$_b1_mv" ] &&
     [ "$_b1_gate" -lt "$_b1_chmod" ] && [ "$_b1_chmod" -lt "$_b1_mv" ]; then
     pass "B1/B2: [ -L ] gate before chmod before the mv gate (with -d conjunct)"
@@ -1852,7 +1890,10 @@ fi
 # --- summary gate -----------------------------------------------------------------
 echo ""
 # --- #249 sweep floor: doctor's python decoders run isolated ----------------------
-_doc_pi=$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -c 'python3 -I' || true)
+# (#448: the four sites moved with the sections into sh/doctor-core.sh --
+# the pin rides the lib now, as does its exact-count twin in
+# test-doctor-core.sh.)
+_doc_pi=$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR_CORE" | grep -c 'python3 -I' || true)
 if [ "${_doc_pi:-0}" -ge 4 ]; then
     echo "  ${GREEN}PASS${NC}  doctor's 4 python3 sites run -I ($_doc_pi found) (#249)"
     passed=$((passed + 1))

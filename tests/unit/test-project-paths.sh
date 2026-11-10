@@ -598,12 +598,13 @@ grep -q '_pp_agent_home' "$PATH_SANE" &&
 # conventions.md "Source-counting pins" (#357 a C5 — the ^-anchored
 # pattern makes the rider a no-op in effect, the letter is kept).
 DOCTOR="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/doctor.sh"
+DOCTOR_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/doctor-core.sh"
 OPK="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opk"
 HANDOVER_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/handover-core.sh"
-_opr_defs=$(sed 's/^[[:space:]]*#.*$//' "$PATH_SANE" "$DOCTOR" "$OPK" "$HANDOVER_CORE" |
+_opr_defs=$(sed 's/^[[:space:]]*#.*$//' "$PATH_SANE" "$DOCTOR" "$DOCTOR_CORE" "$OPK" "$HANDOVER_CORE" |
     grep -c '^opk_policy_root() {' || true)
 if [ "$_opr_defs" = 1 ] &&
-    grep -q 'opk_policy_root "$DOCTOR_ROOT"' "$DOCTOR" &&
+    grep -q 'opk_policy_root "$DOCTOR_ROOT"' "$DOCTOR_CORE" &&
     grep -q 'opk_policy_root "$_ho_policy_dir"' "$HANDOVER_CORE" &&
     grep -q '\. "$PS_LIB"' "$DOCTOR" &&
     grep -q 'sh/path-sane.sh' "$OPK"; then
