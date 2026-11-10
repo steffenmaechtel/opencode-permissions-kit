@@ -113,7 +113,13 @@ else
 fi
 
 # --- 2+3. editorconfig equivalence + discrimination (scratch probe) -------------
-_scratch="$(work_new)"
+# Loud scratch guard (#441 a B1 / #454 a C1 class): no set -e here -- a
+# failed work_new must abort instead of degenerating fixture writes.
+# The post-hoc D4 check below stays as belt-and-suspenders.
+_scratch="$(work_new)" || {
+    echo "format gate: scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
 if [ ! -d "$_scratch" ]; then
     echo "  error  scratch setup failed (work_new) -- aborting (D4 guard)"
     exit 1
@@ -210,7 +216,10 @@ fi
 # .shfmt.tmp.* orphan is swept by a successful run (review b D7), and
 # the scratch dir registers with the work registry (#395; review b D5
 # made it trap-covered). No network anywhere.
-_isf="$(work_new)"
+_isf="$(work_new)" || {
+    echo "format gate: scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
 if [ -d "$_isf" ]; then
     mkdir -p "$_isf/bin"
     # failing curl: `curl -fsSL -o <path> <url>` -> $3 is the -o

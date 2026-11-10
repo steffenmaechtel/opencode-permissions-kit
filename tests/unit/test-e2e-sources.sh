@@ -86,7 +86,12 @@ fi
 # the dist-tag version, and that garbage or an unreachable registry
 # prints EMPTY (the caller's fallback premise) — never a partial value
 # or an abort under lib.sh's set -e. ---
-NPMWORK="$(work_new)"
+# Loud scratch guard (#441 a B1 / #454 a C1 class): no set -e here -- a
+# failed work_new must abort instead of degenerating fixture writes.
+NPMWORK="$(work_new)" || {
+    echo "e2e-sources tests: scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
 mkdir -p "$NPMWORK/bin"
 cat >"$NPMWORK/bin/curl" <<'CURLEOF'
 #!/bin/sh
@@ -261,7 +266,10 @@ fi
 # Example paths only (/tmp/example/...) — the sandbox policy forbids real
 # project-tree literals inside unit suites, and a real path here invites a
 # later session to reuse it for something destructive.
-WTWORK="$(work_new)"
+WTWORK="$(work_new)" || {
+    echo "e2e-sources tests: scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
 extract_func "$LIB" e2e_worktree_suffix >"$WTWORK/fn.sh"
 _wts() {
     REPO_DIR="$1" sh -c '. "$1"; e2e_worktree_suffix' _ "$WTWORK/fn.sh"

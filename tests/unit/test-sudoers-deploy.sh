@@ -33,7 +33,12 @@ check() {
     if "$@" >/dev/null 2>&1; then pass "$_d"; else fail "$_d"; fi
 }
 
-WORK="$(work_new)"
+# Loud scratch guard (#441 a B1 / #454 a C1 class): no set -e here -- a
+# failed work_new must abort instead of degenerating fixture writes.
+WORK="$(work_new)" || {
+    echo "sudoers-deploy tests: scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
 CONF="$WORK/conf"
 SDD="$WORK/sudoers.d"
 mkdir -p "$SDD"
