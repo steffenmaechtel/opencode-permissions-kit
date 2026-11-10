@@ -1223,8 +1223,11 @@ if [ -n "$_f17_block" ]; then
 else
     fail "openchamber stage+mv block extractable (#211 a F17)"
 fi
-_f17_opk_block="$(sed -n '/#211 a F17, the 0.0.44a V10 sibling gap/,/^        fi$/p' \
-    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opk")"
+_f17_opk_block="$(sed -n '/#211 a F17, the 0.0.44a V10 sibling gap/,/^    fi$/p' \
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/openchamber-core.sh")"
+# (Re-targeted from bin/opk by the #415 wave-1 extraction: the arm's
+# body moved to the lib and dedented 4 — the end anchor's `fi` now
+# sits at 4 spaces, matching the moved comment inside the block.)
 if [ -n "$_f17_opk_block" ]; then
     # Hermetic: rewrite /etc/openchamber to scratch so the redirect can
     # actually write (the mechanism — temp + mv to the final name — is
