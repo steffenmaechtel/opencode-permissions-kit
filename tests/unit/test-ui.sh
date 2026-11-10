@@ -280,6 +280,14 @@ for _uc in $_ui_consumers; do
         continue
     fi
     _uc_gs="$(printf '%s\n' "$_uc_gsrc" | sed 's/^[[:space:]]*#.*$//')"
+    # wiring pin: a guard defined but never CALLED protects nothing —
+    # the entry must invoke it right after its ui.sh resolution (the
+    # shape every core pairing guard already carries).
+    if sed 's/^[[:space:]]*#.*$//' "$_uc_entry" | grep -qF "${_uc_guard} || exit 1"; then
+        pass "$_uc_name: entry wires ${_uc_guard} after the ui.sh resolution (#456)"
+    else
+        fail "$_uc_name: $(basename "$_uc_entry") must call ${_uc_guard} || exit 1 (#456)"
+    fi
     # rider, used direction: every ui token the run references must sit
     # in the guard list (emptiness probe per #455 a C2 — an empty
     # extraction must not pass vacuously).
