@@ -21,7 +21,16 @@ cd "$REPO_ROOT" || exit 1
 # gate and the one-line verdict output stay the suite's own.
 . "$SCRIPT_DIR/lib/harness.sh"
 
-TMP="$(work_new_file)"
+# Loud scratch guard (#441 a B1): this suite has no set -e (its checks
+# accumulate FAIL rows across legitimately failing probes), so a failed
+# work_new_file left TMP empty -- every FAIL writer degraded to stderr
+# noise and the [ -s "$TMP" ] gate read false: "docs link check: OK"
+# with detection disabled (the master shape, silently green). Abort
+# loud instead; the pin at the bottom drives this path hermetically.
+TMP="$(work_new_file)" || {
+    echo "docs link check: FAILED - scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
 
 # GitHub anchor normalization: lowercase; remove anything that is not a
 # letter, number, space, or hyphen; spaces -> hyphens; trim edge hyphens.
@@ -323,6 +332,20 @@ grep -q 'checked helper families' "$REPO_ROOT/docs/reference/cli.md" ||
     echo "FAIL cli.md: missing-library scope missing (#273 c C10)" >>"$TMP"
 grep -q 'pre-install exception: full mode exits 0' "$REPO_ROOT/docs/reference/cli.md" ||
     echo "FAIL cli.md: pre-install exit-code exception missing (#273 c C11)" >>"$TMP"
+
+# --- #441 a B1: scratch-creation failure fails loud, not silent-green -----------
+# Hermetic self-re-execution: the suite as a child process under a
+# dead TMPDIR must abort rc 1 with the loud guard message above (the
+# child stops at the guard, before any check -- the re-run is cheap).
+# Sabotage discriminator: with the guard deleted the child exits 0 and
+# prints the silent OK -- exactly the silent-green this pin forbids.
+_b1_rc=0
+_b1_out="$(TMPDIR="$REPO_ROOT/.no-such-tmp-opk-441" sh "$SCRIPT_DIR/test-docs.sh" 2>&1)" ||
+    _b1_rc=$?
+if [ "$_b1_rc" -ne 1 ] ||
+    ! printf '%s' "$_b1_out" | grep -qF 'scratch creation failed'; then
+    echo "FAIL test-docs itself: dead-TMPDIR run must abort loud, not pass silently (rc=$_b1_rc out=$_b1_out) (#441 a B1)" >>"$TMP"
+fi
 
 if [ -s "$TMP" ]; then
     echo "docs link check: FAILED"

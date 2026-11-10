@@ -975,7 +975,9 @@ unset ES_MARKER
 # List drift guard: install.sh's fetch_kit() list and update.sh's KIT_FILES
 # must carry the same file set — a missing entry means streamed installs
 # fetch an incomplete kit and crash at deploy time (set -e).
-install_list="$(sed -n '/^fetch_kit() {/,/^}/p' "$SCRIPT_DIR/../../files/install.sh" |
+# extract_func since #441 a A1: this inventory leg stayed literal when
+# #437 adopted the harness (byte-identity proven before the swap).
+install_list="$(extract_func "$SCRIPT_DIR/../../files/install.sh" fetch_kit |
     grep -v 'mkdir' |
     grep -vE '^[[:space:]]*("\$dir/[^"]*"[[:space:]]*)+\\?$' |
     grep -oE '(install|config|update|uninstall|status)\.sh|opencode(-deny-all)?\.jsonc|sudoers\.template|umask\.sh|VERSION|etc/[a-zA-Z0-9./_-]+|opencode-permissions-kit-lib/[a-zA-Z0-9./_-]+' | sort -u)"
