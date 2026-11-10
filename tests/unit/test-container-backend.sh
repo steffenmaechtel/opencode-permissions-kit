@@ -285,10 +285,9 @@ echo "-- status.sh wiring (section rows live in sh/status-core.sh, #346 wave 1) 
 # hint's install command, so deleting every real backend row kept both
 # pins green. The pins bind the ui_kv rows and the case arms; the
 # per-backend BEHAVIOR is driven by test-status.sh's run_case sourcing
-# pins for kubernetes/empty/docker-rootless only — the podman arm is
-# pinned structurally here (rows + dispatch), and behavioral podman
-# coverage is a deferred work order recorded in this PR's round-a loop
-# status (#439 a S2; the PR thread is the case record). Strip riders
+# pins — kubernetes/empty/docker-rootless since #346, podman-rootless
+# (socket probe + both podman-CLI legs) since #440 — so this file keeps
+# the structural layer only (rows + dispatch). Strip riders
 # on the presence legs (#439 a C3): a row commented out during
 # debugging and committed must not keep a pin green — the #261/#244 g
 # W1 survivor trap, presence form.
