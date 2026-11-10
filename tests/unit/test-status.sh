@@ -1434,7 +1434,7 @@ fi
 # Comment-strip rider (#261, the #244 g W1 class) on the socket-twin
 # count: commented-out rows stop counting; full-line comments only
 # (#244 h W6 residual).
-_sock_n="$(sed 's/^[[:space:]]*#.*$//' "$STATUS_CORE" |
+_sock_n="$(live_src "$STATUS_CORE" |
     grep -cF 'ui_kv "socket" "unknown — needs root to check' || true)"
 if grep -qF 'ui_kv "opencode version" "unknown — probe failed' "$STATUS_CORE" &&
     [ "$_sock_n" = "2" ] &&
@@ -1590,7 +1590,7 @@ fi
 # Issue #201: the dead-end advice lives ONLY in the #166 cell now —
 # exactly one literal (a second occurrence would mean a healthy-direct
 # or unparsable cell advising sudo again).
-_sudo_n="$(sed 's/^[[:space:]]*#.*$//' "$STATUS_CORE" | grep -cF 'unknown — probe failed (run: sudo opk status)' ||
+_sudo_n="$(live_src "$STATUS_CORE" | grep -cF 'unknown — probe failed (run: sudo opk status)' ||
     true)"
 if [ "$_sudo_n" = "1" ]; then
     pass "#201: the sudo-opk-status advice is #166-cell only (one literal)"

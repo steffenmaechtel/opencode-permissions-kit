@@ -153,7 +153,7 @@ check "update-core: bounded --version helper exists (timeout 10 + head -1)" \
 # >=4 floor to 5 — deleting one of the four real probe sites stayed
 # green. For a no-argument helper the call form is the name followed by
 # `)` (the $(...) invocations); the definer's `(` cannot match.
-_ova_n="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE_CORE" | grep -c 'opencode_version_line)' || true)"
+_ova_n="$(live_src "$UPDATE_CORE" | grep -c 'opencode_version_line)' || true)"
 check "update-core: all --version probes route through the bounded helper (call sites: $_ova_n, need exactly 4 — #439 a S1)" \
     [ "$_ova_n" -eq 4 ]
 check "update-core: post-copy failure message never names a backup that was never taken (W6)" \
@@ -269,8 +269,8 @@ rm -rf "$DL"
 # --- 3. TMP cleanup order: never before the install attempt ----------------------
 # (comment-stripped operands, #385; both lines live in update_binary_upgrade
 # in sh/update-core.sh since #346 wave 2)
-IB_LINE=$(sed 's/^[[:space:]]*#.*$//' "$UPDATE_CORE" | grep -n 'install_binary "\$SRC"' | head -1 | cut -d: -f1)
-LAST_TMP_RM=$(sed 's/^[[:space:]]*#.*$//' "$UPDATE_CORE" | grep -n 'rm -rf "\$TMP"' | tail -1 | cut -d: -f1)
+IB_LINE=$(live_src "$UPDATE_CORE" | grep -n 'install_binary "\$SRC"' | head -1 | cut -d: -f1)
+LAST_TMP_RM=$(live_src "$UPDATE_CORE" | grep -n 'rm -rf "\$TMP"' | tail -1 | cut -d: -f1)
 check "cleanup: candidate dir removed only AFTER the install attempt (issue #24)" \
     sh -c "[ -n \"\$1\" ] && [ -n \"\$2\" ] && [ \"\$2\" -gt \"\$1\" ]" _ "$IB_LINE" "$LAST_TMP_RM"
 
@@ -307,7 +307,7 @@ check "flag: --only-binary parsed, implies BINARY_UPDATE" \
     sh -c "grep -q -- '--only-binary)' \"\$1\" && grep -A4 -- '--only-binary)' \"\$1\" | grep -q 'BINARY_UPDATE=true'" _ "$UPDATE"
 check "flag: help text documents --only-binary" \
     sh -c "grep -q -- '--only-binary    skip every kit step' \"\$1\"" _ "$UPDATE"
-_obw_n="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE" | grep -cF 'if [ "$ONLY_BINARY" != true ]; then' || true)"
+_obw_n="$(live_src "$UPDATE" | grep -cF 'if [ "$ONLY_BINARY" != true ]; then' || true)"
 check "gating: kit re-deploy sections are wrapped (2 skip zones; wrap sites: $_obw_n, need >=2)" \
     [ "$_obw_n" -ge 2 ]
 check "no kit self-fetch in binary-only mode (library runs stay offline for kit files)" \
@@ -388,8 +388,8 @@ check "ddev stamp: summary line reports the refreshed value" \
     sh -c "grep -q 'DDEV_VERSION=\$NEW_DDEV_VERSION' \"\$1\"" _ "$UPDATE_CORE"
 
 # --- 7. --channel (switch the tracking ref without editing install.conf) --------
-_prescan_ln=$(sed 's/^[[:space:]]*#.*$//' "$UPDATE" | grep -n '_prev_arg' | head -1 | cut -d: -f1)
-_resolv_ln=$(sed 's/^[[:space:]]*#.*$//' "$UPDATE" | grep -n '_kit_stamped_channel=' | head -1 | cut -d: -f1)
+_prescan_ln=$(live_src "$UPDATE" | grep -n '_prev_arg' | head -1 | cut -d: -f1)
+_resolv_ln=$(live_src "$UPDATE" | grep -n '_kit_stamped_channel=' | head -1 | cut -d: -f1)
 if [ -n "$_prescan_ln" ] && [ -n "$_resolv_ln" ] && [ "$_prescan_ln" -lt "$_resolv_ln" ]; then
     pass "channel: pre-scan runs before the stamp resolution (fetch uses the new ref)"
 else
@@ -1426,7 +1426,7 @@ fi
 # Static arm (discriminates on installed hosts where the behavioral arm
 # above cannot force a missing install.conf): the fallback read carries
 # the || true guard, comment-stripped.
-if sed 's/^[[:space:]]*#.*$//' "$UPDATE" |
+if live_src "$UPDATE" |
     grep -qF 'sed -n '"'"'s/^VERSION=//p'"'"' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1 || true'; then
     pass "fallback read carries the pipefail || true guard (pr-00429 a B1, static arm)"
 else
@@ -1498,7 +1498,7 @@ fi
 # removes it). Both the run order and the pairing-guard list are pinned
 # — they must agree.
 _xdg_pos() {
-    _phase_lines="$(sed 's/^[[:space:]]*#.*$//' "$1" | grep -nE '^[[:space:]]*(update_binary_upgrade|update_redeploy_xdg_shim)[[:space:]]*$' | cut -d: -f1)"
+    _phase_lines="$(live_src "$1" | grep -nE '^[[:space:]]*(update_binary_upgrade|update_redeploy_xdg_shim)[[:space:]]*$' | cut -d: -f1)"
     _bin=""
     _xdg=""
     for _ln in $_phase_lines; do
@@ -1544,7 +1544,7 @@ esac
 # the surprising/riskier answer", agent/conventions.md "Interactive
 # prompts"). Comment-stripped grep for the default itself; the
 # rationale comment must exist at the site too.
-if sed 's/^[[:space:]]*#.*$//' "$UPDATE" | grep -qF 'ui_confirm "$1" "y"' &&
+if live_src "$UPDATE" | grep -qF 'ui_confirm "$1" "y"' &&
     grep -qF '#428 disposition' "$UPDATE"; then
     pass "re-deploy confirm stays default-y, disposition documented (#428)"
 else

@@ -1014,7 +1014,7 @@ check "fix b M3: migrate runner hops through a neutral cwd" \
 # commented-out invocations stop counting; full-line comments only
 # (#244 h W6 residual). The combined pattern is the old pipeline's
 # accept set (both terms on one line): the two live imports.
-_m3i_n="$(sed 's/^[[:space:]]*#.*$//' "$MIGRATESH" | grep -c 'cd / && exec.*migrate-import' || true)"
+_m3i_n="$(live_src "$MIGRATESH" | grep -c 'cd / && exec.*migrate-import' || true)"
 check "fix b M3: both inline import invocations hop through a neutral cwd (import sites: $_m3i_n of 2)" \
     [ "$_m3i_n" = 2 ]
 check "fix b M1: install.sh root probe from / (consistency)" \
@@ -1065,16 +1065,16 @@ check "fix c M1: ddev-hosts helper hops through a neutral cwd (sudo + direct arm
 # Comment-strip rider (#261, the #244 g W1 class — pr-00320 c F1):
 # a commented-out twin invocation stops counting; full-line comments
 # only (#244 h W6 residual).
-_dha_n="$(sed 's/^[[:space:]]*#.*$//' "$HOSTSSH" | grep -cF '"$dha_bin" hostname' || true)"
+_dha_n="$(live_src "$HOSTSSH" | grep -cF '"$dha_bin" hostname' || true)"
 check "fix c M1: no bare ddev-hosts invocation remains outside the helper (invocation sites: $_dha_n of 2)" \
     [ "$_dha_n" = 2 ]
 check "fix c S1: ddev-migrate absolutizes a relative dump-dir" \
     sh -c "grep -qF 'dm_dir=\"\$PWD/\$dm_dir\"' \"\$1\" && grep -qF 'case \"\$dm_dir\" in' \"\$1\"" _ "$MIGRATESH"
+_dv_m1_src=$(live_src "$MIGRATESH")
 check "fix d M1: empty-dir refusal precedes the absolutization (guard hoisted)" \
-    sh -c 's=$(sed "s/^[[:space:]]*#.*\$//" "$1");
-        g=$(printf "%s\n" "$s" | grep -nF "[ -n \"\$dm_dir\" ] ||" | head -1 | cut -d: -f1);
-        c=$(printf "%s\n" "$s" | grep -nF "case \"\$dm_dir\" in" | head -1 | cut -d: -f1);
-        test -n "$g" && test -n "$c" && test "$g" -lt "$c"' _ "$MIGRATESH"
+    sh -c 'g=$(printf "%s\n" "$1" | grep -nF "[ -n \"\$dm_dir\" ] ||" | head -1 | cut -d: -f1);
+        c=$(printf "%s\n" "$1" | grep -nF "case \"\$dm_dir\" in" | head -1 | cut -d: -f1);
+        test -n "$g" && test -n "$c" && test "$g" -lt "$c"' _ "$_dv_m1_src"
 check "fix c L1: container guard precedes the dumps mkdir" \
     sh -c "awk '/^e2e_dump_container\(\)/,/^}/' \"\$1\" | grep -vE '^[[:space:]]*#' | awk '/E2E_CONTAINER/{if (g == 0) g = NR} /mkdir -p/{if (m == 0) m = NR} END{exit !(g > 0 && m > 0 && g < m)}'" _ "$E2ELIB"
 check "fix c L2: the rc capture is the FIRST statement of the trap handler" \
@@ -1776,7 +1776,7 @@ check "update.sh: skip message names both force paths" \
 # is loud in EVERY placement (c1): anywhere it reds the loops==1 pin,
 # and inside the range it additionally shortens this capture, which
 # reds the in-body counts.
-_upd_loop="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE_CORE" | awk '/while IFS= read -r root; do/,/done <"\$PROJECTS_CONF"/')"
+_upd_loop="$(live_src "$UPDATE_CORE" | awk '/while IFS= read -r root; do/,/done <"\$PROJECTS_CONF"/')"
 _upd_gate_n="$(printf '%s\n' "$_upd_loop" | grep -c 'if \[ "\$REFRESH" = true \]; then' || true)"
 _upd_arm_n="$(printf '%s\n' "$_upd_loop" | grep -c 'fs_baseline_root "\$root"' || true)"
 _upd_stmp_n="$(printf '%s\n' "$_upd_loop" | grep -c 'ddev_handover_stamp_write "\$root"' || true)"
@@ -1787,10 +1787,10 @@ _upd_ho_ln="$(printf '%s\n' "$_upd_loop" | grep -n 'ddev_handover_root "\$root"'
 _upd_stamp_ln="$(printf '%s\n' "$_upd_loop" | grep -n 'ddev_handover_stamp_write "\$root"' | head -1 | cut -d: -f1)"
 check "update.sh: in-loop order arm < handover < stamp (${_upd_arm_ln}<${_upd_ho_ln}<${_upd_stamp_ln} — pr-00381 a7)" \
     sh -c '[ -n "$1" ] && [ -n "$2" ] && [ -n "$3" ] && [ "$1" -lt "$2" ] && [ "$2" -lt "$3" ]' _ "$_upd_arm_ln" "$_upd_ho_ln" "$_upd_stamp_ln"
-_upd_loops_n="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE_CORE" | grep -c 'done <"$PROJECTS_CONF"' || true)"
+_upd_loops_n="$(live_src "$UPDATE_CORE" | grep -c 'done <"$PROJECTS_CONF"' || true)"
 check "update.sh: exactly one project-root loop (loops: $_upd_loops_n, need 1 — issue #219)" \
     [ "$_upd_loops_n" -eq 1 ]
-_upd_ho_n="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE_CORE" | grep -c 'ddev_handover_root "$root"' || true)"
+_upd_ho_n="$(live_src "$UPDATE_CORE" | grep -c 'ddev_handover_root "$root"' || true)"
 check "update.sh: handover call per root exactly once (sites: $_upd_ho_n, need 1 — issue #219)" \
     [ "$_upd_ho_n" -eq 1 ]
 check "update.sh: refresh success line kept verbatim (issue #219 move)" \
@@ -1809,7 +1809,7 @@ check "install.sh: stamps after the install-time handover" \
 # of the three real sites left count 3 >= 3 green while the wiring was
 # broken; the call form matches only real invocations (definers, error
 # echoes and comments cannot match) and the floor becomes exact.
-_stampw_n="$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" | grep -c 'ddev_handover_stamp_write "' || true)"
+_stampw_n="$(live_src "$CONFIG" | grep -c 'ddev_handover_stamp_write "' || true)"
 check "config.sh: refresh + projects add + handover re-stamp (call sites: $_stampw_n, need exactly 3 — #408)" \
     [ "$_stampw_n" -eq 3 ]
 check "handover.sh: stamp dir defaults to /etc/opencode-permissions-kit/handover" \
@@ -1832,7 +1832,7 @@ check "install.sh defaults to dev-owned (DDEV_DEV_OWNED=true)" \
     sh -c "grep -qF 'DDEV_DEV_OWNED=true' \"\$1\"" _ "$INSTALL"
 check "install.sh stamps DDEV_DEV_OWNED into install.conf" \
     sh -c "grep -qF 'DDEV_DEV_OWNED=\$DDEV_DEV_OWNED' \"\$1\"" _ "$INSTALL_CORE"
-_dsetq_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" | grep -c 'ddev settings management? (dev-owned projects)' || true)"
+_dsetq_n="$(live_src "$INSTALL_CORE" | grep -c 'ddev settings management? (dev-owned projects)' || true)"
 check "install.sh asks the ddev-settings question (standard + advanced; question sites: $_dsetq_n, need >=2)" \
     [ "$_dsetq_n" -ge 2 ]
 check "status.sh reports the ddev settings mode" \
@@ -1972,7 +1972,7 @@ fi
 # set -e before the -ge 3 FAIL could record.
 # Comment-strip rider (#261, the #244 g W1 class): commented-out warn
 # lines must not count; full-line comments only (#244 h W6 residual).
-_n_w9=$(sed 's/^[[:space:]]*#.*$//' "$HANDOVER" | grep -c 'warn: project-root hand\(back\|over\) incomplete' || true)
+_n_w9=$(live_src "$HANDOVER" | grep -c 'warn: project-root hand\(back\|over\) incomplete' || true)
 [ "$_n_w9" -ge 3 ] &&
     pass "all three project-root warn lines present (#211 b W9)" ||
     fail "all three project-root warn lines present (got $_n_w9) (#211 b W9)"
@@ -1988,7 +1988,7 @@ grep -q 'warn: dev-owned handback incomplete for $dhb_proj (root inode' "$HANDOV
 CB285=$(mktemp -d)
 for _h in --opk-ensure-shared --opk-devowned-flag; do
     sed "/${_h}/,/^fi\$/ s/^/#/" "$HELPER" >"$CB285/helper-$_h"
-    if sed 's/^[[:space:]]*#.*$//' "$CB285/helper-$_h" |
+    if live_src "$CB285/helper-$_h" |
         awk -v pat="$_h" '$0 ~ pat {h=NR} /DDEV=""/{d=NR} END{exit !(h>0 && d>0 && h<d)}'; then
         fail "#285: order pin green with the $_h handler commented out (comment-blind)"
     else

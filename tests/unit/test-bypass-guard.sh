@@ -159,7 +159,7 @@ check "install.sh defines the atomic-copy fallback for a missing lib (#163)" \
 # sites must not count. Full-line comments only (#244 h W6 residual):
 # a trailing comment after a live line still counts. The four call
 # sites live in do_deploy_phase — install-core.sh since #346 wave 3.
-_cbina_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" | grep -cF 'copy_binary_atomic "' || true)"
+_cbina_n="$(live_src "$INSTALL_CORE" | grep -cF 'copy_binary_atomic "' || true)"
 check "install.sh deploys the binary through the atomic helper at exactly four call sites (#163, 0.0.49a W6; call sites: $_cbina_n of 4)" \
     [ "$_cbina_n" -eq 4 ]
 check "install.sh no longer sudo-cps directly onto SYSTEM_BIN (#163)" \
@@ -190,7 +190,7 @@ check "install.sh deploys the umask profile through the atomic file helper at mo
 # command -v wiring line and the fallback definition don't match);
 # -eq, not -ge: a second copy_file_atomic deploy must be a conscious
 # pin update, not a silent pass.
-_cfa_i_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" | grep -cF 'copy_file_atomic "' || true)"
+_cfa_i_n="$(live_src "$INSTALL_CORE" | grep -cF 'copy_file_atomic "' || true)"
 check "install.sh routes exactly one deploy through copy_file_atomic (0.0.49c F3; deploy sites: $_cfa_i_n of 1)" \
     [ "$_cfa_i_n" -eq 1 ]
 check "install.sh no longer sudo-cps the umask profile in place (0.0.49b C1)" \
@@ -225,7 +225,7 @@ check "update.sh defines the atomic-file fallback for a missing lib (0.0.49b C1)
 check "update.sh re-deploys the umask profile through the atomic file helper at mode 644 (0.0.49b C1, 0.0.49c F2)" \
     sh -c 'grep -Fq "copy_file_atomic \"\$FILES_ROOT/etc/umask.sh\"" "$1" \
         && grep -Fq "opencode-permissions-kit-umask.sh 644" "$1"' _ "$UPDATE_CORE"
-_cfa_u_n="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE_CORE" | grep -cF 'copy_file_atomic "' || true)"
+_cfa_u_n="$(live_src "$UPDATE_CORE" | grep -cF 'copy_file_atomic "' || true)"
 check "update.sh routes exactly one deploy through copy_file_atomic (0.0.49c F3; deploy sites: $_cfa_u_n of 1)" \
     [ "$_cfa_u_n" -eq 1 ]
 check "update.sh no longer sudo-cps the umask profile in place (0.0.49b C1)" \

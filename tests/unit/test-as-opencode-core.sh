@@ -195,7 +195,7 @@ fi
 # exists today, verified at #457 filing). Same stripped guard source,
 # same boundary anchor, same emptiness probe as 4d.
 _pg_missing=""
-_pg_entfns="$(sed 's/^[[:space:]]*#.*$//' "$ENTRY" |
+_pg_entfns="$(live_src "$ENTRY" |
     sed 's/^case \$(standalone_mode.*/standalone_mode/' |
     grep -oE '^(wrapper_[a-z_0-9]+|openchamber_guard|standalone_mode)' |
     grep -v '^wrapper_pairing_guard$' | sort -u)"

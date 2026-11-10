@@ -187,15 +187,15 @@ check "openchamber-secure announces replacing divergent content (F1)" grep -qF '
 # Comment-strip riders (#261, the #244 g W1 class): commented-out lines
 # must not count. Full-line comments only (#244 h W6 residual): a
 # trailing comment after a live line still counts.
-_ocb_def="$(sed 's/^[[:space:]]*#.*$//' "$KIT" | grep -c 'oc_bypass_bin' || true)"
+_ocb_def="$(live_src "$KIT" | grep -c 'oc_bypass_bin' || true)"
 check "openchamber-secure's probe helper stays dispatcher-level (#447)" [ "$_ocb_def" -ge 1 ]
-_ocb_n="$(sed 's/^[[:space:]]*#.*$//' "$OCCORE" | grep -c 'oc_bypass_bin' || true)"
+_ocb_n="$(live_src "$OCCORE" | grep -c 'oc_bypass_bin' || true)"
 check "openchamber-secure exempts kit-owned symlinks (F3)" [ "$_ocb_n" -ge 3 ]
 # 0.0.47c C2: every completing path of openchamber-secure ends with the
 # restart hint (getent-skip, nothing-found, decline, full run — the
 # oc_bypass_bin count precedent; behavioral pinning of the decline path
 # would need an interactive ui_confirm, static count is the proxy)
-_rh_n="$(sed 's/^[[:space:]]*#.*$//' "$OCCORE" | grep -c 'restart OpenChamber if it is running' || true)"
+_rh_n="$(live_src "$OCCORE" | grep -c 'restart OpenChamber if it is running' || true)"
 check "openchamber-secure prints the restart hint on every completing path (0.0.47c C2)" [ "$_rh_n" -ge 4 ]
 
 # unknown flag for openchamber-secure aborts before elevation (runs as
@@ -248,7 +248,7 @@ fi
 # The prompt call moved to openchamber-core.sh with the #415 wave-1
 # extraction; the fallback ui_confirm header pin below stays on $KIT
 # (the fallback helper is dispatcher-level).
-if sed 's/^[[:space:]]*#.*$//' "$OCCORE" | grep -qF 'ui_confirm "Remove them now?" "n"'; then
+if live_src "$OCCORE" | grep -qF 'ui_confirm "Remove them now?" "n"'; then
     pass "bypass-removal prompt defaults to n (#370 a E3)"
 else
     fail "bypass-removal prompt defaults to n (#370 a E3)"
@@ -495,8 +495,8 @@ fi
 # Comment-strip rider on the extraction legs too (#261): a commented-out
 # executor line must not be extracted — sed substitutes (never deletes),
 # so the grep -n numbers still match the real file.
-_ho_chmod_lns=$(sed 's/^[[:space:]]*#.*$//' "$HOCORE" | grep -n 'find "\$_ho_a" ! -type l -exec chmod g+w' | cut -d: -f1)
-_ho_chown_lns=$(sed 's/^[[:space:]]*#.*$//' "$HOCORE" | grep -n 'chown -R -h "\$_ho_user:\$_ho_group" "\$_ho_a"' | cut -d: -f1)
+_ho_chmod_lns=$(live_src "$HOCORE" | grep -n 'find "\$_ho_a" ! -type l -exec chmod g+w' | cut -d: -f1)
+_ho_chown_lns=$(live_src "$HOCORE" | grep -n 'chown -R -h "\$_ho_user:\$_ho_group" "\$_ho_a"' | cut -d: -f1)
 # Guarded counts (#260, the #244 f W1 class — sites beyond the issue's
 # list, found by this wave's sweep): an executor line vanishing from the
 # kit script leaves grep -c . counting zero non-empty lines, rc 1 —
@@ -1617,19 +1617,19 @@ fi
 check "settings-edit failure names key-or-value (pr-00263 a F21)" grep -qF 'entry (key or value) by hand' "$OCCORE"
 
 echo ""
-_kit_pi=$(sed 's/^[[:space:]]*#.*$//' "$OCCORE" | grep -c 'python3 -I' || true)
+_kit_pi=$(live_src "$OCCORE" | grep -c 'python3 -I' || true)
 if [ "${_kit_pi:-0}" -ge 1 ]; then
     pass "openchamber-core's settings edit runs python3 -I ($_kit_pi found) (#249, moved with the #415 wave-1 extraction)"
 else
     fail "openchamber-core must run its settings edit with python3 -I (found ${_kit_pi:-0}) (#249)"
 fi
-_kit_hc_pi=$(sed 's/^[[:space:]]*#.*$//' "$HOCORE" | grep -c 'python3 -I' || true)
+_kit_hc_pi=$(live_src "$HOCORE" | grep -c 'python3 -I' || true)
 if [ "${_kit_hc_pi:-0}" -ge 1 ]; then
     pass "handover-core's opk.json reader runs python3 -I ($_kit_hc_pi found) (#249, moved with the #415 extraction)"
 else
     fail "handover-core must run its opk.json reader with python3 -I (found ${_kit_hc_pi:-0}) (#249)"
 fi
-_kit_exec_pi=$(sed 's/^[[:space:]]*#.*$//' "$OCCORE" | grep -c 'exec python3 -I' || true)
+_kit_exec_pi=$(live_src "$OCCORE" | grep -c 'exec python3 -I' || true)
 if [ "${_kit_exec_pi:-0}" -ge 1 ]; then
     pass "openchamber-core's settings-edit exec runs python3 -I (review a C2, moved with the #415 wave-1 extraction)"
 else

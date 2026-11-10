@@ -756,13 +756,13 @@ rm -rf "$_pb_w"
 # silent-degradation class. The used-set guard closes the twin C5 could
 # not see: a PRESENT-but-truncated/older ui.sh (fallback stubs never
 # fire, bare ui_* calls rc-127 under set -e mid-install).
-if sed 's/^[[:space:]]*#.*$//' "$INSTALL" |
+if live_src "$INSTALL" |
     grep -qF 'kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ui.sh"'; then
     pass "ui.sh rides kit_source — a ui.sh-less run dies loud as a broken fetch (#456)"
 else
     fail "install.sh must kit_source ui.sh like every other lib (#456)"
 fi
-if sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -q 'ui_info() { echo'; then
+if live_src "$INSTALL" | grep -q 'ui_info() { echo'; then
     fail "the retired C5 output-stub fallback is fully removed (#456)"
 else
     pass "the retired C5 output-stub fallback is fully removed (#456)"
@@ -789,7 +789,7 @@ if printf '%s' "$_uig_full" | grep -q 'rc=0'; then
 else
     fail "ui guard must pass against the real ui.sh (out=$_uig_full) (#456)"
 fi
-if sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -qF 'install_ui_pairing_guard || exit 1'; then
+if live_src "$INSTALL" | grep -qF 'install_ui_pairing_guard || exit 1'; then
     pass "install.sh wires the ui guard right after the ui.sh kit_source (#456)"
 else
     fail "install.sh must call the ui guard after sourcing ui.sh (#456)"
@@ -867,7 +867,7 @@ fi
 # call site — the two-step false-green the f-W4 sweep left bounded.
 # Full-line comments only (#244 h W6): a trailing comment after a
 # live line would still count — the same residual _p3old carries.
-_v2hits=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" | grep -c 'https://opencode.ai/v2/install' || true)
+_v2hits=$(live_src "$INSTALL_CORE" | grep -c 'https://opencode.ai/v2/install' || true)
 if [ "$_v2hits" -ge 2 ]; then
     pass "bootstrap streams the v2 installer (prompt + curl, $_v2hits sites)"
 else
@@ -984,7 +984,7 @@ if [ -n "$(extract_func "$INSTALL" _py3_health_probe)" ]; then
     # sweep): -F counts substrings anywhere, so a commented-out gate
     # would count as the surviving gate — the exact commented-sabotage
     # pass-green trap.
-    _p3old=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" |
+    _p3old=$(live_src "$INSTALL" |
         grep -cF 'if ! command -v python3 >/dev/null 2>&1; then') || true
     if [ "$_p3old" -eq 1 ]; then
         pass "old presence-only gate replaced (check survives only inside the function)"
@@ -1051,7 +1051,7 @@ if [ -n "$(extract_func "$INSTALL" _py3_health_probe)" ]; then
         *bash*) _p3bin=bash ;;
         *) _p3bin=sh ;;
     esac
-    _p3lines="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" |
+    _p3lines="$(live_src "$INSTALL" |
         grep -E '^[[:space:]]*(export[[:space:]]+|readonly[[:space:]]+|local[[:space:]]+)?_py3_imports[^_[:alnum:]]' || true)"
     _p3n="$(printf '%s\n' "$_p3lines" |
         grep -cE '^[[:space:]]*(export[[:space:]]+|readonly[[:space:]]+|local[[:space:]]+)?_py3_imports[^_[:alnum:]]' || true)"
@@ -1110,7 +1110,7 @@ if [ -n "$(extract_func "$INSTALL" _py3_health_probe)" ]; then
             # The two greps find nothing in most files — rc 1 is the
             # normal case there (guarded empty-match greps); a wholly
             # empty collection is caught by the non-empty check below.
-            sed 's/^[[:space:]]*#.*$//' "$_p3cf" 2>/dev/null |
+            live_src "$_p3cf" 2>/dev/null |
                 grep -oE "^[[:space:]]*(import|from)[[:space:]]+[^[:space:]#][^#]*" \
                     >>"$2" || true
             grep -oE -- "-c[[:space:]]+'import[^']*" "$_p3cf" 2>/dev/null |
@@ -1203,7 +1203,7 @@ fi
 # LOWS-1: the count stays 10 — #371 A7 ADDS the rc-file backup site
 # (before the PATH cleanup), #372 I6 REMOVES the user-authored-config
 # replace arm's site with the arm itself. Net zero, both conscious.
-_bk_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" | grep -c '_bk_fail' || true)"
+_bk_n="$(live_src "$INSTALL_CORE" | grep -c '_bk_fail' || true)"
 [ "$_bk_n" = 10 ] &&
     grep -qF 'INCOMPLETE: $_BK_FAIL' "$INSTALL" &&
     pass "backup failures record loudly + degrade the summary row (pr-00263 a F6 + d W1/W2)" ||
@@ -1212,13 +1212,13 @@ _bk_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" | grep -c '_bk_fail' || tru
 # replace arm (no kit marker, no permission block) no longer renders,
 # so its backup+announce site is gone with it; the re-render twin
 # keeps the honest announce.
-_cba_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" |
+_cba_n="$(live_src "$INSTALL_CORE" |
     grep -cF 'config backup FAILED — see Backup summary' || true)"
 [ "$_cba_n" = 1 ] &&
     grep -qF 'binary backup FAILED — see Backup summary' "$INSTALL_CORE" &&
     pass "the swept backup sites degrade their announce on failure (pr-00263 d W1/W2)" ||
     fail "a backup announce still lies on failure (pr-00263 d W1/W2; config-announce sites: $_cba_n of 1)"
-_acl_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" | grep -cF 'no ACL recovery material' || true)"
+_acl_n="$(live_src "$INSTALL_CORE" | grep -cF 'no ACL recovery material' || true)"
 [ "$_acl_n" = 2 ] &&
     pass "both getfacl backups announce failure instead of success (pr-00263 a F8)" ||
     fail "a getfacl success line still lies (pr-00263 a F8; no-ACL sites: $_acl_n of 2)"

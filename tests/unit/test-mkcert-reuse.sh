@@ -29,7 +29,7 @@ STATUS_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core
 
 # line_of: first line (in the comment-stripped file, #385) containing $2.
 # The strip substitutes (never deletes), so the numbers stay real lines.
-line_of() { sed 's/^[[:space:]]*#.*$//' "$1" | grep -nF "$2" | head -1 | cut -d: -f1; }
+line_of() { live_src "$1" | grep -nF "$2" | head -1 | cut -d: -f1; }
 
 echo ""
 echo "mkcert CA reuse Tests"

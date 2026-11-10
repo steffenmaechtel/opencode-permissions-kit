@@ -77,15 +77,15 @@ fi
 # Comment-strip on every positive conjunct (conventions.md
 # "Source-counting pins", the #451 a Q3 shape): a commented-out
 # resolver block must not satisfy the pin.
-if sed 's/^[[:space:]]*#.*$//' "$UPDATE" | grep -qF 'UPDATE_CORE="$SCRIPT_DIR/../sh/update-core.sh"' &&
-    sed 's/^[[:space:]]*#.*$//' "$UPDATE" |
+if live_src "$UPDATE" | grep -qF 'UPDATE_CORE="$SCRIPT_DIR/../sh/update-core.sh"' &&
+    live_src "$UPDATE" |
     grep -qF '[ -f "$UPDATE_CORE" ] || UPDATE_CORE="$LIBDIR/sh/update-core.sh"' &&
-    sed 's/^[[:space:]]*#.*$//' "$UPDATE" | grep -qF '. "$UPDATE_CORE"'; then
+    live_src "$UPDATE" | grep -qF '. "$UPDATE_CORE"'; then
     pass "update.sh sources update-core.sh checkout-first"
 else
     fail "update.sh must resolve update-core.sh checkout-first (entry + \$LIBDIR fallback + sourcing)"
 fi
-if sed 's/^[[:space:]]*#.*$//' "$UPDATE" | grep -qF 'error: update-core.sh not found'; then
+if live_src "$UPDATE" | grep -qF 'error: update-core.sh not found'; then
     pass "update.sh errors loud on a missing lib (no silent phase drops)"
 else
     fail "update.sh must error loud on a missing lib"
@@ -359,7 +359,7 @@ fi
 # Comment-strip rider (conventions.md "Source-counting pins", the #451
 # a Q3 shape): a commented-out guard wiring line must not satisfy the
 # pin.
-if sed 's/^[[:space:]]*#.*$//' "$UPDATE" | grep -qF 'update_pairing_guard || exit 1'; then
+if live_src "$UPDATE" | grep -qF 'update_pairing_guard || exit 1'; then
     pass "update.sh wires the guard right after the resolver (#413)"
 else
     fail "update.sh must call the guard after sourcing update-core.sh (#413)"
@@ -420,8 +420,8 @@ fi
 _xl_missing=""
 UPDATE_ENTRY="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh"
 _xl_combined="$(
-    sed 's/^[[:space:]]*#.*$//' "$UPDATE_ENTRY"
-    sed 's/^[[:space:]]*#.*$//' "$LIB"
+    live_src "$UPDATE_ENTRY"
+    live_src "$LIB"
 )"
 [ -n "$_xl_combined" ] || _xl_missing="(stripped entry+core extraction empty)"
 for _xl_rel in opencode-permissions-kit-lib/sh/staged-write.sh \
@@ -457,9 +457,9 @@ fi
 # whole update cause-less under set -e (the helper prints nothing), and
 # a swallowed failure would let the rc-2 restore path promise a restore
 # point that does not exist.
-if sed 's/^[[:space:]]*#.*$//' "$LIB" |
+if live_src "$LIB" |
     grep -qF 'error: pre-upgrade backup of $SYSTEM_BIN failed' &&
-    sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    live_src "$LIB" |
     grep -A2 -F 'error: pre-upgrade backup of $SYSTEM_BIN failed' |
         grep -qF 'return 1'; then
     pass "pre-upgrade binary backup failure aborts cause-loud (#371 A5 sweep)"
@@ -604,10 +604,11 @@ else
 fi
 # Comment-strip rider (conventions.md "Source-counting pins",
 # #458): the literal must count only in live lines -- a commented-out
-# backup line must not satisfy the pin. The pipeline rides inside the
-# sh -c (the check helper takes argv, not a pipe).
-check "binary upgrade backs up into the durable update dir (#377-less, #376 B3')" \
-    sh -c 'sed "s/^[[:space:]]*#.*$//" "$1" | grep -qF "BACKUP_DIR=\"\$UPD_BACKUP_DIR/bin\""' _ "$LIB"
+# backup line must not satisfy the pin. check_live carries the rider
+# (#460): the plain check helper takes argv, not a pipe, but check_live
+# is the single-file pipe shape.
+check_live "binary upgrade backs up into the durable update dir (#377-less, #376 B3')" \
+    "$LIB" -qF 'BACKUP_DIR="$UPD_BACKUP_DIR/bin"'
 # B4 class sweep: the upgrade flow's OWN mktemp (the candidate download
 # staging dir) gets the named-cause guard — set -e would abort the whole
 # update on the raw error; the guard degrades to the best-effort skip
@@ -751,7 +752,7 @@ else
 fi
 # Sweep floor: update-core's own site runs isolated (floor — the
 # tree-wide absence pin below is the ceiling).
-_pc=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -c 'python3 -I' || true)
+_pc=$(live_src "$LIB" | grep -c 'python3 -I' || true)
 if [ "${_pc:-0}" -ge 1 ]; then
     pass "sweep floor: update-core.sh python3 call runs -I ($_pc site(s), #249)"
 else
@@ -774,7 +775,7 @@ fi
 # floor pins bound the residual.
 _bare_py=""
 while IFS= read -r _pyf; do
-    _hits=$(sed 's/^[[:space:]]*#.*$//' "$_pyf" |
+    _hits=$(live_src "$_pyf" |
         grep -nE 'python3 (-[A-Za-z]|-$|"|/|\$)' | grep -v 'python3 -I' || true)
     [ -z "$_hits" ] || _bare_py="$_bare_py
 $_pyf: $_hits"
@@ -793,16 +794,16 @@ fi
 # the run ORDER in test-update-flags.sh, the deploy behavior in e2e.
 # Here: the section consults the gate on BOTH sides (withhold/remove)
 # and names the cause in each arm.
-if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'if ! xdg_shim_needed_for "${_xds_maj:-}" "$_xds_trip"; then' &&
-    sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'needs no fallback (#257)' &&
-    sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'opens without one (>= $XDG_SHIM_FIX_VERSION, #257)'; then
+if live_src "$LIB" | grep -qF 'if ! xdg_shim_needed_for "${_xds_maj:-}" "$_xds_trip"; then' &&
+    live_src "$LIB" | grep -qF 'needs no fallback (#257)' &&
+    live_src "$LIB" | grep -qF 'opens without one (>= $XDG_SHIM_FIX_VERSION, #257)'; then
     pass "xdg shim section: version gate + named causes wired (#257)"
 else
     fail "the shim section must gate on xdg_shim_needed_for and name its causes (#257)"
 fi
 # The probe basis is the post-swap binary: the section reads
 # opencode_version_line (SYSTEM_BIN), never a stale install.conf stamp.
-if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF '_xds_ver=$(opencode_version_line)'; then
+if live_src "$LIB" | grep -qF '_xds_ver=$(opencode_version_line)'; then
     pass "xdg shim section probes the deployed binary for its version basis (#257)"
 else
     fail "the shim gate must probe the deployed binary, not a stamp (#257)"

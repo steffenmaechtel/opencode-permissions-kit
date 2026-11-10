@@ -297,7 +297,7 @@ check "file atomic: capturing-mv run leaves no temp behind" \
 # the asserted rc is the pipeline's last member's (awk's, POSIX) --
 # functionally equivalent to a check ... sh -c 'sed | awk' wrapper;
 # this form reads locally for a two-command pin.)
-if sed 's/^[[:space:]]*#.*$//' "$LIB" |
+if live_src "$LIB" |
     awk '/_sb_sudo chmod 750/{c=NR} /_sb_sudo chown/{h=NR} END{exit !(c>0 && h>0 && c<h)}'; then
     pass "secure_binary: chmod before chown (pr-00263 a F25, #285 comment-stripped)"
 else
@@ -310,7 +310,7 @@ fi
 # is the pin above (green every suite run).
 CB285="$WORK/cb285-lib"
 sed '/_sb_sudo chmod 750/ s/^/#/' "$LIB" >"$CB285"
-if sed 's/^[[:space:]]*#.*$//' "$CB285" |
+if live_src "$CB285" |
     awk '/_sb_sudo chmod 750/{c=NR} /_sb_sudo chown/{h=NR} END{exit !(c>0 && h>0 && c<h)}'; then
     fail "#285: order pin green with the chmod call commented out (comment-blind)"
 else
