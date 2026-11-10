@@ -431,7 +431,12 @@ else
     fail "install.sh must call the guard after sourcing install-core.sh (#413)"
 fi
 _pg_missing=""
-for _fn in $(grep -oE '^do_[a-z_]+$' "$INSTALL" | sort -u); do
+_pg_entfns="$(grep -oE '^do_[a-z_]+$' "$INSTALL" | sort -u)"
+# emptiness probe (#457, the #455 a C2 contract -- the sibling-note
+# sweep): an empty extraction would run the loop zero times and the
+# rider would pass vacuously.
+[ -n "$_pg_entfns" ] || _pg_missing="(entry call extraction empty)"
+for _fn in $_pg_entfns; do
     printf '%s\n' "$_pg_src_s" | grep -qE "(^|[[:space:]])$_fn([[:space:];]|\$)" ||
         _pg_missing="$_pg_missing $_fn"
 done
@@ -472,7 +477,8 @@ _ocbk_ln=$(sed 's/^[[:space:]]*#.*$//' "$LIB" |
     grep -nF 'BACKUP_DIR/gitconfig-$OPENCODE_USER.txt' | head -1 | cut -d: -f1)
 if [ -n "$_ocbk_ln" ] &&
     sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'backup skipped: no global gitconfig' &&
-    grep -qF '[ -f "$_oc_gcfg_home/.gitconfig" ] || [ -f "$_oc_gcfg_home/.config/git/config" ]' "$LIB" &&
+    sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    grep -qF '[ -f "$_oc_gcfg_home/.gitconfig" ] || [ -f "$_oc_gcfg_home/.config/git/config" ]' &&
     sed -n "$((_ocbk_ln - 12)),$((_ocbk_ln - 1))p" "$LIB" |
     grep -qF '_oc_gcfg_home="$(getent passwd "$OPENCODE_USER"'; then
     pass "gitconfig backup gated on the global gitconfig files + skip arm (#371 A1 + #424 a S1/P4)"
@@ -590,10 +596,13 @@ _i6_reap_ln=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -nF 'agent config re-app
     head -1 | cut -d: -f1)
 # Leg 1 pins the NEGATED shape (a polarity flip drops the `! `); leg 2
 # pins the ANCHORED marker form (the unanchored substring regression of
-# review a S6 loses the `//` comment-form prefix).
+# review a S6 loses the `//` comment-form prefix). The two $LIB legs
+# carry comment-strip riders (#458, conventions.md "Source-counting
+# pins"): a commented-out heuristic line must not count.
 if grep -qF '// _opencode_permissions_kit — kit-managed config' "$TEMPLATE" &&
-    grep -qF '! grep -qE ' "$LIB" &&
-    grep -qF '//[[:space:]]*_opencode_permissions_kit|"permission' "$LIB" &&
+    sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF '! grep -qE ' &&
+    sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    grep -qF '//[[:space:]]*_opencode_permissions_kit|"permission' &&
     sed 's/^[[:space:]]*#.*$//' "$LIB" |
     grep -qF 'user-authored or broken/unreadable content' &&
     [ -n "$_i6_keep_ln" ] && [ -n "$_i6_reap_ln" ] &&
@@ -809,6 +818,12 @@ fi
 # carve-out (agent/conventions.md "Interactive prompts"). Comment-
 # stripped grep for the default itself; the rationale comment must
 # exist at the site too.
+# The '#428 disposition' grep below is deliberately UN-RIDDEN (#458,
+# conventions.md "Source-counting pins"): it pins a COMMENT literal --
+# the full-line strip rider would delete the very bytes the pin
+# requires and make it unmatchable. The strip rider class protects
+# against commented-out code still counting; here the comment IS the
+# pinned construct, so the discrimination is inverted by design.
 if sed 's/^[[:space:]]*#.*$//' "$LIB" |
     grep -qF '"Re-configure the existing installation with install.sh?" "y"' &&
     grep -qF '#428 disposition' "$LIB"; then

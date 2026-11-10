@@ -98,7 +98,9 @@ else
 fi
 # comment-stripped copy of the guard source for the riders below
 # (#451 b B3, conventions.md "Source-counting pins" over extracted
-# blocks): a comment inside the guard naming a function must not count.
+# blocks): a FULL-LINE comment inside the guard naming a function must
+# not count (the strip is full-line only -- trailing comments after
+# live lines still count, the #244 h W6 residual).
 _pg_src_s="$(printf '%s\n' "$_pg_src" | sed 's/^[[:space:]]*#.*$//')"
 _pg_full=$(sh -c 'eval "$1"; . "$2"; doctor_pairing_guard; echo "rc=$?"' _ "$_pg_src" "$LIB" 2>&1)
 _pg_tr_rc=0
@@ -128,8 +130,13 @@ fi
 # in the list (_doctor_all_cleanup contains doctor_all) and a dropped
 # name would false-pass.
 _pg_missing=""
-for _fn in $(sed 's/^[[:space:]]*#.*$//' "$DOCTOR_ENTRY" |
-    grep -oE '^doctor_[a-z_0-9]+' | grep -v '^doctor_pairing_guard$' | sort -u); do
+_pg_entfns="$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR_ENTRY" |
+    grep -oE '^doctor_[a-z_0-9]+' | grep -v '^doctor_pairing_guard$' | sort -u)"
+# emptiness probe (#457, the #455 a C2 contract): an empty extraction
+# would run the loop zero times and the rider would pass vacuously --
+# the harness contract puts that probe on the caller.
+[ -n "$_pg_entfns" ] || _pg_missing="(entry call extraction empty)"
+for _fn in $_pg_entfns; do
     printf '%s\n' "$_pg_src_s" | grep -qE "(^|[[:space:]])$_fn([[:space:];]|\$)" ||
         _pg_missing="$_pg_missing $_fn"
 done
@@ -143,7 +150,12 @@ fi
 # from the list is the helper-skew hole the round-a fix closes. Same
 # boundary anchor (#451 b B2), same stripped source (B3).
 _pg_hmissing=""
-for _fn in $(grep -oE '^[A-Za-z_][A-Za-z_0-9]*\(\) \{' "$LIB" | sed 's/() {//' | sort -u); do
+_pg_libfns="$(grep -oE '^[A-Za-z_][A-Za-z_0-9]*\(\) \{' "$LIB" | sed 's/() {//' | sort -u)"
+# emptiness probe (#457, the #455 a C2 contract -- same shape the four
+# core suites' helper-direction riders already carry): an empty
+# extraction would run the loop zero times and pass vacuously.
+[ -n "$_pg_libfns" ] || _pg_hmissing="(lib function extraction empty)"
+for _fn in $_pg_libfns; do
     printf '%s\n' "$_pg_src_s" | grep -qE "(^|[[:space:]])$_fn([[:space:];]|\$)" ||
         _pg_hmissing="$_pg_hmissing $_fn"
 done

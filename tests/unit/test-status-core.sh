@@ -254,8 +254,13 @@ fi
 # section names as substrings of helper names in the list and a dropped
 # name would false-pass.
 _pg_missing=""
-for _fn in $(grep -oE '^[[:space:]]*status_section_[a-z_0-9]+[[:space:]]*$' "$STATUS_ENTRY" |
-    awk '{gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print}' | sort -u); do
+_pg_entfns="$(grep -oE '^[[:space:]]*status_section_[a-z_0-9]+[[:space:]]*$' "$STATUS_ENTRY" |
+    awk '{gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print}' | sort -u)"
+# emptiness probe (#457, the #455 a C2 contract -- the sibling-note
+# sweep): an empty extraction would run the loop zero times and the
+# rider would pass vacuously.
+[ -n "$_pg_entfns" ] || _pg_missing="(entry call extraction empty)"
+for _fn in $_pg_entfns; do
     printf '%s\n' "$_pg_src_s" | grep -qE "(^|[[:space:]])$_fn([[:space:];]|\$)" ||
         _pg_missing="$_pg_missing $_fn"
 done
