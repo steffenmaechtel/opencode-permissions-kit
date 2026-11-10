@@ -198,25 +198,33 @@ never proceed silently. Two tiers with DIFFERENT pinning sets
 Any unit-test pin that COUNTS a literal in a shipped or repo-internal
 source file to assert its PRESENCE or a count floor (`grep -c …
 "$INSTALL"`, counts over extracted blocks or `grep -n` extraction
-legs) counts behind a comment-strip rider —
-`sed 's/^[[:space:]]*#.*$//' "$FILE" | grep -c … || true` — so a
-commented-out construct stops counting (the survivor trap, #261/#244 g
-W1). Absence pins (`= 0`) are out of scope — a commented-out forbidden
-line SHOULD keep counting there — and so are deliberate bare control
-arms (the #261 pin's own un-ridden leg). A presence pin whose pinned
-literal is itself a full-line comment is the recorded INVERSION of
-this rule: the rider would delete the pinned bytes and make the pin
-unmatchable — such a site (the documented-disposition marker pin
+legs) counts through `live_src` (#460, `tests/unit/lib/harness.sh`)
+— the canonical comment-strip rider — so a commented-out construct
+stops counting (the survivor trap, #261/#244 g W1). The shapes:
+`live_src "$FILE" | grep …` for pipes, counts and extraction legs;
+`check_live "desc" "$FILE" -qF 'literal'` for the single-file
+presence check; `live_src "$A" "$B" | grep …` for the multi-file
+presence. The helper strips full lines only (`#…` after optional
+leading whitespace — the byte-identical semantics of the historical
+inline rider `sed 's/^[[:space:]]*#.*$//'`, which no longer appears
+inline in the suites; a raw inline rider in a NEW pin is a finding).
+The `|| true` rule keeps its per-shape semantics: rc-observed shapes
+omit it (the consumer's rc must be able to fail the check); piped
+shapes (`grep -c … | grep -q "^[N-M]$"`) and extraction-leg pipelines
+ending in a consumer (`cut -d: -f1`) ride `live_src` but no
+`|| true` — the final consumer takes the rc and the empty case is
+guarded downstream. Absence pins (`= 0`) are out of scope — a
+commented-out forbidden line SHOULD keep counting there (bare grep,
+no `live_src`) — and so are deliberate bare control arms (the #261
+pin's own un-ridden leg). A presence pin whose pinned literal is
+itself a full-line comment is the recorded INVERSION of this rule:
+the strip would delete the pinned bytes and make the pin unmatchable
+— such a site (the documented-disposition marker pin
 `'#428 disposition'` in `test-install-core.sh`) carries an in-place
 annotation naming the inversion instead of the rider (#459 a B3).
 Full-line strip only (#244 h W6 residual: trailing comments after
-live lines still count). Piped
-shapes (`grep -c … | grep -q "^[N-M]$"`) carry the rider but no
-`|| true`: the rc must come from the final `grep -q` so the check can
-fail; extraction-leg pipelines ending in a consumer (`cut -d: -f1`)
-omit it too — the consumer takes the rc and the empty case is guarded
-downstream. Precedent: `test-install-args.sh` (v2 URL, the canonical
-shape) and the #261 rider pin in `test-project-paths.sh`;
+live lines still count). Precedent: `test-install-args.sh` (v2 URL,
+the canonical shape) and the #261 rider pin in `test-project-paths.sh`;
 `test-git-config.sh`'s safe.directory counts strip by a DIFFERENT
 idiom (backslash-continuation join + `grep -v` drop): the join is
 deliberate hardening so a wrapped call cannot escape the check (both
