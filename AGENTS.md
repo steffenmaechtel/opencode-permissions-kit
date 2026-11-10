@@ -153,14 +153,27 @@ not even in teardown. Enforced by
 
 **Sabotage-verify only against secured work.** Before mutating the tree
 to prove a pin fails (mutation verification), commit the finished work or
-`git stash` it first — an in-place `sed` sabotage followed by a
-`git restore` on a dirty tree resets to HEAD and silently wipes every
-uncommitted change (learned the hard way, 2026-10). And sabotage by
+`git stash` it first — a sabotage restore (`git checkout --` /
+`git restore`) resets the file to its INDEX state and silently wipes
+every edit since the last commit or stage (learned the hard way,
+2026-10; recurred 2026-11 in PR #441 round b D1 — that wave pushed a
+pin whose recursion-break marker had been silently wiped). The securing check is
+a PER-CYCLE invariant, not one-time phase preparation: every single
+sabotage cycle starts from a verified-clean tree (`git status
+--porcelain` empty for the target file) — the PR-#441 loss happened in
+the SECOND cycle, after a fresh edit had landed uncommitted between two
+cycles. And sabotage by
 *deleting* the construct, not commenting it out: un-ridden grep-count
 pins (absence pins, bare control arms) still count commented lines, so
 a commented-out sabotage can pass green. After
 the sabotage run, restore the good state from the commit/stash (or a copy
-kept outside the tree) and re-run the suite to confirm green. During a
+kept outside the tree) and re-run the suite to confirm green — and
+verify the restore CONTENT-based, never rc-based: grep the construct
+the fix introduced (marker, guard line); rc 0 holds for the pre-fix and
+post-fix version alike in the restored state, so rc cannot see the wipe
+by construction. Corollary: an `--amend` that commits nothing new after
+an edit you believe you made means the edit was already wiped — grep
+before amending. During a
 review fan-out the tree is a shared read substrate: sabotage only (a)
 before the reviewers launch, (b) after all returned, or (c) in a scratch
 worktree — the window and screening rules live in

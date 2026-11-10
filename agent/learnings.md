@@ -91,7 +91,14 @@ rank 2 (tests remain the least-verified code: `tests-unit` is hotspot #1 in
 both corpora).*
 
 Sabotage-verify (AGENTS.md, Testing) covers green-when-broken — keep it for
-every pin, including pins for wave mechanisms themselves. Two more shapes to
+every pin, including pins for wave mechanisms themselves — and run it only
+against secured work, re-checked before EVERY cycle (PR #441 round b D1
+lost a fix in the SECOND cycle): the restore resets to the index and wipes
+unstaged edits, and the post-restore check greps the construct the fix
+introduced, never rc alone — rc 0 holds for the pre- and post-fix version
+both, the wipe is invisible to rc by construction (rule sharpened
+2026-11-10 in AGENTS.md Testing; restated in
+[review-concept.md](review-concept.md) "Verification duty"). Two more shapes to
 check: (a) the pin block sits **before** the suite's summary exit gate, or
 its FAIL cannot fail the suite (`0.0.44c C1`, fail-but-green; confirmed at
 scale by `pr-00211 b W13` / `c W5`: an `set -e` abort mid-suite skips every
@@ -186,7 +193,15 @@ empty-match greps (`grep … || true` where empty output is rc 1), `IFS= read
   legs — issue #285 carries the inventory
 - **Sabotage-verify per pin** (the ONLY reliable discriminator we have;
   `test-vacuous` reappeared at scale in run 2 — partly corpus composition,
-  partly real: the fail-but-green shape (a) above)
+  partly real: the fail-but-green shape (a) above) — and only against
+  secured work, re-checked per cycle: the 2026-10 AGENTS.md rule alone
+  did not stop the loss — PR #441 round b D1 (2026-11-10) pushed a pin
+  without its recursion-break marker after a second cycle's restore
+  wiped the unstaged marker edit, and the rc-based restore check could
+  not see it (roughly every third session, 2026-11 maintainer estimate);
+  sharpened 2026-11-10 (per-cycle invariant + content-based restore
+  verification + amend indicator, AGENTS.md Testing), restated in
+  [review-concept.md](review-concept.md) "Verification duty" and L4
 - **Pre-release snapshot-scope pass via opencode v2's built-in
   `/review`** (fresh
   external session, staged fan-out) — still the only reliable source of
@@ -222,8 +237,18 @@ Both escalations have live examples: L2's wording was sharpened twice after
 the class returned (#214 5 above), and L1/L4's pin-placement shape became a
 suite-mechanics rule (pins before the summary gate). The sabotage-vs-
 uncommitted-tree incident (2026-10) never entered a review snapshot — it
-lives as an AGENTS.md Testing rule; incidents outside the round comments
-belong there, not here.
+lived as an AGENTS.md Testing rule alone until the class recurred anyway
+(2026-11; roughly every third session, maintainer estimate). The
+recurrence DID enter a round comment (PR #441 round b, D1 HIGH — the
+fix-wave re-review caught what the wave's own rc-based self-checks
+could not see)
+and on 2026-11-10 took this section's first escalation path: wording
+sharpened (AGENTS.md Testing — per-cycle invariant, content-based
+restore verification, amend indicator) and restated in
+[review-concept.md](review-concept.md) "Verification duty" plus L4 and
+Keep doing here. Incidents outside the round comments belong in
+AGENTS.md — restated in the pages the working session reads, not one
+page alone.
 
 ## Era & next-run notes (issue #175 pre-pass, closed 2026-10-22)
 
@@ -236,7 +261,10 @@ belong there, not here.
   snapshots (piped gate, `;` separator — the chain-mechanics rule
   lives in AGENTS.md Testing, the checklist pointer in "Keep doing");
   sabotage-vs-uncommitted-tree produced zero corpus findings (AGENTS.md
-  Testing owns it).
+  Testing owns it; its 2026-11 recurrence — PR #441 round b D1 — is
+  post-corpus: rule sharpened 2026-11-10, per-cycle invariant +
+  content-based restore verification, restated in review-concept.md
+  "Verification duty" and L4/Keep doing above).
 - Numbers the NEXT run should collect: a snapshot-scope pass INSIDE the
   corpus (perm-model HIGH detection is pass-scope-bound); the `internal`
   area trend (59 findings — project memory became a review surface);
