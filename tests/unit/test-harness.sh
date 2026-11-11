@@ -18,6 +18,11 @@
 #     contract for absent names, rider composability on stdout, the
 #     probe+eval production idiom, and the two fail-loud guards
 #     (invalid name, missing file)
+#   - test_chain (#464): the wrapped make-test chain reader -- exact
+#     token stream on wrapped AND unwrapped chains (head stripped,
+#     one name per line, recipe excluded), the .PHONY-only stray-dog
+#     discriminator, the recipe-less-rule leak discriminator, and the
+#     fail-loud guards (arity, missing file)
 #   - the mixed-tally integration: 3 pass + 2 fail -> both counts in
 #     one output, rc 1
 #   - the work registry (#395): work_new / work_new_file create AND
@@ -660,8 +665,12 @@ has "LINES=7/7" "10.15 line-preserving dialect: comment lines become empty lines
 # Makefile (layout pin in test-workflows.sh); test_chain is the READER
 # every membership pin uses. Fixture pins pin SHAPE, not the live
 # chain's contents -- suites get added, counts belong to no meta-pin.
-# Sabotage note: delete test_chain from harness.sh -> every 11.x pin
-# goes red.
+# Sabotage note: delete test_chain from harness.sh -> the rc and shape
+# pins (11.1, 11.2, 11.4, 11.5) go red; 11.3 alone stays green BY
+# DESIGN -- it is a bare-control arm whose rc comes from grep on the
+# then-empty stream (rc 1 = the expected value), so the deleted-function
+# sabotage cannot discriminate it; its .PHONY-only discrimination needs
+# the function PRESENT but wrong (its fixture pins that shape directly).
 _tc_fix="$(mktemp -d)"
 printf '%s\n' \
     '.PHONY: x' \
@@ -680,21 +689,31 @@ printf '%s\n' \
     'test: lint' \
     '' \
     '	@echo hi' >"$_tc_fix/phony-only.mk"
+printf '%s\n' \
+    '.PHONY: x' \
+    'test: lint \' \
+    '      test-docs \' \
+    '      test-kit-cli' \
+    'lint: x' \
+    '' \
+    '	@echo hi' >"$_tc_fix/leak.mk"
 
 # 11.1 exact output: head token stripped, one prerequisite per line,
-# recipe line excluded (the span stops at the first TAB line).
-arm "_tc_out=\$(test_chain \"$_tc_fix/wrapped.mk\"); printf 'OUT:%s|END' \"\$_tc_out\""
+# recipe line excluded. The rc pin runs the function as the arm's LAST
+# command (a `var=$(fn); printf ...` arm would measure printf's rc --
+# the C4-class slip); the shape pin collapses newlines to `|` FIRST so
+# the needle is one line and matches the exact sequence only (a
+# multi-line grep -F needle matches any single line of it -- the C1-class
+# slip the first cut shipped).
+arm "test_chain \"$_tc_fix/wrapped.mk\" >/dev/null"
 rc_is 0 "11.1 test_chain exits 0 on a wrapped chain"
-has "OUT:lint
-test-docs
-test-kit-cli|END" "11.1 wrapped chain: stripped head, one name per line, recipe excluded"
+arm "printf 'OUT:%s|END' \"\$(test_chain \"$_tc_fix/wrapped.mk\" | tr '\n' '|')\""
+has "OUT:lint|test-docs|test-kit-cli|END" "11.1 wrapped chain: stripped head, one name per line, recipe excluded"
 
 # 11.2 the reader is layout-independent: an unwrapped single-line chain
 # yields the same token stream (membership must not depend on wrapping).
-arm "printf 'OUT:%s|END' \"\$(test_chain \"$_tc_fix/unwrapped.mk\")\""
-has "OUT:lint
-test-docs
-test-kit-cli|END" "11.2 unwrapped chain: same token stream"
+arm "printf 'OUT:%s|END' \"\$(test_chain \"$_tc_fix/unwrapped.mk\" | tr '\n' '|')\""
+has "OUT:lint|test-docs|test-kit-cli|END" "11.2 unwrapped chain: same token stream"
 
 # 11.3 the stray-dog discriminator: the name only in a .PHONY
 # continuation must NOT count as chain membership -- this exact slip
@@ -710,6 +729,25 @@ has "test_chain: exactly one Makefile path required" "11.4 arity guard names the
 arm 'test_chain /nonexistent/nowhere.mk'
 rc_is 1 "11.4 missing-file guard"
 has "no such file" "11.4 missing-file guard names the path"
+
+# 11.5 the leak discriminator (round-a B1): a col-0 non-TAB line between
+# the chain block and its recipe (a recipe-less rule) must NOT leak into
+# the token stream -- the first cut's span ended only at a TAB line and
+# glued the foreign rule's head into the last prerequisite token.
+arm "printf 'OUT:%s|END' \"\$(test_chain \"$_tc_fix/leak.mk\" | tr '\n' '|')\""
+has "OUT:lint|test-docs|test-kit-cli|END" "11.5 recipe-less rule after the block does not leak into the chain"
+
+# 11.6 the zero-name-head discriminator (round-a B3): `test: \` with no
+# prerequisite must not emit a leading empty token -- without the head
+# strip and the continuation indent strip, tr -s turns the indent run
+# into a leading empty line and the stream starts `|a`, not `a`.
+printf '%s\n' \
+    'test: \' \
+    '      a' \
+    '' \
+    '	@echo hi' >"$_tc_fix/empty-head.mk"
+arm "printf 'OUT:%s|END' \"\$(test_chain \"$_tc_fix/empty-head.mk\" | tr '\n' '|')\""
+has "OUT:a|END" "11.6 zero-name head emits no leading empty token"
 
 # --- summary gate (independent on purpose -- see header) ------------------------
 echo ""

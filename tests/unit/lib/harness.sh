@@ -63,6 +63,13 @@
 #                        harness, live_src must not appear inside
 #                        sh -c code (boundary: one canonical
 #                        single-file sugar, no separator parsing).
+#   test_chain <makefile>
+#                        the wrapped make-test chain reader (#464): one
+#                        prerequisite per output line, `test:` head
+#                        stripped; membership pins pipe it through
+#                        `grep -qxF <target>` -- a bare grep over the
+#                        raw Makefile would also match the suite's
+#                        .PHONY continuation line
 #   extract_func <file> <name>
 #                        print a top-level `name() { … }` definition
 #                        block from <file> (issue #396 — consolidating
@@ -205,12 +212,20 @@ check_live() {
 test_chain() {
     # $1 = Makefile path. Prints the test: prerequisite chain one token
     # per line, the `test:` head token stripped. The awk span reads the
-    # head line plus the space-indented continuation block up to the
-    # first recipe line -- the wrapped one-prerequisite-per-line chain
-    # layout of issue #464. Callers pin chain membership with
-    # `test_chain ... | grep -qxF <target>`; a bare grep over the raw
-    # Makefile would also match the suite's .PHONY continuation line and
-    # pass without chain membership (the stray-dog class this replaced).
+    # head line plus the continuation block, ending at the LAST
+    # continuation line (the first line without a trailing backslash) or
+    # at the first recipe line (TAB), whichever comes first -- the
+    # wrapped one-prerequisite-per-line chain layout of issue #464. The
+    # backslash-aware termination keeps a non-TAB line between the block
+    # and its recipe (a recipe-less rule, say) from leaking into the
+    # token stream, and the sed drops empty stream lines: the indent run
+    # of the first continuation would otherwise open the stream with an
+    # empty token under tr -s, and so would a zero-prerequisite head
+    # (round-a B3). Callers pin chain membership
+    # with `test_chain ... | grep -qxF <target>`; a bare grep over the
+    # raw Makefile would also match the suite's .PHONY continuation line
+    # and pass without chain membership (the stray-dog class this
+    # replaced).
     if [ "$#" -ne 1 ]; then
         echo "test_chain: exactly one Makefile path required" >&2
         return 1
@@ -219,8 +234,8 @@ test_chain() {
         echo "test_chain: no such file: $1" >&2
         return 1
     fi
-    awk '/^test:/{_in=1; sub(/^test:[ \t]*/, ""); if (length($0)) print; next}
-        _in && /^\t/{_in=0} _in{print}' "$1" | tr -d '\n\\' | tr -s ' \t' '\n'
+    awk '/^test:/{_in=1; sub(/^test:[ \t]*/, ""); if (length($0)) print; if ($0 !~ /\\$/) _in=0; next}
+        _in && /^\t/{_in=0} _in{print; if ($0 !~ /\\$/) _in=0}' "$1" | tr -d '\n\\' | tr -s ' \t' '\n' | sed -e '/^$/d'
 }
 
 extract_func() {

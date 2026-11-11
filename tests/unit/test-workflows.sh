@@ -175,9 +175,12 @@ else
 fi
 
 # Chain layout pin (issue #464): the wrapped prerequisite form is a RULE --
-# .PHONY and test: carry exactly ONE name per physical line, and
-# continuation lines are SPACE-indented (a TAB line is recipe syntax, not
-# a continuation). One-per-line keeps every suite addition a one-line diff
+# .PHONY and test: carry exactly ONE name per physical line. The pin
+# rejects TAB-started block lines (a TAB line is recipe syntax, not a
+# continuation) and wrong name counts; it does NOT measure indent width
+# beyond that (column-0 continuations pass this pin -- they terminate
+# the chain reader instead, failing membership loudly in the orphan
+# direction). One-per-line keeps every suite addition a one-line diff
 # and the chain reviewable at a glance; the 975-char single-line test:
 # chain this replaced was neither. The pin fails when a block line carries
 # the wrong count (head: target token + exactly one name; continuation:
