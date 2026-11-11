@@ -2129,7 +2129,13 @@ else
 fi
 
 # --- 9. Makefile + CI wiring ---------------------------------------------------
-check_live "Makefile has a test-ddev-as-opencode target in the test: list" "$MAKEFILE" -q 'test-ddev-as-opencode'
+# Chain membership via the wrapped test: span (issue #464): a bare grep
+# would also match the suite's .PHONY continuation line and pass without
+# chain membership -- the awk span reads the test: block only.
+_test_chain="$(test_chain "$MAKEFILE")"
+echo "$_test_chain" | grep -qxF 'test-ddev-as-opencode' &&
+    pass "Makefile has a test-ddev-as-opencode target in the test: list" ||
+    fail "Makefile has a test-ddev-as-opencode target in the test: list"
 check_live "test-unit.yml run step mentions the new test" "$TEST_CI" -q 'test-ddev-as-opencode.sh'
 check "bin/ddev-as-opencode is executed by path (git 100755)" \
     sh -c '[ "$(git -C "$2" ls-files -s -- files/opencode-permissions-kit-lib/bin/ddev-as-opencode | cut -d" " -f1)" = "100755" ]' _ x "$SCRIPT_DIR/../.."

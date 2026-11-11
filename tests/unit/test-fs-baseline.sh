@@ -248,7 +248,11 @@ else
 fi
 
 # --- 8. Makefile + CI wiring -----------------------------------------------------------
-live_src "$MAKEFILE" | grep -q 'test-fs-baseline' &&
+# Chain membership via the wrapped test: span (issue #464): a bare grep
+# would also match the suite's .PHONY line and pass without membership --
+# the awk span reads the test: block only.
+_test_chain="$(test_chain "$MAKEFILE")"
+echo "$_test_chain" | grep -qxF 'test-fs-baseline' &&
     pass "Makefile test target includes test-fs-baseline" ||
     fail "Makefile test target includes test-fs-baseline"
 live_src "$TEST_CI" | grep -q 'tests/unit/test-fs-baseline.sh' &&

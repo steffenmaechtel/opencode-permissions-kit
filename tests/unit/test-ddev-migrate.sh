@@ -855,7 +855,13 @@ if make -C "$SCRIPT_DIR/../.." -n lint 2>/dev/null | grep -q 'ddev-migrate.sh' &
 else
     fail "make lint covers ddev-migrate.sh (disk-derived list, 0.0.42d C4)"
 fi
-check_live "Makefile has a test-ddev-migrate target in the test: list" "$MAKEFILE" -q 'test: .*test-ddev-migrate'
+# Chain membership via the wrapped test: span (issue #464): a bare grep
+# would also match the suite's .PHONY continuation line and pass without
+# chain membership -- the awk span reads the test: block only.
+_test_chain="$(test_chain "$MAKEFILE")"
+echo "$_test_chain" | grep -qxF 'test-ddev-migrate' &&
+    pass "Makefile has a test-ddev-migrate target in the test: list" ||
+    fail "Makefile has a test-ddev-migrate target in the test: list"
 check_live "test-unit.yml run step mentions the new test" "$TEST_CI" -q 'test-ddev-migrate.sh'
 # ddev-migrate.sh is a sourced lib (bin/ddev-migrate dispatcher, status.sh)
 # — per the repo invariant (755 <=> executed by path) it must be 100644.
