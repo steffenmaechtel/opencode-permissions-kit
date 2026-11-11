@@ -400,6 +400,58 @@ else
     fail "functions defined by update-core.sh but absent from the guard:$_pg_hmissing (#452, #455 a C2)"
 fi
 
+# Cross-lib stub rider (#456), strongest form like test-install-core's:
+# every function defined by ANY sh/ lib (ui.sh exempt — its surface is
+# update_ui_pairing_guard's, own rider in test-ui.sh) and CALLED by the
+# entry or the core must be DEFINED in update.sh OR update-core.sh.
+# update-core self-sources three libs (wsl-browser-bridge,
+# ddev-handover, fs-baseline) with its own || stub arms — those count;
+# xdg_shim_needed_for was the unswept example fixed with this wave
+# (update-core asks deploy-lib, only lib_deploy was stubbed, and only
+# for the missing-FILE case). Comment-stripped both sides. The lib
+# list is what THIS RUN sources: the entry's resolver loops plus the
+# three libs update-core self-sources with its own stub arms
+# (wsl-browser-bridge, ddev-handover, fs-baseline) — not the whole
+# sh/ glob, whose wrapper-side scripts define shell hooks (ddev(),
+# note()) that are not update's callable surface. Token extraction
+# stays line-separated: tr -d '[:space:]()' concatenates every
+# definition into one token and the loop goes vacuous (the #456
+# sabotage cycle found exactly that on the install twin, L4).
+_xl_missing=""
+UPDATE_ENTRY="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh"
+_xl_combined="$(
+    sed 's/^[[:space:]]*#.*$//' "$UPDATE_ENTRY"
+    sed 's/^[[:space:]]*#.*$//' "$LIB"
+)"
+[ -n "$_xl_combined" ] || _xl_missing="(stripped entry+core extraction empty)"
+for _xl_rel in opencode-permissions-kit-lib/sh/staged-write.sh \
+    opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
+    opencode-permissions-kit-lib/sh/secure-binary.sh \
+    opencode-permissions-kit-lib/sh/deploy-lib.sh \
+    opencode-permissions-kit-lib/sh/tui-plugin.sh \
+    opencode-permissions-kit-lib/sh/git-check.sh \
+    opencode-permissions-kit-lib/sh/log.sh \
+    opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh \
+    opencode-permissions-kit-lib/sh/ddev-handover.sh \
+    opencode-permissions-kit-lib/sh/fs-baseline.sh; do
+    _xl_lib="$SCRIPT_DIR/../../files/$_xl_rel"
+    [ -f "$_xl_lib" ] || {
+        _xl_missing="$_xl_missing (missing lib $_xl_rel)"
+        continue
+    }
+    for _xl_fn in $(grep -oE '^[[:space:]]*[a-zA-Z_][a-zA-Z0-9_]*\(\)' "$_xl_lib" | tr -d '()'); do
+        printf '%s\n' "$_xl_combined" | grep -qE "(^|[^a-zA-Z0-9_])${_xl_fn}([^a-zA-Z0-9_(]|$)" ||
+            continue
+        printf '%s\n' "$_xl_combined" | grep -qE "(^|[|;[:space:]])${_xl_fn}\(\)" ||
+            _xl_missing="$_xl_missing $_xl_fn"
+    done
+done
+if [ -z "$_xl_missing" ]; then
+    pass "every lib function entry-or-core calls is stubbed in update.sh/update-core.sh (#456)"
+else
+    fail "lib functions called but stubbed nowhere in update.sh/update-core.sh:$_xl_missing (#456)"
+fi
+
 # LOWS-1 (#371 A5, class sweep from install.sh): the pre-upgrade binary
 # backup copy names its cause on failure — the bare call aborted the
 # whole update cause-less under set -e (the helper prints nothing), and

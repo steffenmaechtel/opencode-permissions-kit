@@ -230,5 +230,130 @@ out=$(NO_COLOR=1 run_ui 'ui_kv_warn "b" "y"; printf "WARN=%s" "$UI_ROWS_WARN"')
 check "NO_COLOR=1 keeps counting" \
     sh -c "printf %s \"\$1\" | grep -q 'WARN=1'" _ "$out"
 
+# --- consumer used-set guards (issue #456) -----------------------------------------
+# Every ui.sh consumer guards the functions it (and its phase core, if
+# any) actually calls, right after resolving ui.sh — a PRESENT-but-older
+# ui.sh (the #158 shape: deployed lib predating ui_kv_ok/ui_kv_bad)
+# must refuse loud instead of silently dropping rows / rc-127ing
+# mid-run. Riders per consumer, both directions over comment-stripped
+# sources (conventions.md "Source-counting pins"), BOUNDARY-ANCHORED
+# like the #452 core riders; plus the behavioral pair (real lib passes,
+# truncated lib refuses) driven in fresh children. Every consumer that
+# has a phase core names it in the third field — an empty core field
+# silently blinds the used direction to the core's calls (#461 a S10),
+# and the guard-removal awk matches by plain STRING PREFIX (index==1):
+# an -v-carried regex like "\\(\\) \\{" loses its backslashes to -v
+# escape processing and never matches the def line, leaving the guard
+# body in the token stream — the stale direction goes vacuous (#461 a
+# S8, same failure family as the tr -d '[:space:]()' concatenation).
+LIBDIR_FILES="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib"
+_ui_consumers="install:$SCRIPT_DIR/../../files/install.sh:$LIBDIR_FILES/sh/install-core.sh \
+status:$LIBDIR_FILES/management/status.sh:$LIBDIR_FILES/sh/status-core.sh \
+update:$LIBDIR_FILES/management/update.sh:$LIBDIR_FILES/sh/update-core.sh \
+config:$LIBDIR_FILES/management/config.sh: \
+doctor:$LIBDIR_FILES/management/doctor.sh:$LIBDIR_FILES/sh/doctor-core.sh"
+
+# ui tokens referenced by an entry (+ optional core), comment-stripped,
+# with the consumer's OWN guard function removed so the rider cannot
+# match the guard list against itself.
+_ui_used_tokens() {
+    _ut_entry="$1"
+    _ut_core="$2"
+    _ut_guard="$3"
+    {
+        sed 's/^[[:space:]]*#.*$//' "$_ut_entry" |
+            awk -v d="${_ut_guard}() {" '
+                index($0, d) == 1 { infn = 1 }
+                infn && /^}/ { infn = 0; next }
+                !infn { print }
+            '
+        if [ -n "$_ut_core" ]; then
+            sed 's/^[[:space:]]*#.*$//' "$_ut_core"
+        fi
+    } | grep -oE '(^|[^a-zA-Z0-9_])ui_[a-z_0-9]+' | grep -oE 'ui_[a-z_0-9]+$' | sort -u
+}
+
+for _uc in $_ui_consumers; do
+    _uc_name=${_uc%%:*}
+    _uc_rest=${_uc#*:}
+    _uc_entry=${_uc_rest%%:*}
+    _uc_core=${_uc_rest#*:}
+    _uc_guard="${_uc_name}_ui_pairing_guard"
+    _uc_gsrc="$(extract_func "$_uc_entry" "$_uc_guard")"
+    if [ -n "$_uc_gsrc" ]; then
+        pass "$_uc_name: ${_uc_guard} extractable (#456)"
+    else
+        fail "$_uc_name: ${_uc_guard} extractable from $(basename "$_uc_entry") (#456)"
+        continue
+    fi
+    _uc_gs="$(printf '%s\n' "$_uc_gsrc" | sed 's/^[[:space:]]*#.*$//')"
+    # wiring pin: a guard defined but never CALLED protects nothing —
+    # the entry must invoke it right after its ui.sh resolution (the
+    # shape every core pairing guard already carries).
+    if sed 's/^[[:space:]]*#.*$//' "$_uc_entry" | grep -qF "${_uc_guard} || exit 1"; then
+        pass "$_uc_name: entry wires ${_uc_guard} after the ui.sh resolution (#456)"
+    else
+        fail "$_uc_name: $(basename "$_uc_entry") must call ${_uc_guard} || exit 1 (#456)"
+    fi
+    # rider, used direction: every ui token the run references must sit
+    # in the guard list (emptiness probe per #455 a C2 — an empty
+    # extraction must not pass vacuously).
+    _uc_missing=""
+    _uc_used="$(_ui_used_tokens "$_uc_entry" "$_uc_core" "$_uc_guard")"
+    [ -n "$_uc_used" ] || _uc_missing="(used-token extraction empty)"
+    for _uf in $_uc_used; do
+        printf '%s\n' "$_uc_gs" | grep -qE "(^|[[:space:]])$_uf([[:space:];]|\$)" ||
+            _uc_missing="$_uc_missing $_uf"
+    done
+    if [ -z "$_uc_missing" ]; then
+        pass "$_uc_name: ui guard list covers every ui call the run makes (#456)"
+    else
+        fail "$_uc_name: ui functions called but absent from the guard:$_uc_missing (#456)"
+    fi
+    # rider, stale direction: every guard-list entry must be referenced
+    # somewhere (a stale entry pins a function nothing calls).
+    _uc_stale=""
+    for _uf in $(printf '%s\n' "$_uc_gs" | grep -oE '(^|[^a-zA-Z0-9_])ui_[a-z_0-9]+' |
+        grep -oE 'ui_[a-z_0-9]+$' | sort -u); do
+        [ -n "$(printf '%s\n' "$_uc_used" | grep -xF "$_uf")" ] ||
+            _uc_stale="$_uc_stale $_uf"
+    done
+    if [ -z "$_uc_stale" ]; then
+        pass "$_uc_name: ui guard list carries no stale entry (#456)"
+    else
+        fail "$_uc_name: guard entries nothing calls:$_uc_stale (#456)"
+    fi
+    # behavioral pair in fresh children: the real lib passes.
+    _uc_full=$(sh -c 'eval "$1"; . "$2"; "$3"; echo "rc=$?"' _ "$_uc_gsrc" "$UI" "$_uc_guard" 2>&1)
+    if printf '%s' "$_uc_full" | grep -q 'rc=0'; then
+        pass "$_uc_name: ui guard passes against the real ui.sh (#456)"
+    else
+        fail "$_uc_name: ui guard must pass against the real ui.sh (out=$_uc_full) (#456)"
+    fi
+    # ... and a truncated lib (first list entry deleted) refuses loud,
+    # naming the function — the #158 shape made loud.
+    _uc_trunc="$(work_new_file)"
+    awk '
+        $0 ~ /^ui_info\(\) \{/ { infn = 1 }
+        infn && /^}/ { infn = 0; next }
+        !infn { print }
+    ' "$UI" >"$_uc_trunc"
+    _uc_tr_rc=0
+    _uc_tr_out="$(sh -c 'eval "$1"; . "$2"; "$3"' _ "$_uc_gsrc" "$_uc_trunc" "$_uc_guard" 2>&1)" ||
+        _uc_tr_rc=$?
+    # B2 (#461 b): the repair hint is STATUS's documented contract
+    # (docs/reference/cli.md's wiring-abort row) — the other consumers'
+    # guards keep their own refusal wording, no docs row promises a
+    # hint there.
+    if [ "$_uc_tr_rc" -eq 1 ] &&
+        printf '%s' "$_uc_tr_out" | grep -qF "function 'ui_info' missing from ui.sh" &&
+        { [ "$_uc_name" != status ] ||
+            printf '%s' "$_uc_tr_out" | grep -qF "fix: sudo opk update"; }; then
+        pass "$_uc_name: ui guard refuses a truncated ui.sh naming ui_info (#456, #461 b B2)"
+    else
+        fail "$_uc_name: ui guard must refuse a truncated ui.sh (status: with the repair hint) (rc=$_uc_tr_rc out=$_uc_tr_out) (#456, #461 b B2)"
+    fi
+done
+
 # --- Summary --------------------------------------------------------------------------------------------
 suite_done "tests"

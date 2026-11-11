@@ -189,8 +189,11 @@ fi
 # internally (#452, the doctor precedent: a helper-level skew skips
 # removals silently behind a green "Uninstall complete.", e.g. a
 # missing un_rc_q strands every op in the sections that drive it).
-# Functions from other sourced libs are deliberately outside this
-# guard — only the core pairing is pinned here (#455 a Q1). prompt_yn
+# Functions from other sourced libs sit outside this guard by design —
+# the core pairing is what is pinned here; the cross-lib surface rides
+# the entry's pre-source stub arms (log, browser_bridge_remove,
+# agent_home_sane — the #455 a Q1 "already mitigated" surface, kept
+# clean by its own rider, #456). prompt_yn
 # rides the
 # list for the same reason (it lives in the core and gates the consent
 # the whole run hangs on). The list is kept equal to uninstall-core.sh's

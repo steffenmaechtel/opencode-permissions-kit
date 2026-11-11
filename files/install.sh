@@ -328,6 +328,12 @@ command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() {
     return 1
 }
 command -v ddev_handover_stamp_write >/dev/null 2>&1 || ddev_handover_stamp_write() { :; }
+# Core-called sibling (#456 stub sweep): install-core's ddev phase calls
+# this helper directly, not just through ddev_handover_root. rc 2 is the
+# callsite's "could not set" arm (warn + manual-fix hint) — the honest
+# degraded signal for a truncated lib, against rc 1's silent "not
+# needed" skip.
+command -v ddev_rootless_bindmounts >/dev/null 2>&1 || ddev_rootless_bindmounts() { return 2; }
 
 # Shared ddev database-migration helpers (dev-user registry -> SQL dumps,
 # issue #15). Same sourcing rules as ddev-handover.sh; same stub contract
@@ -347,6 +353,40 @@ command -v ddev_migrate_registry >/dev/null 2>&1 || {
         return 1
     }
     ddev_migrate_done() { return 1; }
+}
+# Core-called siblings (#456 stub sweep, #461 a Q4 hoisted to TOP-LEVEL
+# arms): install-core calls the gap probe and the export directly, and
+# ddev-migrate.sh defines registry at :82, gap at :154, export at :351 —
+# nested inside the registry arm above, these stubs armed only when the
+# registry was undefined, so every truncation after :82 left them
+# unarmed and the tolerant call arms (`|| return 0`, `|| true`) turned
+# the rc-127 into a SILENT green skip of the gap scan and the export.
+# Per-function arms arm independently. Their messages say "skipping"
+# not "aborting": the call arms tolerate rc 1 and continue — the named
+# error on stderr is the visible part (#461 a Q5).
+command -v ddev_migrate_gap >/dev/null 2>&1 || ddev_migrate_gap() {
+    echo "error: ddev_migrate_gap unavailable (ddev-migrate.sh incomplete) — skipping the gap scan" >&2
+    return 1
+}
+command -v ddev_migrate_export >/dev/null 2>&1 || ddev_migrate_export() {
+    echo "error: ddev_migrate_export unavailable (ddev-migrate.sh incomplete) — skipping the database export" >&2
+    return 1
+}
+# Intra-lib CALLEE arm (#461 b B1): gap (:157) and export (:389) both
+# call ddev_migrate_latest_dir inside $(…) — the callee is defined at
+# :651, ~500 lines after its callers. A tail truncation anywhere in
+# the :158–:650 window keeps BOTH callers defined (the arms above
+# only fire when a function is entirely missing) and kills only the
+# callee: the gap detector's `|| return 0` and the export's `|| true`
+# swallow the rc and the shell's bare "not found" names neither lib
+# nor fix — the gap scan and the export skip with no counted row (the
+# status-side twin rides the db-dumps probe set, status-core.sh).
+# Stubbing the callee makes the same window name itself on stderr;
+# rc 1 rides the callers' existing tolerant arms.
+command -v ddev_migrate_latest_dir >/dev/null 2>&1 || ddev_migrate_latest_dir() {
+    echo "error: ddev_migrate_latest_dir unavailable (ddev-migrate.sh incomplete) —""\
+ skipping the ddev migration check (fix: sudo opk update)" >&2
+    return 1
 }
 
 # Shared group-baseline helper with live progress (issue #14). Same
@@ -400,6 +440,22 @@ command -v staged_write >/dev/null 2>&1 ||
         echo "error: staged_write unavailable (staged-write.sh missing)" >&2
         return 1
     }
+# Core-called sibling (#456 stub sweep): install-core gates 13 sites
+# through agent_home_sane — including DIRECT sudo writes (~/.ddev,
+# ~/.config, ~/.agents) that never ride staged_write (#461 a X1: the
+# permissive rc-0 draft left the link gate silently off on truncation;
+# the direct-sudo sites run before any staged_write could trip). So
+# this stub fails CLOSED and loud like the action stubs: rc 1 routes
+# every gated site into its warn+skip arm — the never-follow-links
+# contract holds even when the gate itself is unavailable. Deliberately
+# NOT swept onto update.sh/uninstall.sh: their candidate resolvers
+# serve DEPLOYED libs where a pre-0.0.39h vintage legitimately lacks
+# the walker — permissive rc 0 there is the documented old-kit compat
+# contract (missing-FILE direction), not a truncation window.
+command -v agent_home_sane >/dev/null 2>&1 || agent_home_sane() {
+    echo "error: agent_home_sane unavailable (staged-write.sh incomplete) — link gate closed, gated writes skip loudly" >&2
+    return 1
+}
 
 # Shared sudoers pipeline (charset gate, render, visudo validation,
 # install, sudoers.d link, legacy cleanup): one implementation for
@@ -441,6 +497,13 @@ command -v lib_deploy >/dev/null 2>&1 ||
         echo "error: lib_deploy unavailable (deploy-lib.sh missing)" >&2
         return 1
     }
+# Core-called sibling (#456 stub sweep, same never-shadow fail-safe as
+# update-core's xdg_open_real_exists stub): install-core asks whether
+# the xdg-open shim is needed — when the probe is unavailable the only
+# safe answer is "no" (rc 1), so a truncated lib can never shadow a
+# real xdg-open. A missing shim degrades browser opening; a wrong one
+# breaks every other xdg-open user.
+command -v xdg_shim_needed_for >/dev/null 2>&1 || xdg_shim_needed_for() { return 1; }
 
 # Shared agent-config template render (the SECURE_GIT sed pair): one
 # implementation for install.sh and config.sh's git-config toggle.
@@ -474,47 +537,32 @@ command -v browser_bridge_is_wsl >/dev/null 2>&1 || browser_bridge_is_wsl() { re
 command -v browser_bridge_install >/dev/null 2>&1 || browser_bridge_install() { :; }
 
 # === Shared UI helpers ===
-# The kit files sit next to this script (checkout or fully fetched temp dir).
-# The fallback covers the OUTPUT helpers only — the interactive prompts
-# (ui_ask/ui_confirm/ui_menu) come solely from ui.sh, so a ui.sh-less run
-# proceeds only up to its first prompt and dies there (set -e). A --yes
-# run never prompts: it needs every OUTPUT helper below for its whole
-# run — ui_have/ui_atten/ui_add/ui_miss included (0.0.45c C5: the old
-# fallback lacked them and a ui.sh-less --yes died at the inventory's
-# first ui_have, "command not found", before any prompt).
-UI_LIB="$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ui.sh"
-if [ -f "$UI_LIB" ]; then
-    . "$UI_LIB"
-else
-    ui_info() { echo "  info     $1"; }
-    ui_success() { echo "  success  $1"; }
-    ui_warn() { echo "  warn     $1"; }
-    ui_error() { echo "  error    $1" >&2; }
-    ui_detail() { echo "     $1"; }
-    ui_section() {
-        echo ""
-        echo "  --- $1 ---"
-        echo ""
-    }
-    ui_banner() {
-        echo ""
-        echo "  opencode permissions kit  v${1:-}"
-        echo ""
-    }
-    ui_kv() { printf '  %-14s %s\n' "$1" "$2"; }
-    ui_kv_warn() { printf '  %-14s %s\n' "$1" "$2"; }
-    ui_plan() { printf '    %s  %s\n' "$1" "$2"; }
-    ui_have() { echo "  ok        $1  ${2:-}"; }
-    ui_atten() { echo "  warn      $1  ${2:-}"; }
-    ui_add() { echo "  add       $1  ${2:-}"; }
-    ui_miss() { echo "  miss      $1  ${2:-}"; }
-    UI_GREEN=''
-    UI_RED=''
-    UI_YELLOW=''
-    UI_CYAN=''
-    UI_BLUE=''
-    UI_NC=''
-fi
+# The kit files sit next to this script (checkout or fully fetched temp
+# dir), so ui.sh rides the same fetch as the twelve kit_source'd libs
+# above: a missing file is a broken fetch and dies loud through the same
+# kit_source — like every other lib, not excepted (#456). The stub
+# fallback this block once carried (0.0.45c C5) is retired with it: it
+# existed to keep a ui.sh-less --yes run going, but a ui.sh-less tree is
+# a broken fetch, and proceeding with degraded output helpers behind a
+# green run is exactly the #165 silent-degradation class the kit refuses
+# elsewhere. kit_source closes the missing-FILE twin; the guard below
+# closes the missing-FUNCTION twin — a truncated or version-skewed ui.sh
+# would rc-127 the bare ui_* calls (cryptic, set -e, mid-install after
+# earlier phases ran) — and refuses BEFORE any phase runs, the ui-lib
+# twin of install_pairing_guard. The list is every ui function the entry
+# AND install-core call (the test-suite riders enforce both directions).
+kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ui.sh"
+install_ui_pairing_guard() {
+    for _iup in ui_info ui_success ui_warn ui_error ui_detail \
+        ui_section ui_banner ui_have ui_add ui_atten \
+        ui_kv ui_kv_warn ui_plan ui_ask ui_confirm ui_menu; do
+        command -v "$_iup" >/dev/null 2>&1 || {
+            echo "error: function '$_iup' missing from ui.sh — version-skewed (older or truncated), aborting" >&2
+            return 1
+        }
+    done
+}
+install_ui_pairing_guard || exit 1
 
 OPENCODE_USER="opencode"
 # The sharing group is the opencode user's own primary usergroup (created by
@@ -830,9 +878,11 @@ kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/install-core.sh"
 # every function the paired core defines — the phases the entry calls
 # AND the helpers they call internally (#452, the doctor precedent: a
 # helper-level skew aborts mid-install after partial work). Functions
-# from other sourced libs (ddev-handover.sh, fs-baseline.sh, ...) are
-# deliberately outside this guard — only the core pairing is pinned
-# here (#455 a Q1). The list is
+# from other sourced libs (ddev-handover.sh, fs-baseline.sh, ...) sit
+# outside this guard by design — the core pairing is what is pinned
+# here; the cross-lib surface is pinned by the per-lib stub arms above
+# and the ui used-set guard after the ui.sh kit_source (#456, closing
+# the #455 a Q1 boundary). The list is
 # kept equal to install-core.sh's function definitions (the test-suite
 # completeness riders enforce both directions; a phase added to the
 # core without the entry calling it is equally a wiring bug this list

@@ -133,6 +133,23 @@ else
     exit 1
 fi
 
+# UI used-set guard (#456): doctor already hard-fails on a MISSING
+# ui.sh; this closes the present-but-skewed twin — an older deployed
+# ui.sh (predating ui_kv_ok/ui_kv_bad, issue #158) would silently drop
+# diagnosis rows behind a green-looking walk, the exact shape the kit
+# refuses elsewhere. The list is every ui function doctor.sh AND
+# doctor-core call (the test-suite riders enforce both directions).
+doctor_ui_pairing_guard() {
+    for _dup in ui_info ui_warn ui_error ui_detail ui_section \
+        ui_kv ui_kv_warn ui_kv_ok ui_kv_bad ui_confirm; do
+        command -v "$_dup" >/dev/null 2>&1 || {
+            echo "error: function '$_dup' missing from ui.sh — version-skewed (older or truncated), refusing to run" >&2
+            return 1
+        }
+    done
+}
+doctor_ui_pairing_guard || exit 1
+
 # Walk-up opk.json discovery (#353 / #313 phase 4) lives in the shared
 # leaf lib (the same resolution site bin/opk's handover-me warning
 # uses — one implementation, not per-command copies; see path-sane.sh).

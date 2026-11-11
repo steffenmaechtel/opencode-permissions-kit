@@ -354,8 +354,14 @@ else
 fi
 
 # Plan numbering must be dynamic (_plan helper) — a skipped optional step
-# must not leave a gap in the numbered plan the user confirms.
-if grep -q '_plan()' "$INSTALL" && ! grep -Eq 'ui_plan [0-9]' "$INSTALL"; then
+# must not leave a gap in the numbered plan the user confirms. The helper
+# lives in install-core.sh's do_plan_phase (the entry's old ui_plan()
+# fallback stub used to satisfy this greps's first leg by substring —
+# #456 replaced the fallback with the ui used-set guard, so the leg now
+# names the file that actually defines the helper).
+if grep -q '^[[:space:]]*_plan() {' "$INSTALL_CORE" &&
+    ! grep -Eq 'ui_plan [0-9]' "$INSTALL" &&
+    ! grep -Eq 'ui_plan [0-9]' "$INSTALL_CORE"; then
     pass "install.sh: plan numbering is dynamic (no gaps when steps are skipped)"
 else
     fail "install.sh: plan numbering is dynamic (no gaps when steps are skipped)"

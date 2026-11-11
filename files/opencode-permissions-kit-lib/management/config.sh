@@ -105,7 +105,6 @@ else
         echo ""
     }
     ui_kv() { printf '  %-14s %s\n' "$1" "$2"; }
-    ui_kv_warn() { printf '  %-14s %s\n' "$1" "$2"; }
     # 0.0.45c C9: the body also calls ui_have/ui_atten (projects list)
     # and ui_confirm/ui_menu/ui_ask (interactive flows) — without these
     # stubs a ui.sh-less config.sh died rc 127 ("ui_have: not found")
@@ -128,6 +127,27 @@ else
     UI_BLUE=''
     UI_NC=''
 fi
+
+# UI used-set guard (#456): the fallback above covers a ui.sh that is
+# missing ENTIRELY (a library predating ui.sh — old installs stay
+# configurable); a PRESENT-but-older ui.sh is the residual gap: the
+# fallback never fires, and a bare ui_kv/ui_menu call rc-127s mid-run.
+# That is a wiring error, not an old install: refuse loud, before the
+# first prompt or row (exit 1). The list is every ui function config.sh
+# calls (the test-suite riders enforce both directions); the fallback
+# stub block above must stay complete for it (its own rider).
+config_ui_pairing_guard() {
+    for _cup in ui_info ui_success ui_warn ui_error ui_detail \
+        ui_section ui_banner ui_have ui_atten ui_kv \
+        ui_ask ui_confirm ui_menu; do
+        command -v "$_cup" >/dev/null 2>&1 || {
+            echo "error: function '$_cup' missing from ui.sh — version-skewed (older or truncated), refusing to run" >&2
+            return 1
+        }
+    done
+}
+config_ui_pairing_guard || exit 1
+
 PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
 
 # === Audit log ===

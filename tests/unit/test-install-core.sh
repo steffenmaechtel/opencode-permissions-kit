@@ -465,6 +465,101 @@ else
     fail "functions defined by install-core.sh but absent from the guard:$_pg_hmissing (#452, #455 a C2)"
 fi
 
+# --- 9b. cross-lib stub rider (#456): core-called lib functions stay stubbed ------
+# The #250 stub sweep covered the functions the ENTRY calls from the
+# kit_source'd libs; #456 closes the twin it missed: functions the CORE
+# calls from those same libs (agent_home_sane was the live example — 13
+# gated call sites, no stub: a truncated staged-write.sh would have
+# rc-127'd the ddev phase under set -e). STRONGEST form — every
+# function defined by ANY sh/ file (the glob carries the phase cores
+# too; ui.sh exempt: its surface is the used-set guard's, own rider in
+# test-ui.sh) and CALLED by entry or core (word-boundary, not the
+# definition paren) must be DEFINED somewhere in the sourced run —
+# entry stub arm, fallback, or install-core's own definitions (it is
+# kit_source'd before main, so a definition there covers at runtime) —
+# so a present-but-truncated lib can never rc-127 a bare call, and a
+# call into a lib nothing sources fails the same way. Comment-stripped
+# both sides (conventions.md "Source-counting pins"); stub-only names
+# (defined, never called) are out of scope — staleness, not a gap.
+# The extraction keeps tokens line-separated: a tr -d '[:space:]()'
+# here concatenates every definition into one token and the loop goes
+# vacuous (found by the #456 sabotage cycle, L4). The lib list is what
+# THIS RUN sources — live from the kit_source lines plus log.sh's
+# direct sourcing — not the whole sh/ glob: sh/ also carries
+# wrapper-side scripts (ddev-terminal.sh, as-opencode-core.sh) whose
+# shell-hook definitions (ddev(), note()) are not install's callable
+# surface, and globbing them false-reds on binary-name prose.
+_xl_missing=""
+_xl_combined="$(
+    sed 's/^[[:space:]]*#.*$//' "$INSTALL"
+    sed 's/^[[:space:]]*#.*$//' "$LIB"
+)"
+[ -n "$_xl_combined" ] || _xl_missing="(stripped entry+core extraction empty)"
+_xl_libs="$(
+    grep -oE 'kit_source "\$SCRIPT_DIR/opencode-permissions-kit-lib/sh/[a-z0-9-]+\.sh"' "$INSTALL" |
+        sed -e 's/^kit_source "\$SCRIPT_DIR\///' -e 's/"$//'
+    echo opencode-permissions-kit-lib/sh/log.sh
+)"
+for _xl_rel in $_xl_libs; do
+    _xl_lib="$SCRIPT_DIR/../../files/$_xl_rel"
+    case $_xl_lib in */ui.sh) continue ;; esac
+    [ -f "$_xl_lib" ] || {
+        _xl_missing="$_xl_missing (missing lib $_xl_rel)"
+        continue
+    }
+    for _xl_fn in $(grep -oE '^[[:space:]]*[a-zA-Z_][a-zA-Z0-9_]*\(\)' "$_xl_lib" | tr -d '()'); do
+        printf '%s\n' "$_xl_combined" | grep -qE "(^|[^a-zA-Z0-9_])${_xl_fn}([^a-zA-Z0-9_(]|$)" ||
+            continue
+        printf '%s\n' "$_xl_combined" | grep -qE "(^|[|;[:space:]])${_xl_fn}\(\)" ||
+            _xl_missing="$_xl_missing $_xl_fn"
+    done
+done
+if [ -z "$_xl_missing" ]; then
+    pass "every lib function entry-or-core calls is defined in install.sh/install-core.sh (#456)"
+else
+    fail "lib functions called but defined nowhere in install.sh/install-core.sh:$_xl_missing (#456)"
+fi
+# Nesting-shape pin (#461 a Q4): the ddev_migrate_gap/_export stubs
+# must be TOP-LEVEL arms — anchored at column 0. The wave's first cut
+# nested them inside the registry arm, where they armed only when the
+# registry was undefined (ddev-migrate.sh defines registry at :82, gap
+# at :154, export at :351 — every truncation after :82 left them
+# unarmed and the tolerant call arms turned the miss into a silent
+# green skip). An indented, nested copy fails this anchor.
+if sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -qE '^command -v ddev_migrate_gap >/dev/null 2>&1 \|\| ddev_migrate_gap\(\) \{' &&
+    sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -qE '^command -v ddev_migrate_export >/dev/null 2>&1 \|\| ddev_migrate_export\(\) \{'; then
+    pass "ddev_migrate gap/export stubs are top-level arms (arm independently of the registry) (#461 a Q4)"
+else
+    fail "ddev_migrate gap/export stubs must be top-level command -v arms (#461 a Q4)"
+fi
+# B1 pin (#461 b): the INTRA-LIB CALLEE rides its own top-level arm.
+# gap (:157) and export (:389) call ddev_migrate_latest_dir (def :651)
+# inside $(…); a tail cut in the :158–:650 window keeps both callers
+# (the stub arms above only fire on entirely-missing functions) and
+# kills the callee — the tolerant call arms swallowed the rc behind
+# the shell's bare "not found" with no counted row. The callee stub
+# makes that window name itself; anchored at column 0 like Q4's.
+if sed 's/^[[:space:]]*#.*$//' "$INSTALL" |
+    grep -qE '^command -v ddev_migrate_latest_dir >/dev/null 2>&1 \|\| ddev_migrate_latest_dir\(\) \{' &&
+    sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -A2 -F 'ddev_migrate_latest_dir() {' |
+    grep -qF 'skipping the ddev migration check'; then
+    pass "ddev_migrate_latest_dir stub is a top-level arm naming the skip (B1: the intra-lib callee window) (#461 b B1)"
+else
+    fail "ddev_migrate_latest_dir must be a top-level command -v arm with the named skip (#461 b B1)"
+fi
+# X1 pin: the link-gate stub fails CLOSED and loud — the rc-0 draft left
+# the direct-sudo gated writes (~/.ddev, ~/.config, ~/.agents) running
+# with the gate silently off on truncation. Shape pin (inline arm, not
+# extractable): fail-closed rc + named message.
+if sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -A2 -F 'agent_home_sane() {' |
+    grep -qF 'link gate closed, gated writes skip loudly' &&
+    sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -A2 -F 'agent_home_sane() {' |
+    grep -qF 'return 1'; then
+    pass "agent_home_sane stub fails closed and loud (X1: direct-sudo gates never run ungated) (#461 a X1)"
+else
+    fail "agent_home_sane stub must fail closed (rc 1 + named message) (#461 a X1)"
+fi
+
 # --- 8. LOWS-1 (#371/#372/#340): install.sh residual hygiene ----------------------
 
 # A1 + review a S1/P4 (#424 a): the agent-user gitconfig backup is
@@ -674,11 +769,12 @@ _O372_OUT=$(
 if printf '%s\n' "$_O372_OUT" | grep -qF 'SUDO: mkdir -p /home/oc/.agents' &&
     ! printf '%s\n' "$_O372_OUT" | grep -q 'SUDO: cp -a' &&
     printf '%s\n' "$_O372_OUT" | grep -qF 'warn: agent resources not migrated: the chain to /home/oc/.agents turned into a symlink' &&
+    printf '%s\n' "$_O372_OUT" | grep -qF 'or the home-sane gate was unavailable' &&
     printf '%s\n' "$_O372_OUT" | grep -qF 'log: agents migration skipped: exec-time recheck tripped for /home/oc/.agents' &&
     [ -f "$_O372W/dev/.agents/skill-a/SKILL.md" ]; then
-    pass "exec-time recheck trips between mkdir and cp: no copy, loud skip, source untouched (#377 O2)"
+    pass "exec-time recheck trips between mkdir and cp: no copy, loud skip, source untouched (#377 O2, #461 b B3)"
 else
-    fail "exec-time recheck must skip the copy loudly (out=$_O372_OUT) (#377 O2)"
+    fail "exec-time recheck must skip the copy loudly (out=$_O372_OUT) (#377 O2, #461 b B3)"
 fi
 # Control arm: a gate that never trips runs the copy (the recheck must
 # not break the happy path) — agent_home_sane passes every walk.

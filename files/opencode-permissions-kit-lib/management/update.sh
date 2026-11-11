@@ -440,7 +440,14 @@ PROJECTS_CONF="$CONFDIR/projects.conf"
 
 # === Shared UI helpers ===
 # Checkout copy first, then the deployed library; a plain fallback keeps
-# update.sh working on an install whose library predates ui.sh.
+# update.sh working on an install whose library predates ui.sh entirely.
+# A PRESENT-but-older ui.sh (partial update, mid-deploy state) is a
+# different case: the fallback stubs never fire, the bare ui_* calls
+# rc-127 under set -e — the cryptic mid-run abort the core guard below
+# exists to prevent. The used-set guard after the block refuses that
+# state BEFORE any phase runs (#456, the #455 a Q1 mechanism); on the
+# fallback path it passes vacuously (the stub set below is complete for
+# the list).
 UI_LIB=""
 for _cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/ui.sh" "$LIBDIR/sh/ui.sh"; do
     if [ -f "$_cand" ]; then
@@ -467,7 +474,6 @@ else
         echo ""
     }
     ui_kv() { printf '  %-14s %s\n' "$1" "$2"; }
-    ui_kv_warn() { printf '  %-14s %s\n' "$1" "$2"; }
     # 0.0.45d W4: the body's confirm() calls ui_confirm — without a
     # stub a ui.sh-less update died rc 127 at the confirm prompt
     # instead of failing with a re-deploy hint (0.0.45c C9 fixed the
@@ -486,6 +492,25 @@ else
     UI_BLUE=''
     UI_NC=''
 fi
+
+# UI used-set guard (#456): the resolver above accepts a checkout or
+# deployed ui.sh; this closes the present-but-skewed twin the fallback
+# stubs cannot catch (they fire only when NO ui.sh was found). The list
+# is every ui function the entry AND update-core call — pinned BEFORE
+# any phase runs, like update_pairing_guard below: a mid-update rc 127
+# aborts set -e cryptically after earlier phases already ran. The
+# test-suite riders enforce both directions; the fallback stub block
+# above must stay complete for this list (its own rider).
+update_ui_pairing_guard() {
+    for _uup in ui_info ui_success ui_warn ui_error ui_detail \
+        ui_section ui_banner ui_kv ui_confirm; do
+        command -v "$_uup" >/dev/null 2>&1 || {
+            echo "error: function '$_uup' missing from ui.sh — version-skewed (older or truncated), aborting" >&2
+            return 1
+        }
+    done
+}
+update_ui_pairing_guard || exit 1
 
 # === Audit log ===
 # Best-effort shared logger (/var/log/opencode-permissions-kit/). Covers all
@@ -586,6 +611,13 @@ done
         echo "error: lib_deploy unavailable (deploy-lib.sh missing)" >&2
         return 1
     }
+# Core-called sibling (#456 stub sweep, the never-shadow fail-safe
+# update-core's own xdg_open_real_exists stub carries): update-core asks
+# deploy-lib whether the xdg-open shim is needed — when the probe is
+# unavailable the only safe answer is "no" (rc 1): a withheld shim
+# degrades browser opening, a wrong one shadows a real xdg-open for
+# every other user.
+command -v xdg_shim_needed_for >/dev/null 2>&1 || xdg_shim_needed_for() { return 1; }
 
 # Shared TUI 2.x plugin registration (per-user plugin-dir sync): one
 # implementation for update.sh's sync_tui_registration and install.sh
@@ -833,8 +865,10 @@ fi
 # they call internally (#452, the doctor precedent: a helper-level skew
 # aborts mid-update after partial work, e.g. a missing install_binary
 # strands the upgrade after the download). Functions from other sourced
-# libs — ui.sh included, see the resolver note above — are deliberately
-# outside this guard; only the core pairing is pinned (#455 a Q1). The
+# libs sit outside this guard by design — the core pairing is what is
+# pinned here; the ui.sh surface is pinned by the used-set guard after
+# the ui.sh resolver, the per-lib stub arms cover the rest (#456,
+# closing the #455 a Q1 boundary). The
 # list is kept equal to
 # update-core.sh's function definitions (the test-suite completeness
 # riders enforce both directions; a phase added to the core without the

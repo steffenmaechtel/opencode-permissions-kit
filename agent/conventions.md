@@ -160,6 +160,39 @@ Patterns already in this repo:
 | version probes | strict `grep -oE` extract; empty means unknown, never a guess | wrapper, `management/status.sh` |
 | exact id comparison | `grep -qxF` (fixed string, whole line) | `sh/advisories.sh` callers, scan dedup |
 
+## Lib pairing and cross-lib guards (entries that source libs)
+
+An entry script and the libs it sources are pinned surfaces — version
+skew between them must refuse loud (or count the degradation visibly),
+never proceed silently. Two tiers with DIFFERENT pinning sets
+(design record: [internal/records/cross-lib-pairing-guards.md]
+(../internal/records/cross-lib-pairing-guards.md), issues #413/#452/#456):
+
+- **Paired core:** the entry's pairing guard list equals the core's
+  DEFINITIONS, both directions, enforced by test riders — entry and
+  core are same-vintage by construction, and helper-level skew is the
+  #452 finding.
+- **Cross-lib (other sourced libs, ui.sh included):** pin the USED set
+  — every function entry AND core call. A lib's full definition set is
+  deliberately NOT pinned here: legitimately older deployed libs may
+  lack functions the run never calls. ui.sh consumers carry a used-set
+  guard right after their resolver (refuse before the first
+  section/phase); other cross-lib functions ride entry stub arms with
+  named semantics (loud for actions, no-op for advisories/stamps,
+  fail-closed for policy gates, never-shadow for probes).
+- **The discriminator is missing-FILE vs present-but-skewed:** a
+  missing lib keeps the entry's documented legacy contract (compat
+  stubs or a loud abort); a present-but-skewed one is a broken kit and
+  refuses loud. Fail-soft report surfaces (status) degrade into a
+  COUNTED warn row (`ui_kv_warn ... not checked — ... (fix: sudo opk
+  update)`), never a silently dropped row.
+- **Riders** for these surfaces: comment-stripped both sides,
+  boundary-anchored, emptiness-probed, and their token extraction keeps
+  line separation (`tr -d '[:space:]()'` concatenates definitions into
+  one token and the rider goes vacuous — the #456 sabotage cycle);
+  lib iteration covers what the run SOURCES, never a whole-dir glob
+  (wrapper-side shell hooks like `ddev()` live in the same directory).
+
 ## Source-counting pins (unit suites)
 
 Any unit-test pin that COUNTS a literal in a shipped or repo-internal

@@ -288,6 +288,175 @@ if [ -z "$_pg_hmissing" ]; then
 else
     fail "functions defined by status-core.sh but absent from the guard:$_pg_hmissing (#452, #455 a C2)"
 fi
+# B2 pin (#461 b): both wiring-abort guards (ui + core pairing) carry
+# the repair hint — docs/reference/cli.md's exit-code row promises
+# "the named function and the repair hint land on stderr with
+# fix: sudo opk update"; before the fix no abort path printed any
+# hint (the row lied). Comment-stripped count pin: exactly two
+# refusal lines, each with the hint.
+_pg_hint=$(sed 's/^[[:space:]]*#.*$//' "$STATUS_ENTRY" | grep -c 'refusing to run (fix: sudo opk update)')
+if [ "$_pg_hint" -eq 2 ]; then
+    pass "both wiring-abort guards print the repair hint (docs row is true) (#461 b B2)"
+else
+    fail "wiring-abort guards must carry the repair hint, count 2 (got $_pg_hint) (#461 b B2)"
+fi
+
+# Cross-lib protection-map rider (#456): status's cross-lib surface is
+# call-site-guarded, not stubbed (fail-soft report — a missing helper
+# must degrade into a COUNTED warn row, never a silent skip), so the
+# sibling stub riders' shape does not fit. Same extraction, status's
+# requirement: every lib function (ui.sh exempt — the entry's
+# used-set guard owns that surface, rider in test-ui.sh) CALLED by
+# entry or core and defined NOWHERE in them must have a literal
+# `command -v <fn>` guard at its call surface. The two truncation
+# gates this wave added are what make that true today (ddev-migrate
+# trio, ddev_reshare_needed); git_status_row and xdg_open_real_exists
+# carried theirs (0.0.46a F4, #199 a W3).
+_xl_missing=""
+_xl_combined="$(
+    sed 's/^[[:space:]]*#.*$//' "$STATUS_ENTRY"
+    sed 's/^[[:space:]]*#.*$//' "$LIB"
+)"
+[ -n "$_xl_combined" ] || _xl_missing="(stripped entry+core extraction empty)"
+# What THIS RUN sources: the entry resolves git-check.sh and ui.sh;
+# status-core resolves ddev-migrate.sh, ddev-handover.sh,
+# ddev-hosts.sh, update-check.sh and advisories.sh behind file guards
+# (#461 a Q3 extended the list past the original four — the rider once
+# pinned the incompleteness green); wsl-browser-bridge.sh's
+# never-shadow probe is the optional surface the xdg call site
+# command-v-guards. Not the whole sh/ glob — its wrapper-side scripts
+# define shell hooks (ddev(), note()) that are not status's callable
+# surface. Token extraction stays line-separated: a
+# tr -d '[:space:]()' concatenates every definition into one token and
+# the loop goes vacuous (the #456 sabotage cycle found exactly that on
+# the install twin, L4).
+for _xl_rel in opencode-permissions-kit-lib/sh/git-check.sh \
+    opencode-permissions-kit-lib/sh/ddev-migrate.sh \
+    opencode-permissions-kit-lib/sh/ddev-handover.sh \
+    opencode-permissions-kit-lib/sh/ddev-hosts.sh \
+    opencode-permissions-kit-lib/sh/update-check.sh \
+    opencode-permissions-kit-lib/sh/advisories.sh \
+    opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh; do
+    _xl_lib="$SCRIPT_DIR/../../files/$_xl_rel"
+    [ -f "$_xl_lib" ] || {
+        _xl_missing="$_xl_missing (missing lib $_xl_rel)"
+        continue
+    }
+    for _xl_fn in $(grep -oE '^[[:space:]]*[a-zA-Z_][a-zA-Z0-9_]*\(\)' "$_xl_lib" | tr -d '()'); do
+        printf '%s\n' "$_xl_combined" | grep -qE "(^|[^a-zA-Z0-9_])${_xl_fn}([^a-zA-Z0-9_(]|$)" ||
+            continue
+        printf '%s\n' "$_xl_combined" | grep -qE "(^|[|;[:space:]])${_xl_fn}\(\)" &&
+            continue
+        printf '%s\n' "$_xl_combined" | grep -qF "command -v $_xl_fn" ||
+            _xl_missing="$_xl_missing $_xl_fn"
+    done
+done
+if [ -z "$_xl_missing" ]; then
+    pass "every lib call site carries a command-v guard or stub (#456)"
+else
+    fail "lib functions called unguarded (no command -v, no stub):$_xl_missing (#456)"
+fi
+# The truncation gates this wave added, verbatim: present-but-truncated
+# libs must land in a COUNTED warn row, not a silent skip — the row
+# text is the user-visible contract (fix hint, #165 idiom).
+if printf '%s\n' "$(sed 's/^[[:space:]]*#.*$//' "$LIB")" |
+    grep -qF 'ui_kv_warn "db dumps" "not checked — kit file sh/ddev-migrate.sh outdated (fix: sudo opk update)"'; then
+    pass "db-dump truncation gate renders a counted warn row (#456)"
+else
+    fail "db-dump truncation gate must render a counted warn row (#456)"
+fi
+if printf '%s\n' "$(sed 's/^[[:space:]]*#.*$//' "$LIB")" |
+    grep -qF 'ui_kv_warn "ddev share" "not checked — kit file sh/ddev-handover.sh outdated (fix: sudo opk update)"'; then
+    pass "share-scan truncation gate renders a counted warn row (#456)"
+else
+    fail "share-scan truncation gate must render a counted warn row (#456)"
+fi
+# The #461 a Q3 sibling gates, same counted-warn contract: ddev-hosts,
+# update-check, advisories — grep-pinned; the PATTERN itself is
+# executed-pinned twice above (db-dump, share-scan). No hosts-gate
+# executed twin: _st_ddev_win_hosts gates readiness behind
+# [ -d /mnt/c ] absolute literals — a full-function drive is
+# environment-dependent (vacuous on non-WSL CI, the L4b class), and
+# weakening the extraction to reach the gate would pin a copy, not
+# the code.
+if printf '%s\n' "$(sed 's/^[[:space:]]*#.*$//' "$LIB")" |
+    grep -qF 'ui_kv_warn "kit update" "not checked — kit file sh/update-check.sh outdated (fix: sudo opk update)"'; then
+    pass "update-check truncation gate renders a counted warn row (#461 a Q3)"
+else
+    fail "update-check truncation gate must render a counted warn row (#461 a Q3)"
+fi
+if printf '%s\n' "$(sed 's/^[[:space:]]*#.*$//' "$LIB")" |
+    grep -qF 'ui_kv_warn "advisories database" "not checked — kit file sh/advisories.sh outdated (fix: sudo opk update)"'; then
+    pass "advisories truncation gate renders a counted warn row (#461 a Q3)"
+else
+    fail "advisories truncation gate must render a counted warn row (#461 a Q3)"
+fi
+if printf '%s\n' "$(sed 's/^[[:space:]]*#.*$//' "$LIB")" |
+    grep -qF 'ui_kv_warn "hosts (win)" "not checked — kit file sh/ddev-hosts.sh outdated (fix: sudo opk update)"'; then
+    pass "hosts(win) truncation gate renders a counted warn row (#461 a Q3)"
+else
+    fail "hosts(win) truncation gate must render a counted warn row (#461 a Q3)"
+fi
+# Behavioral pins (L1, #456): the truncation gates EXECUTED, not just
+# present — fresh child per gate, scratch tree carrying a present-but-
+# truncated lib copy (the skew shape), controlled PATH (/usr/bin:/bin,
+# conventions.md "Test sandbox" controlled-PATH rule: the extracted
+# code must not see a contributor's nvm & co),
+# the warn row observed the way production renders it (stdout).
+_gate_scratch="$(work_new)"
+mkdir -p "${_gate_scratch:?}/lib/sh" "${_gate_scratch:?}/call/sh" "${_gate_scratch:?}/call/management"
+printf '# truncated copy: definitions gone\n' >"${_gate_scratch:?}/lib/sh/ddev-migrate.sh"
+printf '# truncated copy: definitions gone\n' >"${_gate_scratch:?}/call/sh/ddev-handover.sh"
+_gate_ui="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/ui.sh"
+_gate_db_out="$(PATH='/usr/bin:/bin' sh -c '
+    . "$1"
+    DEFAULT_USER=dev
+    LIBDIR="$2/lib"
+    PROJECTS_CONF=""
+    eval "$3"
+    _st_ddev_db_dumps
+' x "$_gate_ui" "$_gate_scratch" "$(extract_func "$LIB" _st_ddev_db_dumps)" 2>&1)"
+if printf '%s' "$_gate_db_out" | grep -qF 'sh/ddev-migrate.sh outdated'; then
+    pass "db-dump gate fires on a truncated ddev-migrate.sh (executed, #456)"
+else
+    fail "db-dump gate must fire on a truncated ddev-migrate.sh (out=$_gate_db_out) (#456)"
+fi
+# S5 variant (#461 a): PARTIAL truncation — the trio (gap/projects/home)
+# survives, only ddev_migrate_latest_dir (defined :651, ~500 lines after
+# its caller) is gone. The pre-fix gate passed this shape and the gap
+# probe rc-127'd inside $(…) with no counted row.
+printf '# partial: trio present, callee gone\nddev_migrate_gap() { :; }\nddev_migrate_projects() { :; }\nddev_migrate_home() { :; }\n' \
+    >"${_gate_scratch:?}/lib/sh/ddev-migrate.sh"
+_gate_db2_out="$(PATH='/usr/bin:/bin' sh -c '
+    . "$1"
+    DEFAULT_USER=dev
+    LIBDIR="$2/lib"
+    PROJECTS_CONF=""
+    eval "$3"
+    _st_ddev_db_dumps
+' x "$_gate_ui" "$_gate_scratch" "$(extract_func "$LIB" _st_ddev_db_dumps)" 2>&1)"
+if printf '%s' "$_gate_db2_out" | grep -qF 'sh/ddev-migrate.sh outdated'; then
+    pass "db-dump gate fires when ONLY ddev_migrate_latest_dir is missing (executed, #461 a S5)"
+else
+    fail "db-dump gate must fire on the latest_dir-only truncation (out=$_gate_db2_out) (#461 a S5)"
+fi
+# OPENCODE_USER names a nonexistent user so the uid guard enters the
+# scan arm deterministically on every host (an environment-dependent
+# pin is vacuous somewhere, L4b).
+_gate_share_out="$(PATH='/usr/bin:/bin' sh -c '
+    . "$1"
+    OPENCODE_USER=nosuchopkuser456
+    ST_CALL_DIR="$2/call/management"
+    LIBDIR="$2/lib"
+    PROJECTS_CONF=""
+    eval "$3"
+    _st_ddev_share_scan
+' x "$_gate_ui" "$_gate_scratch" "$(extract_func "$LIB" _st_ddev_share_scan)" 2>&1)"
+if printf '%s' "$_gate_share_out" | grep -qF 'sh/ddev-handover.sh outdated'; then
+    pass "share-scan gate fires on a truncated ddev-handover.sh (executed, #456)"
+else
+    fail "share-scan gate must fire on a truncated ddev-handover.sh (out=$_gate_share_out) (#456)"
+fi
 
 # --- progress tee under hostile PYTHONHOME (#249) ---------------------------------
 # _st_progress_tee runs `python3 -I` on the scan pipeline: a poisoned

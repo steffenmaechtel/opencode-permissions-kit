@@ -131,10 +131,14 @@ fi
 # name would false-pass.
 _pg_missing=""
 _pg_entfns="$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR_ENTRY" |
-    grep -oE '^doctor_[a-z_0-9]+' | grep -v '^doctor_pairing_guard$' | sort -u)"
+    grep -oE '^doctor_[a-z_0-9]+' | grep -v '^doctor_pairing_guard$' |
+    grep -v '^doctor_ui_pairing_guard$' | sort -u)"
 # emptiness probe (#457, the #455 a C2 contract): an empty extraction
 # would run the loop zero times and the rider would pass vacuously --
-# the harness contract puts that probe on the caller.
+# the harness contract puts that probe on the caller. The second
+# exclusion drops the entry's OWN ui used-set guard (#456) — its def
+# and call are doctor_* tokens but belong to the ui-lib surface, not
+# the doctor-core guard list.
 [ -n "$_pg_entfns" ] || _pg_missing="(entry call extraction empty)"
 for _fn in $_pg_entfns; do
     printf '%s\n' "$_pg_src_s" | grep -qE "(^|[[:space:]])$_fn([[:space:];]|\$)" ||
