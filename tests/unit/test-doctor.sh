@@ -573,8 +573,8 @@ rm -rf "${A1BIN:?}"
 # the detect refusal, not slip past a gate that ran on the start dir.
 # (#448: both markers moved with the section into sh/doctor-core.sh --
 # doctor_walkup carries them in order.)
-_wu_block=$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR_CORE" | grep -nF 'case "$DOCTOR_ROOT_ARG" in' | head -1 | cut -d: -f1)
-_wu_gate=$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR_CORE" | grep -nF "refusing to walk the whole filesystem" | head -1 | cut -d: -f1)
+_wu_block=$(live_src "$DOCTOR_CORE" | grep -nF 'case "$DOCTOR_ROOT_ARG" in' | head -1 | cut -d: -f1)
+_wu_gate=$(live_src "$DOCTOR_CORE" | grep -nF "refusing to walk the whole filesystem" | head -1 | cut -d: -f1)
 if [ -n "$_wu_block" ] && [ -n "$_wu_gate" ] && [ "$_wu_block" -lt "$_wu_gate" ]; then
     pass "walk-up resolves before the detect '/' gate (static order)"
 else
@@ -587,7 +587,12 @@ fi
 # ui.sh hard-fail; accepted residual, pin-cost budget). Structural pin
 # instead: the PS_LIB block must sit AFTER the ui.sh sourcing -- the
 # error path needs ui_error, which only exists once ui.sh loaded
-_nl_src=$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR")
+# round b B2 (class sweep, twin of the ddev sites): || true keeps the
+# one-red-row failure path under set -e (a failed strip streams empty
+# content; the [ -n ] probes' else branch reds the row -- the greps
+# themselves fail silently inside the command substitutions, their
+# pipeline tail is cut, rc 0).
+_nl_src=$(live_src "$DOCTOR") || true
 _nl_uilib=$(printf '%s\n' "$_nl_src" | grep -nF 'UI_LIB=' | head -1 | cut -d: -f1)
 _nl_pslib=$(printf '%s\n' "$_nl_src" | grep -nF 'PS_LIB=' | head -1 | cut -d: -f1)
 if [ -n "$_nl_uilib" ] && [ -n "$_nl_pslib" ] && [ "$_nl_uilib" -lt "$_nl_pslib" ]; then
@@ -603,10 +608,10 @@ fi
 # would rc-127 silently past the summary otherwise). Comment-strip
 # rider on every conjunct (conventions.md "Source-counting pins",
 # #451 a Q3): a commented-out resolver block must not satisfy the pin.
-if sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF 'DOCTOR_CORE="$DR_CALL_DIR/../sh/doctor-core.sh"' &&
-    sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF '|| DOCTOR_CORE="/usr/local/lib/opencode-permissions-kit/sh/doctor-core.sh"' &&
-    sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF 'doctor-core.sh not found' &&
-    sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF 'doctor_pairing_guard || exit 1'; then
+if live_src "$DOCTOR" | grep -qF 'DOCTOR_CORE="$DR_CALL_DIR/../sh/doctor-core.sh"' &&
+    live_src "$DOCTOR" | grep -qF '|| DOCTOR_CORE="/usr/local/lib/opencode-permissions-kit/sh/doctor-core.sh"' &&
+    live_src "$DOCTOR" | grep -qF 'doctor-core.sh not found' &&
+    live_src "$DOCTOR" | grep -qF 'doctor_pairing_guard || exit 1'; then
     pass "entry sources doctor-core.sh checkout-first + pairing guard (#448)"
 else
     fail "entry sources doctor-core.sh checkout-first + pairing guard (#448)"
@@ -1129,7 +1134,7 @@ fi
 # the design's depth -- hermetic execution of the DEFAULT arm would scan
 # the host's real tree, so the claim is source-pinned instead. (#448:
 # the literals moved with the all block into sh/doctor-core.sh.)
-_nl_src="$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR_CORE")"
+_nl_src="$(live_src "$DOCTOR_CORE")" || true
 if printf '%s' "$_nl_src" | grep -qF '[ -d /var/www/vhosts ]' &&
     printf '%s' "$_nl_src" | grep -qF 'projects.conf' &&
     printf '%s' "$_nl_src" | grep -qF -- '-maxdepth 3'; then
@@ -1461,13 +1466,13 @@ RD_OPK=""
 # any period matched; #344 c Q1: the b-wave fragments left the
 # absolute and backslash arms unpinned — mutation-verified in the
 # round-b/c reviews, records on this PR's timeline)
-sed 's/^[[:space:]]*#.*$//' "$DOCTOR_CORE" | grep -qF "trap '_doctor_cleanup; exit 1' INT TERM" &&
-    sed 's/^[[:space:]]*#.*$//' "$DOCTOR_CORE" | grep -qF 'trap _doctor_cleanup EXIT' &&
+live_src "$DOCTOR_CORE" | grep -qF "trap '_doctor_cleanup; exit 1' INT TERM" &&
+    live_src "$DOCTOR_CORE" | grep -qF 'trap _doctor_cleanup EXIT' &&
     pass "signal handlers exit (#344 a C1 house shape, stripped source)" ||
     fail "signal handlers exit (#344 a C1 house shape, stripped source)"
-sed 's/^[[:space:]]*#.*$//' "$DOCTOR_CORE" | grep -qF '/* | */ | . | ./* | .. | ../* | ' &&
-    sed 's/^[[:space:]]*#.*$//' "$DOCTOR_CORE" | grep -qF '*/. | */./* | */.. | */../* | ' &&
-    sed 's/^[[:space:]]*#.*$//' "$DOCTOR_CORE" | grep -qF '*//* | *\\*)' &&
+live_src "$DOCTOR_CORE" | grep -qF '/* | */ | . | ./* | .. | ../* | ' &&
+    live_src "$DOCTOR_CORE" | grep -qF '*/. | */./* | */.. | */../* | ' &&
+    live_src "$DOCTOR_CORE" | grep -qF '*//* | *\\*)' &&
     pass "belt case pinned end-to-end: absolute, trailing/dot/dotdot/empty forms, backslash (#344 a S5 + b R1 + c Q1)" ||
     fail "belt case pinned end-to-end: absolute, trailing/dot/dotdot/empty forms, backslash (#344 a S5 + b R1 + c Q1)"
 
@@ -1859,9 +1864,9 @@ rc_doctor "B4+a A1: C1-byte root refused for detect (rc 64)" 64 detect "$C1_PROJ
 # test-kit-cli.sh. The mid-run swap itself is not fixture-able without
 # window injection; the mechanism was mechanically verified in round a
 # (verdicts-v1, reproduced by main on the verbatim awk).
-_b1_gate=$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR_CORE" | grep -nF 'if [ -L "$_dt_tmp" ]; then' | head -1 | cut -d: -f1)
-_b1_chmod=$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR_CORE" | grep -nF 'chmod "$_dt_mode" "$_dt_tmp"' | head -1 | cut -d: -f1)
-_b1_mv=$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR_CORE" | grep -nF '[ ! -L "$_dt_tmp" ] && [ ! -L "$DOCTOR_ROOT/opk.json" ] && [ ! -d' | head -1 | cut -d: -f1)
+_b1_gate=$(live_src "$DOCTOR_CORE" | grep -nF 'if [ -L "$_dt_tmp" ]; then' | head -1 | cut -d: -f1)
+_b1_chmod=$(live_src "$DOCTOR_CORE" | grep -nF 'chmod "$_dt_mode" "$_dt_tmp"' | head -1 | cut -d: -f1)
+_b1_mv=$(live_src "$DOCTOR_CORE" | grep -nF '[ ! -L "$_dt_tmp" ] && [ ! -L "$DOCTOR_ROOT/opk.json" ] && [ ! -d' | head -1 | cut -d: -f1)
 if [ -n "$_b1_gate" ] && [ -n "$_b1_chmod" ] && [ -n "$_b1_mv" ] &&
     [ "$_b1_gate" -lt "$_b1_chmod" ] && [ "$_b1_chmod" -lt "$_b1_mv" ]; then
     pass "B1/B2: [ -L ] gate before chmod before the mv gate (with -d conjunct)"
@@ -1893,7 +1898,7 @@ echo ""
 # (#448: the four sites moved with the sections into sh/doctor-core.sh --
 # the pin rides the lib now, as does its exact-count twin in
 # test-doctor-core.sh.)
-_doc_pi=$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR_CORE" | grep -c 'python3 -I' || true)
+_doc_pi=$(live_src "$DOCTOR_CORE" | grep -c 'python3 -I' || true)
 if [ "${_doc_pi:-0}" -ge 4 ]; then
     echo "  ${GREEN}PASS${NC}  doctor's 4 python3 sites run -I ($_doc_pi found) (#249)"
     passed=$((passed + 1))

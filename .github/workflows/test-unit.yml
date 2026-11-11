@@ -166,6 +166,8 @@ jobs:
         run: ./tests/unit/test-log.sh
       - name: Run test harness meta tests
         run: ./tests/unit/test-harness.sh
+      - name: Run rider lint tests (issue #460)
+        run: ./tests/unit/test-rider-lint.sh
       - name: Run stdin-run caller-dir anchor tests (issue #405)
         run: ./tests/unit/test-stdin-anchor.sh
       - name: Run browser bridge tests

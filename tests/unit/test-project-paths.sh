@@ -283,9 +283,9 @@ fi
 # "Source-counting pins").
 # #346 wave 3: install's three refusal sites moved to install-core.sh;
 # the count keeps its || true guard (grep -c aborts on zero under set -e).
-_q1i=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" |
+_q1i=$(live_src "$INSTALL_CORE" |
     grep -cF 'is not a valid project root (system path, symlink, or malformed form)' || true)
-_q1c=$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" |
+_q1c=$(live_src "$CONFIG" |
     grep -cF 'is not a valid project root (system path, symlink, or malformed form)' || true)
 if [ "$_q1i" -eq 3 ] && [ "$_q1c" -eq 2 ]; then
     pass "caller refusal messages enumerate the real causes at all five sites (a Q1)"
@@ -398,7 +398,7 @@ if grep -q '^path_sane_tilde_home() {' "$PATH_SANE" &&
     ! grep -qE '^[[:space:]]*PROJECT_TILDE_HOME="\$HOME"$' "$INSTALL_CORE" &&
     ! grep -qE '^[[:space:]]*PROJECT_TILDE_HOME="\$HOME"$' "$CONFIG" &&
     ! grep -qE '^[[:space:]]*PROJECT_TILDE_HOME="\$HOME"$' "$INSTALL" &&
-    sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" | grep -qE '^[[:space:]]*path_sane_tilde_home$' &&
+    live_src "$INSTALL_CORE" | grep -qE '^[[:space:]]*path_sane_tilde_home$' &&
     grep -qF 'path_sane_tilde_home() { PROJECT_TILDE_HOME="$HOME"; }' "$INSTALL" &&
     grep -qF 'path_sane_tilde_home() { PROJECT_TILDE_HOME="$HOME"; }' "$CONFIG"; then
     pass "tilde-home setup: one lib implementation, callers delegate + fail-safe stubs (#340)"
@@ -473,7 +473,7 @@ INSTALL_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/install-co
 # before the -ge 4 check could record its FAIL (#244 h W2). Comment-strip
 # rider (#261, the #244 g W1 class): commented-out lines stop counting —
 # full-line comments only (#244 h W6 residual).
-_norm_sites=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" | grep -c '_PP_NORM' || true)
+_norm_sites=$(live_src "$INSTALL_CORE" | grep -c '_PP_NORM' || true)
 if [ "$_norm_sites" -ge 3 ]; then
     pass "install.sh uses _PP_NORM in all project entry points ($_norm_sites sites)"
 else
@@ -523,7 +523,7 @@ fi
 # derived from the real tree, not hard-coded, so legitimate _PP_NORM
 # growth cannot false-red the pin.
 sed '/_PP_NORM/s/^\([[:space:]]*\)/\1# /' "$INSTALL" >"$_pin_dir/install-norm-commented"
-_norm_ridden=$(sed 's/^[[:space:]]*#.*$//' "$_pin_dir/install-norm-commented" | grep -c '_PP_NORM' || true)
+_norm_ridden=$(live_src "$_pin_dir/install-norm-commented" | grep -c '_PP_NORM' || true)
 _norm_total=$(grep -c '_PP_NORM' "$INSTALL" || true)
 _norm_bare=$(grep -c '_PP_NORM' "$_pin_dir/install-norm-commented" || true)
 if [ "$_norm_ridden" = 0 ] && [ "$_norm_bare" = "$_norm_total" ]; then
@@ -601,7 +601,7 @@ DOCTOR="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/doctor.s
 DOCTOR_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/doctor-core.sh"
 OPK="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opk"
 HANDOVER_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/handover-core.sh"
-_opr_defs=$(sed 's/^[[:space:]]*#.*$//' "$PATH_SANE" "$DOCTOR" "$DOCTOR_CORE" "$OPK" "$HANDOVER_CORE" |
+_opr_defs=$(live_src "$PATH_SANE" "$DOCTOR" "$DOCTOR_CORE" "$OPK" "$HANDOVER_CORE" |
     grep -c '^opk_policy_root() {' || true)
 if [ "$_opr_defs" = 1 ] &&
     grep -q 'opk_policy_root "$DOCTOR_ROOT"' "$DOCTOR_CORE" &&

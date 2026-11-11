@@ -72,8 +72,8 @@ check "empty cache fails loud (FAIL message + adjacent exit 1, #224 b W1)" \
 # (#224 a W6 — presence-only would stay green under reordering). Both
 # greps run over the comment-stripped lib (#385): a future comment
 # quoting either literal must not become the pin's anchor.
-_pin_ln=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -n 'OC_VERSION="\$E2E_OC_VERSION"' | head -1 | cut -d: -f1)
-_res_ln=$(sed 's/^[[:space:]]*#.*$//' "$LIB" |
+_pin_ln=$(live_src "$LIB" | grep -n 'OC_VERSION="\$E2E_OC_VERSION"' | head -1 | cut -d: -f1)
+_res_ln=$(live_src "$LIB" |
     grep -n 'OC_VERSION=\$(npm_dist_latest "\$target")' | head -1 | cut -d: -f1)
 if [ -n "$_pin_ln" ] && [ -n "$_res_ln" ] && [ "$_pin_ln" -lt "$_res_ln" ]; then
     pass "a pin wins before any resolution (order pinned, line $_pin_ln < $_res_ln)"
@@ -168,7 +168,7 @@ check "lib.sh reads the E2E_GIT_CHANNEL knob (default distro)" \
 # Comment-strip rider (#261, the #244 g W1 class): a commented-out
 # builder line stops counting; full-line comments only (#244 h W6
 # residual). lib.sh is repo-internal source, same blindness class.
-_git_build_args=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -c -- '--build-arg GIT_CHANNEL' || true)
+_git_build_args=$(live_src "$LIB" | grep -c -- '--build-arg GIT_CHANNEL' || true)
 if [ "$_git_build_args" -ge 2 ]; then
     pass "git channel forwarded on both builder paths (BuildKit + classic)"
 else
@@ -200,7 +200,7 @@ check "run.sh asserts the latest leg really runs PPA git" \
 # workflow files. ---
 check "lib.sh reads the E2E_BASE_IMAGE knob (default ubuntu:24.04)" \
     grep_q 'E2E_BASE_IMAGE="\${E2E_BASE_IMAGE:-ubuntu:24.04}"'
-_base_build_args=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -c -- '--build-arg BASE_IMAGE' || true)
+_base_build_args=$(live_src "$LIB" | grep -c -- '--build-arg BASE_IMAGE' || true)
 if [ "$_base_build_args" -ge 2 ]; then
     pass "base image forwarded on both builder paths (BuildKit + classic)"
 else
@@ -226,7 +226,7 @@ check "workflows export the mirror base image to the e2e steps" \
 RUN_ROOTLESS="$(cd "$(dirname "$0")/../e2e" && pwd)/run-docker-rootless.sh"
 
 # Comment-stripped (a commented-out assignment must not satisfy the pin).
-if sed 's/^[[:space:]]*#.*$//' "$LIB" |
+if live_src "$LIB" |
     grep -q 'E2E_CONTAINER="\$E2E_CONTAINER-$(e2e_worktree_suffix)"'; then
     pass "lib.sh appends the worktree suffix to E2E_CONTAINER at source time"
 else
@@ -242,7 +242,7 @@ check "per-suite base names stay distinct (the suites stay disjoint)" \
 # env, not clobber it (guarded count — grep-in-pipe cannot trip set -e).
 _pwc=0
 for _r in "$RUN_SH" "$RUN_ROOTLESS" "$RUN_DDEV"; do
-    if sed 's/^[[:space:]]*#.*$//' "$_r" | grep -q 'E2E_CONTAINER="\${E2E_CONTAINER:-'; then
+    if live_src "$_r" | grep -q 'E2E_CONTAINER="\${E2E_CONTAINER:-'; then
         _pwc=$((_pwc + 1))
     fi
 done
@@ -254,7 +254,7 @@ fi
 # The effective name must be visible at container start (incident aid:
 # with two same-suite runs the log must show which run owns which
 # container). Comment-stripped likewise.
-if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -q 'echo "  container: \$E2E_CONTAINER'; then
+if live_src "$LIB" | grep -q 'echo "  container: \$E2E_CONTAINER'; then
     pass "e2e_start_container prints the effective container name"
 else
     fail "e2e_start_container does not print the effective container name"
@@ -301,8 +301,8 @@ rm -rf "$WTWORK"
 # fatal signal kill the runner and leak the host-side TMP_PROJECT.
 # Comment-strip rider on both counts (the source-counting convention):
 # a commented-out trap must not satisfy the pin.
-_LTRAP_EXIT=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -c '^trap e2e_cleanup EXIT$' || true)
-_LTRAP_SIG=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -cF "trap 'trap - EXIT INT TERM; e2e_cleanup; exit 1' INT TERM" || true)
+_LTRAP_EXIT=$(live_src "$LIB" | grep -c '^trap e2e_cleanup EXIT$' || true)
+_LTRAP_SIG=$(live_src "$LIB" | grep -cF "trap 'trap - EXIT INT TERM; e2e_cleanup; exit 1' INT TERM" || true)
 if [ "$_LTRAP_EXIT" = 1 ] && [ "$_LTRAP_SIG" = 1 ]; then
     pass "lib.sh: cleanup on EXIT plus self-disarming signal arms (INT TERM, exit 1)"
 else

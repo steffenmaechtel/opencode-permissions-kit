@@ -72,7 +72,7 @@ fi
 # kit_source line must not satisfy the pin. The no-fallback ABSENCE leg
 # stays un-ridden (absence pins are out of scope — a commented-out
 # forbidden line SHOULD keep counting there).
-if sed 's/^[[:space:]]*#.*$//' "$INSTALL" |
+if live_src "$INSTALL" |
     grep -qF 'kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/install-core.sh"' &&
     ! grep -q 'LIBDIR/sh/install-core' "$INSTALL"; then
     pass "install.sh kit_sources install-core.sh from \$SCRIPT_DIR, no \$LIBDIR fallback"
@@ -280,8 +280,8 @@ esac
 # --yes takes the documented skip (0.0.44b W14): the SKIP_PROMPTS elif
 # sits before the interactive selection call (comment-stripped
 # operands, #385 — the pin predates the move and keeps its semantics).
-_skip_ln=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -n 'elif \[ "\$SKIP_PROMPTS" = true \]; then' | head -1 | cut -d: -f1)
-_sel_ln=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -n 'install_project_roots_select$' | tail -1 | cut -d: -f1)
+_skip_ln=$(live_src "$LIB" | grep -n 'elif \[ "\$SKIP_PROMPTS" = true \]; then' | head -1 | cut -d: -f1)
+_sel_ln=$(live_src "$LIB" | grep -n 'install_project_roots_select$' | tail -1 | cut -d: -f1)
 if [ -n "$_skip_ln" ] && [ -n "$_sel_ln" ] && [ "$_skip_ln" -lt "$_sel_ln" ]; then
     pass "--yes skip branch precedes the interactive selection (W14)"
 else
@@ -290,8 +290,8 @@ fi
 # normalize-agents-forms (0.0.44a V1) runs before the dispatch that
 # fires the migration loop — live anchors, not the naming comment (#385
 # b b1): the CALL arm vs the dispatch arm.
-_norm_ln=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -n 'install_agents_form_normalize$' | tail -1 | cut -d: -f1)
-_disp_ln=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -n 'm | move | c | copy)' | head -1 | cut -d: -f1)
+_norm_ln=$(live_src "$LIB" | grep -n 'install_agents_form_normalize$' | tail -1 | cut -d: -f1)
+_disp_ln=$(live_src "$LIB" | grep -n 'm | move | c | copy)' | head -1 | cut -d: -f1)
 if [ -n "$_norm_ln" ] && [ -n "$_disp_ln" ] && [ "$_norm_ln" -lt "$_disp_ln" ]; then
     pass "normalization precedes the migration dispatch (V1)"
 else
@@ -299,8 +299,8 @@ else
 fi
 # the distro gate runs before the first interactive menu (0.0.45a order
 # pin; comment-stripped operands)
-_dg_call_ln=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -n '^    _distro_gate ' | head -1 | cut -d: -f1)
-_dg_menu_ln=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -n 'ui_menu "How do you want to install?"' | head -1 | cut -d: -f1)
+_dg_call_ln=$(live_src "$LIB" | grep -n '^    _distro_gate ' | head -1 | cut -d: -f1)
+_dg_menu_ln=$(live_src "$LIB" | grep -n 'ui_menu "How do you want to install?"' | head -1 | cut -d: -f1)
 if [ -n "$_dg_call_ln" ] && [ -n "$_dg_menu_ln" ] && [ "$_dg_call_ln" -lt "$_dg_menu_ln" ]; then
     pass "distro gate runs before the first interactive menu (order pin)"
 else
@@ -311,20 +311,20 @@ fi
 # a rewired call neuters the gate while every matrix pin stays green.
 # Comment-stripped streams (#407 a P4, the #385 discipline): a
 # commented-out call line must not satisfy a presence pin.
-if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF '_distro_gate "${_dg_id:-unknown}" "$_dg_ver"'; then
+if live_src "$LIB" | grep -qF '_distro_gate "${_dg_id:-unknown}" "$_dg_ver"'; then
     pass "do_plan_phase wires the parsed os-release values into the gate (verbatim call pin)"
 else
     fail "do_plan_phase wires the parsed os-release values into the gate (verbatim call pin)"
 fi
-if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF '_root_user_gate "$DEFAULT_USER"'; then
+if live_src "$LIB" | grep -qF '_root_user_gate "$DEFAULT_USER"'; then
     pass "do_plan_phase wires DEFAULT_USER into _root_user_gate (verbatim call pin)"
 else
     fail "do_plan_phase wires DEFAULT_USER into _root_user_gate (verbatim call pin)"
 fi
 # root gate after the charset gate, before the distro gate (issue #192:
 # a root shell is unrepairable, so it refuses first)
-_rug_call_ln=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -n '^    _root_user_gate ' | head -1 | cut -d: -f1)
-_rug_charset_ln=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -n "Invalid user name" | head -1 | cut -d: -f1)
+_rug_call_ln=$(live_src "$LIB" | grep -n '^    _root_user_gate ' | head -1 | cut -d: -f1)
+_rug_charset_ln=$(live_src "$LIB" | grep -n "Invalid user name" | head -1 | cut -d: -f1)
 if [ -n "$_rug_call_ln" ] && [ -n "$_rug_charset_ln" ] && [ -n "$_dg_call_ln" ] &&
     [ "$_rug_charset_ln" -lt "$_rug_call_ln" ] && [ "$_rug_call_ln" -lt "$_dg_call_ln" ]; then
     pass "root gate runs after the charset gate, before the distro gate (order pin)"
@@ -334,7 +334,7 @@ fi
 # the pre-flight wires the python3 health gate (verbatim call pin,
 # #244; the gate function itself stays in install.sh and is matrix-
 # pinned in test-install-args.sh). Comment-stripped (#407 a P4).
-if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF '    _py3_health_probe'; then
+if live_src "$LIB" | grep -qF '    _py3_health_probe'; then
     pass "pre-flight wires the health gate (verbatim call pin)"
 else
     fail "pre-flight wires the health gate (verbatim call pin)"
@@ -383,12 +383,12 @@ fi
 # the update-core twin's documented contract), and the done probe's
 # rc 1 = "not migrated" keeps the flow on the migration path where the
 # loud action stubs catch a truncated lib anyway.
-if sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -qF 'ddev_handover_stamp_write() { :; }'; then
+if live_src "$INSTALL" | grep -qF 'ddev_handover_stamp_write() { :; }'; then
     pass "stamp-write stub stays deliberately silent (documented exception)"
 else
     fail "stamp-write stub must stay the documented silent exception"
 fi
-if sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -qF 'ddev_migrate_done() { return 1; }'; then
+if live_src "$INSTALL" | grep -qF 'ddev_migrate_done() { return 1; }'; then
     pass "done-probe stub stays deliberately fail-safe (documented exception)"
 else
     fail "done-probe stub must stay the documented fail-safe exception"
@@ -425,7 +425,7 @@ if [ "$_pg_tr_rc" -eq 1 ] &&
 else
     fail "pairing guard must refuse a skewed pairing (rc=$_pg_tr_rc out=$_pg_tr_out) (#413)"
 fi
-if sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -qF 'install_pairing_guard || exit 1'; then
+if live_src "$INSTALL" | grep -qF 'install_pairing_guard || exit 1'; then
     pass "install.sh wires the guard right after kit_source (#413)"
 else
     fail "install.sh must call the guard after sourcing install-core.sh (#413)"
@@ -491,8 +491,8 @@ fi
 # surface, and globbing them false-reds on binary-name prose.
 _xl_missing=""
 _xl_combined="$(
-    sed 's/^[[:space:]]*#.*$//' "$INSTALL"
-    sed 's/^[[:space:]]*#.*$//' "$LIB"
+    live_src "$INSTALL"
+    live_src "$LIB"
 )"
 [ -n "$_xl_combined" ] || _xl_missing="(stripped entry+core extraction empty)"
 _xl_libs="$(
@@ -526,8 +526,8 @@ fi
 # at :154, export at :351 — every truncation after :82 left them
 # unarmed and the tolerant call arms turned the miss into a silent
 # green skip). An indented, nested copy fails this anchor.
-if sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -qE '^command -v ddev_migrate_gap >/dev/null 2>&1 \|\| ddev_migrate_gap\(\) \{' &&
-    sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -qE '^command -v ddev_migrate_export >/dev/null 2>&1 \|\| ddev_migrate_export\(\) \{'; then
+if live_src "$INSTALL" | grep -qE '^command -v ddev_migrate_gap >/dev/null 2>&1 \|\| ddev_migrate_gap\(\) \{' &&
+    live_src "$INSTALL" | grep -qE '^command -v ddev_migrate_export >/dev/null 2>&1 \|\| ddev_migrate_export\(\) \{'; then
     pass "ddev_migrate gap/export stubs are top-level arms (arm independently of the registry) (#461 a Q4)"
 else
     fail "ddev_migrate gap/export stubs must be top-level command -v arms (#461 a Q4)"
@@ -539,9 +539,9 @@ fi
 # kills the callee — the tolerant call arms swallowed the rc behind
 # the shell's bare "not found" with no counted row. The callee stub
 # makes that window name itself; anchored at column 0 like Q4's.
-if sed 's/^[[:space:]]*#.*$//' "$INSTALL" |
+if live_src "$INSTALL" |
     grep -qE '^command -v ddev_migrate_latest_dir >/dev/null 2>&1 \|\| ddev_migrate_latest_dir\(\) \{' &&
-    sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -A2 -F 'ddev_migrate_latest_dir() {' |
+    live_src "$INSTALL" | grep -A2 -F 'ddev_migrate_latest_dir() {' |
     grep -qF 'skipping the ddev migration check'; then
     pass "ddev_migrate_latest_dir stub is a top-level arm naming the skip (B1: the intra-lib callee window) (#461 b B1)"
 else
@@ -551,9 +551,9 @@ fi
 # the direct-sudo gated writes (~/.ddev, ~/.config, ~/.agents) running
 # with the gate silently off on truncation. Shape pin (inline arm, not
 # extractable): fail-closed rc + named message.
-if sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -A2 -F 'agent_home_sane() {' |
+if live_src "$INSTALL" | grep -A2 -F 'agent_home_sane() {' |
     grep -qF 'link gate closed, gated writes skip loudly' &&
-    sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -A2 -F 'agent_home_sane() {' |
+    live_src "$INSTALL" | grep -A2 -F 'agent_home_sane() {' |
     grep -qF 'return 1'; then
     pass "agent_home_sane stub fails closed and loud (X1: direct-sudo gates never run ungated) (#461 a X1)"
 else
@@ -568,11 +568,11 @@ fi
 # (fresh install), and `git config --global --list` fails rc 128 when
 # the user exists without a global config (re-install residue). The
 # skip arm's log names what was checked.
-_ocbk_ln=$(sed 's/^[[:space:]]*#.*$//' "$LIB" |
+_ocbk_ln=$(live_src "$LIB" |
     grep -nF 'BACKUP_DIR/gitconfig-$OPENCODE_USER.txt' | head -1 | cut -d: -f1)
 if [ -n "$_ocbk_ln" ] &&
-    sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'backup skipped: no global gitconfig' &&
-    sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    live_src "$LIB" | grep -qF 'backup skipped: no global gitconfig' &&
+    live_src "$LIB" |
     grep -qF '[ -f "$_oc_gcfg_home/.gitconfig" ] || [ -f "$_oc_gcfg_home/.config/git/config" ]' &&
     sed -n "$((_ocbk_ln - 12)),$((_ocbk_ln - 1))p" "$LIB" |
     grep -qF '_oc_gcfg_home="$(getent passwd "$OPENCODE_USER"'; then
@@ -616,7 +616,7 @@ esac
 
 # A5: every copy_binary_atomic call site names its cause on failure
 # (four sites — the count is pinned at four in test-bypass-guard.sh).
-_cba_err_n="$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -cF 'error: copying the opencode binary' || true)"
+_cba_err_n="$(live_src "$LIB" | grep -cF 'error: copying the opencode binary' || true)"
 [ "$_cba_err_n" = 4 ] &&
     pass "all four binary-copy failures abort cause-loud (#371 A5)" ||
     fail "binary-copy failure arms incomplete (#371 A5; sites: $_cba_err_n of 4)"
@@ -627,9 +627,9 @@ _cba_err_n="$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -cF 'error: copying the 
 # INCREMENT is pinned too — losing it (back to the old `:` no-op)
 # would silence the closing row on the both-succeeded path while every
 # conditional literal survives.
-if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'if [ "$_oc_tps_ok" -eq 2 ]; then' &&
-    sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'elif [ "$_oc_tps_ok" -eq 1 ]; then' &&
-    sed 's/^[[:space:]]*#.*$//' "$LIB" |
+if live_src "$LIB" | grep -qF 'if [ "$_oc_tps_ok" -eq 2 ]; then' &&
+    live_src "$LIB" | grep -qF 'elif [ "$_oc_tps_ok" -eq 1 ]; then' &&
+    live_src "$LIB" |
     grep -qF '_oc_tps_ok=$((_oc_tps_ok + 1))'; then
     pass "TUI 2.x closing row conditional + counter increment (#371 A6 + #424 a P3)"
 else
@@ -640,14 +640,14 @@ fi
 # .opencode/bin (the old sed matched ANY line containing it — aliases,
 # comments), backs the rc file up first, observes a failed cleanup, and
 # the audit log names the cleaned count instead of claiming blindly.
-if sed 's/^[[:space:]]*#.*$//' "$LIB" |
+if live_src "$LIB" |
     grep -qF '\|^[[:space:]]*export PATH=.*[.]opencode/bin|d' &&
     ! grep -qF 'sed -i '\''\|\.opencode/bin|d'\''' "$LIB" &&
-    sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    live_src "$LIB" |
     grep -qF '_bk_fail "rc-$(basename "$cf")"' &&
-    sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    live_src "$LIB" |
     grep -qF 'could not remove a stale .opencode/bin PATH export from $cf' &&
-    sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    live_src "$LIB" |
     grep -qF 'stale PATH exports cleaned in $_rc_cleaned rc file(s)'; then
     pass "rc cleanup anchored + backed up + observed + honest claim (#371 A7/I3)"
 else
@@ -656,8 +656,8 @@ fi
 
 # A4R: _oc_install_agent_config propagates staged_write's rc past the
 # trailing rm (the latent trap for a future tested-context caller).
-if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF '_oic_rc=$?' &&
-    sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'return "$_oic_rc"'; then
+if live_src "$LIB" | grep -qF '_oic_rc=$?' &&
+    live_src "$LIB" | grep -qF 'return "$_oic_rc"'; then
     pass "agent-config install propagates staged_write rc (#371 A4R)"
 else
     fail "agent-config rc still masked by trailing rm (#371 A4R)"
@@ -672,7 +672,7 @@ fi
 
 # I4: /usr/local/bin/opencode is excluded as a pickup source only in
 # its wrapper-SYMLINK form — both loops (inventory + deploy pickup).
-_i4_n="$(sed 's/^[[:space:]]*#.*$//' "$LIB" |
+_i4_n="$(live_src "$LIB" |
     grep -cF '[ "$loc" != "/usr/local/bin/opencode" ] || [ ! -L "$loc" ]' || true)"
 [ "$_i4_n" = 2 ] &&
     pass "binary pickup excludes /usr/local/bin/opencode only as a symlink (#372 I4)" ||
@@ -685,9 +685,9 @@ _i4_n="$(sed 's/^[[:space:]]*#.*$//' "$LIB" |
 # sits BEFORE the re-render else (an elif reorder would bury it).
 TEMPLATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/templates/opencode.jsonc"
 RENDER_LIB="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/render-agent-config.sh"
-_i6_keep_ln=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -nF 'existing opencode.jsonc has no kit marker' |
+_i6_keep_ln=$(live_src "$LIB" | grep -nF 'existing opencode.jsonc has no kit marker' |
     head -1 | cut -d: -f1)
-_i6_reap_ln=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -nF 'agent config re-applied' |
+_i6_reap_ln=$(live_src "$LIB" | grep -nF 'agent config re-applied' |
     head -1 | cut -d: -f1)
 # Leg 1 pins the NEGATED shape (a polarity flip drops the `! `); leg 2
 # pins the ANCHORED marker form (the unanchored substring regression of
@@ -695,10 +695,10 @@ _i6_reap_ln=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -nF 'agent config re-app
 # carry comment-strip riders (#458, conventions.md "Source-counting
 # pins"): a commented-out heuristic line must not count.
 if grep -qF '// _opencode_permissions_kit — kit-managed config' "$TEMPLATE" &&
-    sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF '! grep -qE ' &&
-    sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    live_src "$LIB" | grep -qF '! grep -qE ' &&
+    live_src "$LIB" |
     grep -qF '//[[:space:]]*_opencode_permissions_kit|"permission' &&
-    sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    live_src "$LIB" |
     grep -qF 'user-authored or broken/unreadable content' &&
     [ -n "$_i6_keep_ln" ] && [ -n "$_i6_reap_ln" ] &&
     [ "$_i6_keep_ln" -lt "$_i6_reap_ln" ]; then
@@ -719,7 +719,7 @@ fi
 
 # #340: the tilde-home setup is ONE call into sh/path-sane.sh, no
 # inline copy left in the phase lib.
-if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qxE '^[[:space:]]*path_sane_tilde_home$' &&
+if live_src "$LIB" | grep -qxE '^[[:space:]]*path_sane_tilde_home$' &&
     ! grep -qE '^[[:space:]]*PROJECT_TILDE_HOME="\$HOME"$' "$LIB"; then
     pass "tilde-home setup delegated to path-sane.sh, no inline copy (#340)"
 else
@@ -897,9 +897,9 @@ fi
 # policy) — the gate LOGIC is execution-pinned in test-deploy-lib.sh,
 # the deployed behavior in e2e (2b). Here: the block consults the gate
 # BEFORE the never-shadow deploy arm and logs the withhold cause.
-if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'if ! xdg_shim_needed_for "${_xdi_maj:-}" "$_xdi_trip"; then' &&
-    sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'xdg-open shim skipped: opencode' &&
-    sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'elif ! command -v xdg-open >/dev/null 2>&1 &&'; then
+if live_src "$LIB" | grep -qF 'if ! xdg_shim_needed_for "${_xdi_maj:-}" "$_xdi_trip"; then' &&
+    live_src "$LIB" | grep -qF 'xdg-open shim skipped: opencode' &&
+    live_src "$LIB" | grep -qF 'elif ! command -v xdg-open >/dev/null 2>&1 &&'; then
     pass "install xdg block: version gate before the never-shadow arm (#257)"
 else
     fail "install must gate the shim deploy on xdg_shim_needed_for (#257)"
@@ -920,7 +920,7 @@ fi
 # requires and make it unmatchable. The strip rider class protects
 # against commented-out code still counting; here the comment IS the
 # pinned construct, so the discrimination is inverted by design.
-if sed 's/^[[:space:]]*#.*$//' "$LIB" |
+if live_src "$LIB" |
     grep -qF '"Re-configure the existing installation with install.sh?" "y"' &&
     grep -qF '#428 disposition' "$LIB"; then
     pass "re-configure ask stays default-y, disposition documented (#428)"

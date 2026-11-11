@@ -53,7 +53,7 @@ WORK="$(work_new)"
 
 # strip <file>: comment-stripped copy of a shipped source (the
 # source-counting rider idiom — commented-out anchors stop counting).
-strip() { sed 's/^[[:space:]]*#.*$//' "$1"; }
+strip() { live_src "$1"; }
 # has <haystack-string> <needle...>: fixed-string containment.
 has() {
     _h="$1"
@@ -155,7 +155,7 @@ check "control arm: the invoking cwd carries the interpreter-named file (#433)" 
 check "status-core resolvers ride ST_CALL_DIR (review a A1/C1)" \
     sh -c 'printf "%s" "$1" | grep -qF "_ku_lib=\"\${ST_CALL_DIR:-" &&
         printf "%s" "$1" | grep -qF "_st_dhl=\"\${ST_CALL_DIR:-"' \
-    _ "$(sed 's/^[[:space:]]*#.*$//' "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core.sh")"
+    _ "$(live_src "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core.sh")"
 
 # --- 1b. behavioral: a symlink to a checkout entry keeps the checkout (#434) -------
 # ST_CALL_DIR resolves through readlink -f (uninstall.sh's UN_CALL_DIR

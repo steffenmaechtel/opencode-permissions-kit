@@ -263,8 +263,8 @@ fi
 # the entry's call order (wrapper_version_passthrough runs before
 # wrapper_advisories), and THAT order is what executes: pin the entry's
 # call lines (#453 a C2 — definition order in the lib constrains nothing).
-_verline=$(sed 's/^[[:space:]]*#.*$//' "$WRAPPER_CORE" | grep -n -m1 -- '--version | -v | -h | --help)' | cut -d: -f1)
-_advline=$(sed 's/^[[:space:]]*#.*$//' "$WRAPPER_CORE" | grep -n -m1 '/sh/advisories.sh' | cut -d: -f1)
+_verline=$(live_src "$WRAPPER_CORE" | grep -n -m1 -- '--version | -v | -h | --help)' | cut -d: -f1)
+_advline=$(live_src "$WRAPPER_CORE" | grep -n -m1 '/sh/advisories.sh' | cut -d: -f1)
 _call_pass=$(grep -n '^wrapper_version_passthrough "\$@"$' "$WRAPPER" | cut -d: -f1)
 _call_adv=$(grep -n '^wrapper_advisories$' "$WRAPPER" | cut -d: -f1)
 if [ -n "$_verline" ] && [ -n "$_advline" ] && [ "$_verline" -lt "$_advline" ] &&
@@ -429,8 +429,8 @@ if grep -qF 'medium) SEVERITY=moderate ;;' "$SCAN"; then
 else
     fail "advisory-watch.sh: GitHub's medium maps to the kit's moderate (F1)"
 fi
-_known_ln="$(sed 's/^[[:space:]]*#.*$//' "$SCAN" | grep -n 'grep -qxF "\$ID"' | head -1 | cut -d: -f1)"
-_valid_ln="$(sed 's/^[[:space:]]*#.*$//' "$SCAN" | grep -n 'scan_advisory_valid "\$ID"' | head -1 | cut -d: -f1)"
+_known_ln="$(live_src "$SCAN" | grep -n 'grep -qxF "\$ID"' | head -1 | cut -d: -f1)"
+_valid_ln="$(live_src "$SCAN" | grep -n 'scan_advisory_valid "\$ID"' | head -1 | cut -d: -f1)"
 if [ -n "$_known_ln" ] && [ -n "$_valid_ln" ] && [ "$_known_ln" -lt "$_valid_ln" ]; then
     pass "advisory-watch.sh: known-id dedup runs before shape validation (F1)"
 else
@@ -438,8 +438,8 @@ else
 fi
 # V12: the gh-issue dedup must also run before validation, and the id
 # charset gate must precede BOTH dedups (the gh search embeds the id).
-_tracked_ln="$(sed 's/^[[:space:]]*#.*$//' "$SCAN" | grep -n 'TRACKED=\$(gh issue list' | head -1 | cut -d: -f1)"
-_idclean_ln="$(sed 's/^[[:space:]]*#.*$//' "$SCAN" | grep -n 'scan_id_clean "\$ID"' | head -1 | cut -d: -f1)"
+_tracked_ln="$(live_src "$SCAN" | grep -n 'TRACKED=\$(gh issue list' | head -1 | cut -d: -f1)"
+_idclean_ln="$(live_src "$SCAN" | grep -n 'scan_id_clean "\$ID"' | head -1 | cut -d: -f1)"
 if [ -n "$_idclean_ln" ] && [ -n "$_tracked_ln" ] && [ "$_idclean_ln" -lt "$_tracked_ln" ] &&
     [ -n "$_valid_ln" ] && [ "$_tracked_ln" -lt "$_valid_ln" ]; then
     pass "advisory-watch.sh: id gate -> both dedups -> validation (V12)"

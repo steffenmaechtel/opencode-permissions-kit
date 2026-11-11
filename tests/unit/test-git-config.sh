@@ -335,8 +335,8 @@ _gc_mark='(markers present, rules inactive)'
 # Comment-strip riders (#261, the #244 g W1 class — sweep finds beyond
 # the issue list): commented-out ui_kv rows stop counting; full-line
 # comments only (#244 h W6 residual).
-_gc_on_n=$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" | grep -cF "$_gc_on" || true)
-_gc_off_n=$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" | grep -cF "$_gc_off" || true)
+_gc_on_n=$(live_src "$CONFIG" | grep -cF "$_gc_on" || true)
+_gc_off_n=$(live_src "$CONFIG" | grep -cF "$_gc_off" || true)
 if grep -qF "$_gc_on" "$CONFIG" &&
     grep -qF "$_gc_off" "$CONFIG" &&
     [ "$_gc_on_n" -ge 2 ] &&

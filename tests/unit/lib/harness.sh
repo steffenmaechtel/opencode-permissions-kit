@@ -24,6 +24,45 @@
 #   assert_eq <desc> <expected> <actual>
 #                        string-equality assertion with expected/got
 #                        output on failure
+#   live_src <file>...   the canonical comment-strip rider (#460):
+#                        prints each file with full-line comments
+#                        stripped, concatenated in argument order. A
+#                        presence/count pin over a shipped or
+#                        repo-internal source observes only LIVE lines
+#                        (the survivor trap, #261/#244 g W1: a
+#                        temporarily commented-out pinned construct
+#                        stops counting). Full-line strip only --
+#                        trailing comments after live lines still count
+#                        (#244 h W6 residual, deliberate). The strip
+#                        is LINE-PRESERVING (comment lines become
+#                        empty lines): grep -n extraction legs keep
+#                        raw-file line numbers. Loudness is shape-
+#                        dependent (round a A1): single-file presence
+#                        fails loud on a missing file (sed's own error
+#                        surfaces, downstream grep sees empty input and
+#                        reds); a MULTI-FILE count pin or any
+#                        zero-count pin passes rc-silently on a
+#                        missing operand (the historical sed A B C
+#                        masked identically) -- such pins need their
+#                        own missing-file conjunct when that drift
+#                        matters. A call site may add 2>/dev/null; it
+#                        owns the muting then (pre-existing shape,
+#                        test-install-args).
+#   check_live <desc> <file> <grep-args...>
+#                        pass/fail around grep over the file's LIVE
+#                        lines -- the dominant single-file presence
+#                        shape (#460). The grep flags and pattern pass
+#                        through verbatim (-qF, -Eq, -c, --, …): call
+#                        sites keep their exact matching semantics,
+#                        only the rider moves inside. Multi-file
+#                        presence stays `live_src "$A" "$B" | grep …`
+#                        or per-file conjunctions; compound shapes
+#                        keep live_src in the PARENT and pass the
+#                        stripped content into the child as an
+#                        argument -- sh -c children never source the
+#                        harness, live_src must not appear inside
+#                        sh -c code (boundary: one canonical
+#                        single-file sugar, no separator parsing).
 #   extract_func <file> <name>
 #                        print a top-level `name() { … }` definition
 #                        block from <file> (issue #396 — consolidating
@@ -104,6 +143,63 @@ check() {
 assert_eq() {
     _d="$1" _e="$2" _a="$3"
     if [ "$_e" = "$_a" ]; then pass "$_d"; else fail "$_d (expected [$_e] got [$_a])"; fi
+}
+
+# --- live_src / check_live (#460) ------------------------------------------------
+#
+# The comment-strip rider the conventions rule "Source-counting pins"
+# names canonical: BEFORE #460 the rider was a 40-byte magic sed string
+# duplicated inline at 200+ pin sites -- unauditable (the round-a
+# census needed a joined-continuation parser to find ~40 true positives
+# among 411 raw candidates), and every future rider-semantics change
+# (the deferred JSONC `//` decision) would have been another
+# cross-suite sweep. One named primitive makes the un-ridden census
+# class greppable and the semantics changeable in one place.
+live_src() {
+    # $@ = source files, stripped and concatenated in argument order.
+    # The strip expression is byte-identical to the historical inline
+    # rider; the multi-file loop concatenates so `grep -qF pat` matches
+    # if ANY file carries the live construct (presence semantics of
+    # `grep -qF pat A B`). A concatenation SUMS per-file counts: a
+    # multi-file count pin asserts on the union; per-file counts need
+    # per-file calls. No-args guard (round a A4): a conversion slip
+    # dropping the file must fail loud, never pass vacuously.
+    local _ls_f
+    if [ "$#" -eq 0 ]; then
+        echo "live_src: no files given" >&2
+        return 1
+    fi
+    for _ls_f in "$@"; do
+        sed 's/^[[:space:]]*#.*$//' "$_ls_f"
+    done
+}
+
+check_live() {
+    # Arg-count guards BEFORE any shift (round a A5): dash aborts the
+    # whole suite on `shift 2` overflow (rc 2, no fail row, no summary
+    # gate), and an unbound $2 under set -u kills the 0-arg shape --
+    # both slip shapes must land in a counted FAIL row instead.
+    if [ "$#" -eq 0 ]; then
+        fail "check_live: no arguments given (desc and file required)"
+        return
+    fi
+    if [ "$#" -lt 2 ]; then
+        fail "$1 (check_live: file argument missing)"
+        return
+    fi
+    local _cl_desc="$1" _cl_file="$2"
+    shift 2
+    # Mirror of check's F6 guard: a conversion slip dropping the grep
+    # arguments must fail loud, never vacuously pass.
+    if [ "$#" -eq 0 ]; then
+        fail "$_cl_desc (check_live: no grep arguments given)"
+        return
+    fi
+    if live_src "$_cl_file" | grep "$@"; then
+        pass "$_cl_desc"
+    else
+        fail "$_cl_desc"
+    fi
 }
 
 extract_func() {

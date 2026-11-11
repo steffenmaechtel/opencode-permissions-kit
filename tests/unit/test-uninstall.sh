@@ -206,9 +206,9 @@ fi
 # (#370 a I1): both files name /var/backups/opencode-permissions-kit/
 # install-*, and neither carries the retired /tmp mktemp shape. The
 # positive legs strip comments first (the source-counting rider).
-if sed 's/^[[:space:]]*#.*$//' "$UNINSTALL" |
+if live_src "$UNINSTALL" |
     grep -qF '/var/backups/opencode-permissions-kit/install-' &&
-    sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" |
+    live_src "$INSTALL_CORE" |
     grep -qF 'BACKUP_DIR="$_bk_root/install-' &&
     ! grep -qF '/tmp/opencode-install-backup' "$UNINSTALL" &&
     ! grep -qF '/tmp/opencode-install-backup' "$INSTALL" &&

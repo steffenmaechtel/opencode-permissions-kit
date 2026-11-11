@@ -89,12 +89,12 @@ fi
 # keep absence legs un-ridden, but the entry carries a prose kit_source
 # mention ("Unlike install.sh's kit_source ..." at its resolver
 # comment) that an unstripped absence leg would false-fail on.
-if sed 's/^[[:space:]]*#.*$//' "$UNINSTALL" |
+if live_src "$UNINSTALL" |
     grep -qF 'UNINSTALL_CORE="$UN_CALL_DIR/../sh/uninstall-core.sh"' &&
-    sed 's/^[[:space:]]*#.*$//' "$UNINSTALL" |
+    live_src "$UNINSTALL" |
     grep -qF 'UNINSTALL_CORE="/usr/local/lib/opencode-permissions-kit/sh/uninstall-core.sh"' &&
-    sed 's/^[[:space:]]*#.*$//' "$UNINSTALL" | grep -qF 'error: uninstall-core.sh not found' &&
-    ! sed 's/^[[:space:]]*#.*$//' "$UNINSTALL" | grep -q 'kit_source'; then
+    live_src "$UNINSTALL" | grep -qF 'error: uninstall-core.sh not found' &&
+    ! live_src "$UNINSTALL" | grep -q 'kit_source'; then
     pass "entry resolver: checkout-first (anchored caller dir, update.sh parity) + \$LIBDIR fallback, loud abort"
 else
     fail "entry resolver shape (checkout-first + LIBDIR fallback)"
@@ -137,10 +137,10 @@ fi
 # legs are the beyond-census sweep finds -- same class, same statement,
 # conventions.md "Source-counting pins" covers shipped sources, not
 # only $LIB): a commented-out wiring line must not count.
-if sed 's/^[[:space:]]*#.*$//' "$UNINSTALL" |
+if live_src "$UNINSTALL" |
     grep -qF 'if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then' &&
-    sed 's/^[[:space:]]*#.*$//' "$UNINSTALL" | grep -qF '    un_projects_revert' &&
-    sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    live_src "$UNINSTALL" | grep -qF '    un_projects_revert' &&
+    live_src "$LIB" |
     grep -qF 'done <"$UNINSTALL_PROJECTS_CONF"'; then
     pass "projects guard in the entry, conf redirect in the lib function"
 else
@@ -364,7 +364,7 @@ fi
 # fixture UNINSTALL_PROJECTS_CONF (the function reads the variable its
 # `done <` redirect names — no stdin surgery anymore). Comment-strip
 # rider on the count (conventions.md, "Source-counting pins").
-_unq_all="$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -c 'un_rc_q "' || true)"
+_unq_all="$(live_src "$LIB" | grep -c 'un_rc_q "' || true)"
 if printf '%s' "$_unq_all" | grep -qE '^[0-9]+$' && [ "$_unq_all" -gt 10 ]; then
     pass "rc-observing runner wired across the sections (#218)"
 else
@@ -772,8 +772,8 @@ fi
 # The uid/gid capture must happen BEFORE the user removal: after userdel
 # the name no longer resolves and only the numeric ids can still match
 # the orphaned files. (Comment-stripped operands, #385.)
-CAPTURE_LINE=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -n 'UN_OC_UID=' | head -1 | cut -d: -f1)
-USERDEL_LINE=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -n 'sudo userdel -r' | head -1 | cut -d: -f1)
+CAPTURE_LINE=$(live_src "$LIB" | grep -n 'UN_OC_UID=' | head -1 | cut -d: -f1)
+USERDEL_LINE=$(live_src "$LIB" | grep -n 'sudo userdel -r' | head -1 | cut -d: -f1)
 if [ -n "$CAPTURE_LINE" ] && [ -n "$USERDEL_LINE" ] && [ "$CAPTURE_LINE" -lt "$USERDEL_LINE" ]; then
     pass "ownership revert: ids captured before userdel (orphan-proof)"
 else
@@ -786,8 +786,8 @@ fi
 # different DEFAULT_USER), and userdel -r then deleted .agents/.claude
 # without the warning. An unreadable dir counts as NON-EMPTY now.
 # Comment-strip riders (#458): commented-out gate lines must not count.
-if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'sudo ls -A "$_un_ag_src"' &&
-    sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF '_un_ag_ls="probe-failed"'; then
+if live_src "$LIB" | grep -qF 'sudo ls -A "$_un_ag_src"' &&
+    live_src "$LIB" | grep -qF '_un_ag_ls="probe-failed"'; then
     pass "agents-backup gate: privileged probe + fail-safe on unreadable (C6)"
 else
     fail "agents-backup gate: privileged probe + fail-safe on unreadable (C6)"
@@ -803,7 +803,7 @@ fi
 # is in, the unprivileged one is gone. The positive leg carries a
 # comment-strip rider (#458); the absence leg stays un-ridden by
 # design (a commented-out forbidden line SHOULD keep counting).
-if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'if sudo test -d "$_un_ag_src"; then' &&
+if live_src "$LIB" | grep -qF 'if sudo test -d "$_un_ag_src"; then' &&
     ! grep -qF 'if [ -d "$_un_ag_src" ]; then' "$LIB"; then
     pass "agents-backup gate: existence probe rides sudo (W2)"
 else
@@ -904,11 +904,11 @@ else
 fi
 # Comment-strip riders on all four legs (#458): the loop, the capture
 # line and both log literals must count only in live lines.
-if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'UN_DEV_GID=$(id -g "$DEFAULT_USER"' &&
-    sed 's/^[[:space:]]*#.*$//' "$LIB" |
+if live_src "$LIB" | grep -qF 'UN_DEV_GID=$(id -g "$DEFAULT_USER"' &&
+    live_src "$LIB" |
     grep -qF 'for _un_acl_pair in "opencode group:$UN_OC_GID" "dev group:$UN_DEV_GID"' &&
-    sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'project revert PARTIALLY completed' &&
-    sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    live_src "$LIB" | grep -qF 'project revert PARTIALLY completed' &&
+    live_src "$LIB" |
     grep -qF 'id unknown — its ACL entries left in place'; then
     pass "ACL revert: both gids captured, principal loop, loud per-principal skip + partial log (0.0.42f C2 + 0.0.42g S1 + 0.0.42h S1 + #218)"
 else
@@ -1276,8 +1276,8 @@ fi
 # Comment-strip riders (#458): commented-out section content must not
 # satisfy the pin.
 if command -v un_config_dirs_remove >/dev/null &&
-    sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'un_rc_q "rm /etc/opencode-permissions-kit"' &&
-    sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    live_src "$LIB" | grep -qF 'un_rc_q "rm /etc/opencode-permissions-kit"' &&
+    live_src "$LIB" |
     grep -qF 'openchamber policy pin removal FAILED'; then
     pass "config-dirs section present + rc-observing (#243 a S1/S2)"
 else
@@ -1384,7 +1384,7 @@ fi
 # lives in the lib; the entry must stay marker-free too). The positive
 # leg carries a comment-strip rider (#458); the two [?] absence legs
 # stay un-ridden by design.
-if sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -qF 'n | no)' &&
+if live_src "$LIB" | grep -qF 'n | no)' &&
     ! grep -qF '[?]' "$LIB" && ! grep -qF '[?]' "$UNINSTALL"; then
     pass "prompt_yn in the lib with n|no arm, no [?] marker anywhere"
 else
@@ -1504,7 +1504,7 @@ if [ -n "$_f27_block" ] && printf '%s' "$_f27_block" | grep -q 'browser_bridge_r
     else
         fail "wsl.conf consent defaults to n (#370 a D1)"
     fi
-    if sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    if live_src "$LIB" |
         grep -qF '[DRY] ask: remove the kit-owned wsl.conf bridge block? (default: no)'; then
         pass "DRY row states the default: no (#370 a D1)"
     else
@@ -1866,7 +1866,7 @@ if [ "$_pg_tr_rc" -eq 1 ] &&
 else
     fail "pairing guard must refuse a skewed pairing (rc=$_pg_tr_rc out=$_pg_tr_out) (#413)"
 fi
-if sed 's/^[[:space:]]*#.*$//' "$UNINSTALL" | grep -qF 'un_pairing_guard || exit 1'; then
+if live_src "$UNINSTALL" | grep -qF 'un_pairing_guard || exit 1'; then
     pass "uninstall.sh wires the guard right after the resolver (#413)"
 else
     fail "uninstall.sh must call the guard after sourcing uninstall-core.sh (#413)"
@@ -1918,8 +1918,8 @@ fi
 _xl_missing=""
 UNINSTALL_ENTRY="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/uninstall.sh"
 _xl_combined="$(
-    sed 's/^[[:space:]]*#.*$//' "$UNINSTALL_ENTRY"
-    sed 's/^[[:space:]]*#.*$//' "$LIB"
+    live_src "$UNINSTALL_ENTRY"
+    live_src "$LIB"
 )"
 [ -n "$_xl_combined" ] || _xl_missing="(stripped entry+core extraction empty)"
 # What THIS RUN sources: the entry's three candidate loops (log,
@@ -1950,7 +1950,7 @@ else
     fail "lib functions called but stubbed nowhere in uninstall.sh/uninstall-core.sh:$_xl_missing (#456)"
 fi
 
-_unc_pi=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -c 'python3 -I' || true)
+_unc_pi=$(live_src "$LIB" | grep -c 'python3 -I' || true)
 if [ "${_unc_pi:-0}" -ge 1 ]; then
     echo "  ${GREEN}PASS${NC}  tui unregister runs python3 -I ($_unc_pi found) (#249)"
     passed=$((passed + 1))

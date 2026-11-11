@@ -494,10 +494,10 @@ check "wiring: update.sh tui.json write goes through staged_write" \
 # replace arm no longer renders (a jsonc without kit marker and without
 # a permission block is KEPT now) — definition + fresh-install +
 # re-render calls remain.
-_iac_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" | grep -c '_oc_install_agent_config' || true)"
+_iac_n="$(live_src "$INSTALL_CORE" | grep -c '_oc_install_agent_config' || true)"
 check "wiring: install.sh config writes go through staged_write (0.0.39h F8: offline-rendered, ONE write per branch; render sites: $_iac_n, need 3-9)" \
     sh -c '[ "$2" -ge 3 ] && [ "$2" -le 9 ] && ! grep -q "sed -i .*opencode\.jsonc" "$1" && ! grep -q "sed -i .*opencode\.jsonc" "$3"' _ "$INSTALL_CORE" "$_iac_n" "$INSTALL"
-_gca_n="$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" | grep -c 'staged_write 664' || true)"
+_gca_n="$(live_src "$CONFIG" | grep -c 'staged_write 664' || true)"
 check "wiring: config.sh git_config_apply renders offline, ONE staged_write (0.0.39h F8; staged_write sites: $_gca_n of 2)" \
     sh -c 'grep -qF "_gca_tmp" "$1" && [ "$2" = 2 ] && ! grep -qF "sed -i '"'"'s|" "$1"' _ "$CONFIG" "$_gca_n"
 OPK="$REPO/files/opencode-permissions-kit-lib/bin/opk"
@@ -539,13 +539,13 @@ check "walker: the home itself passes" \
 UNINSTALL="$REPO/files/opencode-permissions-kit-lib/management/uninstall.sh"
 check "gates: install.sh ~/.ddev operand gate" \
     sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"/home/\$OPENCODE_USER/.ddev\"" "$1"' _ "$INSTALL_CORE"
-_ahg_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" | grep -c 'agent_home_sane "$OPENCODE_USER" /home/opencode/' || true)"
+_ahg_n="$(live_src "$INSTALL_CORE" | grep -c 'agent_home_sane "$OPENCODE_USER" /home/opencode/' || true)"
 check "gates: install.sh Step 8 operand gates (.config/.config/opencode/.agents; gate sites: $_ahg_n, need 3-9)" \
     sh -c '[ "$2" -ge 3 ] && [ "$2" -le 9 ]' _ "$INSTALL_CORE" "$_ahg_n"
 # 0.0.39i F1: the combined top-level mkdir is gone — every Step 8 mkdir
 # runs INSIDE its operand gate (three per-operand mkdirs), so no root
 # mkdir passes through a linked parent.
-_mk8_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL_CORE" | grep -c 'sudo mkdir -p /home/opencode/' || true)"
+_mk8_n="$(live_src "$INSTALL_CORE" | grep -c 'sudo mkdir -p /home/opencode/' || true)"
 check "gates: install.sh Step 8 mkdir sits inside the operand gates (0.0.39i F1; mkdir sites: $_mk8_n, need 3-9)" \
     sh -c '! grep -qF "mkdir -p /home/opencode/.config/opencode /home/opencode/.agents" "$1" \
         && [ "$2" -ge 3 ] && [ "$2" -le 9 ]' _ "$INSTALL_CORE" "$_mk8_n"
