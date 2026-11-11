@@ -552,7 +552,9 @@ has "HOST_REACHED=1" "9.8 ... reaches the real body end (truncation discriminato
 #     strip pin (10.1) and BOTH survivor-trap arms (10.2, 10.9) go
 #     red: a commented-out construct counts again -- exactly the
 #     #261/#244 g W1 trap the rider exists to kill
-#   - delete live_src from harness.sh -> every 10.x pin goes red
+#   - delete live_src from harness.sh -> every pipeline-exercising
+#     10.x pin goes red; 10.10 and 10.12-10.14 stay green (their
+#     guards fire before any live_src call -- round a A3)
 #   - break check_live's pipe (grep the FILE directly) -> 10.9 reds
 #     while 10.1 stays green (discrimination runs through the strip,
 #     not through the fixture)
@@ -617,6 +619,32 @@ arm "check_live \"cl ere\" \"$_ls_fix/subject.sh\" -Eq 'pinned_(alpha|gamma)=\"l
 rc_is 0 "10.11 grep flags pass through verbatim (-Eq ERE arm)"
 arm "check_live \"cl spaced\" \"$_ls_fix/subject.sh\" -qF 'kept # trailing comment stays'; suite_done demo"
 rc_is 0 "10.11 ... a spaced pattern with a # survives quoting intact"
+
+# 10.12 (round a A4): a no-args live_src is a conversion-slip shape --
+# it must fail loud, never stream empty rc 0 into a vacuous pass.
+arm 'live_src >/dev/null 2>&1; echo "NORC=$?"'
+has "NORC=1" "10.12 live_src without files returns rc 1 (A4)"
+arm 'live_src 2>&1; true'
+has "no files given" "10.12 ... the rejection names the contract on stderr (A4)"
+arm 'check "vac slip" live_src; suite_done demo'
+rc_is 1 "10.12 ... check around a bare live_src reds the suite (A4 vacuity)"
+has "Failed: 1" "10.12 ... counted as a failure, not a vacuous pass"
+
+# 10.13/10.14 (round a A5): dropped-argument slip shapes must land in
+# a counted FAIL row -- under dash the unguarded `shift 2` used to
+# abort the whole suite (rc 2, no fail row, no summary gate).
+arm 'check_live "one arg"; suite_done demo'
+rc_is 1 "10.13 check_live with only a desc -> fail row, suite rc 1 (A5)"
+has "file argument missing" "10.13 ... the rejection names the missing operand (A5)"
+arm 'check_live; suite_done demo'
+rc_is 1 "10.14 zero-arg check_live -> fail row, suite rc 1 (A5)"
+has "no arguments given" "10.14 ... the guard fires before any unset access (A5)"
+
+# 10.15 (round a A6): the strip is LINE-PRESERVING (substitute-to-
+# empty, not deletion) -- grep -n extraction legs keep raw-file line
+# numbers. A deletion dialect (`/d`) must go red here.
+arm "_ls=\$(live_src \"$_ls_fix/subject.sh\" | wc -l | tr -d ' '); _raw=\$(wc -l < \"$_ls_fix/subject.sh\" | tr -d ' '); printf 'LINES=%s/%s' \"\$_ls\" \"\$_raw\""
+has "LINES=7/7" "10.15 line-preserving dialect: comment lines become empty lines (A6)"
 
 # --- summary gate (independent on purpose -- see header) ------------------------
 echo ""

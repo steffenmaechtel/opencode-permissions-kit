@@ -660,7 +660,9 @@ if [ -s "$WORK/finblock" ]; then
         sh -c "! grep -qF 'chown \"root:\$dm_ocg\" \"\$DD_MIG_DUMP_DIR/manifest.conf\"' \"\$1\"" _ "$WORK/finblock"
     check "finalize: the manifest re-take rides the find gate (S2)" \
         sh -c "grep -qF -- '-exec chown \"root:\$dm_ocg\" {} +' \"\$1\"" _ "$WORK/finblock"
-    _fm_fin_src=$(live_src "$WORK/finblock")
+    # round a B1: || true keeps the one-red-row failure path under
+    # set -e (see the _dv_m1_src twin in test-ddev-as-opencode).
+    _fm_fin_src=$(live_src "$WORK/finblock") || true
     check "finalize: dir lock (root takes the dir) precedes every operand op (S2/S5)" \
         sh -c 'lock_ln=$(printf "%s\n" "$1" | grep -n "^    chown \"root:\$dm_ocg\" \"\$DD_MIG_DUMP_DIR\" " | head -1 | cut -d: -f1);
             op_ln=$(printf "%s\n" "$1" | grep -n "chmod 640" | head -1 | cut -d: -f1);
@@ -719,7 +721,8 @@ check "install.sh sources ddev-migrate.sh" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh' \"\$1\"" _ "$INSTALL"
 check "install.sh fetch list includes ddev-migrate.sh" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh' \"\$1\"" _ "$INSTALL"
-_fm_exp_src=$(live_src "$INSTALL_CORE")
+# round a B1: || true keeps the one-red-row failure path under set -e.
+_fm_exp_src=$(live_src "$INSTALL_CORE") || true
 check "install.sh runs the export in Step 4b (before the Step 5 handover)" \
     sh -c 'export_ln=$(printf "%s\n" "$1" | grep -n "ddev_migrate_export \"" | head -1 | cut -d: -f1);
         hand_ln=$(printf "%s\n" "$1" | grep -n "ddev_handover_root \"" | head -1 | cut -d: -f1);

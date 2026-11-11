@@ -1070,7 +1070,10 @@ check "fix c M1: no bare ddev-hosts invocation remains outside the helper (invoc
     [ "$_dha_n" = 2 ]
 check "fix c S1: ddev-migrate absolutizes a relative dump-dir" \
     sh -c "grep -qF 'dm_dir=\"\$PWD/\$dm_dir\"' \"\$1\" && grep -qF 'case \"\$dm_dir\" in' \"\$1\"" _ "$MIGRATESH"
-_dv_m1_src=$(live_src "$MIGRATESH")
+# round a B1: || true keeps the one-red-row failure path under set -e
+# (a failed strip streams empty content; the child's -n probes red the
+# check) instead of aborting the whole suite at the assignment.
+_dv_m1_src=$(live_src "$MIGRATESH") || true
 check "fix d M1: empty-dir refusal precedes the absolutization (guard hoisted)" \
     sh -c 'g=$(printf "%s\n" "$1" | grep -nF "[ -n \"\$dm_dir\" ] ||" | head -1 | cut -d: -f1);
         c=$(printf "%s\n" "$1" | grep -nF "case \"\$dm_dir\" in" | head -1 | cut -d: -f1);
