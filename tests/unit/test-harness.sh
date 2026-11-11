@@ -552,13 +552,18 @@ has "HOST_REACHED=1" "9.8 ... reaches the real body end (truncation discriminato
 #     strip pin (10.1) and BOTH survivor-trap arms (10.2, 10.9) go
 #     red: a commented-out construct counts again -- exactly the
 #     #261/#244 g W1 trap the rider exists to kill
-#   - delete live_src from harness.sh -> every pipeline-exercising
-#     10.x pin reds. Green survivors (round b B1 precise): 10.10,
-#     10.13, 10.14 -- check_live's ARG guards precede any live_src
-#     call. 10.12 reds DIFFERENTLY (rc 127 / "not found" instead of
-#     1 / "no files given": its guard lives INSIDE live_src and dies
-#     with it) and its check-wrapped arm stays red via rc 127 -- the
-#     deletion stays detected either way.
+#   - delete live_src from harness.sh -> the section reds. LIVE-
+#     VERIFIED enumeration (round c, deletion executed against the
+#     committed tree) -- RED ARMS: 10.1, 10.3, 10.4, 10.5, 10.6,
+#     10.7, 10.11, 10.12, 10.15. FULLY GREEN ARMS: 10.2, 10.8,
+#     10.9 -- rc-1-pinned absent-pattern arms: grep over the empty
+#     stream reds them identically, they cannot see the stripper;
+#     10.10, 10.13, 10.14 -- check_live's ARG guards precede any
+#     live_src call. GREEN PINS inside red arms (expectations an
+#     error-only or fail-row output satisfies): 10.1 p2/p3
+#     (lacks-pins), 10.5 p2, 10.6 p1 (rc-1 pins), 10.7 p3 (the
+#     desc rides the FAIL row too), 10.12 p1 (NORC=1 substring-
+#     matches NORC=127) and p3/p4 (rc 1 + Failed: 1).
 #   - break check_live's pipe (grep the FILE directly) -> 10.9 reds
 #     while 10.1 stays green (discrimination runs through the strip,
 #     not through the fixture)

@@ -589,7 +589,9 @@ fi
 # error path needs ui_error, which only exists once ui.sh loaded
 # round b B2 (class sweep, twin of the ddev sites): || true keeps the
 # one-red-row failure path under set -e (a failed strip streams empty
-# content; the downstream -n probes and greps red their rows).
+# content; the [ -n ] probes' else branch reds the row -- the greps
+# themselves fail silently inside the command substitutions, their
+# pipeline tail is cut, rc 0).
 _nl_src=$(live_src "$DOCTOR") || true
 _nl_uilib=$(printf '%s\n' "$_nl_src" | grep -nF 'UI_LIB=' | head -1 | cut -d: -f1)
 _nl_pslib=$(printf '%s\n' "$_nl_src" | grep -nF 'PS_LIB=' | head -1 | cut -d: -f1)
