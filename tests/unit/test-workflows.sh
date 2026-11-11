@@ -178,9 +178,12 @@ fi
 # .PHONY and test: carry exactly ONE name per physical line. The pin
 # rejects TAB-started block lines (a TAB line is recipe syntax, not a
 # continuation) and wrong name counts; it does NOT measure indent width
-# beyond that (column-0 continuations pass this pin -- they terminate
-# the chain reader instead, failing membership loudly in the orphan
-# direction). One-per-line keeps every suite addition a one-line diff
+# beyond that, and column 0 by itself is not the loud-failure trigger:
+# col-0 continuation lines that still carry their backslash join the
+# chain for real make AND for the chain reader alike, so nothing fails
+# anywhere. The loud orphan direction comes from a DROPPED BACKSLASH --
+# the reader terminates at that line and later names fail membership.
+# One-per-line keeps every suite addition a one-line diff
 # and the chain reviewable at a glance; the 975-char single-line test:
 # chain this replaced was neither. The pin fails when a block line carries
 # the wrong count (head: target token + exactly one name; continuation:

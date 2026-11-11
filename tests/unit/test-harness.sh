@@ -21,8 +21,9 @@
 #   - test_chain (#464): the wrapped make-test chain reader -- exact
 #     token stream on wrapped AND unwrapped chains (head stripped,
 #     one name per line, recipe excluded), the .PHONY-only stray-dog
-#     discriminator, the recipe-less-rule leak discriminator, and the
-#     fail-loud guards (arity, missing file)
+#     discriminator, the recipe-less-rule leak discriminator, the
+#     zero-name-head empty-token discriminator, and the fail-loud
+#     guards (arity, missing file)
 #   - the mixed-tally integration: 3 pass + 2 fail -> both counts in
 #     one output, rc 1
 #   - the work registry (#395): work_new / work_new_file create AND
@@ -666,7 +667,7 @@ has "LINES=7/7" "10.15 line-preserving dialect: comment lines become empty lines
 # every membership pin uses. Fixture pins pin SHAPE, not the live
 # chain's contents -- suites get added, counts belong to no meta-pin.
 # Sabotage note: delete test_chain from harness.sh -> the rc and shape
-# pins (11.1, 11.2, 11.4, 11.5) go red; 11.3 alone stays green BY
+# pins (11.1, 11.2, 11.4, 11.5, 11.6) go red; 11.3 alone stays green BY
 # DESIGN -- it is a bare-control arm whose rc comes from grep on the
 # then-empty stream (rc 1 = the expected value), so the deleted-function
 # sabotage cannot discriminate it; its .PHONY-only discrimination needs
