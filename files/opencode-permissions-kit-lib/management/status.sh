@@ -86,8 +86,11 @@ fi
 # UI_ROWS_* counters they bump vanish with them — the summary tallies a
 # broken report green. That is a wiring error, not a probe failure, and
 # gets the same answer as status_pairing_guard below: refuse loud,
-# whole report, before any section renders (exit 1 — a wiring abort is
-# not a verdict and must not collide with the --short probe codes). The
+# whole report, before any section renders. The exit is 1 like the
+# core guard's — a code rc-only consumers cannot tell from "alert(s)"
+# (#461 a X2): the discriminator is stdout (a wiring abort prints no
+# verdict line; the message and fix hint land on stderr), documented
+# in docs/reference/cli.md's exit-code table. The
 # list is every ui function the entry AND status-core call (the
 # test-suite riders enforce both directions).
 status_ui_pairing_guard() {

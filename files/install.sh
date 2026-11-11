@@ -352,20 +352,25 @@ command -v ddev_migrate_registry >/dev/null 2>&1 || {
         echo "error: ddev_migrate_projects unavailable (ddev-migrate.sh incomplete) — aborting" >&2
         return 1
     }
-    # Core-called siblings (#456 stub sweep): install-core calls the gap
-    # probe and the export directly. Loud like the registry above: the
-    # tolerant call arms (`|| return 0`, `|| true`) swallow only the rc —
-    # the named error still reaches stderr instead of the bare rc 127
-    # a truncated lib would produce.
-    ddev_migrate_gap() {
-        echo "error: ddev_migrate_gap unavailable (ddev-migrate.sh incomplete) — aborting" >&2
-        return 1
-    }
-    ddev_migrate_export() {
-        echo "error: ddev_migrate_export unavailable (ddev-migrate.sh incomplete) — aborting" >&2
-        return 1
-    }
     ddev_migrate_done() { return 1; }
+}
+# Core-called siblings (#456 stub sweep, #461 a Q4 hoisted to TOP-LEVEL
+# arms): install-core calls the gap probe and the export directly, and
+# ddev-migrate.sh defines registry at :82, gap at :154, export at :351 —
+# nested inside the registry arm above, these stubs armed only when the
+# registry was undefined, so every truncation after :82 left them
+# unarmed and the tolerant call arms (`|| return 0`, `|| true`) turned
+# the rc-127 into a SILENT green skip of the gap scan and the export.
+# Per-function arms arm independently. Their messages say "skipping"
+# not "aborting": the call arms tolerate rc 1 and continue — the named
+# error on stderr is the visible part (#461 a Q5).
+command -v ddev_migrate_gap >/dev/null 2>&1 || ddev_migrate_gap() {
+    echo "error: ddev_migrate_gap unavailable (ddev-migrate.sh incomplete) — skipping the gap scan" >&2
+    return 1
+}
+command -v ddev_migrate_export >/dev/null 2>&1 || ddev_migrate_export() {
+    echo "error: ddev_migrate_export unavailable (ddev-migrate.sh incomplete) — skipping the database export" >&2
+    return 1
 }
 
 # Shared group-baseline helper with live progress (issue #14). Same
@@ -419,12 +424,22 @@ command -v staged_write >/dev/null 2>&1 ||
         echo "error: staged_write unavailable (staged-write.sh missing)" >&2
         return 1
     }
-# Core-called sibling (#456 stub sweep): install-core gates 14 sites
-# through agent_home_sane. Permissive rc-0 twin of update.sh's and
-# uninstall.sh's stubs (a gate PROBE, not an action — rc 1 would refuse
-# the install's own config-dir work): the loud staged_write stub above
-# stays the truncation tripwire for everything that writes.
-command -v agent_home_sane >/dev/null 2>&1 || agent_home_sane() { return 0; }
+# Core-called sibling (#456 stub sweep): install-core gates 13 sites
+# through agent_home_sane — including DIRECT sudo writes (~/.ddev,
+# ~/.config, ~/.agents) that never ride staged_write (#461 a X1: the
+# permissive rc-0 draft left the link gate silently off on truncation;
+# the direct-sudo sites run before any staged_write could trip). So
+# this stub fails CLOSED and loud like the action stubs: rc 1 routes
+# every gated site into its warn+skip arm — the never-follow-links
+# contract holds even when the gate itself is unavailable. Deliberately
+# NOT swept onto update.sh/uninstall.sh: their candidate resolvers
+# serve DEPLOYED libs where a pre-0.0.39h vintage legitimately lacks
+# the walker — permissive rc 0 there is the documented old-kit compat
+# contract (missing-FILE direction), not a truncation window.
+command -v agent_home_sane >/dev/null 2>&1 || agent_home_sane() {
+    echo "error: agent_home_sane unavailable (staged-write.sh incomplete) — link gate closed, gated writes skip loudly" >&2
+    return 1
+}
 
 # Shared sudoers pipeline (charset gate, render, visudo validation,
 # install, sudoers.d link, legacy cleanup): one implementation for
@@ -523,7 +538,7 @@ command -v browser_bridge_install >/dev/null 2>&1 || browser_bridge_install() { 
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ui.sh"
 install_ui_pairing_guard() {
     for _iup in ui_info ui_success ui_warn ui_error ui_detail \
-        ui_section ui_banner ui_have ui_add ui_atten ui_miss \
+        ui_section ui_banner ui_have ui_add ui_atten \
         ui_kv ui_kv_warn ui_plan ui_ask ui_confirm ui_menu; do
         command -v "$_iup" >/dev/null 2>&1 || {
             echo "error: function '$_iup' missing from ui.sh — version-skewed (older or truncated), aborting" >&2

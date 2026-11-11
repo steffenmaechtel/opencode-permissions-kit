@@ -474,7 +474,6 @@ else
         echo ""
     }
     ui_kv() { printf '  %-14s %s\n' "$1" "$2"; }
-    ui_kv_warn() { printf '  %-14s %s\n' "$1" "$2"; }
     # 0.0.45d W4: the body's confirm() calls ui_confirm — without a
     # stub a ui.sh-less update died rc 127 at the confirm prompt
     # instead of failing with a re-deploy hint (0.0.45c C9 fixed the
@@ -504,7 +503,7 @@ fi
 # above must stay complete for this list (its own rider).
 update_ui_pairing_guard() {
     for _uup in ui_info ui_success ui_warn ui_error ui_detail \
-        ui_section ui_banner ui_kv ui_kv_warn ui_confirm; do
+        ui_section ui_banner ui_kv ui_confirm; do
         command -v "$_uup" >/dev/null 2>&1 || {
             echo "error: function '$_uup' missing from ui.sh — version-skewed (older or truncated), aborting" >&2
             return 1

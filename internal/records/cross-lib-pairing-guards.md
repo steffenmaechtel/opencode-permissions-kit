@@ -23,10 +23,14 @@ mechanism):
   present-but-skewed one rc-127'd a bare `ui_*` call mid-run under
   `set -e`: cryptic, no named cause, after earlier phases already ran.
 - The #250 stub sweep had covered only the functions the ENTRY calls;
-  functions the CORE calls (`agent_home_sane` — 14 gated sites;
+  functions the CORE calls (`agent_home_sane` — 13 gated sites;
   `xdg_shim_needed_for`; `ddev_migrate_gap`/`_export`;
-  `ddev_rootless_bindmounts`) were unstubbed: a truncated lib aborted
-  the run exactly as cryptically.
+  `ddev_rootless_bindmounts`) were unstubbed. Their failure modes
+  split by call shape (#461 a Q5 corrected this narrative): plain
+  statements under `set -e` aborted cryptically (the update.sh ui
+  surface), while if-condition and tolerant-arm call sites
+  (`|| true`, `|| return 0`, `$(…)`) swallowed the rc-127 as a
+  SILENT skip behind a green run — the quieter and worse shape.
 
 ## 2. Decision — two tiers, two different pinning sets
 

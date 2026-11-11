@@ -307,17 +307,23 @@ _xl_combined="$(
 )"
 [ -n "$_xl_combined" ] || _xl_missing="(stripped entry+core extraction empty)"
 # What THIS RUN sources: the entry resolves git-check.sh and ui.sh;
-# status-core resolves ddev-migrate.sh and ddev-handover.sh behind file
-# guards; wsl-browser-bridge.sh's never-shadow probe is the optional
-# surface the xdg call site command-v-guards. Not the whole sh/ glob —
-# its wrapper-side scripts define shell hooks (ddev(), note()) that
-# are not status's callable surface. Token extraction stays
-# line-separated: tr -d '[:space:]()' concatenates every definition
-# into one token and the loop goes vacuous (the #456 sabotage cycle
-# found exactly that on the install twin, L4).
+# status-core resolves ddev-migrate.sh, ddev-handover.sh,
+# ddev-hosts.sh, update-check.sh and advisories.sh behind file guards
+# (#461 a Q3 extended the list past the original four — the rider once
+# pinned the incompleteness green); wsl-browser-bridge.sh's
+# never-shadow probe is the optional surface the xdg call site
+# command-v-guards. Not the whole sh/ glob — its wrapper-side scripts
+# define shell hooks (ddev(), note()) that are not status's callable
+# surface. Token extraction stays line-separated: a
+# tr -d '[:space:]()' concatenates every definition into one token and
+# the loop goes vacuous (the #456 sabotage cycle found exactly that on
+# the install twin, L4).
 for _xl_rel in opencode-permissions-kit-lib/sh/git-check.sh \
     opencode-permissions-kit-lib/sh/ddev-migrate.sh \
     opencode-permissions-kit-lib/sh/ddev-handover.sh \
+    opencode-permissions-kit-lib/sh/ddev-hosts.sh \
+    opencode-permissions-kit-lib/sh/update-check.sh \
+    opencode-permissions-kit-lib/sh/advisories.sh \
     opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh; do
     _xl_lib="$SCRIPT_DIR/../../files/$_xl_rel"
     [ -f "$_xl_lib" ] || {
@@ -352,6 +358,32 @@ if printf '%s\n' "$(sed 's/^[[:space:]]*#.*$//' "$LIB")" |
     pass "share-scan truncation gate renders a counted warn row (#456)"
 else
     fail "share-scan truncation gate must render a counted warn row (#456)"
+fi
+# The #461 a Q3 sibling gates, same counted-warn contract: ddev-hosts,
+# update-check, advisories — grep-pinned; the PATTERN itself is
+# executed-pinned twice above (db-dump, share-scan). No hosts-gate
+# executed twin: _st_ddev_win_hosts gates readiness behind
+# [ -d /mnt/c ] absolute literals — a full-function drive is
+# environment-dependent (vacuous on non-WSL CI, the L4b class), and
+# weakening the extraction to reach the gate would pin a copy, not
+# the code.
+if printf '%s\n' "$(sed 's/^[[:space:]]*#.*$//' "$LIB")" |
+    grep -qF 'ui_kv_warn "kit update" "not checked — kit file sh/update-check.sh outdated (fix: sudo opk update)"'; then
+    pass "update-check truncation gate renders a counted warn row (#461 a Q3)"
+else
+    fail "update-check truncation gate must render a counted warn row (#461 a Q3)"
+fi
+if printf '%s\n' "$(sed 's/^[[:space:]]*#.*$//' "$LIB")" |
+    grep -qF 'ui_kv_warn "advisories database" "not checked — kit file sh/advisories.sh outdated (fix: sudo opk update)"'; then
+    pass "advisories truncation gate renders a counted warn row (#461 a Q3)"
+else
+    fail "advisories truncation gate must render a counted warn row (#461 a Q3)"
+fi
+if printf '%s\n' "$(sed 's/^[[:space:]]*#.*$//' "$LIB")" |
+    grep -qF 'ui_kv_warn "hosts (win)" "not checked — kit file sh/ddev-hosts.sh outdated (fix: sudo opk update)"'; then
+    pass "hosts(win) truncation gate renders a counted warn row (#461 a Q3)"
+else
+    fail "hosts(win) truncation gate must render a counted warn row (#461 a Q3)"
 fi
 # Behavioral pins (L1, #456): the truncation gates EXECUTED, not just
 # present — fresh child per gate, scratch tree carrying a present-but-

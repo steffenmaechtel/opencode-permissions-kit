@@ -1994,16 +1994,23 @@ else
 fi
 # control: lib present -> fallback silent; then through the REAL guard
 # head (shipped guard + shipped sourcing + shipped section header; the
-# harness appends only the closing fi) the section still renders.
+# harness appends only the closing fi) the section still renders. The
+# fixture lib DEFINES the two probes: a healthy shape — since #461 a
+# Q3 an empty (truncated) advisories.sh correctly fires the outdated
+# gate instead of rendering the section.
 mkdir -p "$_a165_dir/sh"
-: >"$_a165_dir/sh/advisories.sh"
+printf 'advisories_matching() { :; }\nadvisories_ids() { :; }\n' >"$_a165_dir/sh/advisories.sh"
 _a165_out=$(_a165_run "$_a165_dir" || true)
 if [ -z "$_a165_out" ]; then
     pass "#165: present advisories lib keeps the fallback silent (control)"
 else
     fail "#165: present advisories lib must not fire the fallback (got: $_a165_out)"
 fi
-_a165_head="$(sed -n '/^[[:space:]]*if \[ -f "\$LIBDIR\/sh\/advisories.sh" \]; then$/,/ui_section "Security advisories"/p' "$STATUS_CORE")"
+# The head's end anchor is EXACTLY-8sp ui_section: the #461 a Q3
+# truncation gate inserted between sourcing and body carries its own
+# 12sp ui_section — the extraction must span past the gate to the
+# body's real section header.
+_a165_head="$(sed -n '/^[[:space:]]*if \[ -f "\$LIBDIR\/sh\/advisories.sh" \]; then$/,/^        ui_section "Security advisories"$/p' "$STATUS_CORE")"
 if [ -n "$_a165_head" ]; then
     _a165_out=$(
         (
@@ -2128,7 +2135,7 @@ if [ -n "$_m165" ]; then
     # control: lib present, its gap stub answers -> the guarded body
     # renders the real INCOMPLETE row (proves the check family ran)
     mkdir -p "$_m165_dir/sh"
-    printf 'ddev_migrate_gap() { echo "1 2"; }\nddev_migrate_projects() { echo p1; echo p2; }\nddev_migrate_home() { echo "$1"; }\n' >"$_m165_dir/sh/ddev-migrate.sh"
+    printf 'ddev_migrate_gap() { echo "1 2"; }\nddev_migrate_projects() { echo p1; echo p2; }\nddev_migrate_home() { echo "$1"; }\nddev_migrate_latest_dir() { :; }\n' >"$_m165_dir/sh/ddev-migrate.sh"
     printf '%s/root-a\n' "$_m165_dir" >"$_m165_dir/projects.conf"
     _m165_out=$(_m165_run dev "$_m165_dir" "$_m165_dir/projects.conf" || true)
     if printf '%s' "$_m165_out" | grep -q '^WARN|db dumps|INCOMPLETE — registry lists 2 project(s), only 1 dump(s) recorded$' &&

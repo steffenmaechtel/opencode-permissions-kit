@@ -105,7 +105,6 @@ else
         echo ""
     }
     ui_kv() { printf '  %-14s %s\n' "$1" "$2"; }
-    ui_kv_warn() { printf '  %-14s %s\n' "$1" "$2"; }
     # 0.0.45c C9: the body also calls ui_have/ui_atten (projects list)
     # and ui_confirm/ui_menu/ui_ask (interactive flows) — without these
     # stubs a ui.sh-less config.sh died rc 127 ("ui_have: not found")
@@ -139,7 +138,7 @@ fi
 # stub block above must stay complete for it (its own rider).
 config_ui_pairing_guard() {
     for _cup in ui_info ui_success ui_warn ui_error ui_detail \
-        ui_section ui_banner ui_have ui_atten ui_kv ui_kv_warn \
+        ui_section ui_banner ui_have ui_atten ui_kv \
         ui_ask ui_confirm ui_menu; do
         command -v "$_cup" >/dev/null 2>&1 || {
             echo "error: function '$_cup' missing from ui.sh — version-skewed (older or truncated), refusing to run" >&2

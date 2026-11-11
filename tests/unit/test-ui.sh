@@ -238,9 +238,16 @@ check "NO_COLOR=1 keeps counting" \
 # mid-run. Riders per consumer, both directions over comment-stripped
 # sources (conventions.md "Source-counting pins"), BOUNDARY-ANCHORED
 # like the #452 core riders; plus the behavioral pair (real lib passes,
-# truncated lib refuses) driven in fresh children.
+# truncated lib refuses) driven in fresh children. Every consumer that
+# has a phase core names it in the third field — an empty core field
+# silently blinds the used direction to the core's calls (#461 a S10),
+# and the guard-removal awk matches by plain STRING PREFIX (index==1):
+# an -v-carried regex like "\\(\\) \\{" loses its backslashes to -v
+# escape processing and never matches the def line, leaving the guard
+# body in the token stream — the stale direction goes vacuous (#461 a
+# S8, same failure family as the tr -d '[:space:]()' concatenation).
 LIBDIR_FILES="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib"
-_ui_consumers="install:$SCRIPT_DIR/../../files/install.sh: \
+_ui_consumers="install:$SCRIPT_DIR/../../files/install.sh:$LIBDIR_FILES/sh/install-core.sh \
 status:$LIBDIR_FILES/management/status.sh:$LIBDIR_FILES/sh/status-core.sh \
 update:$LIBDIR_FILES/management/update.sh:$LIBDIR_FILES/sh/update-core.sh \
 config:$LIBDIR_FILES/management/config.sh: \
@@ -255,8 +262,8 @@ _ui_used_tokens() {
     _ut_guard="$3"
     {
         sed 's/^[[:space:]]*#.*$//' "$_ut_entry" |
-            awk -v g="^${_ut_guard}\\(\\) \\{" '
-                $0 ~ g { infn = 1 }
+            awk -v d="${_ut_guard}() {" '
+                index($0, d) == 1 { infn = 1 }
                 infn && /^}/ { infn = 0; next }
                 !infn { print }
             '

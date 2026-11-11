@@ -468,7 +468,7 @@ fi
 # --- 9b. cross-lib stub rider (#456): core-called lib functions stay stubbed ------
 # The #250 stub sweep covered the functions the ENTRY calls from the
 # kit_source'd libs; #456 closes the twin it missed: functions the CORE
-# calls from those same libs (agent_home_sane was the live example — 14
+# calls from those same libs (agent_home_sane was the live example — 13
 # gated call sites, no stub: a truncated staged-write.sh would have
 # rc-127'd the ddev phase under set -e). STRONGEST form — every
 # function defined by ANY sh/ file (the glob carries the phase cores
@@ -518,6 +518,19 @@ if [ -z "$_xl_missing" ]; then
     pass "every lib function entry-or-core calls is defined in install.sh/install-core.sh (#456)"
 else
     fail "lib functions called but defined nowhere in install.sh/install-core.sh:$_xl_missing (#456)"
+fi
+# Nesting-shape pin (#461 a Q4): the ddev_migrate_gap/_export stubs
+# must be TOP-LEVEL arms — anchored at column 0. The wave's first cut
+# nested them inside the registry arm, where they armed only when the
+# registry was undefined (ddev-migrate.sh defines registry at :82, gap
+# at :154, export at :351 — every truncation after :82 left them
+# unarmed and the tolerant call arms turned the miss into a silent
+# green skip). An indented, nested copy fails this anchor.
+if sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -qE '^command -v ddev_migrate_gap >/dev/null 2>&1 \|\| ddev_migrate_gap\(\) \{' &&
+    sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -qE '^command -v ddev_migrate_export >/dev/null 2>&1 \|\| ddev_migrate_export\(\) \{'; then
+    pass "ddev_migrate gap/export stubs are top-level arms (arm independently of the registry) (#461 a Q4)"
+else
+    fail "ddev_migrate gap/export stubs must be top-level command -v arms (#461 a Q4)"
 fi
 
 # --- 8. LOWS-1 (#371/#372/#340): install.sh residual hygiene ----------------------

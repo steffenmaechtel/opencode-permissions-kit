@@ -221,24 +221,36 @@ status_section_core() {
     else
         # shellcheck disable=SC1090  # checkout or deployed lib, resolved above
         . "$_ku_lib"
-        _ku_channel="${KIT_CHANNEL:-master}"
-        if kit_update_is_tag "$_ku_channel"; then
-            # A pin is deliberate: no fetch, no finding — neutral row like
-            # the ".git/config access allowed" choice.
-            ui_kv "kit update" "pinned to $_ku_channel — pinned installs skip update checks"
-        elif ! command -v curl >/dev/null 2>&1; then
-            ui_kv "kit update" "unknown — live check unavailable (curl missing)"
-        else
-            _ku_remote=""
-            _ku_remote=$(kit_update_fetch_version "$_ku_channel" || true)
-            if [ -z "$_ku_remote" ]; then
-                ui_kv "kit update" "unknown — live check unavailable (offline or blocked)"
-            elif [ "$(kit_update_version_cmp "$_ku_remote" "$VERSION")" = gt ]; then
-                ui_kv_warn "kit update" "new kit $_ku_remote available (installed: $VERSION)"
-                ui_detail "update with: sudo opk update"
+        # Truncation gate (#456 class sweep, #461 a Q3): a
+        # present-but-truncated update-check.sh rc-127s the probes —
+        # kit_update_version_cmp's failure inside the $(…) comparison
+        # falls into the else arm and renders the GREEN "current" row
+        # over a broken comparison. Counted warn row instead (#165
+        # class), like the missing-file arm above.
+        if command -v kit_update_is_tag >/dev/null 2>&1 &&
+            command -v kit_update_fetch_version >/dev/null 2>&1 &&
+            command -v kit_update_version_cmp >/dev/null 2>&1; then
+            _ku_channel="${KIT_CHANNEL:-master}"
+            if kit_update_is_tag "$_ku_channel"; then
+                # A pin is deliberate: no fetch, no finding — neutral row like
+                # the ".git/config access allowed" choice.
+                ui_kv "kit update" "pinned to $_ku_channel — pinned installs skip update checks"
+            elif ! command -v curl >/dev/null 2>&1; then
+                ui_kv "kit update" "unknown — live check unavailable (curl missing)"
             else
-                ui_kv_ok "kit update" "current — $VERSION on $_ku_channel"
+                _ku_remote=""
+                _ku_remote=$(kit_update_fetch_version "$_ku_channel" || true)
+                if [ -z "$_ku_remote" ]; then
+                    ui_kv "kit update" "unknown — live check unavailable (offline or blocked)"
+                elif [ "$(kit_update_version_cmp "$_ku_remote" "$VERSION")" = gt ]; then
+                    ui_kv_warn "kit update" "new kit $_ku_remote available (installed: $VERSION)"
+                    ui_detail "update with: sudo opk update"
+                else
+                    ui_kv_ok "kit update" "current — $VERSION on $_ku_channel"
+                fi
             fi
+        else
+            ui_kv_warn "kit update" "not checked — kit file sh/update-check.sh outdated (fix: sudo opk update)"
         fi
     fi
     if id "$OPENCODE_USER" >/dev/null 2>&1; then
@@ -395,9 +407,30 @@ status_section_advisories() {
         ui_section "Security advisories"
         ui_kv_warn "advisories database" "missing — security checks skipped (fix: sudo opk update)"
     fi
+    # Truncation gate (#456 class sweep, #461 a Q3): a present-but-
+    # truncated advisories.sh leaves ADV_HITS empty behind the
+    # `|| true` arms and renders the FALSE-GREEN "no known advisory
+    # affects this install" row; a missing advisories_ids empties
+    # ADV_KNOWN and inflates the upstream-new warn over nothing.
     if [ -f "$LIBDIR/sh/advisories.sh" ]; then
         # shellcheck disable=SC1090
         . "$LIBDIR/sh/advisories.sh"
+        # Truncation gate (#456 class sweep, #461 a Q3), INSERTED after
+        # the sourcing on purpose: the probes exist only once the lib
+        # ran, and an insertion (no wrapper, no dedent) keeps every
+        # anchored test extraction over this body stable. A truncated
+        # advisories.sh leaves ADV_HITS empty behind the `|| true` arms
+        # and renders the FALSE-GREEN "no known advisory affects this
+        # install" row; a missing advisories_ids empties ADV_KNOWN and
+        # inflates the upstream-new warn over nothing. Counted warn row
+        # and return instead (#165 class), like the missing-file arm
+        # above.
+        if ! command -v advisories_matching >/dev/null 2>&1 ||
+            ! command -v advisories_ids >/dev/null 2>&1; then
+            ui_section "Security advisories"
+            ui_kv_warn "advisories database" "not checked — kit file sh/advisories.sh outdated (fix: sudo opk update)"
+            return 0
+        fi
         # Shared never-shadow probe for the xdg-open verdict (0.0.42d S1/C1):
         # optional like the other libs — a missing lib degrades the verdict
         # to the red "missing" branch, never to a false green.
@@ -1055,10 +1088,16 @@ _st_ddev_db_dumps() {
         # PRESENT-but-truncated ddev-migrate.sh would rc-127 the gap
         # probe silently — the row and its severity counter vanish
         # behind a green summary. A counted warn row instead, exactly
-        # like the missing-file arm below (#165 class).
+        # like the missing-file arm below (#165 class). latest_dir
+        # rides the probe set too (#461 a S5): it is defined at :651,
+        # ~500 lines AFTER its caller gap (:157) — truncation anywhere
+        # in that window keeps the trio and kills the callee. registry
+        # (:82) and under_roots (:92) sit before every caller and are
+        # unreachable by tail truncation while their callers survive.
         if command -v ddev_migrate_gap >/dev/null 2>&1 &&
             command -v ddev_migrate_projects >/dev/null 2>&1 &&
-            command -v ddev_migrate_home >/dev/null 2>&1; then
+            command -v ddev_migrate_home >/dev/null 2>&1 &&
+            command -v ddev_migrate_latest_dir >/dev/null 2>&1; then
             # Roots ride positional parameters, one per line from projects.conf
             # (0.0.44a V18): the old `tr '\n' ' '` + unquoted call word-split a
             # spaced root (hand-edited conf) into bogus "roots" and spurious
@@ -1161,7 +1200,15 @@ _st_ddev_win_hosts() {
     if [ "$_st_hosts_ready" = true ] && [ -f "$LIBDIR/sh/ddev-hosts.sh" ]; then
         # shellcheck disable=SC1091  # deployed lib, checked above
         . "$LIBDIR/sh/ddev-hosts.sh"
-        if [ -f "$PROJECTS_CONF" ] && [ -s "$PROJECTS_CONF" ]; then
+        # Truncation gate (#456 class sweep, #461 a Q3): a present-but-
+        # truncated ddev-hosts.sh rc-127s inside the $(…) probe and the
+        # `[ -n "$_st_m" ] || continue` swallows it — every hosts(win)
+        # row silently vanishes behind a green summary. One counted
+        # warn row instead (#165 class), like the missing-file arm
+        # below.
+        if ! command -v ddev_hosts_missing >/dev/null 2>&1; then
+            ui_kv_warn "hosts (win)" "not checked — kit file sh/ddev-hosts.sh outdated (fix: sudo opk update)"
+        elif [ -f "$PROJECTS_CONF" ] && [ -s "$PROJECTS_CONF" ]; then
             while IFS= read -r _st_root; do
                 [ -z "$_st_root" ] && continue
                 [ -d "$_st_root" ] || continue
