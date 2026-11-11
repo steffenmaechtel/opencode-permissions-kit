@@ -97,7 +97,8 @@ status_ui_pairing_guard() {
     for _sup in ui_info ui_warn ui_detail ui_section ui_banner \
         ui_have ui_atten ui_miss ui_kv ui_kv_warn ui_kv_ok ui_kv_bad; do
         command -v "$_sup" >/dev/null 2>&1 || {
-            echo "error: function '$_sup' missing from ui.sh — version-skewed (older or truncated), refusing to run" >&2
+            echo "error: function '$_sup' missing from ui.sh — version-skewed (older or truncated),""\
+ refusing to run (fix: sudo opk update)" >&2
             return 1
         }
     done
@@ -218,7 +219,8 @@ status_pairing_guard() {
         _st_ddev_version _st_ddev_win_hosts _st_progress_tee \
         _st_root_blocker status_groups_hits status_sock_agent_reachable; do
         command -v "$_spg" >/dev/null 2>&1 || {
-            echo "error: function '$_spg' missing from status-core.sh — version-skewed entry/lib pairing, refusing to run" >&2
+            echo "error: function '$_spg' missing from status-core.sh — version-skewed entry/lib""\
+ pairing, refusing to run (fix: sudo opk update)" >&2
             return 1
         }
     done

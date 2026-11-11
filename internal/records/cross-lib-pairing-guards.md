@@ -70,6 +70,26 @@ stubs or loud abort per the entry's contract) versus
 **present-but-skewed** (a broken kit — refuse loud or count the
 degradation; never proceed silently).
 
+**The intra-lib callee window (#461 b B1):** per-function arms only
+fire when a function is ENTIRELY missing — a tail truncation that
+keeps the CALLER and kills a later-defined CALLEE arms nothing.
+ddev-migrate.sh's gap (:157) and export (:389) both call
+`ddev_migrate_latest_dir` (def :651) inside `$(…)`; a cut anywhere in
+the :158–:650 window leaves both callers defined and kills only the
+callee, and the tolerant call arms (`|| return 0`, `|| true`)
+swallowed the rc behind the shell's bare "not found" — the gap scan
+and the export skipped with no counted row. The callee therefore
+rides its OWN stub arm (install) / the db-dumps probe set (status,
+#461 a S5). Class sweep over the install-sourced libs found one
+further window — ddev-handover.sh `ddev_handover_root` (:593) calls
+`ddev_handover_project` (:865) / `_back` (:754) — which degrades
+LOUD (plain call under `set -e`, no tolerant arm): the refuse-loud
+direction, deliberately left as is. The X1 fail-closed
+`agent_home_sane` stub routes the 13 gated sites into skip arms
+whose texts name BOTH causes (symlink user-managed, or the gate
+unavailable — #461 b B3): under truncation no operand is a link,
+and the persistent log must not assert one.
+
 ## 3. install.sh's C5 fallback retirement
 
 The 0.0.45c C5 output-stub fallback (ui.sh-less `--yes` runs proceed
@@ -97,6 +117,10 @@ refuse loud at the sourcing instead of limping to their first prompt.
   concatenates a lib's definitions into one loop token and the rider
   goes vacuous — found by the #456 sabotage cycle, not by any green
   run (the L4 argument for sabotage-verify).
+- Shape pins anchor the migrate stub arms at column 0 (#461 a Q4,
+  #461 b B1 incl. the callee arm): an indented, nested copy fails
+  the anchor — the first cut nested the stubs inside the registry
+  arm, where they armed only when the registry was undefined.
 - Executed failure paths (L1): the status truncation gates are driven
   in fresh children against scratch truncated libs, warn row observed
   on stdout the way production renders it.

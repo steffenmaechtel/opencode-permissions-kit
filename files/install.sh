@@ -372,6 +372,22 @@ command -v ddev_migrate_export >/dev/null 2>&1 || ddev_migrate_export() {
     echo "error: ddev_migrate_export unavailable (ddev-migrate.sh incomplete) — skipping the database export" >&2
     return 1
 }
+# Intra-lib CALLEE arm (#461 b B1): gap (:157) and export (:389) both
+# call ddev_migrate_latest_dir inside $(…) — the callee is defined at
+# :651, ~500 lines after its callers. A tail truncation anywhere in
+# the :158–:650 window keeps BOTH callers defined (the arms above
+# only fire when a function is entirely missing) and kills only the
+# callee: the gap detector's `|| return 0` and the export's `|| true`
+# swallow the rc and the shell's bare "not found" names neither lib
+# nor fix — the gap scan and the export skip with no counted row (the
+# status-side twin rides the db-dumps probe set, status-core.sh).
+# Stubbing the callee makes the same window name itself on stderr;
+# rc 1 rides the callers' existing tolerant arms.
+command -v ddev_migrate_latest_dir >/dev/null 2>&1 || ddev_migrate_latest_dir() {
+    echo "error: ddev_migrate_latest_dir unavailable (ddev-migrate.sh incomplete) —""\
+ skipping the ddev migration check (fix: sudo opk update)" >&2
+    return 1
+}
 
 # Shared group-baseline helper with live progress (issue #14). Same
 # sourcing rules as ddev-handover.sh; same loud stub contract (#250,

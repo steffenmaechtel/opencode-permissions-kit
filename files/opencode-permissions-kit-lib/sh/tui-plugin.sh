@@ -42,7 +42,9 @@ tui_plugin_sync_user() {
     _tp_libdir="$5"
     _tp_oc_user="$6"
     if ! agent_home_sane "$_tp_oc_user" "$_tp_user_dir"; then
-        log "tui plugin registration skipped: symlink in the chain to $_tp_user_dir (user-managed)"
+        log "tui plugin registration skipped: symlink in the chain to $_tp_user_dir""\
+ (user-managed) — or the home-sane gate was unavailable""\
+ (staged-write.sh incomplete — fix: sudo opk update)"
         return 2
     fi
     if [ -L "$_tp_user_dir/plugins" ] || [ -L "$_tp_user_dir/plugins/opencode-permissions-kit" ]; then

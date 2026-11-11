@@ -952,7 +952,8 @@ do_ddev_phase() {
         sudo chmod 755 "/home/$OPENCODE_USER/.ddev"
         log "ddev home provisioned: /home/$OPENCODE_USER/.ddev"
     else
-        log "ddev home provisioning skipped: /home/$OPENCODE_USER/.ddev is a symlink (user-managed)"
+        log "ddev home provisioning skipped: /home/$OPENCODE_USER/.ddev is a symlink (user-managed)""\
+ or the home-sane gate was unavailable (staged-write.sh incomplete — fix: sudo opk update)"
     fi
 
     # docker-rootless + ddev 1.25.0-1.25.2: the global no-bind-mounts switch
@@ -1065,10 +1066,13 @@ do_ddev_phase() {
         # exist, so warn like the other no-CA ends (0.0.39h F5).
         if ! agent_home_sane "$OPENCODE_USER" "$caroot"; then
             ui_warn "mkcert: the chain to $caroot contains a symlink — CA provisioning skipped""\
- (the kit never follows links in the agent home)."
+ (the kit never follows links in the agent home) — or the home-sane gate was unavailable""\
+ (staged-write.sh incomplete — fix: sudo opk update)."
             ui_warn "no mkcert CA exists at $caroot — ddev HTTPS will use an untrusted or no certificate. ""\
 Remove the link or place your CA at $caroot and re-run."
-            log "mkcert CA provisioning skipped: symlink in the chain to $caroot (no CA provisioned)"
+            log "mkcert CA provisioning skipped: symlink in the chain to $caroot (no CA""\
+ provisioned) — or the home-sane gate was unavailable""\
+ (staged-write.sh incomplete — fix: sudo opk update)"
         else
             sudo mkdir -p "$caroot"
             src=""
@@ -1880,10 +1884,14 @@ do_deploy_phase() {
             sudo chown -R "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode/.config
             sudo chmod 2775 /home/opencode/.config
         else
-            log "agent config dir baseline skipped: /home/opencode/.config turned into a symlink mid-step (user-managed)"
+            log "agent config dir baseline skipped: /home/opencode/.config turned into a symlink""\
+ mid-step (user-managed) — or the home-sane gate was unavailable""\
+ (staged-write.sh incomplete — fix: sudo opk update)"
         fi
     else
-        log "agent config dir skipped: /home/opencode/.config is (below) a symlink (user-managed)"
+        log "agent config dir skipped: /home/opencode/.config is (below) a symlink (user-managed)""\
+ — or the home-sane gate was unavailable""\
+ (staged-write.sh incomplete — fix: sudo opk update)"
     fi
     if agent_home_sane "$OPENCODE_USER" /home/opencode/.config/opencode; then
         sudo mkdir -p /home/opencode/.config/opencode
@@ -1897,10 +1905,14 @@ do_deploy_phase() {
             sudo chown -R "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode/.config/opencode
             sudo chmod 2775 /home/opencode/.config/opencode
         else
-            log "agent config dir baseline skipped: /home/opencode/.config/opencode turned into a symlink mid-step (user-managed)"
+            log "agent config dir baseline skipped: /home/opencode/.config/opencode turned into a""\
+ symlink mid-step (user-managed) — or the home-sane gate was unavailable""\
+ (staged-write.sh incomplete — fix: sudo opk update)"
         fi
     else
-        log "agent config dir skipped: /home/opencode/.config/opencode is (below) a symlink (user-managed)"
+        log "agent config dir skipped: /home/opencode/.config/opencode is (below) a symlink""\
+ (user-managed) — or the home-sane gate was unavailable""\
+ (staged-write.sh incomplete — fix: sudo opk update)"
     fi
     if agent_home_sane "$OPENCODE_USER" /home/opencode/.agents; then
         sudo mkdir -p /home/opencode/.agents
@@ -1908,10 +1920,14 @@ do_deploy_phase() {
             sudo chown -R "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode/.agents
             sudo chmod 2775 /home/opencode/.agents
         else
-            log "agent skills dir baseline skipped: /home/opencode/.agents turned into a symlink mid-step (user-managed)"
+            log "agent skills dir baseline skipped: /home/opencode/.agents turned into a symlink""\
+ mid-step (user-managed) — or the home-sane gate was unavailable""\
+ (staged-write.sh incomplete — fix: sudo opk update)"
         fi
     else
-        log "agent skills dir skipped: /home/opencode/.agents is (below) a symlink (user-managed)"
+        log "agent skills dir skipped: /home/opencode/.agents is (below) a symlink (user-managed)""\
+ — or the home-sane gate was unavailable""\
+ (staged-write.sh incomplete — fix: sudo opk update)"
     fi
 
     # === Step 8a: migrate the developer's agent resources (issue #19) ==============
@@ -1942,8 +1958,10 @@ do_deploy_phase() {
         # the pointed tree to the agent. Skip loudly (user-managed).
         if ! agent_home_sane "$OPENCODE_USER" "$_opk_dst"; then
             ui_warn "agent resources not migrated: the chain to $_opk_dst contains a symlink""\
- (user-managed) — $_opk_src left untouched"
-            log "agents migration skipped: symlink in the chain to $_opk_dst"
+ (user-managed) — or the home-sane gate was unavailable""\
+ (staged-write.sh incomplete — fix: sudo opk update) — $_opk_src left untouched"
+            log "agents migration skipped: symlink in the chain to $_opk_dst — or the home-sane""\
+ gate was unavailable (staged-write.sh incomplete — fix: sudo opk update)"
             return 0
         fi
         sudo mkdir -p "$_opk_dst"
@@ -1966,7 +1984,8 @@ do_deploy_phase() {
         # target (no content, agent-removable, no escalation).
         if ! agent_home_sane "$OPENCODE_USER" "$_opk_dst"; then
             ui_warn "agent resources not migrated: the chain to $_opk_dst turned into a symlink""\
- before the copy (user-managed) — $_opk_src left untouched"
+ before the copy (user-managed) — or the home-sane gate was unavailable""\
+ (staged-write.sh incomplete — fix: sudo opk update) — $_opk_src left untouched"
             log "agents migration skipped: exec-time recheck tripped for $_opk_dst"
             return 0
         fi
@@ -1983,7 +2002,9 @@ do_deploy_phase() {
             # other code path baselines .claude/skills).
             if ! agent_home_sane "$OPENCODE_USER" "$_opk_dst"; then
                 ui_warn "agent resources copied but the sharing baseline was NOT applied:""\
- the chain to $_opk_dst turned into a symlink mid-step (user-managed)"
+ the chain to $_opk_dst turned into a symlink mid-step (user-managed)""\
+ — or the home-sane gate was unavailable""\
+ (staged-write.sh incomplete — fix: sudo opk update)"
                 ui_warn "the original at $_opk_src is untouched — re-run the install to normalize""\
  $_opk_dst"
                 log "agents migration: exec-time recheck tripped before the baseline legs for $_opk_dst (source kept)"
@@ -2115,8 +2136,10 @@ do_deploy_phase() {
     }
     if ! agent_home_sane "$OPENCODE_USER" /home/opencode/.config/opencode; then
         ui_warn "the chain to /home/opencode/.config/opencode contains a symlink — agent config NOT (re)installed""\
- (user-managed; the kit never follows links in the agent home)."
-        log "agent config skipped: symlink in the parent chain of /home/opencode/.config/opencode"
+ (user-managed; the kit never follows links in the agent home) — or the home-sane gate was unavailable""\
+ (staged-write.sh incomplete — fix: sudo opk update)."
+        log "agent config skipped: symlink in the parent chain of /home/opencode/.config/opencode""\
+ — or the home-sane gate was unavailable (staged-write.sh incomplete — fix: sudo opk update)"
     elif [ ! -f /home/opencode/.config/opencode/opencode.jsonc ] &&
         [ ! -f /home/opencode/.config/opencode/opencode.json ]; then
         _oc_install_agent_config
@@ -2229,8 +2252,11 @@ do_deploy_phase() {
     # loudly (user-managed). The gate includes the .config/opencode leaf:
     # mkdir -p through a linked leaf redirects the write the same way.
     if ! agent_home_sane "$OPENCODE_USER" "$OC_TUI_DIR"; then
-        ui_detail "the chain to $OC_TUI_CONF contains a symlink — TUI mode display NOT installed (user-managed)"
-        log "tui mode display skipped: symlink in the chain to $OC_TUI_CONF"
+        ui_detail "the chain to $OC_TUI_CONF contains a symlink — TUI mode display NOT installed""\
+ (user-managed) — or the home-sane gate was unavailable""\
+ (staged-write.sh incomplete — fix: sudo opk update)"
+        log "tui mode display skipped: symlink in the chain to $OC_TUI_CONF — or the home-sane""\
+ gate was unavailable (staged-write.sh incomplete — fix: sudo opk update)"
     else
         sudo mkdir -p "$OC_TUI_DIR"
         # A symlink at the destination is user structure (dotfile setups): never
@@ -2299,7 +2325,8 @@ do_deploy_phase() {
                     exit 1
                 elif [ "$_oc_tps_rc" -eq 2 ]; then
                     ui_detail "the chain to $_oc_user_dir contains a symlink""\
- — TUI plugin registration skipped (user-managed)"
+ — TUI plugin registration skipped (user-managed) — or the home-sane gate was unavailable""\
+ (staged-write.sh incomplete — fix: sudo opk update)"
                 elif [ "$_oc_tps_rc" -eq 3 ]; then
                     ui_detail "existing $_oc_user_dir/plugins is a symlink""\
  — TUI plugin registration skipped (user-managed link)"

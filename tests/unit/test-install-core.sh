@@ -532,6 +532,21 @@ if sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -qE '^command -v ddev_migrate_g
 else
     fail "ddev_migrate gap/export stubs must be top-level command -v arms (#461 a Q4)"
 fi
+# B1 pin (#461 b): the INTRA-LIB CALLEE rides its own top-level arm.
+# gap (:157) and export (:389) call ddev_migrate_latest_dir (def :651)
+# inside $(…); a tail cut in the :158–:650 window keeps both callers
+# (the stub arms above only fire on entirely-missing functions) and
+# kills the callee — the tolerant call arms swallowed the rc behind
+# the shell's bare "not found" with no counted row. The callee stub
+# makes that window name itself; anchored at column 0 like Q4's.
+if sed 's/^[[:space:]]*#.*$//' "$INSTALL" |
+    grep -qE '^command -v ddev_migrate_latest_dir >/dev/null 2>&1 \|\| ddev_migrate_latest_dir\(\) \{' &&
+    sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -A2 -F 'ddev_migrate_latest_dir() {' |
+    grep -qF 'skipping the ddev migration check'; then
+    pass "ddev_migrate_latest_dir stub is a top-level arm naming the skip (B1: the intra-lib callee window) (#461 b B1)"
+else
+    fail "ddev_migrate_latest_dir must be a top-level command -v arm with the named skip (#461 b B1)"
+fi
 # X1 pin: the link-gate stub fails CLOSED and loud — the rc-0 draft left
 # the direct-sudo gated writes (~/.ddev, ~/.config, ~/.agents) running
 # with the gate silently off on truncation. Shape pin (inline arm, not
@@ -754,11 +769,12 @@ _O372_OUT=$(
 if printf '%s\n' "$_O372_OUT" | grep -qF 'SUDO: mkdir -p /home/oc/.agents' &&
     ! printf '%s\n' "$_O372_OUT" | grep -q 'SUDO: cp -a' &&
     printf '%s\n' "$_O372_OUT" | grep -qF 'warn: agent resources not migrated: the chain to /home/oc/.agents turned into a symlink' &&
+    printf '%s\n' "$_O372_OUT" | grep -qF 'or the home-sane gate was unavailable' &&
     printf '%s\n' "$_O372_OUT" | grep -qF 'log: agents migration skipped: exec-time recheck tripped for /home/oc/.agents' &&
     [ -f "$_O372W/dev/.agents/skill-a/SKILL.md" ]; then
-    pass "exec-time recheck trips between mkdir and cp: no copy, loud skip, source untouched (#377 O2)"
+    pass "exec-time recheck trips between mkdir and cp: no copy, loud skip, source untouched (#377 O2, #461 b B3)"
 else
-    fail "exec-time recheck must skip the copy loudly (out=$_O372_OUT) (#377 O2)"
+    fail "exec-time recheck must skip the copy loudly (out=$_O372_OUT) (#377 O2, #461 b B3)"
 fi
 # Control arm: a gate that never trips runs the copy (the recheck must
 # not break the happy path) — agent_home_sane passes every walk.

@@ -341,11 +341,17 @@ for _uc in $_ui_consumers; do
     _uc_tr_rc=0
     _uc_tr_out="$(sh -c 'eval "$1"; . "$2"; "$3"' _ "$_uc_gsrc" "$_uc_trunc" "$_uc_guard" 2>&1)" ||
         _uc_tr_rc=$?
+    # B2 (#461 b): the repair hint is STATUS's documented contract
+    # (docs/reference/cli.md's wiring-abort row) — the other consumers'
+    # guards keep their own refusal wording, no docs row promises a
+    # hint there.
     if [ "$_uc_tr_rc" -eq 1 ] &&
-        printf '%s' "$_uc_tr_out" | grep -qF "function 'ui_info' missing from ui.sh"; then
-        pass "$_uc_name: ui guard refuses a truncated ui.sh naming ui_info (#456)"
+        printf '%s' "$_uc_tr_out" | grep -qF "function 'ui_info' missing from ui.sh" &&
+        { [ "$_uc_name" != status ] ||
+            printf '%s' "$_uc_tr_out" | grep -qF "fix: sudo opk update"; }; then
+        pass "$_uc_name: ui guard refuses a truncated ui.sh naming ui_info (#456, #461 b B2)"
     else
-        fail "$_uc_name: ui guard must refuse a truncated ui.sh (rc=$_uc_tr_rc out=$_uc_tr_out) (#456)"
+        fail "$_uc_name: ui guard must refuse a truncated ui.sh (status: with the repair hint) (rc=$_uc_tr_rc out=$_uc_tr_out) (#456, #461 b B2)"
     fi
 done
 

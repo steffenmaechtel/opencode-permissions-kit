@@ -288,6 +288,18 @@ if [ -z "$_pg_hmissing" ]; then
 else
     fail "functions defined by status-core.sh but absent from the guard:$_pg_hmissing (#452, #455 a C2)"
 fi
+# B2 pin (#461 b): both wiring-abort guards (ui + core pairing) carry
+# the repair hint — docs/reference/cli.md's exit-code row promises
+# "the named function and the repair hint land on stderr with
+# fix: sudo opk update"; before the fix no abort path printed any
+# hint (the row lied). Comment-stripped count pin: exactly two
+# refusal lines, each with the hint.
+_pg_hint=$(sed 's/^[[:space:]]*#.*$//' "$STATUS_ENTRY" | grep -c 'refusing to run (fix: sudo opk update)')
+if [ "$_pg_hint" -eq 2 ]; then
+    pass "both wiring-abort guards print the repair hint (docs row is true) (#461 b B2)"
+else
+    fail "wiring-abort guards must carry the repair hint, count 2 (got $_pg_hint) (#461 b B2)"
+fi
 
 # Cross-lib protection-map rider (#456): status's cross-lib surface is
 # call-site-guarded, not stubbed (fail-soft report — a missing helper
