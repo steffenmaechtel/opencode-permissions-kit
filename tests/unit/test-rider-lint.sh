@@ -29,7 +29,12 @@
 # (values ending .jsonc/.json/.ts/.tsx) register but are EXEMPT: the
 # rider strips `#` lines only, so riding them is an identity no-op
 # until the deferred JSONC `//` decision (#460 rules of engagement)
-# lands in live_src. Exempt otherwise: non-source operands (rendered
+# lands in live_src. Markdown sources (values ending .md) are EXEMPT
+# for the OPPOSITE reason -- decided, not deferred (#472): a
+# `#`-initial line is a heading there, so the strip deletes live
+# content; the canonical docs-pin shape is the raw un-ridden grep
+# (conventions.md "Source-counting pins"). Exempt otherwise:
+# non-source operands (rendered
 # fixtures, stub logs). Negation/absence: an absence leg (`! grep`,
 # if-found-then-fail) stays un-ridden by design, and since the review-a
 # fix (#468) the exemption is LEG-scoped: the detector splits each
@@ -192,9 +197,9 @@ _rule2_detect() {
                     v = vname[k]
                     if (marked[v]) continue
                     r = vval[v]
-                    own_slash = (r ~ /\.(jsonc|json|tsx|ts)("|[[:space:]]|$)/) ? 1 : 0
+                    own_ex = (r ~ /\.(jsonc|json|tsx|ts|md)("|[[:space:]]|$)/) ? 1 : 0
                     if (r ~ /\$REPO\/|\$FILES\/|\.github\/|\.\.\/e2e\/|\$SCRIPT_DIR\/\.\.\/\.\.|\$SCRIPT_DIR\/\.\.\/sh\//) {
-                        marked[v] = 1; slashy[v] = own_slash; changed++
+                        marked[v] = 1; exempt[v] = own_ex; changed++
                     } else if (match(r, /\$[A-Za-z_][A-Za-z_0-9]*/)) {
                         ref = substr(r, RSTART + 1, RLENGTH - 1)
                         if (marked[ref]) {
@@ -202,9 +207,9 @@ _rule2_detect() {
                             # own extension WINS over inheritance ("$TS/../sh/y.sh"
                             # is a shell source even though $TS is a .tsx);
                             # extension-less values inherit the parent class
-                            if (own_slash) slashy[v] = 1
-                            else if (r ~ /\.[a-z0-9]+("|[[:space:]]|$)/) slashy[v] = 0
-                            else slashy[v] = slashy[ref]
+                            if (own_ex) exempt[v] = 1
+                            else if (r ~ /\.[a-z0-9]+("|[[:space:]]|$)/) exempt[v] = 0
+                            else exempt[v] = exempt[ref]
                             changed++
                         }
                     }
@@ -294,7 +299,7 @@ _rule2_detect() {
             while (match(s, /"\$[A-Za-z_][A-Za-z_0-9]*(\/[^"]*)?"/)) {
                 name = substr(s, RSTART + 2, RLENGTH - 3)
                 sub(/\/.*/, "", name)
-                if (marked[name] && !slashy[name]) return 1
+                if (marked[name] && !exempt[name]) return 1
                 s = substr(s, RSTART + RLENGTH)
             }
             return 0
@@ -302,7 +307,7 @@ _rule2_detect() {
         func has_reg_bind(s) {
             while (match(s, /"\$[A-Za-z_][A-Za-z_0-9]*"/)) {
                 name = substr(s, RSTART + 2, RLENGTH - 3)
-                if (marked[name] && !slashy[name]) return 1
+                if (marked[name] && !exempt[name]) return 1
                 s = substr(s, RSTART + RLENGTH)
             }
             return 0
@@ -356,12 +361,14 @@ printf '%s\n' \
     'SRC="$REPO/files/opencode-permissions-kit-lib/sh/x.sh"' \
     'FIX="$WORK/fixture.log"' \
     'TS="$REPO/files/opencode-permissions-kit-lib/tui/x.tsx"' \
+    'MD="$REPO/docs/reference/cli.md"' \
     'CHK="$TS/../sh/y.sh"' \
     'check "direct over registered" grep -qF pat "$SRC"' \
     'check "direct over fixture stays" grep -qF pat "$FIX"' \
     'check "direct inversion-annotated stays" grep -qF pat "$SRC" # rider-inversion (comment-literal pin)' \
     'check "direct beside absence leg flags" grep -qF pat "$SRC" && ! grep -qF nope "$SRC"' \
     'check "direct over slash-family stays" grep -qF pat "$TS"' \
+    'check "direct over markdown stays" grep -qF pat "$MD"' \
     'grep -qF pre "$SRC" && check "joined direct flags" grep -qF pat "$SRC"' \
     'check "shc over registered" sh -c "grep -qF pat \"\$1\"" _ "$SRC"' \
     'check "shc absence stays uncounted" sh -c "! grep -qF nope \"\$1\"" _ "$SRC"' \
@@ -383,6 +390,8 @@ _n="$(_rule2_detect "$_cell/rule2.sh" | grep DIRECT | grep -c 'joined direct')"
 check "&&-joined check flags (review a S4, #468)" test "$_n" = 1
 _n="$(_rule2_detect "$_cell/rule2.sh" | grep DIRECT | grep -c 'slash-family')"
 check "direct over slash-family source stays unflagged (// deferred)" test "$_n" = 0
+_n="$(_rule2_detect "$_cell/rule2.sh" | grep DIRECT | grep -c 'markdown')"
+check "direct over markdown source stays unflagged (headings are not comments, #472)" test "$_n" = 0
 _n="$(_rule2_detect "$_cell/rule2.sh" | grep -c 'chained')"
 check "chained registration flags (transitive derivation)" test "$_n" = 1
 _n="$(_rule2_detect "$_cell/rule2.sh" | grep -c SHC1)"

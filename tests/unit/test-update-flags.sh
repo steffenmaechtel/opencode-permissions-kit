@@ -354,7 +354,11 @@ if live_src "$KIT" | grep -q 'upgrade-opencode)' &&
 else
     fail "kit CLI has the upgrade-opencode shorthand (injects --yes --only-binary)"
 fi
-check_live "docs: cli.md update flag table lists --only-binary" "$CLI_MD" -q -- '--only-binary'
+# Markdown operand -- RAW grep, no strip rider (#472): the rider deletes
+# #-initial headings (25 in this file), the false-alarm direction for a
+# docs pin; markdown rows are live content, not comments.
+check "docs: cli.md update flag table lists --only-binary" \
+    grep -q -- '--only-binary' "$CLI_MD"
 
 # --- 5. channel resolution (issue #38: env KIT_BRANCH > KIT_CHANNEL stamp > master)
 # The stamp read + fallback chain is extracted verbatim and executed with

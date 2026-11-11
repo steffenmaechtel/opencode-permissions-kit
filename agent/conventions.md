@@ -222,7 +222,22 @@ value references the repo/shipped tree (`$REPO/`, `$FILES/`,
 `$SCRIPT_DIR/../../`, `$SCRIPT_DIR/../sh/`, `../e2e/`, `.github/`)
 directly or through another registered variable. Slash-comment
 sources (values ending `.jsonc/.json/.ts/.tsx`) register but stay
-EXEMPT pending the deferred JSONC `//` decision. The `sh -c`
+EXEMPT pending the deferred JSONC `//` decision. Markdown sources
+(values ending `.md`) stay EXEMPT too, but DECIDED, not deferred
+(#472): a `#`-initial line is a heading there, so the strip rider
+deletes live content — a docs reorg that leaves the pinned literal
+only in heading lines false-alarms a ridden pin, and extraction legs
+over markdown (a `sed -n '/^## …/,/^## /p'` span) use headings as
+their anchors, which riding would delete. The canonical docs-pin
+shape is therefore the raw un-ridden grep (`check "desc" grep -qF --
+'literal' "$MD"` — the `--` guards dash-leading flag literals, the
+common docs-pin class; if-form pipes likewise); a docs-presence sugar
+(`check_raw`/`raw_src`) enters the harness at the third
+strict-shape site per the rule of three — one exists today
+(test-update-flags.sh's cli.md `--only-binary` pin, un-ridden by
+#472). When the JSONC `//` decision eventually lands it follows the
+same boundary — its own primitive or semantics, never the `#` strip
+pointed at non-`#` syntax. The `sh -c`
 indirection of the same shape (`sh -c 'grep … "$1"' _ "$SRCVAR"`) is
 GATED too since the #470 wave (rule 3; was a down-only ratchet until
 then, 304 residual sites converted): single-leg presence greps go to

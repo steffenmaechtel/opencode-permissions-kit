@@ -162,6 +162,10 @@ assert_eq() {
 # (the deferred JSONC `//` decision) would have been another
 # cross-suite sweep. One named primitive makes the un-ridden census
 # class greppable and the semantics changeable in one place.
+# Operands whose `#` is not a comment marker never ride it: markdown
+# (`#` = heading -- the strip deletes live bytes) stays raw, issue
+# #472; the exemption families live in conventions.md
+# "Source-counting pins".
 live_src() {
     # $@ = source files, stripped and concatenated in argument order.
     # The strip expression is byte-identical to the historical inline
