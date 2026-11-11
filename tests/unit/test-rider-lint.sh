@@ -69,8 +69,11 @@
 # Zero is the contract WITHIN the detector's grammar: single
 # positional file, presence-only, var-bound (`_ "$VAR"`); sibling
 # spellings escape it -- multi-operand payloads, literal-path bindings,
-# if-form (non check-form) shapes -- and convert on sight like the
-# counted shape did.
+# indirect `$(cd ...)/path`-spelling bindings the registration regex
+# cannot see, `;`-statement payloads (the sh -c leg gate never matches
+# a check-prefix after a `;` split), numeric-gate second operands
+# (lifting the positional count to 2), if-form (non check-form) shapes
+# -- and convert on sight like the counted shape did.
 #
 # Discrimination arms (scratch fixtures, run BEFORE the tree sweep):
 #   - a planted single-quoted file-operand rider -> flagged

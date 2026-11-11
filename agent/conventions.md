@@ -231,7 +231,10 @@ then, 304 residual sites converted): single-leg presence greps go to
 parent-if + `live_src` pipes (the strip substitutes empty lines, so
 NR bookkeeping stays true) — the gate covers the detector's grammar
 (single positional file, presence-only, var-bound); sibling spellings
-(multi-operand payloads, literal-path bindings, if-form shapes)
+(multi-operand payloads, literal-path bindings, indirect
+`$(cd "$(dirname "$0")/…")`-spelling bindings the registration regex
+cannot see, `;`-statement payloads, numeric-gate second operands
+lifting the positional count, if-form shapes)
 escape it and convert on sight like the counted shape did. Shapes
 where `live_src` would change the semantics unwrap RAW instead,
 un-ridden: behavioral probes (`. "$1"` sourcing, `sh "$1"` execution,
