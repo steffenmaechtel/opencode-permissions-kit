@@ -74,7 +74,10 @@ degradation; never proceed silently).
 fire when a function is ENTIRELY missing — a tail truncation that
 keeps the CALLER and kills a later-defined CALLEE arms nothing.
 ddev-migrate.sh's gap (:157) and export (:389) both call
-`ddev_migrate_latest_dir` (def :651) inside `$(…)`; a cut anywhere in
+`ddev_migrate_latest_dir` (def :651) inside `$(…)` — a third call
+site, :665 inside `ddev_migrate_import`, is not install-reachable
+(the import is deliberately not part of the install, #461 c C2); a
+cut anywhere in
 the :158–:650 window leaves both callers defined and kills only the
 callee, and the tolerant call arms (`|| return 0`, `|| true`)
 swallowed the rc behind the shell's bare "not found" — the gap scan
@@ -88,7 +91,12 @@ direction, deliberately left as is. The X1 fail-closed
 `agent_home_sane` stub routes the 13 gated sites into skip arms
 whose texts name BOTH causes (symlink user-managed, or the gate
 unavailable — #461 b B3): under truncation no operand is a link,
-and the persistent log must not assert one.
+and the persistent log must not assert one. Accepted cost (#461 c
+C3): the amended tui-plugin.sh text also renders in UPDATE runs,
+where update.sh's permissive rc-0 stub means the arm is entered
+only via the REAL gate — the gate-unavailable disjunct is then
+vacuously present and the hint self-referential; the arm cannot
+distinguish the causes by rc.
 
 ## 3. install.sh's C5 fallback retirement
 

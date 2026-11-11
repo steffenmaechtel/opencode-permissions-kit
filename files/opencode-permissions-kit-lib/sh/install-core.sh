@@ -1069,7 +1069,8 @@ do_ddev_phase() {
  (the kit never follows links in the agent home) — or the home-sane gate was unavailable""\
  (staged-write.sh incomplete — fix: sudo opk update)."
             ui_warn "no mkcert CA exists at $caroot — ddev HTTPS will use an untrusted or no certificate. ""\
-Remove the link or place your CA at $caroot and re-run."
+Remove a link in the chain or place your CA at $caroot and re-run — if the home-sane""\
+ gate was unavailable instead: sudo opk update."
             log "mkcert CA provisioning skipped: symlink in the chain to $caroot (no CA""\
  provisioned) — or the home-sane gate was unavailable""\
  (staged-write.sh incomplete — fix: sudo opk update)"
