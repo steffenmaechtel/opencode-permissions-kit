@@ -205,19 +205,19 @@ else
     fail "wrapper still escalates via CONTAINER_GROUP"
 fi
 
-if grep -q 'jsonc-parser.py --tools' "$CORE_LIB"; then
+if live_src "$CORE_LIB" | grep -q 'jsonc-parser.py --tools'; then
     pass "wrapper keeps --tools project detection"
 else
     fail "wrapper lost --tools detection"
 fi
 
-if grep -q 'DOCKER_HOST' "$WRAPPER_FILE" && grep -q 'XDG_RUNTIME_DIR' "$WRAPPER_FILE"; then
+if live_src "$WRAPPER_FILE" | grep -q 'DOCKER_HOST' && live_src "$WRAPPER_FILE" | grep -q 'XDG_RUNTIME_DIR'; then
     pass "wrapper exports DOCKER_HOST/XDG_RUNTIME_DIR for rootless"
 else
     fail "wrapper lost the rootless env exports"
 fi
 
-if grep -q 'sudo -u opencode' "$WRAPPER_FILE"; then
+if live_src "$WRAPPER_FILE" | grep -q 'sudo -u opencode'; then
     pass "wrapper still execs via sudo -u opencode"
 else
     fail "wrapper lost the sudo -u opencode exec"
@@ -371,7 +371,7 @@ fi
 echo ""
 echo "--- Headless mode (third-party tools) ---"
 
-if grep -q 'HEADLESS=false' "$CORE_LIB" && grep -q 'serve | acp | models | agent | providers' "$CORE_LIB"; then
+if live_src "$CORE_LIB" | grep -q 'HEADLESS=false' && grep -q 'serve | acp | models | agent | providers' "$CORE_LIB"; then
     pass "wrapper classifies headless subcommands (serve/acp/queries)"
 else
     fail "wrapper lost headless subcommand classification"
@@ -448,18 +448,21 @@ hl_case "2x mini stays interactive" false mini
 hl_case "no args stays interactive" false
 hl_case "flags-only start stays interactive" false --debug
 
-if grep -q '\-t 0' "$CORE_LIB"; then
+if live_src "$CORE_LIB" | grep -q '\-t 0'; then
     pass "run without message checks stdin tty (piped = headless)"
 else
     fail "run lost the interactive-tty distinction"
 fi
 
-if grep -q 'if \[ "${1:-}" = "serve" \]; then' "$CORE_LIB" && grep -q 'CONTAINER_AUTO=false' "$CORE_LIB"; then
+if grep -q 'if \[ "${1:-}" = "serve" \]; then' "$CORE_LIB" && live_src "$CORE_LIB" | grep -q 'CONTAINER_AUTO=false'; then
     pass "serve requests container tools without prompting"
 else
     fail "serve lost the silent container-tool request"
 fi
 
+# Absence pins in if-found-then-fail shape (removed 0.0.21 constructs):
+# a commented-out forbidden line SHOULD keep counting (conventions.md
+# "Source-counting pins") -- all legs stay bare by design.
 if grep -q 'Press Enter to start opencode' "$WRAPPER_FILE" || grep -q 'Press Enter to start opencode' "$CORE_LIB"; then
     fail "wrapper still pauses on Press Enter (removed 0.0.21)"
 else
@@ -500,7 +503,7 @@ else
     fail "container advisory prints raw to stdout"
 fi
 
-if grep -q 'OPENCODE_SERVER_PASSWORD' "$SUDOERS_FILE"; then
+if live_src "$SUDOERS_FILE" | grep -q 'OPENCODE_SERVER_PASSWORD'; then
     pass "sudoers.template keeps OPENCODE_SERVER_PASSWORD across sudo"
 else
     fail "sudoers.template drops OPENCODE_SERVER_PASSWORD (headless serve loses auth)"
@@ -514,10 +517,10 @@ for marker in '#@docker-group-begin' '#@ddev-delegated-begin' '#@ddev-sandbox-be
     fi
 done
 
-if grep -q 'env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME"' "$SUDOERS_FILE" &&
+if live_src "$SUDOERS_FILE" | grep -q 'env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME"' &&
     ! grep -q 'DDEV_DEBUG' "$SUDOERS_FILE" &&
     grep -q '(opencode) NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/opencode' "$SUDOERS_FILE" &&
-    grep -q 'socket-check \*' "$SUDOERS_FILE"; then
+    live_src "$SUDOERS_FILE" | grep -q 'socket-check \*'; then
     pass "sudoers.template keeps base RunAs + socket-check + env_keep (no DDEV_DEBUG)"
 else
     fail "sudoers.template lost a required rule"
@@ -627,25 +630,25 @@ assert_eq "serve cwd: unavailable probe (empty output) changes nothing" \
 
 # static: wrapper wiring + sudoers rule
 if grep -q 'cwd-check "\$1" 2>/dev/null || true' "$CORE_LIB" &&
-    grep -q 'sudo -n -u opencode.*cwd-check' "$CORE_LIB"; then
+    live_src "$CORE_LIB" | grep -q 'sudo -n -u opencode.*cwd-check'; then
     pass "wrapper probes the serve cwd via cwd-check (sudo -n, fault-tolerant)"
 else
     fail "wrapper lost the fault-tolerant cwd-check probe"
 fi
 
-if grep -q 'OPENCHAMBER_OPENCODE_CWD' "$CORE_LIB"; then
+if live_src "$CORE_LIB" | grep -q 'OPENCHAMBER_OPENCODE_CWD'; then
     pass "serve warning names OPENCHAMBER_OPENCODE_CWD as the fix"
 else
     fail "serve warning lost the OPENCHAMBER_OPENCODE_CWD hint"
 fi
 
-if grep -q 'getent passwd opencode' "$CORE_LIB"; then
+if live_src "$CORE_LIB" | grep -q 'getent passwd opencode'; then
     pass "serve fallback ends at the opencode user's home"
 else
     fail "serve fallback lost the opencode-home last resort"
 fi
 
-if grep -q 'bin/cwd-check \*' "$SUDOERS_FILE"; then
+if live_src "$SUDOERS_FILE" | grep -q 'bin/cwd-check \*'; then
     pass "sudoers.template gates cwd-check (NOPASSWD, opencode RunAs)"
 else
     fail "sudoers.template lost the cwd-check rule"
@@ -816,8 +819,8 @@ else
 fi
 
 # static wiring: the wrapper calls the guard and links the how-to
-if grep -q '^openchamber_guard$' "$WRAPPER_FILE" &&
-    grep -q 'docs/how-to/openchamber.md' "$CORE_LIB"; then
+if live_src "$WRAPPER_FILE" | grep -q '^openchamber_guard$' &&
+    live_src "$CORE_LIB" | grep -q 'docs/how-to/openchamber.md'; then
     pass "wrapper calls openchamber_guard and links the how-to"
 else
     fail "wrapper lost the openchamber_guard call or how-to link"
@@ -833,13 +836,13 @@ echo ""
 echo "--- Merged-config container detection (issue #81) ---"
 
 # static: the probe is wired as designed (fault-tolerant, no prompt)
-if grep -q '/usr/bin/sudo -n -u opencode' "$CORE_LIB" && grep -q 'bin/opencode debug config' "$CORE_LIB"; then
+if live_src "$CORE_LIB" | grep -q '/usr/bin/sudo -n -u opencode' && live_src "$CORE_LIB" | grep -q 'bin/opencode debug config'; then
     pass "wrapper probes the merged config via opencode debug config (sudo -n)"
 else
     fail "wrapper lost the opencode debug config probe"
 fi
 
-if grep -q 'tools_from_config -' "$CORE_LIB" && grep -q 'tools_from_config "\$PROJECT_CONFIG"' "$CORE_LIB"; then
+if live_src "$CORE_LIB" | grep -q 'tools_from_config -' && live_src "$CORE_LIB" | grep -q 'tools_from_config "\$PROJECT_CONFIG"'; then
     pass "wrapper evaluates the merged config first, project file as fallback"
 else
     fail "wrapper lost the merged/project detection order"
@@ -998,7 +1001,7 @@ assert_eq "merged: error-object probe falls back to the project scan" \
     "tools=[docker] requested=true auto=true banner=1" "$result"
 
 # 2.x: the probe's background service is stopped again (stale-config guard)
-if grep -q 'stop_merged_config_service()' "$CORE_LIB" && grep -q 'service stop' "$CORE_LIB"; then
+if grep -q 'stop_merged_config_service()' "$CORE_LIB" && live_src "$CORE_LIB" | grep -q 'service stop'; then
     pass "wrapper stops the 2.x probe service (stale-config guard)"
 else
     fail "wrapper lost the probe service stop"
@@ -1007,7 +1010,7 @@ fi
 # the probe is time-bounded: a 2.x service blocked from its port makes
 # `debug config` retry forever (port is per channel, not per user) — the
 # wrapper must fall through instead of hanging even --version
-if grep -q 'timeout 10' "$CORE_LIB" && grep -q 'timeout 5' "$CORE_LIB"; then
+if live_src "$CORE_LIB" | grep -q 'timeout 10' && live_src "$CORE_LIB" | grep -q 'timeout 5'; then
     pass "probe + service stop are time-bounded (port-collision hang)"
 else
     fail "wrapper lost the probe/stop timeouts"
@@ -1020,8 +1023,8 @@ fi
 # bounded --version first line — a second serial probe only added fail-
 # open delay); the direct fallback stays bounded for advisories-less
 # stamps and covers the pre-advisories cohort.
-if grep -qF '_MAJOR_SRC="${ADV_LINE:-}"' "$CORE_LIB" &&
-    grep -qF 'case "$_MAJOR_SRC" in' "$CORE_LIB" &&
+if live_src "$CORE_LIB" | grep -qF '_MAJOR_SRC="${ADV_LINE:-}"' &&
+    live_src "$CORE_LIB" | grep -qF 'case "$_MAJOR_SRC" in' &&
     grep -q '_MAJOR_SRC=$(timeout 10' "$CORE_LIB"; then
     pass "OPENCODE_MAJOR fallback probe reuses ADV_LINE, direct fallback bounded (0.0.43a F3, 0.0.44a V21)"
 else
@@ -1087,7 +1090,7 @@ sm_case none 2 --standalone
 sm_case none 2 run --standalone "hi"
 
 # arg rewriting: the wrapper's case block inserts/appends correctly
-if grep -q 'case \$(standalone_mode "\$@")' "$WRAPPER_FILE" && grep -q 'set -- "\$_sub" --standalone "\$@"' "$WRAPPER_FILE"; then
+if grep -q 'case \$(standalone_mode "\$@")' "$WRAPPER_FILE" && live_src "$WRAPPER_FILE" | grep -q 'set -- "\$_sub" --standalone "\$@"'; then
     pass "wrapper rewrites args via standalone_mode"
 else
     fail "wrapper lost the standalone arg rewriting"

@@ -40,14 +40,16 @@
 # Rule 3 (measured 2026-11-11, deliberately NOT gating): the sh -c
 # indirection of the same strict shape (`check "desc" sh -c 'grep ...
 # \"$1\"' _ "$SRCVAR"`, single positional file, presence-only) -- 336
-# sites tree-wide at measurement, ~250 of them OUTSIDE the #460 census
-# inventory suites (ddev-as-opencode, ddev-hosts, ddev-migrate,
-# wsl-exposure, ui, and the stdin-anchor printf-fed shapes that are
-# already ridden upstream). Same survivor trap, same conversion path
-# (check_live for single legs, parent-if + live_src pipes for
-# multi-leg). Recorded as a ratchet: the count must only go DOWN; the
-# wave that drives it to zero flips it to a gating zero-count (the
-# same path rule 2 took).
+# sites tree-wide before the census wave, 304 after it converted the
+# inventory suites' sites (bypass-guard, container-backend, kit-cli
+# fetch twins, mkcert-reuse, staged-write, tui-mode's uninstall pin,
+# update-flags' #164 twins). The residual sits in suites the round-a
+# census never named (ddev-as-opencode, ddev-hosts, ddev-migrate,
+# wsl-exposure, ui, and update-flags' openchamber/#163 blocks). Same
+# survivor trap, same conversion path (check_live for single legs,
+# parent-if + live_src pipes for multi-leg). Recorded as a ratchet:
+# the count must only go DOWN; the wave that drives it to zero flips
+# it to a gating zero-count (the same path rule 2 took).
 #
 # Discrimination arms (scratch fixtures, run BEFORE the tree sweep):
 #   - a planted single-quoted file-operand rider -> flagged
@@ -341,10 +343,11 @@ for _f in "$SCRIPT_DIR"/test-*.sh; do
     _r3=$((_r3 + _n))
 done
 # Ratchet baseline: the census wave (#460 PR 2) converted the
-# inventory suites' sh -c sites; the residual sits in the suites the
-# inventory never named (ddev-as-opencode, ddev-hosts, ddev-migrate,
-# wsl-exposure, ui). Only downward motion is legal; the wave that
-# reaches zero flips this ratchet into a gating zero-count.
-check "sh -c single-file presence ratchet (rule 3, census residual: $_r3)" test "$_r3" -le 336
+# inventory suites' sh -c sites (336 -> 304); the residual sits in the
+# suites the round-a inventory never named (ddev-as-opencode,
+# ddev-hosts, ddev-migrate, wsl-exposure, ui). Only downward motion is
+# legal; the wave that reaches zero flips this ratchet into a gating
+# zero-count.
+check "sh -c single-file presence ratchet (rule 3, census residual: $_r3)" test "$_r3" -le 304
 
 suite_done "rider lint tests"

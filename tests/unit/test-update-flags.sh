@@ -657,13 +657,15 @@ check "update openchamber presence probe escalates like the write (issue #164)" 
     sh -c "grep -qF 'sudo test -f /etc/openchamber/policy.json' \"\$1\" \
         && ! grep -qF '[ -f /etc/openchamber/policy.json ]' \"\$1\" \
         && ! grep -qF '[ -f /etc/openchamber/policy.json ]' \"\$2\"" _ "$UPDATE_CORE" "$UPDATE"
-check "install twin probes at the same authority (issue #164)" \
-    sh -c "grep -qF 'sudo test -f /etc/openchamber/policy.json' \"\$1\"" _ \
-    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/install-core.sh"
-check "uninstall twin probes at the same authority (issue #164)" \
-    sh -c "grep -qF 'sudo test -f /etc/openchamber/policy.json' \"\$1\" \
-        && grep -qF 'sudo grep -q ' \"\$1\"" _ \
-    "$UNINSTALL_CORE"
+check_live "install twin probes at the same authority (issue #164)" \
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/install-core.sh" \
+    -qF 'sudo test -f /etc/openchamber/policy.json'
+if live_src "$UNINSTALL_CORE" | grep -qF 'sudo test -f /etc/openchamber/policy.json' &&
+    live_src "$UNINSTALL_CORE" | grep -qF 'sudo grep -q '; then
+    pass "uninstall twin probes at the same authority (issue #164)"
+else
+    fail "uninstall twin probes at the same authority (issue #164)"
+fi
 
 # Behavioral (L1/L4): the extracted gate block runs verbatim against a
 # fixture /etc/openchamber, mode 000 — caller-blind, root-visible (the
@@ -1329,13 +1331,13 @@ fi
 # both roots, and the in-code contract says the skip must not be silent.
 # Both literals moved to sh/update-core.sh with their sections (#346
 # wave 2).
-grep -qF 'ui_detail "sudoers re-deploy skipped' "$UPDATE_CORE" &&
-    grep -qF 'ui_detail "umask profile re-deploy skipped' "$UPDATE_CORE" &&
-    echo "  ${GREEN}PASS${NC}  both re-deploy skips are terminal-loud (pr-00263 a F7)" && passed=$((passed + 1)) ||
-    {
-        echo "  ${RED}FAIL${NC}  a re-deploy skip is log-only again (pr-00263 a F7)"
-        failures=$((failures + 1))
-    }
+if live_src "$UPDATE_CORE" | grep -qF 'ui_detail "sudoers re-deploy skipped' &&
+    live_src "$UPDATE_CORE" | grep -qF 'ui_detail "umask profile re-deploy skipped'; then
+    echo "  ${GREEN}PASS${NC}  both re-deploy skips are terminal-loud (pr-00263 a F7)" && passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  a re-deploy skip is log-only again (pr-00263 a F7)"
+    failures=$((failures + 1))
+fi
 
 # --- 10. fetched VERSION shape gate + ensure_local_file mktemp guard (#376 B3/B4) --
 # B3 behavioral: the VERSION-read fragment is extracted and executed —
@@ -1518,21 +1520,34 @@ fi
 # order above (the guard pins the section list — keep them in agreement).
 # The list spans backslash-continued lines — joined first, comments
 # stripped (the rider idiom — a comment inside the guard must not carry
-# the order proof, review a C3), then the ORDER is proven by prefix:
-# whatever precedes update_redeploy_xdg_shim must already contain
-# update_binary_upgrade.
+# the order proof, review a C3), then the ORDER is proven by whole-token
+# positions.
+# A3 (#460, the #453 b D1 prefix-window class): the old case arms
+# matched UNANCHORED substrings on the flattened list — an identifier
+# merely CONTAINING a pinned name (update_binary_upgrade_v2, a
+# pre_update_redeploy_xdg_shim helper) satisfied the order proof.
+# Whole-token equality in awk closes that window (and avoids the
+# delimiter-sharing trap of space-anchored case patterns on
+# single-space-separated tokens).
 _pg_list="$(extract_func "$UPDATE" update_pairing_guard | sed 's/^[[:space:]]*#.*$//' | tr -d '\\' | tr -s '[:space:]' ' ')"
-case "$_pg_list" in
-    *update_binary_upgrade*update_redeploy_xdg_shim*)
-        pass "pairing guard list keeps the same order (#257)"
-        ;;
-    *update_redeploy_xdg_shim*)
-        fail "pairing guard must list update_redeploy_xdg_shim after update_binary_upgrade (#257)"
-        ;;
-    *)
-        fail "pairing guard must list update_redeploy_xdg_shim (#257)"
-        ;;
-esac
+_pg_a="$(printf '%s\n' "$_pg_list" | awk '{
+    a = 0; b = 0
+    for (i = 1; i <= NF; i++) {
+        if ($i == "update_binary_upgrade" && a == 0) a = i
+        if ($i == "update_redeploy_xdg_shim" && b == 0) b = i
+    }
+    print a, b
+}')"
+_pg_first=${_pg_a% *}
+_pg_second=${_pg_a#* }
+if [ "${_pg_second:-0}" -gt 0 ] && [ "${_pg_first:-0}" -gt 0 ] &&
+    [ "$_pg_first" -lt "$_pg_second" ]; then
+    pass "pairing guard list keeps the same order (#257)"
+elif [ "${_pg_second:-0}" -gt 0 ]; then
+    fail "pairing guard must list update_redeploy_xdg_shim after update_binary_upgrade (#257)"
+else
+    fail "pairing guard must list update_redeploy_xdg_shim (#257)"
+fi
 
 # --- LOWS-6 (#428 disposition): the re-deploy confirm stays default-y ------------
 # The PR-#426 decline rationale, pinned so an accidental flip to n
