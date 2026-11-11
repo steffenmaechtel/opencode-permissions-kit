@@ -526,8 +526,8 @@ fi
 # at :154, export at :351 — every truncation after :82 left them
 # unarmed and the tolerant call arms turned the miss into a silent
 # green skip). An indented, nested copy fails this anchor.
-if sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -qE '^command -v ddev_migrate_gap >/dev/null 2>&1 \|\| ddev_migrate_gap\(\) \{' &&
-    sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -qE '^command -v ddev_migrate_export >/dev/null 2>&1 \|\| ddev_migrate_export\(\) \{'; then
+if live_src "$INSTALL" | grep -qE '^command -v ddev_migrate_gap >/dev/null 2>&1 \|\| ddev_migrate_gap\(\) \{' &&
+    live_src "$INSTALL" | grep -qE '^command -v ddev_migrate_export >/dev/null 2>&1 \|\| ddev_migrate_export\(\) \{'; then
     pass "ddev_migrate gap/export stubs are top-level arms (arm independently of the registry) (#461 a Q4)"
 else
     fail "ddev_migrate gap/export stubs must be top-level command -v arms (#461 a Q4)"
@@ -539,9 +539,9 @@ fi
 # kills the callee — the tolerant call arms swallowed the rc behind
 # the shell's bare "not found" with no counted row. The callee stub
 # makes that window name itself; anchored at column 0 like Q4's.
-if sed 's/^[[:space:]]*#.*$//' "$INSTALL" |
+if live_src "$INSTALL" |
     grep -qE '^command -v ddev_migrate_latest_dir >/dev/null 2>&1 \|\| ddev_migrate_latest_dir\(\) \{' &&
-    sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -A2 -F 'ddev_migrate_latest_dir() {' |
+    live_src "$INSTALL" | grep -A2 -F 'ddev_migrate_latest_dir() {' |
     grep -qF 'skipping the ddev migration check'; then
     pass "ddev_migrate_latest_dir stub is a top-level arm naming the skip (B1: the intra-lib callee window) (#461 b B1)"
 else
@@ -551,9 +551,9 @@ fi
 # the direct-sudo gated writes (~/.ddev, ~/.config, ~/.agents) running
 # with the gate silently off on truncation. Shape pin (inline arm, not
 # extractable): fail-closed rc + named message.
-if sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -A2 -F 'agent_home_sane() {' |
+if live_src "$INSTALL" | grep -A2 -F 'agent_home_sane() {' |
     grep -qF 'link gate closed, gated writes skip loudly' &&
-    sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -A2 -F 'agent_home_sane() {' |
+    live_src "$INSTALL" | grep -A2 -F 'agent_home_sane() {' |
     grep -qF 'return 1'; then
     pass "agent_home_sane stub fails closed and loud (X1: direct-sudo gates never run ungated) (#461 a X1)"
 else
