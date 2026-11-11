@@ -151,19 +151,19 @@ jobs:
         run: |
           # Azure's resolver (168.63.129.16, the runner's systemd-resolved
           # upstream) returns SERVFAIL for the ubuntu archive domains since
-          # 2026-11-11 midday: the HOST fails getent for archive.ubuntu.com
-          # and azure.archive.ubuntu.com while github.com resolves, and
-          # nslookup @168.63.129.16 SERVFAILs while @1.1.1.1/@8.8.8.8/
-          # @9.9.9.9 answer instantly (proven in the dns-diag sandbox, Q1+
-          # Q3). Build containers inherit the same broken path. Fix
-          # (Q6-proven verbatim): write the host upstream FIRST plus a
-          # public-resolver battery into resolv.conf and restart docker so
-          # dockerd/buildkitd re-read it — the build then resolves the
-          # archive again.
-          UPSTREAM="$(resolvectl status | grep -oP 'DNS Servers: \K.*' | grep . | head -1)"
+          # 2026-11-11 midday (dns-diag sandbox Q1+Q3: host getent FAILs,
+          # @168.63.129.16 SERVFAILs, public resolvers answer instantly).
+          # PUBLIC RESOLVERS FIRST: dockerd's embedded DNS (the path every
+          # docker RUN container takes) relays the first upstream answer —
+          # with Azure's fast SERVFAIL first in the list, container apt
+          # flapped and provisioning died on missing candidates. Public-
+          # first wins that race deterministically; Azure stays LAST only
+          # as the internal-cloudapp fallback. The restart makes dockerd/
+          # buildkitd re-read the file.
           {
+            printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\nnameserver 9.9.9.9\n'
+            UPSTREAM="$(resolvectl status | grep -oP 'DNS Servers: \K.*' | grep . | head -1)"
             if [ -n "$UPSTREAM" ]; then printf 'nameserver %s\n' $UPSTREAM; fi
-            printf 'nameserver 168.63.129.16\nnameserver 1.1.1.1\nnameserver 8.8.8.8\nnameserver 9.9.9.9\n'
           } | sudo tee /etc/resolv.conf
           cat /etc/resolv.conf
           sudo systemctl restart docker
@@ -256,19 +256,19 @@ jobs:
         run: |
           # Azure's resolver (168.63.129.16, the runner's systemd-resolved
           # upstream) returns SERVFAIL for the ubuntu archive domains since
-          # 2026-11-11 midday: the HOST fails getent for archive.ubuntu.com
-          # and azure.archive.ubuntu.com while github.com resolves, and
-          # nslookup @168.63.129.16 SERVFAILs while @1.1.1.1/@8.8.8.8/
-          # @9.9.9.9 answer instantly (proven in the dns-diag sandbox, Q1+
-          # Q3). Build containers inherit the same broken path. Fix
-          # (Q6-proven verbatim): write the host upstream FIRST plus a
-          # public-resolver battery into resolv.conf and restart docker so
-          # dockerd/buildkitd re-read it — the build then resolves the
-          # archive again.
-          UPSTREAM="$(resolvectl status | grep -oP 'DNS Servers: \K.*' | grep . | head -1)"
+          # 2026-11-11 midday (dns-diag sandbox Q1+Q3: host getent FAILs,
+          # @168.63.129.16 SERVFAILs, public resolvers answer instantly).
+          # PUBLIC RESOLVERS FIRST: dockerd's embedded DNS (the path every
+          # docker RUN container takes) relays the first upstream answer —
+          # with Azure's fast SERVFAIL first in the list, container apt
+          # flapped and provisioning died on missing candidates. Public-
+          # first wins that race deterministically; Azure stays LAST only
+          # as the internal-cloudapp fallback. The restart makes dockerd/
+          # buildkitd re-read the file.
           {
+            printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\nnameserver 9.9.9.9\n'
+            UPSTREAM="$(resolvectl status | grep -oP 'DNS Servers: \K.*' | grep . | head -1)"
             if [ -n "$UPSTREAM" ]; then printf 'nameserver %s\n' $UPSTREAM; fi
-            printf 'nameserver 168.63.129.16\nnameserver 1.1.1.1\nnameserver 8.8.8.8\nnameserver 9.9.9.9\n'
           } | sudo tee /etc/resolv.conf
           cat /etc/resolv.conf
           sudo systemctl restart docker
