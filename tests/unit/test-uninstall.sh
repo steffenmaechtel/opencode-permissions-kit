@@ -173,7 +173,7 @@ for _pin in \
     '/usr/local/lib/opencode/wrapper' \
     '/usr/local/lib/opencode/protect-projects.sh' \
     'case "$_un_pp_link" in'; do
-    if grep -qF -- "$_pin" "$UNINSTALL_CORE"; then
+    if live_src "$UNINSTALL_CORE" | grep -qF -- "$_pin"; then
         pass "legacy removal pinned: $_pin"
     else
         fail "legacy removal pinned: $_pin"
@@ -182,7 +182,7 @@ done
 # The generic legacy names must stay MARKER-GATED, never blanket-removed:
 # anything else living at /etc/sudoers.d/opencode or /usr/local/lib/opencode
 # is not kit-owned.
-if grep -qF 'not kit-owned — left untouched' "$UNINSTALL_CORE" &&
+if live_src "$UNINSTALL_CORE" | grep -qF 'not kit-owned — left untouched' &&
     ! grep -Eq 'rm -rf /etc/opencode($|[^-])' "$UNINSTALL" &&
     ! grep -Eq 'rm -rf /etc/opencode($|[^-])' "$UNINSTALL_CORE"; then
     pass "legacy names are marker-gated (foreign content survives)"
@@ -192,12 +192,12 @@ fi
 
 # --- 5. cleanup hints match what install.sh leaves behind ----------------------
 
-if grep -qF "still contain" "$UNINSTALL" && grep -qF 'opencode permissions kit' "$UNINSTALL"; then
+if live_src "$UNINSTALL" | grep -qF "still contain" && live_src "$UNINSTALL" | grep -qF 'opencode permissions kit'; then
     pass "manual-cleanup section mentions the rc lines"
 else
     fail "manual-cleanup section mentions the rc lines"
 fi
-if grep -qF '.config/opencode/opencode.jsonc' "$UNINSTALL"; then
+if live_src "$UNINSTALL" | grep -qF '.config/opencode/opencode.jsonc'; then
     pass "manual-cleanup section mentions the default-user config"
 else
     fail "manual-cleanup section mentions the default-user config"
@@ -220,7 +220,7 @@ fi
 # Session hint (issue #73): the running shell keeps the ddev function
 # (helper deleted), PATH/umask and group membership — the uninstall must
 # tell the user to restart the terminal.
-if grep -q 'Restart your terminal' "$UNINSTALL"; then
+if live_src "$UNINSTALL" | grep -q 'Restart your terminal'; then
     pass "final output tells the user to restart the terminal (issue #73)"
 else
     fail "final output tells the user to restart the terminal (issue #73)"
@@ -238,7 +238,7 @@ else
 fi
 
 # uninstall side of the conf-user homes (0.0.44b W16)
-grep -q '"/home/$OPENCODE_USER/.config/opencode"' "$UNINSTALL_CORE" &&
+live_src "$UNINSTALL_CORE" | grep -q '"/home/$OPENCODE_USER/.config/opencode"' &&
     pass "uninstall plugin-unregister rides the conf user (V16)" ||
     fail "uninstall plugin-unregister rides the conf user (V16)"
 
@@ -248,11 +248,11 @@ grep -q '"/home/$OPENCODE_USER/.config/opencode"' "$UNINSTALL_CORE" &&
 # Issue #164: presence + content run at the rm's authority (sudo) — the
 # script runs as the developer, an admin 0700 /etc/openchamber must not
 # hide a kit pin from removal.
-if grep -q 'grep -q .\"opencodeBinary\".*\"/usr/local/bin/opencode\"' "$UNINSTALL_CORE" &&
-    grep -q 'rm -f /etc/openchamber/policy.json' "$UNINSTALL_CORE" &&
-    grep -q 'rmdir /etc/openchamber' "$UNINSTALL_CORE" &&
-    grep -qF 'sudo test -f /etc/openchamber/policy.json' "$UNINSTALL_CORE" &&
-    grep -qF 'sudo grep -q ' "$UNINSTALL_CORE"; then
+if live_src "$UNINSTALL_CORE" | grep -q 'grep -q .\"opencodeBinary\".*\"/usr/local/bin/opencode\"' &&
+    live_src "$UNINSTALL_CORE" | grep -q 'rm -f /etc/openchamber/policy.json' &&
+    live_src "$UNINSTALL_CORE" | grep -q 'rmdir /etc/openchamber' &&
+    live_src "$UNINSTALL_CORE" | grep -qF 'sudo test -f /etc/openchamber/policy.json' &&
+    live_src "$UNINSTALL_CORE" | grep -qF 'sudo grep -q '; then
     pass "openchamber policy removed marker-gated (kit content only)"
 else
     fail "openchamber policy removal lost its marker gate"
@@ -276,7 +276,7 @@ _un_bad="$(grep -e '/home/\$DEFAULT_USER' -e '/home/\${DEFAULT_USER' "$UNINSTALL
     grep -v '|| [[:alnum:]_]\{1,\}="/home/\$DEFAULT_USER"$' |
     grep -v '[[:alnum:]_]\{1,\}="\${[[:alnum:]_]\{1,\}:-/home/\${DEFAULT_USER:-\$USER}}"$' || true)"
 if grep -qF '_un_dev_home="$(getent passwd "$DEFAULT_USER" 2>/dev/null | cut -d: -f6 || true)"' "$UNINSTALL_CORE" &&
-    grep -qF '"$_un_dev_home/.config/opencode"' "$UNINSTALL_CORE" &&
+    live_src "$UNINSTALL_CORE" | grep -qF '"$_un_dev_home/.config/opencode"' &&
     [ -z "$_un_bad" ]; then
     pass "uninstall.sh resolves the developer home via getent for the cleanup loop"
 else
@@ -298,7 +298,7 @@ else
 fi
 
 # pr-00263 a F10: uninstall twin of the config.sh agent-home refusal.
-grep -q '_un_agent_home' "$UNINSTALL_CORE" &&
+live_src "$UNINSTALL_CORE" | grep -q '_un_agent_home' &&
     pass "uninstall agent-home refusal getent-aware (pr-00263 a F10)" ||
     fail "uninstall agent-home refusal literal-only (pr-00263 a F10)"
 
