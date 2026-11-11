@@ -36,6 +36,17 @@ ENV DEBIAN_FRONTEND=noninteractive
 # E2E_GIT_CHANNEL=latest make e2e-rootless honest too. See Dockerfile.
 ARG GIT_CHANNEL=distro
 
+# Apt archive knob — same contract as Dockerfile (see it for the full
+# rationale): CI sets azure.archive.ubuntu.com, empty default keeps the
+# base image's own sources. The trailing grep fails the build loud if the
+# rewrite missed.
+ARG APT_ARCHIVE_MIRROR=""
+RUN if [ -n "$APT_ARCHIVE_MIRROR" ]; then \
+        sed -i "s|archive.ubuntu.com|${APT_ARCHIVE_MIRROR}|g; s|security.ubuntu.com|${APT_ARCHIVE_MIRROR}|g" \
+            /etc/apt/sources.list.d/ubuntu.sources \
+        && grep -q "$APT_ARCHIVE_MIRROR" /etc/apt/sources.list.d/ubuntu.sources; \
+    fi
+
 # systemd + the pieces dockerd-rootless needs that apt does not install as
 # hard dependencies of docker-ce-rootless-extras on Ubuntu. fuse-overlayfs is
 # the rootless storage driver fallback (overlay2 under user namespaces);

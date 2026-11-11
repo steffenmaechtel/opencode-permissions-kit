@@ -197,6 +197,10 @@ jobs:
           # RUN steps in the docker bridge lost apt DNS while the runner's
           # own resolver worked — host networking shares it.
           E2E_BUILD_NETWORK: host
+          # Apt archive = Azure's mirror (archive.ubuntu.com DNS failures on
+          # the runners, 2026-11 — resolver-side; azure.archive.ubuntu.com
+          # rides the Azure DNS path that stayed healthy).
+          E2E_APT_ARCHIVE_MIRROR: azure.archive.ubuntu.com
 
   # Core setuid-docker suite, opencode 2.x lane, git-latest — the
   # floating half of the git pair (issue #118): builds the image with
@@ -267,6 +271,10 @@ jobs:
           # RUN steps in the docker bridge lost apt DNS while the runner's
           # own resolver worked — host networking shares it.
           E2E_BUILD_NETWORK: host
+          # Apt archive = Azure's mirror (archive.ubuntu.com DNS failures on
+          # the runners, 2026-11 — resolver-side; azure.archive.ubuntu.com
+          # rides the Azure DNS path that stayed healthy).
+          E2E_APT_ARCHIVE_MIRROR: azure.archive.ubuntu.com
 
   # docker-rootless daemon e2e (Phase 3). Same triggers + shared binary cache;
   # needs systemd-in-container + nested user namespaces, and SKIPs wholesale
@@ -323,6 +331,10 @@ jobs:
           # RUN steps in the docker bridge lost apt DNS while the runner's
           # own resolver worked — host networking shares it.
           E2E_BUILD_NETWORK: host
+          # Apt archive = Azure's mirror (archive.ubuntu.com DNS failures on
+          # the runners, 2026-11 — resolver-side; azure.archive.ubuntu.com
+          # rides the Azure DNS path that stayed healthy).
+          E2E_APT_ARCHIVE_MIRROR: azure.archive.ubuntu.com
 
   # opencode 1.x lane (issue #197): the same suite against the CURRENT
   # 1.x release, resolved from GitHub releases/latest at run time — the
@@ -395,6 +407,10 @@ jobs:
           # RUN steps in the docker bridge lost apt DNS while the runner's
           # own resolver worked — host networking shares it.
           E2E_BUILD_NETWORK: host
+          # Apt archive = Azure's mirror (archive.ubuntu.com DNS failures on
+          # the runners, 2026-11 — resolver-side; azure.archive.ubuntu.com
+          # rides the Azure DNS path that stayed healthy).
+          E2E_APT_ARCHIVE_MIRROR: azure.archive.ubuntu.com
 
   # docker-rootless daemon e2e, opencode 1.x lane (issue #197) — the
   # same mirrored trigger/cache layout as its 2x twin above; see
@@ -455,3 +471,7 @@ jobs:
           # RUN steps in the docker bridge lost apt DNS while the runner's
           # own resolver worked — host networking shares it.
           E2E_BUILD_NETWORK: host
+          # Apt archive = Azure's mirror (archive.ubuntu.com DNS failures on
+          # the runners, 2026-11 — resolver-side; azure.archive.ubuntu.com
+          # rides the Azure DNS path that stayed healthy).
+          E2E_APT_ARCHIVE_MIRROR: azure.archive.ubuntu.com

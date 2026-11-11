@@ -55,6 +55,13 @@
 #                    build bridge intermittently lost DNS (apt hosts
 #                    unresolvable, 2026-11) while the runner's OWN resolver
 #                    worked in the same run — host networking shares it.
+#   E2E_APT_ARCHIVE_MIRROR  apt archive host for the e2e image (default:
+#                    EMPTY = the base image's own archive.ubuntu.com
+#                    sources). CI sets 'azure.archive.ubuntu.com': the
+#                    runners' DNS path failed for the ubuntu archive hosts
+#                    (2026-11, resolver-side — bridge AND host networking,
+#                    while Azure-owned names resolved fine); the Azure
+#                    mirror lives in the same datacenters as the runners.
 #
 # Daemon quirk (setuid): a docker daemon unpacking images through the
 # containerd snapshotter — the kit's own rootless docker does this — can strip
@@ -97,6 +104,9 @@ E2E_BASE_IMAGE="${E2E_BASE_IMAGE:-ubuntu:24.04}"
 # --network on both builder paths (e2e_start_container); empty = docker's
 # default bridge.
 E2E_BUILD_NETWORK="${E2E_BUILD_NETWORK:-}"
+# Apt archive knob — see the header block. Forwarded as a build arg on both
+# builder paths; empty = the base image's own apt sources.
+E2E_APT_ARCHIVE_MIRROR="${E2E_APT_ARCHIVE_MIRROR:-}"
 # Pin the opencode version under test (e.g. E2E_OC_VERSION=1.18.15 for an
 # explicit 1.x lane run, issue #197). Pinned versions are fetched on demand:
 # 1.x from GitHub release assets, 2.x from the npm registry (2.x ships no
@@ -477,9 +487,11 @@ e2e_start_container() {
         echo ""
         echo "--- Building Docker image ($E2E_DOCKERFILE, git channel: $E2E_GIT_CHANNEL, base: $E2E_BASE_IMAGE) ---"
         echo "    build network: ${E2E_BUILD_NETWORK:-docker default bridge}"
+        echo "    apt archive: ${E2E_APT_ARCHIVE_MIRROR:-ubuntu defaults}"
         docker build ${E2E_BUILD_NETWORK:+--network "$E2E_BUILD_NETWORK"} \
             --build-arg GIT_CHANNEL="$E2E_GIT_CHANNEL" \
             --build-arg BASE_IMAGE="$E2E_BASE_IMAGE" \
+            --build-arg APT_ARCHIVE_MIRROR="$E2E_APT_ARCHIVE_MIRROR" \
             -t "$E2E_IMAGE" -f "$SCRIPT_DIR/$E2E_DOCKERFILE" "$SCRIPT_DIR"
 
         # Setuid guard: daemons that unpack images through the containerd
@@ -498,6 +510,7 @@ e2e_start_container() {
             if ! DOCKER_BUILDKIT=0 docker build ${E2E_BUILD_NETWORK:+--network "$E2E_BUILD_NETWORK"} \
                 --build-arg GIT_CHANNEL="$E2E_GIT_CHANNEL" \
                 --build-arg BASE_IMAGE="$E2E_BASE_IMAGE" \
+                --build-arg APT_ARCHIVE_MIRROR="$E2E_APT_ARCHIVE_MIRROR" \
                 -t "$E2E_IMAGE" -f "$SCRIPT_DIR/$E2E_DOCKERFILE" "$SCRIPT_DIR"; then
                 echo "  ${RED}FAIL${NC} classic-builder rebuild failed (removed in this Docker version?)."
                 echo "  Run the suite on a daemon whose images keep setuid bits (e.g. the rootful system docker)."

@@ -17,6 +17,20 @@ FROM ${BASE_IMAGE}
 # as --build-arg GIT_CHANNEL=...
 ARG GIT_CHANNEL=distro
 
+# Apt archive knob (archive.ubuntu.com DNS failures on the GitHub runners,
+# 2026-11 — resolver-side, bridge AND host networking affected while
+# Azure-owned names stayed healthy): lib.sh forwards E2E_APT_ARCHIVE_MIRROR
+# as --build-arg APT_ARCHIVE_MIRROR; CI points apt at Azure's mirror (the
+# same datacenters as the runners). Empty default = the base image's own
+# sources. The trailing grep fails the build loud if the rewrite missed
+# (e.g. a future base image without the DEB822 sources file).
+ARG APT_ARCHIVE_MIRROR=""
+RUN if [ -n "$APT_ARCHIVE_MIRROR" ]; then \
+        sed -i "s|archive.ubuntu.com|${APT_ARCHIVE_MIRROR}|g; s|security.ubuntu.com|${APT_ARCHIVE_MIRROR}|g" \
+            /etc/apt/sources.list.d/ubuntu.sources \
+        && grep -q "$APT_ARCHIVE_MIRROR" /etc/apt/sources.list.d/ubuntu.sources; \
+    fi
+
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update -qq && apt-get install -y --no-install-recommends \

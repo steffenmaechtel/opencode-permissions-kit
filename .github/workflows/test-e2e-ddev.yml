@@ -161,6 +161,10 @@ jobs:
           # RUN steps in the docker bridge lost apt DNS while the runner's
           # own resolver worked — host networking shares it.
           E2E_BUILD_NETWORK: host
+          # Apt archive = Azure's mirror (archive.ubuntu.com DNS failures on
+          # the runners, 2026-11 — resolver-side; azure.archive.ubuntu.com
+          # rides the Azure DNS path that stayed healthy).
+          E2E_APT_ARCHIVE_MIRROR: azure.archive.ubuntu.com
           # Authorize api.github.com calls (rate-limit resilience, lib.sh
           # gh_latest_tag resolves the ddev version) — the ephemeral
           # workflow token, no secret needed.
@@ -248,6 +252,10 @@ jobs:
           # RUN steps in the docker bridge lost apt DNS while the runner's
           # own resolver worked — host networking shares it.
           E2E_BUILD_NETWORK: host
+          # Apt archive = Azure's mirror (archive.ubuntu.com DNS failures on
+          # the runners, 2026-11 — resolver-side; azure.archive.ubuntu.com
+          # rides the Azure DNS path that stayed healthy).
+          E2E_APT_ARCHIVE_MIRROR: azure.archive.ubuntu.com
           # Authorize api.github.com calls (rate-limit resilience, lib.sh
           # gh_latest_tag resolves the ddev version) — the ephemeral
           # workflow token, no secret needed.
