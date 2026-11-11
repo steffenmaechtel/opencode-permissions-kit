@@ -182,6 +182,16 @@ jobs:
           restore-keys: |
             opencode-e2e-2x-old${{ steps.old.outputs.OLD_VERSION }}-
             opencode-e2e-old${{ steps.old.outputs.OLD_VERSION }}-
+      - name: Point build DNS at the Azure resolver
+        run: |
+          # Build containers never inherit the runner's loopback nameserver
+          # (systemd-resolved stub): BuildKit substitutes public defaults
+          # into build steps, and those failed for EVERY name in the
+          # 2026-11 DNS breaks while the host resolved fine. Write the
+          # reachable Azure resolver into the host resolv.conf — build
+          # containers copy it verbatim.
+          printf 'nameserver 168.63.129.16\n' | sudo tee /etc/resolv.conf
+          cat /etc/resolv.conf
       - name: Run E2E test
         run: |
           ./tests/e2e/run.sh
@@ -256,6 +266,16 @@ jobs:
           restore-keys: |
             opencode-e2e-2x-old${{ steps.old.outputs.OLD_VERSION }}-
             opencode-e2e-old${{ steps.old.outputs.OLD_VERSION }}-
+      - name: Point build DNS at the Azure resolver
+        run: |
+          # Build containers never inherit the runner's loopback nameserver
+          # (systemd-resolved stub): BuildKit substitutes public defaults
+          # into build steps, and those failed for EVERY name in the
+          # 2026-11 DNS breaks while the host resolved fine. Write the
+          # reachable Azure resolver into the host resolv.conf — build
+          # containers copy it verbatim.
+          printf 'nameserver 168.63.129.16\n' | sudo tee /etc/resolv.conf
+          cat /etc/resolv.conf
       - name: Run E2E test
         run: |
           ./tests/e2e/run.sh
@@ -320,6 +340,16 @@ jobs:
           restore-keys: |
             opencode-e2e-2x-old${{ steps.old.outputs.OLD_VERSION }}-
             opencode-e2e-old${{ steps.old.outputs.OLD_VERSION }}-
+      - name: Point build DNS at the Azure resolver
+        run: |
+          # Build containers never inherit the runner's loopback nameserver
+          # (systemd-resolved stub): BuildKit substitutes public defaults
+          # into build steps, and those failed for EVERY name in the
+          # 2026-11 DNS breaks while the host resolved fine. Write the
+          # reachable Azure resolver into the host resolv.conf — build
+          # containers copy it verbatim.
+          printf 'nameserver 168.63.129.16\n' | sudo tee /etc/resolv.conf
+          cat /etc/resolv.conf
       - name: Run docker-rootless E2E test
         run: |
           E2E_STRICT="${{ inputs.strict == true && '1' || '0' }}" ./tests/e2e/run-docker-rootless.sh
@@ -393,6 +423,16 @@ jobs:
           restore-keys: |
             opencode-e2e-old${{ steps.old.outputs.OLD_VERSION }}-
             opencode-e2e-2x-old${{ steps.old.outputs.OLD_VERSION }}-
+      - name: Point build DNS at the Azure resolver
+        run: |
+          # Build containers never inherit the runner's loopback nameserver
+          # (systemd-resolved stub): BuildKit substitutes public defaults
+          # into build steps, and those failed for EVERY name in the
+          # 2026-11 DNS breaks while the host resolved fine. Write the
+          # reachable Azure resolver into the host resolv.conf — build
+          # containers copy it verbatim.
+          printf 'nameserver 168.63.129.16\n' | sudo tee /etc/resolv.conf
+          cat /etc/resolv.conf
       - name: Run E2E test (opencode 1.x pin)
         run: |
           ./tests/e2e/run.sh
@@ -457,6 +497,16 @@ jobs:
           restore-keys: |
             opencode-e2e-old${{ steps.old.outputs.OLD_VERSION }}-
             opencode-e2e-2x-old${{ steps.old.outputs.OLD_VERSION }}-
+      - name: Point build DNS at the Azure resolver
+        run: |
+          # Build containers never inherit the runner's loopback nameserver
+          # (systemd-resolved stub): BuildKit substitutes public defaults
+          # into build steps, and those failed for EVERY name in the
+          # 2026-11 DNS breaks while the host resolved fine. Write the
+          # reachable Azure resolver into the host resolv.conf — build
+          # containers copy it verbatim.
+          printf 'nameserver 168.63.129.16\n' | sudo tee /etc/resolv.conf
+          cat /etc/resolv.conf
       - name: Run docker-rootless E2E test (opencode 1.x pin)
         run: |
           E2E_STRICT="${{ inputs.strict == true && '1' || '0' }}" ./tests/e2e/run-docker-rootless.sh

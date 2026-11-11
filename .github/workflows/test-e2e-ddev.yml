@@ -147,6 +147,16 @@ jobs:
           restore-keys: |
             opencode-e2e-2x-
             opencode-e2e-latest
+      - name: Point build DNS at the Azure resolver
+        run: |
+          # Build containers never inherit the runner's loopback nameserver
+          # (systemd-resolved stub): BuildKit substitutes public defaults
+          # into build steps, and those failed for EVERY name in the
+          # 2026-11 DNS breaks while the host resolved fine. Write the
+          # reachable Azure resolver into the host resolv.conf — build
+          # containers copy it verbatim.
+          printf 'nameserver 168.63.129.16\n' | sudo tee /etc/resolv.conf
+          cat /etc/resolv.conf
       - name: Run real-ddev E2E test
         env:
           E2E_DDEV_SITE: >-
@@ -235,6 +245,16 @@ jobs:
           key: opencode-e2e-latest${{ steps.version.outputs.OC_VERSION }}
           restore-keys: |
             opencode-e2e-latest
+      - name: Point build DNS at the Azure resolver
+        run: |
+          # Build containers never inherit the runner's loopback nameserver
+          # (systemd-resolved stub): BuildKit substitutes public defaults
+          # into build steps, and those failed for EVERY name in the
+          # 2026-11 DNS breaks while the host resolved fine. Write the
+          # reachable Azure resolver into the host resolv.conf — build
+          # containers copy it verbatim.
+          printf 'nameserver 168.63.129.16\n' | sudo tee /etc/resolv.conf
+          cat /etc/resolv.conf
       - name: Run real-ddev E2E test (opencode 1.x pin)
         env:
           E2E_DDEV_SITE: >-
