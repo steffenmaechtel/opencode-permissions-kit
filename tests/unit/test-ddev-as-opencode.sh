@@ -844,9 +844,13 @@ rm -rf "${HRH:?}"
 # start fails with EPERM. The hook must name the one-command fix BEFORE
 # the run; silent in every other case (grep-based, mirrors the hosts-hint
 # tests — the fixed /usr/local lib path prevents a functional test).
+# The shared case label pinned as its literal bytes (#473): the old ERE
+# alternation carried a dead start arm (start\\ matched nothing -- the
+# delivered pattern parsed as literal-backslash alternation) and passed
+# via the restart arm alone, leaving the start path unasserted.
 check_live "hook prints the typo3-bootstrap hint before start/restart" \
     "$FUNC" \
-    -qE 'start\\|restart\) _opk_bootstrap_hint'
+    -qF 'start | restart) _opk_bootstrap_hint'
 check_live "hook bootstrap hint shows the ready-made handover command" "$FUNC" -q 'config handover'
 check_live "hook bootstrap hint is gated on a project in the cwd" "$FUNC" -qF '[ -f "$PWD/.ddev/config.yaml" ]'
 check_live "hook bootstrap hint reuses the kit typo3 detection" "$FUNC" -q 'ddev_typo3_detected'
