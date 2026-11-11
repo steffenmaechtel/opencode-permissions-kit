@@ -330,6 +330,50 @@ else
     fail "git channel value counts off (latest:$_n_latest, distro:$_n_distro — expected 1/1)"
 fi
 
+# --- outage-wave CI hardening (2026-11-11; pins owed by issue #467) -----------
+# The launchpad/archive DNS outage hardened every e2e lane; the pins
+# were deliberately deferred (debug mode). Live-source counts (the
+# comment-strip convention): a disabled step or env must stop counting.
+
+# Host-network builds in every lane (2026-11 archive flakes: RUN steps
+# in the docker bridge lost apt DNS while the runner's own resolver
+# worked): 5 lanes here, 2 in the ddev twin.
+_NB_E2E=$(live_src "$WF_E2E" | grep -cE '^[[:space:]]*E2E_BUILD_NETWORK: host$' || true)
+_NB_DDEV=$(live_src "$WF_DDEV_E2E" | grep -cE '^[[:space:]]*E2E_BUILD_NETWORK: host$' || true)
+if [ "$_NB_E2E" = 5 ] && [ "$_NB_DDEV" = 2 ]; then
+    pass "every e2e lane builds with E2E_BUILD_NETWORK: host (5 + 2)"
+else
+    fail "E2E_BUILD_NETWORK: host lanes: test-e2e=$_NB_E2E (want 5), ddev=$_NB_DDEV (want 2)"
+fi
+
+# Resolver battery in every lane: presence, the docker restart that
+# makes dockerd/buildkitd re-read resolv.conf, and PUBLIC-FIRST order
+# (Azure's resolver SERVFAILs fastest and dockerd's embedded DNS relays
+# the first upstream answer — the Azure upstream must append LAST).
+# The order pins via adjacency: each UPSTREAM append sits directly
+# behind the public-resolver printf block.
+_RB_E2E=$(live_src "$WF_E2E" | grep -c 'Point build DNS at a resolver battery' || true)
+_RB_DDEV=$(live_src "$WF_DDEV_E2E" | grep -c 'Point build DNS at a resolver battery' || true)
+if [ "$_RB_E2E" = 5 ] && [ "$_RB_DDEV" = 2 ]; then
+    pass "resolver battery step in every e2e lane (5 + 2)"
+else
+    fail "resolver battery steps: test-e2e=$_RB_E2E (want 5), ddev=$_RB_DDEV (want 2)"
+fi
+_RB_RST_E2E=$(live_src "$WF_E2E" | grep -c 'sudo systemctl restart docker' || true)
+_RB_RST_DDEV=$(live_src "$WF_DDEV_E2E" | grep -c 'sudo systemctl restart docker' || true)
+if [ "$_RB_RST_E2E" = 5 ] && [ "$_RB_RST_DDEV" = 2 ]; then
+    pass "battery ends with the docker restart (re-read resolv.conf, 5 + 2)"
+else
+    fail "battery docker restarts: test-e2e=$_RB_RST_E2E (want 5), ddev=$_RB_RST_DDEV (want 2)"
+fi
+_RB_UP_E2E=$(grep -B1 'UPSTREAM="\$(resolvectl' "$WF_E2E" | grep -c 'nameserver 1.1.1.1' || true)
+_RB_UP_DDEV=$(grep -B1 'UPSTREAM="\$(resolvectl' "$WF_DDEV_E2E" | grep -c 'nameserver 1.1.1.1' || true)
+if [ "$_RB_UP_E2E" = 5 ] && [ "$_RB_UP_DDEV" = 2 ]; then
+    pass "battery order: public resolvers print directly BEFORE the Azure append (5 + 2)"
+else
+    fail "battery public-first order: e2e=$_RB_UP_E2E (want 5), ddev=$_RB_UP_DDEV (want 2)"
+fi
+
 # Explicit 1x lanes (renamed from the -2x twins, issue #197): GitHub
 # releases/latest, authenticated (0.0.45c C8 contract kept through the
 # flip — the ephemeral token, never an anonymous call from a shared

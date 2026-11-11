@@ -309,6 +309,47 @@ else
     fail "lib.sh cleanup traps: EXIT=$_LTRAP_EXIT signal=$_LTRAP_SIG (expected 1/1)"
 fi
 
+# --- outage-wave build knobs (2026-11-11; pins owed by issue #467) ------------
+# Comment-strip riders on every count (the source-counting convention):
+# a commented-out knob must stop counting.
+
+# E2E_BUILD_NETWORK (CI exports 'host' in all 7 lanes, pinned in
+# test-workflows.sh): the default, the banner print, and forwarding on
+# BOTH builder paths — the classic-builder fallback (DOCKER_BUILDKIT=0,
+# the setuid-quirk arm) losing the forwarding would silently rebuild on
+# the flaky bridge in exactly the runs that hit the quirk.
+_BN_DEFAULT=$(live_src "$LIB" | grep -cF 'E2E_BUILD_NETWORK="${E2E_BUILD_NETWORK:-}"' || true)
+_BN_FWD=$(live_src "$LIB" | grep -cF -- '--network "$E2E_BUILD_NETWORK"' || true)
+_BN_BANNER=$(live_src "$LIB" | grep -cF 'build network: ${E2E_BUILD_NETWORK:-docker default bridge}' || true)
+if [ "$_BN_DEFAULT" = 1 ] && [ "$_BN_FWD" = 2 ] && [ "$_BN_BANNER" = 1 ]; then
+    pass "lib.sh: E2E_BUILD_NETWORK default + banner + both builder paths forward it"
+else
+    fail "lib.sh E2E_BUILD_NETWORK: default=$_BN_DEFAULT fwd=$_BN_FWD (want 2), banner=$_BN_BANNER"
+fi
+
+# E2E_APT_ARCHIVE_MIRROR — pinned AS-IS (issue #467 offered pin-or-drop):
+# CI no longer exports it (the resolver battery superseded the Azure
+# mirror route), but it stays a working local operator escape for
+# Azure-adjacent runners — the machinery must not rot silently: lib.sh
+# forwards the build-arg on both paths, and both Dockerfiles rewrite
+# the apt sources only when it is set.
+E2E_DIR="$(dirname "$LIB")"
+_AM_FWD=$(live_src "$LIB" | grep -cF -- '--build-arg APT_ARCHIVE_MIRROR="$E2E_APT_ARCHIVE_MIRROR"' || true)
+if [ "$_AM_FWD" = 2 ]; then
+    pass "lib.sh: APT_ARCHIVE_MIRROR build-arg forwarded on both builder paths"
+else
+    fail "lib.sh APT_ARCHIVE_MIRROR forwarding sites: $_AM_FWD (expected 2)"
+fi
+for _df in "$E2E_DIR/Dockerfile" "$E2E_DIR/Dockerfile.rootless"; do
+    _am_arg=$(live_src "$_df" | grep -c '^ARG APT_ARCHIVE_MIRROR=""$' || true)
+    _am_sed=$(live_src "$_df" | grep -cF 's|archive.ubuntu.com|${APT_ARCHIVE_MIRROR}|g' || true)
+    if [ "$_am_arg" = 1 ] && [ "$_am_sed" -ge 1 ]; then
+        pass "$(basename "$_df"): conditional archive-mirror rewrite (ARG + sed, gated on non-empty)"
+    else
+        fail "$(basename "$_df") archive-mirror machinery: ARG=$_am_arg sed=$_am_sed"
+    fi
+done
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"
