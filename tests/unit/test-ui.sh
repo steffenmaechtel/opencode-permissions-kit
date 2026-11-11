@@ -194,8 +194,11 @@ check "no-tty gate: UI_NO_STDIN_FALLBACK hard-exits with guidance" \
     sh -c "[ \"\$1\" -ne 0 ] && printf '%s' \"\$2\" | grep -q 'no terminal available'" _ "$gate_rc" "$gate_out"
 
 menu_err=$(setsid sh -c ". \"\$1\"; ui_menu \"Mode?\" \"1\" \"1|Standard\"" _ "$UI" 2>&1 >/dev/null </dev/null)
-check "ui_menu prints the menu to stderr" \
-    sh -c "printf %s \"\$1\" | grep -q 'Mode?'" _ "$menu_err"
+if printf %s "$menu_err" | grep -q 'Mode?'; then
+    pass "ui_menu prints the menu to stderr"
+else
+    fail "ui_menu prints the menu to stderr"
+fi
 
 # --- plan list ----------------------------------------------------------------------------------------
 out=$(run_ui 'ui_plan 3 "Apply ACLs" "group rwx"')

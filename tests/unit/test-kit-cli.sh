@@ -584,10 +584,16 @@ check "chain walk: a clean absolute chain passes (#422)" \
     _ho_chain_sane "$HO_WALK/real/tree"
 check "chain walk: a symlinked parent component refuses (#422)" \
     sh -c '! _ho_chain_sane "$1"' _ "$HO_WALK/link-parent/tree"
-check "chain walk: relative operands resolve against the cwd (#422)" \
-    sh -c '. "$1" && cd "$2/real" && _ho_chain_sane tree' _ "$HOCORE" "$HO_WALK"
-check "chain walk: spaced paths survive the string-op walk (#422)" \
-    sh -c '. "$1" && mkdir -p "$2/spaced root" && _ho_chain_sane "$2/spaced root"' _ "$HOCORE" "$HO_WALK"
+if (. "$HOCORE" && cd "$HO_WALK/real" && _ho_chain_sane tree); then
+    pass "chain walk: relative operands resolve against the cwd (#422)"
+else
+    fail "chain walk: relative operands resolve against the cwd (#422)"
+fi
+if (. "$HOCORE" && mkdir -p "$HO_WALK/spaced root" && _ho_chain_sane "$HO_WALK/spaced root"); then
+    pass "chain walk: spaced paths survive the string-op walk (#422)"
+else
+    fail "chain walk: spaced paths survive the string-op walk (#422)"
+fi
 # The realpath-absent fallback (#437 a C4): a PATH-shadowed FAILING
 # realpath drives the || printf arm — the walk runs on the raw prefixed
 # form and still gates the linked parent (and still passes the clean

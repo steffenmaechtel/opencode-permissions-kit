@@ -563,8 +563,11 @@ check "0.0.39h F12: no 1;33 color definition remains repo-wide (files/)" \
 AH="$WORK/ah"
 mkdir -p "$AH/oc/.config/opencode" "$AH/other"
 ln -s "$AH/other" "$AH/oc/linked"
-check "walker: clean chain passes silently" \
-    sh -c '. "$1" && OPK_AGENT_HOME="$2/oc" agent_home_sane oc "$2/oc/.config/opencode"' _ "$STAGEDWRITE" "$AH"
+if (. "$STAGEDWRITE" && OPK_AGENT_HOME="$AH/oc" agent_home_sane oc "$AH/oc/.config/opencode"); then
+    pass "walker: clean chain passes silently"
+else
+    fail "walker: clean chain passes silently"
+fi
 if OPK_AGENT_HOME="$AH/oc" sh -c '. "$1" && agent_home_sane oc "$2/oc/linked/x"' _ "$STAGEDWRITE" "$AH" 2>/dev/null; then
     fail "walker: linked intermediate component trips"
 else
@@ -575,18 +578,28 @@ if OPK_AGENT_HOME="$AH/oc" sh -c '. "$1" && agent_home_sane oc "$2/oc/linked"' _
 else
     pass "walker: linked leaf trips"
 fi
-check "walker: path outside the agent home passes" \
-    sh -c '. "$1" && OPK_AGENT_HOME="$2/oc" agent_home_sane oc "$2/other/x"' _ "$STAGEDWRITE" "$AH"
-check "walker: the home itself passes" \
-    sh -c '. "$1" && OPK_AGENT_HOME="$2/oc" agent_home_sane oc "$2/oc"' _ "$STAGEDWRITE" "$AH"
+if (. "$STAGEDWRITE" && OPK_AGENT_HOME="$AH/oc" agent_home_sane oc "$AH/other/x"); then
+    pass "walker: path outside the agent home passes"
+else
+    fail "walker: path outside the agent home passes"
+fi
+if (. "$STAGEDWRITE" && OPK_AGENT_HOME="$AH/oc" agent_home_sane oc "$AH/oc"); then
+    pass "walker: the home itself passes"
+else
+    fail "walker: the home itself passes"
+fi
 
 # --- 7. wiring: the 0.0.39h gates ----------------------------------------------
 UNINSTALL="$REPO/files/opencode-permissions-kit-lib/management/uninstall.sh"
 check_live "gates: install.sh ~/.ddev operand gate" "$INSTALL_CORE" \
     -qF 'agent_home_sane "$OPENCODE_USER" "/home/$OPENCODE_USER/.ddev"'
 _ahg_n="$(live_src "$INSTALL_CORE" | grep -c 'agent_home_sane "$OPENCODE_USER" /home/opencode/' || true)"
-check "gates: install.sh Step 8 operand gates (.config/.config/opencode/.agents; gate sites: $_ahg_n, need 3-9)" \
-    sh -c '[ "$2" -ge 3 ] && [ "$2" -le 9 ]' _ "$INSTALL_CORE" "$_ahg_n"
+if [ "$_ahg_n" -ge 3 ] &&
+    [ "$_ahg_n" -le 9 ]; then
+    pass "gates: install.sh Step 8 operand gates (.config/.config/opencode/.agents; gate sites: $_ahg_n, need 3-9)"
+else
+    fail "gates: install.sh Step 8 operand gates (.config/.config/opencode/.agents; gate sites: $_ahg_n, need 3-9)"
+fi
 # 0.0.39i F1: the combined top-level mkdir is gone — every Step 8 mkdir
 # runs INSIDE its operand gate (three per-operand mkdirs), so no root
 # mkdir passes through a linked parent.

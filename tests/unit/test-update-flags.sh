@@ -144,8 +144,12 @@ _re=$(run_resolver "$WORK/bin" "$WORK/stub-v1" 'current_opencode_major')
 # --version hang (issue #80) — opk update, the remediation path, must
 # never block on it. Every --version call site routes through the
 # timeout-wrapped helper.
-check "update-core: bounded --version helper exists (timeout 10 + head -1)" \
-    sh -c "grep -q 'timeout 10 \"\$SYSTEM_BIN\" --version' \"\$1\" && grep -q 'opencode_version_line() {' \"\$1\"" _ "$UPDATE_CORE"
+if live_src "$UPDATE_CORE" | grep -q 'timeout 10 "$SYSTEM_BIN" --version' &&
+    live_src "$UPDATE_CORE" | grep -q 'opencode_version_line() {'; then
+    pass "update-core: bounded --version helper exists (timeout 10 + head -1)"
+else
+    fail "update-core: bounded --version helper exists (timeout 10 + head -1)"
+fi
 # Comment-strip riders (#261, the #244 g W1 class): commented-out lines
 # stop counting; full-line comments only (#244 h W6 residual). The count
 # binds the CALL FORM (#439 a S1, the #408 discipline): the bare name
@@ -156,8 +160,12 @@ check "update-core: bounded --version helper exists (timeout 10 + head -1)" \
 _ova_n="$(live_src "$UPDATE_CORE" | grep -c 'opencode_version_line)' || true)"
 check "update-core: all --version probes route through the bounded helper (call sites: $_ova_n, need exactly 4 — #439 a S1)" \
     [ "$_ova_n" -eq 4 ]
-check "update-core: post-copy failure message never names a backup that was never taken (W6)" \
-    sh -c "grep -qF 'no previous binary was backed up' \"\$1\" && grep -qF '[ -f \"\$BACKUP_DIR/opencode.current\" ]' \"\$1\"" _ "$UPDATE_CORE"
+if live_src "$UPDATE_CORE" | grep -qF 'no previous binary was backed up' &&
+    live_src "$UPDATE_CORE" | grep -qF '[ -f "$BACKUP_DIR/opencode.current" ]'; then
+    pass "update-core: post-copy failure message never names a backup that was never taken (W6)"
+else
+    fail "update-core: post-copy failure message never names a backup that was never taken (W6)"
+fi
 
 # 2b. latest resolution per major (npm dist-tag vs GitHub releases/latest)
 _re=$(run_resolver "$WORK/bin" "$WORK/stub-v2" 'resolve_latest_opencode_version 2')
@@ -284,12 +292,15 @@ check "cleanup: candidate dir removed only AFTER the install attempt (issue #24)
 # half-written backup is a poisoned restore source) and the fallback
 # restore. Sites live in sh/update-core.sh since #346 wave 2 (the
 # missing-lib fallback stub stays in update.sh's sourcing cluster).
-check "#163: install_binary deploys through the atomic helper" \
-    sh -c "grep -qF 'copy_binary_atomic \"\$src\" \"\$SYSTEM_BIN\" || return 1' \"\$1\"" _ "$UPDATE_CORE"
-check "#163: the pre-upgrade backup copy is atomic" \
-    sh -c "grep -qF 'copy_binary_atomic \"\$SYSTEM_BIN\" \"\$BACKUP_DIR/opencode.current\"' \"\$1\"" _ "$UPDATE_CORE"
-check "#163: the fallback restore is atomic" \
-    sh -c "grep -qF 'copy_binary_atomic \"\$BACKUP_DIR/opencode.current\" \"\$SYSTEM_BIN\"' \"\$1\"" _ "$UPDATE_CORE"
+check_live "#163: install_binary deploys through the atomic helper" \
+    "$UPDATE_CORE" \
+    -qF 'copy_binary_atomic "$src" "$SYSTEM_BIN" || return 1'
+check_live "#163: the pre-upgrade backup copy is atomic" \
+    "$UPDATE_CORE" \
+    -qF 'copy_binary_atomic "$SYSTEM_BIN" "$BACKUP_DIR/opencode.current"'
+check_live "#163: the fallback restore is atomic" \
+    "$UPDATE_CORE" \
+    -qF 'copy_binary_atomic "$BACKUP_DIR/opencode.current" "$SYSTEM_BIN"'
 check "#163: no direct sudo-cp onto/from SYSTEM_BIN remains" \
     sh -c "! grep -qF 'sudo cp \"\$src\" \"\$SYSTEM_BIN\"' \"\$1\" \
         && ! grep -qF 'sudo cp \"\$SYSTEM_BIN\" \"\$BACKUP_DIR/opencode.current\"' \"\$1\" \
@@ -297,37 +308,53 @@ check "#163: no direct sudo-cp onto/from SYSTEM_BIN remains" \
         && ! grep -qF 'sudo cp \"\$src\" \"\$SYSTEM_BIN\"' \"\$2\" \
         && ! grep -qF 'sudo cp \"\$SYSTEM_BIN\" \"\$BACKUP_DIR/opencode.current\"' \"\$2\" \
         && ! grep -qF 'sudo cp \"\$BACKUP_DIR/opencode.current\" \"\$SYSTEM_BIN\"' \"\$2\"" _ "$UPDATE" "$UPDATE_CORE"
-check "#163: the missing-lib fallback fails loud for the helper too" \
-    sh -c "grep -A1 -F 'copy_binary_atomic() {' \"\$1\" | grep -qF 'echo \"error: copy_binary_atomic unavailable'" _ "$UPDATE"
-check "#163: the manual-restore advice teaches the atomic shape" \
-    sh -c "grep -qF 'sudo mv \${SYSTEM_BIN}.tmp \$SYSTEM_BIN' \"\$1\"" _ "$UPDATE_CORE"
+if live_src "$UPDATE" | grep -A1 -F 'copy_binary_atomic() {' |
+    grep -qF 'echo "error: copy_binary_atomic unavailable'; then
+    pass "#163: the missing-lib fallback fails loud for the helper too"
+else
+    fail "#163: the missing-lib fallback fails loud for the helper too"
+fi
+check_live "#163: the manual-restore advice teaches the atomic shape" \
+    "$UPDATE_CORE" \
+    -qF 'sudo mv ${SYSTEM_BIN}.tmp $SYSTEM_BIN'
 
 # --- 4. --only-binary (issue #24 feature) -----------------------------------------
-check "flag: --only-binary parsed, implies BINARY_UPDATE" \
-    sh -c "grep -q -- '--only-binary)' \"\$1\" && grep -A4 -- '--only-binary)' \"\$1\" | grep -q 'BINARY_UPDATE=true'" _ "$UPDATE"
-check "flag: help text documents --only-binary" \
-    sh -c "grep -q -- '--only-binary    skip every kit step' \"\$1\"" _ "$UPDATE"
+if live_src "$UPDATE" | grep -q -- '--only-binary)' &&
+    live_src "$UPDATE" | grep -A4 -- '--only-binary)' | grep -q 'BINARY_UPDATE=true'; then
+    pass "flag: --only-binary parsed, implies BINARY_UPDATE"
+else
+    fail "flag: --only-binary parsed, implies BINARY_UPDATE"
+fi
+check_live "flag: help text documents --only-binary" "$UPDATE" -q -- '--only-binary    skip every kit step'
 _obw_n="$(live_src "$UPDATE" | grep -cF 'if [ "$ONLY_BINARY" != true ]; then' || true)"
 check "gating: kit re-deploy sections are wrapped (2 skip zones; wrap sites: $_obw_n, need >=2)" \
     [ "$_obw_n" -ge 2 ]
-check "no kit self-fetch in binary-only mode (library runs stay offline for kit files)" \
-    sh -c "grep -qF 'for _opk_a in \"\$@\"' \"\$1\" \
-        && grep -qF '[ \"\$_opk_binonly\" != true ] && { [ \"\$_opk_stdin\" = true ] ||' \"\$1\" \
-        && grep -qF '[ ! -f \"\$SCRIPT_DIR/../../../VERSION\" ]; }; then' \"\$1\"" _ "$UPDATE"
-check "--binary-path alone does NOT skip the self-fetch (full update + binary swap, review 0.0.29)" \
-    sh -c "grep -A2 -F -- '--only-binary)' \"\$1\" | tr -s '[:space:]' ' ' | grep -qF '_opk_binonly=true break' " _ "$UPDATE"
-check "library runs fall back to the installed version stamp" \
-    sh -c "grep -q 's/^VERSION=//p' \"\$1\"" _ "$UPDATE"
-check "gating: confirm prompt reflects binary-only mode" \
-    sh -c "grep -q 'Only upgrade the opencode binary' \"\$1\"" _ "$UPDATE"
-check "summary: binary-only mode reports Mode instead of Kit/Configs" \
-    sh -c "grep -q 'binary-only (kit files untouched)' \"\$1\"" _ "$UPDATE"
-check "kit CLI usage documents --only-binary" \
-    sh -c "grep -q -- '--only-binary' \"\$1\"" _ "$KIT"
-check "kit CLI has the upgrade-opencode shorthand (injects --yes --only-binary)" \
-    sh -c "grep -q 'upgrade-opencode)' \"\$1\" && grep -q -- '--yes --only-binary' \"\$1\"" _ "$KIT"
-check "docs: cli.md update flag table lists --only-binary" \
-    sh -c "grep -q -- '--only-binary' \"\$1\"" _ "$CLI_MD"
+if live_src "$UPDATE" | grep -qF 'for _opk_a in "$@"' &&
+    live_src "$UPDATE" | grep -qF '[ "$_opk_binonly" != true ] && { [ "$_opk_stdin" = true ] ||' &&
+    live_src "$UPDATE" | grep -qF '[ ! -f "$SCRIPT_DIR/../../../VERSION" ]; }; then'; then
+    pass "no kit self-fetch in binary-only mode (library runs stay offline for kit files)"
+else
+    fail "no kit self-fetch in binary-only mode (library runs stay offline for kit files)"
+fi
+if live_src "$UPDATE" | grep -A2 -F -- '--only-binary)' |
+    tr -s '[:space:]' ' ' | grep -qF '_opk_binonly=true break'; then
+    pass "--binary-path alone does NOT skip the self-fetch (full update + binary swap, review 0.0.29)"
+else
+    fail "--binary-path alone does NOT skip the self-fetch (full update + binary swap, review 0.0.29)"
+fi
+check_live "library runs fall back to the installed version stamp" "$UPDATE" -q 's/^VERSION=//p'
+check_live "gating: confirm prompt reflects binary-only mode" "$UPDATE" -q 'Only upgrade the opencode binary'
+check_live "summary: binary-only mode reports Mode instead of Kit/Configs" \
+    "$UPDATE" \
+    -q 'binary-only (kit files untouched)'
+check_live "kit CLI usage documents --only-binary" "$KIT" -q -- '--only-binary'
+if live_src "$KIT" | grep -q 'upgrade-opencode)' &&
+    live_src "$KIT" | grep -q -- '--yes --only-binary'; then
+    pass "kit CLI has the upgrade-opencode shorthand (injects --yes --only-binary)"
+else
+    fail "kit CLI has the upgrade-opencode shorthand (injects --yes --only-binary)"
+fi
+check_live "docs: cli.md update flag table lists --only-binary" "$CLI_MD" -q -- '--only-binary'
 
 # --- 5. channel resolution (issue #38: env KIT_BRANCH > KIT_CHANNEL stamp > master)
 # The stamp read + fallback chain is extracted verbatim and executed with
@@ -368,24 +395,32 @@ out=$(chan_case "" "")
 out=$(chan_case "" "feature/x")
 [ "$out" = "feature/x" ] && pass "channel: any branch env passes through" ||
     fail "channel: any branch env passes through (out=$out)"
-check "channel: KIT_BASE_URL builds from the resolved ref" \
-    sh -c "grep -F 'KIT_BASE_URL=\"\${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/\$KIT_BRANCH}\"' \"\$1\"" _ "$UPDATE"
-check "channel: install.conf refresh strips and re-stamps KIT_CHANNEL" \
-    sh -c "grep -qF -- \"-e '^KIT_CHANNEL='\" \"\$1\" && grep -qF 'echo \"KIT_CHANNEL=\$KIT_BRANCH\"' \"\$1\"" _ "$UPDATE_CORE"
+check_live "channel: KIT_BASE_URL builds from the resolved ref" \
+    "$UPDATE" \
+    -F 'KIT_BASE_URL="${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/$KIT_BRANCH}"'
+if live_src "$UPDATE_CORE" | grep -qF -- "-e '^KIT_CHANNEL='" &&
+    live_src "$UPDATE_CORE" | grep -qF 'echo "KIT_CHANNEL=$KIT_BRANCH"'; then
+    pass "channel: install.conf refresh strips and re-stamps KIT_CHANNEL"
+else
+    fail "channel: install.conf refresh strips and re-stamps KIT_CHANNEL"
+fi
 
 # --- 6. ddev version stamp refresh (issue #72) -------------------------------------
 # DDEV_VERSION in install.conf is an install-time stamp; ddev upgrades leave
 # it behind, and ddev >= 1.25.4 even refuses root-run probes (update.sh runs
 # as root). The refresh must re-probe via the kit's helper (ddev exactly as
 # the kit runs it) and keep the old stamp when nothing answers.
-check "ddev stamp: refresh strips and re-stamps DDEV_VERSION" \
-    sh -c "grep -qF -- \"-e '^DDEV_VERSION='\" \"\$1\" && grep -qF 'echo \"DDEV_VERSION=\$NEW_DDEV_VERSION\"' \"\$1\"" _ "$UPDATE_CORE"
-check "ddev stamp: probe asks the ddev-as-opencode helper (ddev >= 1.25.4 refuses root)" \
-    sh -c "grep -q 'sudo -n -u \"\$OPENCODE_USER\" \"\$LIBDIR/bin/ddev-as-opencode\" --version' \"\$1\"" _ "$UPDATE_CORE"
-check "ddev stamp: old stamp survives when no binary answers" \
-    sh -c "grep -q 's/^DDEV_VERSION=//p' \"\$1\"" _ "$UPDATE_CORE"
-check "ddev stamp: summary line reports the refreshed value" \
-    sh -c "grep -q 'DDEV_VERSION=\$NEW_DDEV_VERSION' \"\$1\"" _ "$UPDATE_CORE"
+if live_src "$UPDATE_CORE" | grep -qF -- "-e '^DDEV_VERSION='" &&
+    live_src "$UPDATE_CORE" | grep -qF 'echo "DDEV_VERSION=$NEW_DDEV_VERSION"'; then
+    pass "ddev stamp: refresh strips and re-stamps DDEV_VERSION"
+else
+    fail "ddev stamp: refresh strips and re-stamps DDEV_VERSION"
+fi
+check_live "ddev stamp: probe asks the ddev-as-opencode helper (ddev >= 1.25.4 refuses root)" \
+    "$UPDATE_CORE" \
+    -q 'sudo -n -u "$OPENCODE_USER" "$LIBDIR/bin/ddev-as-opencode" --version'
+check_live "ddev stamp: old stamp survives when no binary answers" "$UPDATE_CORE" -q 's/^DDEV_VERSION=//p'
+check_live "ddev stamp: summary line reports the refreshed value" "$UPDATE_CORE" -q 'DDEV_VERSION=$NEW_DDEV_VERSION'
 
 # --- 7. --channel (switch the tracking ref without editing install.conf) --------
 _prescan_ln=$(live_src "$UPDATE" | grep -n '_prev_arg' | head -1 | cut -d: -f1)
@@ -395,55 +430,113 @@ if [ -n "$_prescan_ln" ] && [ -n "$_resolv_ln" ] && [ "$_prescan_ln" -lt "$_reso
 else
     fail "channel: pre-scan runs before the stamp resolution (fetch uses the new ref)"
 fi
-check "channel: arg loop accepts --channel with a value (not 'unknown option')" \
-    sh -c "grep -q -- '--channel)' \"\$1\" && grep -qF -- '--channel requires a ref' \"\$1\"" _ "$UPDATE"
-check "channel: help text documents --channel" \
-    sh -c "grep -q -- '--channel <ref>' \"\$1\"" _ "$UPDATE"
-check "channel: switch persists via the KIT_CHANNEL re-stamp" \
-    sh -c "grep -qF 'KIT_CHANNEL=\$KIT_BRANCH' \"\$1\"" _ "$UPDATE_CORE"
-check "channel: missing ref is rejected (arg loop, from a checkout)" \
-    sh -c "! sh \"\$1\" --channel >/dev/null 2>&1" _ "$UPDATE"
-check "channel: --help with --channel still works (pre-scan is silent)" \
-    sh -c "sh \"\$1\" --channel testref --help >/dev/null 2>&1" _ "$UPDATE"
-check "channel: ref charset is enforced — metacharacters rejected (0.0.39b S1)" \
-    sh -c "! sh \"\$1\" --channel 'foo;rm' >/dev/null 2>&1" _ "$UPDATE"
-check "channel: ref charset is enforced — '..' rejected (URL traversal off the repo prefix, 0.0.39e S4)" \
-    sh -c "! sh \"\$1\" --channel 'a..b' >/dev/null 2>&1" _ "$UPDATE"
-check "channel: ref charset is enforced — newline rejected, also via env" \
-    sh -c "! env KIT_BRANCH=\$(printf 'a\\nb') sh \"\$1\" --help >/dev/null 2>&1" _ "$UPDATE"
-check "channel: a real ref shape passes the gate (stable)" \
-    sh -c "sh \"\$1\" --channel stable --help >/dev/null 2>&1" _ "$UPDATE"
+if live_src "$UPDATE" | grep -q -- '--channel)' &&
+    live_src "$UPDATE" | grep -qF -- '--channel requires a ref'; then
+    pass "channel: arg loop accepts --channel with a value (not 'unknown option')"
+else
+    fail "channel: arg loop accepts --channel with a value (not 'unknown option')"
+fi
+check_live "channel: help text documents --channel" "$UPDATE" -q -- '--channel <ref>'
+check_live "channel: switch persists via the KIT_CHANNEL re-stamp" "$UPDATE_CORE" -qF 'KIT_CHANNEL=$KIT_BRANCH'
+if ! sh "$UPDATE" --channel >/dev/null 2>&1; then
+    pass "channel: missing ref is rejected (arg loop, from a checkout)"
+else
+    fail "channel: missing ref is rejected (arg loop, from a checkout)"
+fi
+if sh "$UPDATE" --channel testref --help >/dev/null 2>&1; then
+    pass "channel: --help with --channel still works (pre-scan is silent)"
+else
+    fail "channel: --help with --channel still works (pre-scan is silent)"
+fi
+if ! sh "$UPDATE" --channel 'foo;rm' >/dev/null 2>&1; then
+    pass "channel: ref charset is enforced — metacharacters rejected (0.0.39b S1)"
+else
+    fail "channel: ref charset is enforced — metacharacters rejected (0.0.39b S1)"
+fi
+if ! sh "$UPDATE" --channel 'a..b' >/dev/null 2>&1; then
+    pass "channel: ref charset is enforced — '..' rejected (URL traversal off the repo prefix, 0.0.39e S4)"
+else
+    fail "channel: ref charset is enforced — '..' rejected (URL traversal off the repo prefix, 0.0.39e S4)"
+fi
+if ! env KIT_BRANCH=$(printf 'a\nb') sh "$UPDATE" --help >/dev/null 2>&1; then
+    pass "channel: ref charset is enforced — newline rejected, also via env"
+else
+    fail "channel: ref charset is enforced — newline rejected, also via env"
+fi
+if sh "$UPDATE" --channel stable --help >/dev/null 2>&1; then
+    pass "channel: a real ref shape passes the gate (stable)"
+else
+    fail "channel: a real ref shape passes the gate (stable)"
+fi
 
 # --- 7b. scratch cleanup (review 0.0.39a C1) --------------------------------------
 # Split by #346 wave 2: the trap and the fetch-tree hand-off stay in
 # update.sh's bootstrap; the install.conf staging temp moved with the
 # finalize sections into sh/update-core.sh.
-check "cleanup: EXIT/INT/TERM trap removes the fetch tree" \
-    sh -c "grep -qF 'trap cleanup EXIT' \"\$1\" && grep -qF \"trap 'cleanup; exit 1' INT TERM\" \"\$1\" && grep -qF '_FETCH_TREE=\"\$base\"' \"\$1\"" _ "$UPDATE"
-check "cleanup: the conf staging temp is trap-registered in the phase lib" \
-    sh -c "grep -qF '_CONF_TMP=' \"\$1\"" _ "$UPDATE_CORE"
-check "cleanup: fetched tree survives the self re-exec via the environment" \
-    sh -c "grep -qF 'export _FETCH_TREE' \"\$1\"" _ "$UPDATE"
+if live_src "$UPDATE" | grep -qF 'trap cleanup EXIT' &&
+    live_src "$UPDATE" | grep -qF "trap 'cleanup; exit 1' INT TERM" &&
+    live_src "$UPDATE" | grep -qF '_FETCH_TREE="$base"'; then
+    pass "cleanup: EXIT/INT/TERM trap removes the fetch tree"
+else
+    fail "cleanup: EXIT/INT/TERM trap removes the fetch tree"
+fi
+check_live "cleanup: the conf staging temp is trap-registered in the phase lib" "$UPDATE_CORE" -qF '_CONF_TMP='
+check_live "cleanup: fetched tree survives the self re-exec via the environment" "$UPDATE" -qF 'export _FETCH_TREE'
 
 # --- 8. --major / --version (issue #99: upgrades never cross majors) ------------
-check "flag: --major parsed, only 1 or 2 accepted" \
-    sh -c "grep -q -- '--major)' \"\$1\" && grep -q -- '--major must be 1 or 2' \"\$1\"" _ "$UPDATE"
-check "flag: --version parsed with a value" \
-    sh -c "grep -q -- '--version)' \"\$1\" && grep -q -- '--version requires an opencode version' \"\$1\"" _ "$UPDATE"
-check "flag: --major 3 is rejected" \
-    sh -c "! sh \"\$1\" --binary --major 3 >/dev/null 2>&1" _ "$UPDATE"
-check "flag: --version without a value is rejected" \
-    sh -c "! sh \"\$1\" --binary --version >/dev/null 2>&1" _ "$UPDATE"
-check "flag: help text documents --major and --version" \
-    sh -c "grep -q -- '--major 1|2' \"\$1\" && grep -q -- '--version <ver>' \"\$1\"" _ "$UPDATE"
-check "resolve: latest-version resolution guards the requested major" \
-    sh -c "grep -A1 -F '2.*)' \"\$1\" | grep -qF 'echo \"\$_rlov_ver\"' && grep -A1 -F '1.*)' \"\$1\" | grep -qF 'echo \"\$_rlov_ver\"'" _ "$UPDATE_CORE"
-check "resolve: 2.x channel is the npm registry (with scope fallback)" \
-    sh -c "grep -q 'registry.npmjs.org/@opencode/cli-' \"\$1\" && grep -q 'registry.npmjs.org/@opencode-ai/cli-' \"\$1\"" _ "$UPDATE_CORE"
-check "tui: registration flips with the major (sync function, both directions)" \
-    sh -c "grep -q '^sync_tui_registration() {' \"\$1\" && grep -q 'tui_plugin_sync_user \"\$_str_major\"' \"\$1\" && grep -qF 'rm -rf \"\${_tp_user_dir:?}/plugins/opencode-permissions-kit\"' \"\$2\"" _ "$UPDATE_CORE" "$TUIPLUGIN"
-check "tui: a major flip re-anchors the registration even in --only-binary runs" \
-    sh -c "grep -n 'sync_tui_registration \"\$_maj_after\"' \"\$1\" | head -1 | cut -d: -f1 | grep -q ." _ "$UPDATE_CORE"
+if live_src "$UPDATE" | grep -q -- '--major)' &&
+    live_src "$UPDATE" | grep -q -- '--major must be 1 or 2'; then
+    pass "flag: --major parsed, only 1 or 2 accepted"
+else
+    fail "flag: --major parsed, only 1 or 2 accepted"
+fi
+if live_src "$UPDATE" | grep -q -- '--version)' &&
+    live_src "$UPDATE" | grep -q -- '--version requires an opencode version'; then
+    pass "flag: --version parsed with a value"
+else
+    fail "flag: --version parsed with a value"
+fi
+if ! sh "$UPDATE" --binary --major 3 >/dev/null 2>&1; then
+    pass "flag: --major 3 is rejected"
+else
+    fail "flag: --major 3 is rejected"
+fi
+if ! sh "$UPDATE" --binary --version >/dev/null 2>&1; then
+    pass "flag: --version without a value is rejected"
+else
+    fail "flag: --version without a value is rejected"
+fi
+if live_src "$UPDATE" | grep -q -- '--major 1|2' &&
+    live_src "$UPDATE" | grep -q -- '--version <ver>'; then
+    pass "flag: help text documents --major and --version"
+else
+    fail "flag: help text documents --major and --version"
+fi
+if live_src "$UPDATE_CORE" | grep -A1 -F '2.*)' | grep -qF 'echo "$_rlov_ver"' &&
+    live_src "$UPDATE_CORE" | grep -A1 -F '1.*)' | grep -qF 'echo "$_rlov_ver"'; then
+    pass "resolve: latest-version resolution guards the requested major"
+else
+    fail "resolve: latest-version resolution guards the requested major"
+fi
+if live_src "$UPDATE_CORE" | grep -q 'registry.npmjs.org/@opencode/cli-' &&
+    live_src "$UPDATE_CORE" | grep -q 'registry.npmjs.org/@opencode-ai/cli-'; then
+    pass "resolve: 2.x channel is the npm registry (with scope fallback)"
+else
+    fail "resolve: 2.x channel is the npm registry (with scope fallback)"
+fi
+if live_src "$UPDATE_CORE" | grep -q '^sync_tui_registration() {' &&
+    live_src "$UPDATE_CORE" | grep -q 'tui_plugin_sync_user "$_str_major"' &&
+    live_src "$TUIPLUGIN" | grep -qF 'rm -rf "${_tp_user_dir:?}/plugins/opencode-permissions-kit"'; then
+    pass "tui: registration flips with the major (sync function, both directions)"
+else
+    fail "tui: registration flips with the major (sync function, both directions)"
+fi
+if live_src "$UPDATE_CORE" | grep -n 'sync_tui_registration "$_maj_after"' |
+    head -1 | cut -d: -f1 | grep -q .; then
+    pass "tui: a major flip re-anchors the registration even in --only-binary runs"
+else
+    fail "tui: a major flip re-anchors the registration even in --only-binary runs"
+fi
 
 # OPENCODE_MAJOR re-stamp discipline (0.0.44a V5/V20, hardened 0.0.44b
 # W4): a RETURNED version line is always a major (2.x prints "opencode
@@ -589,10 +682,13 @@ fi
 # wave 3 — the absence covers BOTH files (the suite's own idiom).
 check "install-time stamp has no bare default-to-1 (F1)" \
     sh -c "! grep -qE '^[[:space:]]+OPENCODE_MAJOR=1\$' \"\$1\" && ! grep -qE '^[[:space:]]+OPENCODE_MAJOR=1\$' \"\$2\"" _ "$INSTALL" "$INSTALL_CORE"
-check "preflight probes the reused binary bounded (F1)" \
-    sh -c "grep -qF 'timeout 10 \"\$_pf_oc_bin\" --version' \"\$1\"" _ "$INSTALL_CORE"
-check "preflight warns instead of aborting on an unresponsive binary (F1)" \
-    sh -c "grep -qF 'does not answer --version' \"\$1\" && grep -qF \"the install reuses this binary\" \"\$1\"" _ "$INSTALL_CORE"
+check_live "preflight probes the reused binary bounded (F1)" "$INSTALL_CORE" -qF 'timeout 10 "$_pf_oc_bin" --version'
+if live_src "$INSTALL_CORE" | grep -qF 'does not answer --version' &&
+    live_src "$INSTALL_CORE" | grep -qF "the install reuses this binary"; then
+    pass "preflight warns instead of aborting on an unresponsive binary (F1)"
+else
+    fail "preflight warns instead of aborting on an unresponsive binary (F1)"
+fi
 
 # --- streamed stdin guard (0.0.45c S8) + help-text drift (D2) ---------------------
 # A streamed update (curl | sudo bash) has the script body on stdin: the
@@ -601,8 +697,12 @@ check "preflight warns instead of aborting on an unresponsive binary (F1)" \
 # streamed entry point, consumed script bytes as the confirm answer and
 # unknown input silently resolved to the default y. Set AND exported:
 # the re-exec'd fetched copy below inherits it.
-check "streamed update never reads the confirm answer from the script stream (S8)" \
-    sh -c "grep -qF 'UI_NO_STDIN_FALLBACK=1' \"\$1\" && grep -qF 'export UI_NO_STDIN_FALLBACK' \"\$1\"" _ "$UPDATE"
+if live_src "$UPDATE" | grep -qF 'UI_NO_STDIN_FALLBACK=1' &&
+    live_src "$UPDATE" | grep -qF 'export UI_NO_STDIN_FALLBACK'; then
+    pass "streamed update never reads the confirm answer from the script stream (S8)"
+else
+    fail "streamed update never reads the confirm answer from the script stream (S8)"
+fi
 check "update.sh --help no longer claims prompt-free defaults (D2)" \
     sh -c "! grep -qF 'No prompts by default' \"\$1\"" _ "$UPDATE"
 
@@ -611,21 +711,27 @@ check "update.sh --help no longer claims prompt-free defaults (D2)" \
 # OPENCHAMBER_POLICY=yes (sourced above), never created without the
 # opt-in, and an admin-owned policy.json without the opt-in stays
 # untouched.
-check "update re-applies the policy pin when opted in" \
-    sh -c "grep -qF '[ \"\${OPENCHAMBER_POLICY:-}\" = \"yes\" ]' \"\$1\" \
-        && grep -qF 'sudo mv -f \"\$_ocp_tmp\" /etc/openchamber/policy.json' \"\$1\"" _ "$UPDATE_CORE"
+if live_src "$UPDATE_CORE" | grep -qF '[ "${OPENCHAMBER_POLICY:-}" = "yes" ]' &&
+    live_src "$UPDATE_CORE" | grep -qF 'sudo mv -f "$_ocp_tmp" /etc/openchamber/policy.json'; then
+    pass "update re-applies the policy pin when opted in"
+else
+    fail "update re-applies the policy pin when opted in"
+fi
 check "update never creates the policy pin without the opt-in" \
     sh -c "! grep -qF 'OPENCHAMBER_POLICY=\"yes\"' \"\$1\" && ! grep -qF 'OPENCHAMBER_POLICY=\"yes\"' \"\$2\"" _ "$UPDATE" "$UPDATE_CORE"
 # 0.0.47a F1: the re-apply never overwrites admin content — byte-gate on
 # the kit one-liner, loud skip (not a silent tee) when the file diverges,
 # and the write sits in the gated else branch.
-check "update re-apply is byte-gated on kit-shaped content (0.0.47a F1)" \
-    sh -c "grep -qF '_oc_expected=' \"\$1\" \
-        && grep -qF '!= \"\$_oc_expected\" ]' \"\$1\" \
-        && grep -qF 'diverges from the kit pin (admin-owned content) — left untouched' \"\$1\"" _ "$UPDATE_CORE"
-check "install twin carries the same admin-content gate (0.0.47a F1)" \
-    sh -c "grep -qF 'diverges from the kit pin' \"\$1\"" _ \
-    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/install-core.sh"
+if live_src "$UPDATE_CORE" | grep -qF '_oc_expected=' &&
+    live_src "$UPDATE_CORE" | grep -qF '!= "$_oc_expected" ]' &&
+    live_src "$UPDATE_CORE" | grep -qF 'diverges from the kit pin (admin-owned content) — left untouched'; then
+    pass "update re-apply is byte-gated on kit-shaped content (0.0.47a F1)"
+else
+    fail "update re-apply is byte-gated on kit-shaped content (0.0.47a F1)"
+fi
+check_live "install twin carries the same admin-content gate (0.0.47a F1)" \
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/install-core.sh" \
+    -qF 'diverges from the kit pin'
 
 # --- issue #164: presence probes run at the write's authority ---------------------
 # The openchamber gate probed /etc/openchamber/policy.json at INVOKING-user

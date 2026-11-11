@@ -147,7 +147,11 @@ echo ""
 echo "-- wrapper rootless socket probe (socket-check.sh) --"
 SOCKCHECK="$REPO/files/opencode-permissions-kit-lib/bin/socket-check"
 check "socket-check exists" [ -f "$SOCKCHECK" ]
-check "socket-check has shebang" sh -c 'test "$(head -1 "$1")" = "#!/bin/sh"' _ "$SOCKCHECK"
+if test "$(head -1 "$SOCKCHECK")" = "#!/bin/sh"; then
+    pass "socket-check has shebang"
+else
+    fail "socket-check has shebang"
+fi
 check_live "socket-check only does test -S (no command execution)" "$SOCKCHECK" -Fq '[ -n "$sock" ] && [ -S "$sock" ]'
 check_live "socket-check strips a unix:// prefix" "$SOCKCHECK" -Fq 'sock="${sock#unix://}"'
 check_live "wrapper has a sock_reachable probe function" "$WRAPPER_CORE" -Fq 'sock_reachable()'
@@ -210,8 +214,11 @@ if live_src "$DEPLOYLIB" | grep -qF 'opencode-permissions-kit-lib/bin/setup-cont
 else
     fail "update.sh deploys setup-container-backend to LIBDIR (lib_deploy manifest)"
 fi
-check "update.sh KIT_FILES has NO migrate-denies.sh (legacy cleanup)" \
-    sh -c "! sed -n 's/^KIT_FILES=\"\\(.*\\)\"$/\\1/p' \"\$1\" | grep -q migrate-denies" _ "$UPDATE"
+if ! sed -n 's/^KIT_FILES="\(.*\)"$/\1/p' "$UPDATE" | grep -q migrate-denies; then
+    pass "update.sh KIT_FILES has NO migrate-denies.sh (legacy cleanup)"
+else
+    fail "update.sh KIT_FILES has NO migrate-denies.sh (legacy cleanup)"
+fi
 check "update.sh stamps no HARD_DENY_REMOVED key anymore" \
     sh -c '! grep -Fq "HARD_DENY_REMOVED=1" "$1" && ! grep -Fq "HARD_DENY_REMOVED=1" "$2"' _ "$UPDATE" "$UPDATE_CORE"
 check "update.sh KIT_FILES has NO protect-projects.sh" \
@@ -300,7 +307,11 @@ echo ""
 echo "-- setup-container-backend structure --"
 SETUP="$REPO/files/opencode-permissions-kit-lib/bin/setup-container-backend"
 check "setup-container-backend exists" [ -f "$SETUP" ]
-check "setup has shebang" sh -c 'test "$(head -1 "$1")" = "#!/bin/sh"' _ "$SETUP"
+if test "$(head -1 "$SETUP")" = "#!/bin/sh"; then
+    pass "setup has shebang"
+else
+    fail "setup has shebang"
+fi
 check_live "setup accepts rootless backends" "$SETUP" -Fq 'docker-rootless | podman-rootless'
 check_live "setup installs uidmap + dbus" "$SETUP" -Fq 'apt_install uidmap'
 check_live "setup auto-allocates subuid/subgid" "$SETUP" -Fq 'allocate_subuid_subgid'

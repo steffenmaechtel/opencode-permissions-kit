@@ -126,8 +126,12 @@ check_no "plugin never touches the user's theme (no theme.set/install)" \
 # --- install.sh wiring --------------------------------------------------------
 check_live "install.sh fetch list includes the tui payload" "$INSTALL" \
     -q 'opencode-permissions-kit-lib/tui/kit-mode.tsx'
-check "install.sh deploys the plugin to LIBDIR/tui (lib_deploy manifest)" \
-    sh -c 'grep -qF "opencode-permissions-kit-lib/tui/kit-mode.tsx 644" "$2" && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL_CORE" "$DEPLOYLIB"
+if live_src "$DEPLOYLIB" | grep -qF "opencode-permissions-kit-lib/tui/kit-mode.tsx 644" &&
+    live_src "$INSTALL_CORE" | grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\""; then
+    pass "install.sh deploys the plugin to LIBDIR/tui (lib_deploy manifest)"
+else
+    fail "install.sh deploys the plugin to LIBDIR/tui (lib_deploy manifest)"
+fi
 check_live "install.sh installs the opencode-user tui.json (marker policy)" "$INSTALL_CORE" \
     -q 'grep -q .\"_opencode_permissions_kit\". \"\$OC_TUI_CONF\"'
 check_live "install.sh installs the default-user danger theme" "$INSTALL_CORE" \
@@ -136,8 +140,12 @@ check_live "install.sh keeps user-managed tui.json (skip branch)" "$INSTALL_CORE
 
 # --- update.sh wiring ---------------------------------------------------------
 check_live "update.sh KIT_FILES includes the tui payload" "$UPDATE" -q 'opencode-permissions-kit-lib/tui/kit-mode.tsx'
-check "update.sh re-deploys the plugin to LIBDIR/tui (lib_deploy manifest)" \
-    sh -c 'grep -qF "opencode-permissions-kit-lib/tui/kit-mode.tsx 644" "$2" && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE_CORE" "$DEPLOYLIB"
+if live_src "$DEPLOYLIB" | grep -qF "opencode-permissions-kit-lib/tui/kit-mode.tsx 644" &&
+    live_src "$UPDATE_CORE" | grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\""; then
+    pass "update.sh re-deploys the plugin to LIBDIR/tui (lib_deploy manifest)"
+else
+    fail "update.sh re-deploys the plugin to LIBDIR/tui (lib_deploy manifest)"
+fi
 check_live "update.sh refreshes the opencode-user tui.json (marker policy)" "$UPDATE_CORE" \
     -q 'grep -q .\"_opencode_permissions_kit\". \"\$OC_TUI_CONF\"'
 check_live "update.sh refreshes the default-user danger theme" "$UPDATE_CORE" \
@@ -181,8 +189,12 @@ check "2x plugin render is defensive (try/catch)" \
     grep -q 'catch' "$PLUGIN2X"
 check_live "install.sh fetch list includes the 2x plugin" "$INSTALL" \
     -q 'opencode-permissions-kit-lib/tui/kit-mode-2x.tsx'
-check "install.sh deploys the 2x plugin to LIBDIR/tui (lib_deploy manifest)" \
-    sh -c 'grep -qF "opencode-permissions-kit-lib/tui/kit-mode-2x.tsx 644" "$2" && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL_CORE" "$DEPLOYLIB"
+if live_src "$DEPLOYLIB" | grep -qF "opencode-permissions-kit-lib/tui/kit-mode-2x.tsx 644" &&
+    live_src "$INSTALL_CORE" | grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\""; then
+    pass "install.sh deploys the 2x plugin to LIBDIR/tui (lib_deploy manifest)"
+else
+    fail "install.sh deploys the 2x plugin to LIBDIR/tui (lib_deploy manifest)"
+fi
 # review a S2 (#468): the vacuous no-command check row plus the bare
 # rc-discarded sh -c below are one real pin now -- both legs ridden
 # (kit_source on the entry, the sync call in the deploy lib).
@@ -195,12 +207,20 @@ fi
 check_live "install.sh unregisters inert cli.json path entries (2x cleanup, via sh/tui-plugin.sh)" "$TUIPLUGIN" \
     -qF 'tui-register.py" "$_tp_user_dir/cli.json" unregister'
 check_live "update.sh fetch list includes the 2x plugin" "$UPDATE" -q 'opencode-permissions-kit-lib/tui/kit-mode-2x.tsx'
-check "update.sh re-registers the 2x plugin dir (major-gated, sync function)" \
-    sh -c 'grep -qF "tui_plugin_sync_user \"\$_str_major\"" "$1" && grep -q "sync_tui_registration \"\$_oc_major\"" "$1" && grep -qF "sh/tui-plugin.sh" "$2"' _ "$UPDATE_CORE" "$UPDATE" &&
-    grep -q 'sync_tui_registration "$_maj_after"' "$UPDATE_CORE"
-check "uninstall.sh removes the 2x plugin dir and cli.json entries" \
-    sh -c 'grep -q "plugins/opencode-permissions-kit" "$1" && grep -q "kit-mode-2x.tsx" "$1"' _ \
-    "$UNINSTALL_CORE"
+if live_src "$UPDATE_CORE" | grep -qF "tui_plugin_sync_user \"\$_str_major\"" &&
+    live_src "$UPDATE_CORE" | grep -q "sync_tui_registration \"\$_oc_major\"" &&
+    live_src "$UPDATE" | grep -qF "sh/tui-plugin.sh" &&
+    live_src "$UPDATE_CORE" | grep -q 'sync_tui_registration "$_maj_after"'; then
+    pass "update.sh re-registers the 2x plugin dir (major-gated, sync function)"
+else
+    fail "update.sh re-registers the 2x plugin dir (major-gated, sync function)"
+fi
+if live_src "$UNINSTALL_CORE" | grep -q "plugins/opencode-permissions-kit" &&
+    live_src "$UNINSTALL_CORE" | grep -q "kit-mode-2x.tsx"; then
+    pass "uninstall.sh removes the 2x plugin dir and cli.json entries"
+else
+    fail "uninstall.sh removes the 2x plugin dir and cli.json entries"
+fi
 
 # tui-register.py functional behavior (cli.json is user-owned state)
 check "tui-register.py exists" test -f "$REGISTER"

@@ -223,8 +223,31 @@ value references the repo/shipped tree (`$REPO/`, `$FILES/`,
 directly or through another registered variable. Slash-comment
 sources (values ending `.jsonc/.json/.ts/.tsx`) register but stay
 EXEMPT pending the deferred JSONC `//` decision. The `sh -c`
-indirection of the same shape (`sh -c 'grep … "$1"' _ "$SRCVAR"`)
-is recorded as a down-only ratchet (rule 3) — convert on sight.
+indirection of the same shape (`sh -c 'grep … "$1"' _ "$SRCVAR"`) is
+GATED too since the #470 wave (rule 3; was a down-only ratchet until
+then, 304 residual sites converted): single-leg presence greps go to
+`check_live`, multi-leg and extraction pipelines (awk ranges,
+`grep -A/-B` context, `sed -n` spans, `head`/`tr`/`cut` consumers) to
+parent-if + `live_src` pipes (the strip substitutes empty lines, so
+NR bookkeeping stays true) — the gate covers the detector's grammar
+(single positional file, presence-only, var-bound); sibling spellings
+(multi-operand payloads, literal-path bindings, indirect
+`$(cd "$(dirname "$0")/…")`-spelling bindings the registration regex
+cannot see, `;`-statement payloads, numeric-gate second operands
+lifting the positional count, if-form shapes)
+escape it and convert on sight like the counted shape did. Shapes
+where `live_src` would change the semantics unwrap RAW instead,
+un-ridden: behavioral probes (`. "$1"` sourcing, `sh "$1"` execution,
+`make -n` dry-runs, numeric gate checks — a commented-out construct
+changes the probe's behavior, so the survivor trap does not apply)
+and pins over CAPTURED OUTPUT (`sh -c` output captures, printf-stdin
+payloads — what the process printed carries no comment-line
+structure; the detector's transitive registration over-approximates
+these). This exemption does NOT cover SOURCE-TEXT captures: an
+unstripped `sed -n` span or extract_func block carries comment lines
+verbatim, so a raw pin over one still matches a commented-out
+construct — ride `live_src`, or strip the block at capture (the
+inline block-strip sanction above).
 The `|| true` rule keeps its per-shape semantics: rc-observed shapes
 omit it (the consumer's rc must be able to fail the check); piped
 shapes (`grep -c … | grep -q "^[N-M]$"`) and extraction-leg pipelines
