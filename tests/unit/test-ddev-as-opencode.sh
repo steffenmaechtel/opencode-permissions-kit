@@ -584,10 +584,18 @@ if live_src "$INSTALL" | grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.
 else
     fail "install.sh fetches both new files (fetch_kit list)"
 fi
-check "install.sh deploys the function file (lib_deploy manifest)" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh 644' \"\$2\" && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\"" _ "$INSTALL_CORE" "$DEPLOYLIB"
-check "install.sh deploys the helper (mode 755, lib_deploy manifest)" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/bin/ddev-as-opencode 755' \"\$2\" && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\"" _ "$INSTALL_CORE" "$DEPLOYLIB"
+if live_src "$DEPLOYLIB" | grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh 644' &&
+    live_src "$INSTALL_CORE" | grep -q 'lib_deploy "$SCRIPT_DIR" "$LIBDIR"'; then
+    pass "install.sh deploys the function file (lib_deploy manifest)"
+else
+    fail "install.sh deploys the function file (lib_deploy manifest)"
+fi
+if live_src "$DEPLOYLIB" | grep -q 'opencode-permissions-kit-lib/bin/ddev-as-opencode 755' &&
+    live_src "$INSTALL_CORE" | grep -q 'lib_deploy "$SCRIPT_DIR" "$LIBDIR"'; then
+    pass "install.sh deploys the helper (mode 755, lib_deploy manifest)"
+else
+    fail "install.sh deploys the helper (mode 755, lib_deploy manifest)"
+fi
 check_live "install.sh hooks the function into the developer rc files" \
     "$INSTALL_CORE" \
     -q 'opencode-permissions-kit/sh/ddev-terminal.sh'
@@ -621,10 +629,18 @@ fi
 check_live "update.sh KIT_FILES includes the handover helper" \
     "$UPDATE" \
     -q 'opencode-permissions-kit-lib/sh/ddev-handover.sh'
-check "update.sh deploys the function file (lib_deploy manifest)" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh 644' \"\$2\" && grep -q 'lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"' \"\$1\"" _ "$UPDATE_CORE" "$DEPLOYLIB"
-check "update.sh deploys the helper (mode 755, lib_deploy manifest)" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/bin/ddev-as-opencode 755' \"\$2\" && grep -q 'lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"' \"\$1\"" _ "$UPDATE_CORE" "$DEPLOYLIB"
+if live_src "$DEPLOYLIB" | grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh 644' &&
+    live_src "$UPDATE_CORE" | grep -q 'lib_deploy "$FILES_ROOT" "$LIBDIR"'; then
+    pass "update.sh deploys the function file (lib_deploy manifest)"
+else
+    fail "update.sh deploys the function file (lib_deploy manifest)"
+fi
+if live_src "$DEPLOYLIB" | grep -q 'opencode-permissions-kit-lib/bin/ddev-as-opencode 755' &&
+    live_src "$UPDATE_CORE" | grep -q 'lib_deploy "$FILES_ROOT" "$LIBDIR"'; then
+    pass "update.sh deploys the helper (mode 755, lib_deploy manifest)"
+else
+    fail "update.sh deploys the helper (mode 755, lib_deploy manifest)"
+fi
 check_live "update.sh heals the rc-file hook idempotently" \
     "$UPDATE_CORE" \
     -q 'opencode-permissions-kit/sh/ddev-terminal.sh'

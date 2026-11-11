@@ -179,8 +179,12 @@ fi
 check_live "lib manifest deploys bin/xdg-open 755" "$DEPLOYLIB" -q 'opencode-permissions-kit-lib/bin/xdg-open 755'
 # split legs (#346 wave 3): the path literal is the fetch-list entry
 # (stays in install.sh), the guarded ln sits in do_deploy_phase (the lib)
-check "install.sh deploys the xdg-open shim (guarded, never shadows a real one)" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/bin/xdg-open' \"\$1\" && grep -qF 'ln -s \"\$LIBDIR/bin/xdg-open\" /usr/local/bin/xdg-open' \"\$2\"" _ "$INSTALL" "$INSTALL_CORE"
+if live_src "$INSTALL" | grep -q 'opencode-permissions-kit-lib/bin/xdg-open' &&
+    live_src "$INSTALL_CORE" | grep -qF 'ln -s "$LIBDIR/bin/xdg-open" /usr/local/bin/xdg-open'; then
+    pass "install.sh deploys the xdg-open shim (guarded, never shadows a real one)"
+else
+    fail "install.sh deploys the xdg-open shim (guarded, never shadows a real one)"
+fi
 check "update.sh refreshes and heals the xdg-open shim (stands back for a real one)" \
     sh -c "grep -q 'opencode-permissions-kit-lib/bin/xdg-open' \"\$2\" && grep -qF 'xdg_open_real_exists' \"\$1\" && ! grep -qF '/usr/bin/xdg-open' \"\$1\" && ! grep -qF '/usr/bin/xdg-open' \"\$2\"" _ "$UPDATE_CORE" "$UPDATE"
 check_live "status.sh reports the xdg-open fallback state" "$STATUS_CORE" -qF 'xdg-open fallback'
@@ -209,9 +213,13 @@ if live_src "$UNINSTALL_CORE" | grep -q 'browser bridge -- begin\$' &&
 else
     fail "uninstall.sh prints the manual line range when declined"
 fi
-check "install.sh and update.sh deploy bin/browser-bridge into the library (lib_deploy manifest)" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/bin/browser-bridge 755' \"\$3\" \
-        && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\" && grep -q 'lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"' \"\$2\"" _ "$INSTALL_CORE" "$UPDATE_CORE" "$DEPLOYLIB"
+if live_src "$DEPLOYLIB" | grep -q 'opencode-permissions-kit-lib/bin/browser-bridge 755' &&
+    live_src "$INSTALL_CORE" | grep -q 'lib_deploy "$SCRIPT_DIR" "$LIBDIR"' &&
+    live_src "$UPDATE_CORE" | grep -q 'lib_deploy "$FILES_ROOT" "$LIBDIR"'; then
+    pass "install.sh and update.sh deploy bin/browser-bridge into the library (lib_deploy manifest)"
+else
+    fail "install.sh and update.sh deploy bin/browser-bridge into the library (lib_deploy manifest)"
+fi
 
 # --- mode-mask arithmetic (the exact check status.sh performs) -----------------
 mode_allows_other() {

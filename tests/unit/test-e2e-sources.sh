@@ -49,8 +49,7 @@ check "default resolution goes through npm_dist_latest" \
     grep_q 'OC_VERSION=\$(npm_dist_latest "\$target")'
 check "npm_dist_latest reads the per-target packument" \
     grep_q 'registry\.npmjs\.org/@opencode/cli-\$tgt'
-check "default resolution is gated on an anchored 2.x semver" \
-    sh -c "grep -q '\\^2\\\\\\.\\[0' \"\$1\"" _ "$LIB"
+check_live "default resolution is gated on an anchored 2.x semver" "$LIB" -q '\^2\\\.\[0'
 check "2.x gate message names the E2E_OC_VERSION escape hatch" \
     grep_q 'pin E2E_OC_VERSION=<ver> to test another major'
 check "offline fallback to the newest cached binary stays" \
@@ -65,8 +64,12 @@ check "off-major warning names the E2E_OC_VERSION escape hatch (#224 a W1)" \
 # together — the FAIL message alone without the exit would print red and
 # keep going (OC_VERSION empty -> messy failure far downstream), the exit
 # without the message fails silently. Presence + adjacency pins the pair.
-check "empty cache fails loud (FAIL message + adjacent exit 1, #224 b W1)" \
-    sh -c "grep -q 'cannot resolve opencode version and no cached version available' \"\$1\" && grep -A1 'cannot resolve opencode version' \"\$1\" | grep -q 'exit 1'" _ "$LIB"
+if live_src "$LIB" | grep -q 'cannot resolve opencode version and no cached version available' &&
+    live_src "$LIB" | grep -A1 'cannot resolve opencode version' | grep -q 'exit 1'; then
+    pass "empty cache fails loud (FAIL message + adjacent exit 1, #224 b W1)"
+else
+    fail "empty cache fails loud (FAIL message + adjacent exit 1, #224 b W1)"
+fi
 # The pin must not just EXIST but WIN: the assignment has to sit before the
 # default resolution, or the resolved value is clobbered after the fact
 # (#224 a W6 — presence-only would stay green under reordering). Both
@@ -137,18 +140,30 @@ WF_DDEV="$(cd "$(dirname "$0")/../../.github/workflows" && pwd)/test-e2e-ddev.ym
 
 check "gh_latest_tag helper exists in lib.sh" \
     grep -q '^gh_latest_tag() {' "$LIB"
-check "version resolution authorizes the API when a token is present" \
-    sh -c "grep -q 'OPK_GH_TOKEN' \"\$1\" && grep -q 'Authorization: Bearer' \"\$1\"" _ "$LIB"
-check "version resolution falls back to the releases/latest redirect" \
-    sh -c "grep -q 'url_effective' \"\$1\" && grep -q '/tag/v' \"\$1\"" _ "$LIB"
+if live_src "$LIB" | grep -q 'OPK_GH_TOKEN' &&
+    live_src "$LIB" | grep -q 'Authorization: Bearer'; then
+    pass "version resolution authorizes the API when a token is present"
+else
+    fail "version resolution authorizes the API when a token is present"
+fi
+if live_src "$LIB" | grep -q 'url_effective' &&
+    live_src "$LIB" | grep -q '/tag/v'; then
+    pass "version resolution falls back to the releases/latest redirect"
+else
+    fail "version resolution falls back to the releases/latest redirect"
+fi
 check "run-ddev.sh resolves ddev through gh_latest_tag (no bare API call)" \
     sh -c "grep -q 'gh_latest_tag ddev/ddev' \"\$1\" && ! grep -q 'https://api.github.com/repos/ddev' \"\$1\"" _ "$RUN_DDEV"
 # Token backstop (#224 a W3: since the #197 flip only the GitHub-calling
 # steps need it — the -1x lane resolves and both ddev jobs' gh_latest_tag;
 # the per-job auth contract lives in test-workflows.sh's lane pins, this
 # file-level grep is the coarse "no workflow went fully tokenless" net).
-check "workflows export the workflow token to the api.github.com-calling steps" \
-    sh -c "grep -q 'OPK_GH_TOKEN: \${{ github.token }}' \"\$1\" && grep -q 'OPK_GH_TOKEN: \${{ github.token }}' \"\$2\"" _ "$WF_E2E" "$WF_DDEV"
+if live_src "$WF_E2E" | grep -q 'OPK_GH_TOKEN: ${{ github.token }}' &&
+    live_src "$WF_DDEV" | grep -q 'OPK_GH_TOKEN: ${{ github.token }}'; then
+    pass "workflows export the workflow token to the api.github.com-calling steps"
+else
+    fail "workflows export the workflow token to the api.github.com-calling steps"
+fi
 
 # --- git channel knob (issue #118): lib.sh must forward E2E_GIT_CHANNEL as a
 # build-arg on BOTH builder paths (BuildKit + the classic setuid fallback) —
@@ -176,10 +191,18 @@ else
 fi
 check "non-distro git channels get an image-tag suffix (cache separation)" \
     grep_q 'E2E_IMAGE="\$E2E_IMAGE-git-\$E2E_GIT_CHANNEL"'
-check "Dockerfile declares the GIT_CHANNEL build arg" \
-    sh -c "grep -q '^ARG GIT_CHANNEL=' \"\$1\" && grep -q '^ARG GIT_CHANNEL=' \"\$2\"" _ "$DOCKERFILE" "$DOCKERFILE_ROOTLESS"
-check "both Dockerfiles upgrade via the git-core PPA on channel latest" \
-    sh -c "grep -q 'ppa:git-core/ppa' \"\$1\" && grep -q 'ppa:git-core/ppa' \"\$2\"" _ "$DOCKERFILE" "$DOCKERFILE_ROOTLESS"
+if live_src "$DOCKERFILE" | grep -q '^ARG GIT_CHANNEL=' &&
+    live_src "$DOCKERFILE_ROOTLESS" | grep -q '^ARG GIT_CHANNEL='; then
+    pass "Dockerfile declares the GIT_CHANNEL build arg"
+else
+    fail "Dockerfile declares the GIT_CHANNEL build arg"
+fi
+if live_src "$DOCKERFILE" | grep -q 'ppa:git-core/ppa' &&
+    live_src "$DOCKERFILE_ROOTLESS" | grep -q 'ppa:git-core/ppa'; then
+    pass "both Dockerfiles upgrade via the git-core PPA on channel latest"
+else
+    fail "both Dockerfiles upgrade via the git-core PPA on channel latest"
+fi
 # The git channel pair runs as two explicit jobs (lane-naming wave
 # 2026-10-23, was a matrix): stable per-leg check names for branch
 # protection, and a job-level skip can no longer collapse the legs.
@@ -206,15 +229,24 @@ if [ "$_base_build_args" -ge 2 ]; then
 else
     fail "base image forwarded on $_base_build_args of 2 builder paths"
 fi
-check "both Dockerfiles pin the default base image (ARG BASE_IMAGE)" \
-    sh -c "grep -q '^ARG BASE_IMAGE=ubuntu:24.04' \"\$1\" \
-&& grep -q '^ARG BASE_IMAGE=ubuntu:24.04' \"\$2\"" _ "$DOCKERFILE" "$DOCKERFILE_ROOTLESS"
-check "both Dockerfiles pull the configurable base (FROM \${BASE_IMAGE})" \
-    sh -c "grep -q '^FROM \${BASE_IMAGE}' \"\$1\" \
-&& grep -q '^FROM \${BASE_IMAGE}' \"\$2\"" _ "$DOCKERFILE" "$DOCKERFILE_ROOTLESS"
-check "workflows export the mirror base image to the e2e steps" \
-    sh -c "grep -q 'E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04' \"\$1\" \
-&& grep -q 'E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04' \"\$2\"" _ "$WF_E2E" "$WF_DDEV"
+if live_src "$DOCKERFILE" | grep -q '^ARG BASE_IMAGE=ubuntu:24.04' &&
+    live_src "$DOCKERFILE_ROOTLESS" | grep -q '^ARG BASE_IMAGE=ubuntu:24.04'; then
+    pass "both Dockerfiles pin the default base image (ARG BASE_IMAGE)"
+else
+    fail "both Dockerfiles pin the default base image (ARG BASE_IMAGE)"
+fi
+if live_src "$DOCKERFILE" | grep -q '^FROM ${BASE_IMAGE}' &&
+    live_src "$DOCKERFILE_ROOTLESS" | grep -q '^FROM ${BASE_IMAGE}'; then
+    pass "both Dockerfiles pull the configurable base (FROM \${BASE_IMAGE})"
+else
+    fail "both Dockerfiles pull the configurable base (FROM \${BASE_IMAGE})"
+fi
+if live_src "$WF_E2E" | grep -q 'E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04' &&
+    live_src "$WF_DDEV" | grep -q 'E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04'; then
+    pass "workflows export the mirror base image to the e2e steps"
+else
+    fail "workflows export the mirror base image to the e2e steps"
+fi
 
 # --- per-worktree container names (issue #366): two checkouts running the
 # SAME suite on one docker daemon shared the fixed container name — the
@@ -234,10 +266,13 @@ else
 fi
 check "e2e_worktree_suffix helper exists in lib.sh" \
     grep -q '^e2e_worktree_suffix() {' "$LIB"
-check "per-suite base names stay distinct (the suites stay disjoint)" \
-    sh -c "grep -q 'E2E_CONTAINER:-opencode-e2e-test}\"' \"\$1\" \
-&& grep -q 'E2E_CONTAINER:-opencode-e2e-rootless-test}\"' \"\$2\" \
-&& grep -q 'E2E_CONTAINER:-opencode-e2e-ddev-test}\"' \"\$3\"" _ "$RUN_SH" "$RUN_ROOTLESS" "$RUN_DDEV"
+if live_src "$RUN_SH" | grep -q 'E2E_CONTAINER:-opencode-e2e-test}"' &&
+    live_src "$RUN_ROOTLESS" | grep -q 'E2E_CONTAINER:-opencode-e2e-rootless-test}"' &&
+    live_src "$RUN_DDEV" | grep -q 'E2E_CONTAINER:-opencode-e2e-ddev-test}"'; then
+    pass "per-suite base names stay distinct (the suites stay disjoint)"
+else
+    fail "per-suite base names stay distinct (the suites stay disjoint)"
+fi
 # Passthrough count, comment-stripped: all three runners must read the
 # env, not clobber it (guarded count — grep-in-pipe cannot trip set -e).
 _pwc=0

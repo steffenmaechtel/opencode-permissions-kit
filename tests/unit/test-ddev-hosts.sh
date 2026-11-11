@@ -206,11 +206,19 @@ check_live "install.sh fetch list includes ddev-hosts.sh" \
     "$INSTALL" \
     -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh'
 # lib_deploy call site: install-core.sh since #346 wave 3
-check "install.sh deploys ddev-hosts.sh (lib_deploy manifest)" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh 644' \"\$2\" && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\"" _ "$INSTALL_CORE" "$DEPLOYLIB"
+if live_src "$DEPLOYLIB" | grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh 644' &&
+    live_src "$INSTALL_CORE" | grep -q 'lib_deploy "$SCRIPT_DIR" "$LIBDIR"'; then
+    pass "install.sh deploys ddev-hosts.sh (lib_deploy manifest)"
+else
+    fail "install.sh deploys ddev-hosts.sh (lib_deploy manifest)"
+fi
 check_live "update.sh KIT_FILES includes ddev-hosts.sh" "$UPDATE" -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh'
-check "update.sh deploys ddev-hosts.sh (lib_deploy manifest)" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh 644' \"\$2\" && grep -q 'lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"' \"\$1\"" _ "$UPDATE_CORE" "$DEPLOYLIB"
+if live_src "$DEPLOYLIB" | grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh 644' &&
+    live_src "$UPDATE_CORE" | grep -q 'lib_deploy "$FILES_ROOT" "$LIBDIR"'; then
+    pass "update.sh deploys ddev-hosts.sh (lib_deploy manifest)"
+else
+    fail "update.sh deploys ddev-hosts.sh (lib_deploy manifest)"
+fi
 check_live "status.sh reports missing Windows hostnames" "$STATUS_CORE" -q 'hosts (win)'
 check_live "status.sh scan prunes vendor dirs (issue #21)" "$STATUS_CORE" -qF -e '-name vendor'
 check_live "status.sh scan prunes node_modules dirs (issue #21)" "$STATUS_CORE" -qF -e '-name node_modules'

@@ -52,15 +52,25 @@
 # semantics: behavioral probes (. source / sh execution / make dry-run)
 # unwrap to parent-if probes with the operands substituted (a
 # commented-out construct changes the probe's behavior, so the survivor
-# trap does not apply); pins over CAPTURED strings (sh -c "$(…)"
-# captures, printf-stdin payloads, extract_func blocks -- the
-# detector's transitive registration over-approximates these) unwrap
-# raw, un-ridden: live_src is files-only and the captured bytes cannot
-# be comment-sabotaged; absence legs stay raw per conventions.md. ONE
-# recorded inversion remains (the #459 a B3 mechanism, registered in
-# conventions.md + the tripwire below): test-ddev-as-opencode's
-# browser-arm pin -- its literal is itself a full-line comment. Zero is
-# the contract; any new sh -c presence site fails loud.
+# trap does not apply); pins over CAPTURED OUTPUT (sh -c "$(…)"
+# captures, printf-stdin payloads -- what the process PRINTED carries no
+# comment-line structure; the detector's transitive registration
+# over-approximates these) unwrap raw, un-ridden -- this exemption does
+# NOT cover SOURCE-TEXT captures: an unstripped `sed -n` span or
+# extract_func block carries comment lines verbatim, so a raw pin over
+# one still matches a commented-out construct (ride live_src, or strip
+# the block at capture per the conventions.md block-strip sanction);
+# absence legs stay raw per conventions.md. Recorded inversions (the
+# #459 a B3 mechanism, registered in conventions.md + the tripwire
+# below): TWO marker-mention sites -- the container-backend
+# comment-literal pin and test-ddev-as-opencode's browser-arm pin (its
+# literal is itself a full-line comment) -- plus the marker-less `#428
+# disposition` inversion (test-install-core.sh, annotated in-place).
+# Zero is the contract WITHIN the detector's grammar: single
+# positional file, presence-only, var-bound (`_ "$VAR"`); sibling
+# spellings escape it -- multi-operand payloads, literal-path bindings,
+# if-form (non check-form) shapes -- and convert on sight like the
+# counted shape did.
 #
 # Discrimination arms (scratch fixtures, run BEFORE the tree sweep):
 #   - a planted single-quoted file-operand rider -> flagged
@@ -209,7 +219,7 @@ _rule2_detect() {
                 # on a &&-continuation leg of a compound is gated like a
                 # statement-initial one; an absence leg (`! grep`) is its
                 # own leg and no longer exempts the check leg beside it.
-                # Rule 3 keeps a LEG-level `! grep` exemption: the ratchet
+                # Rule 3 keeps a LEG-level `! grep` exemption: the sweep
                 # counts presence-only shapes -- absence stays un-ridden
                 # (conventions.md), so a sh -c payload carrying an absence
                 # leg stays uncounted.

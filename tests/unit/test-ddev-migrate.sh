@@ -604,9 +604,13 @@ fi
 check_live "finalize keeps the manifest root-owned for the resume seed (F2)" "$MIG" -q 'chown "root:'
 check "install.sh prints the FAIL list from the function state, never a re-grep (F1)" \
     sh -c "grep -q 'DD_MIG_FAILLIST' \"\$1\" && ! grep -q \"grep -c '^OK|' \\\"\\\$DD_MIG_DUMP_DIR/manifest.conf\\\"\" \"\$1\"" _ "$INSTALL_CORE"
-check_live "export return state starts EMPTY — counters signal completion (E1)" \
-    "$MIG" \
-    -A3 -F 'DD_MIG_DUMP_DIR=""' | tr -s '[:space:]' ' ' | grep -qF 'DD_MIG_DUMP_DIR="" DD_MIG_OK="" DD_MIG_FAIL="" DD_MIG_FAILLIST=""'
+if live_src "$MIG" | grep -A3 -F 'DD_MIG_DUMP_DIR=""' |
+    tr -s '[:space:]' ' ' |
+    grep -qF 'DD_MIG_DUMP_DIR="" DD_MIG_OK="" DD_MIG_FAIL="" DD_MIG_FAILLIST=""'; then
+    pass "export return state starts EMPTY — counters signal completion (E1)"
+else
+    fail "export return state starts EMPTY — counters signal completion (E1)"
+fi
 
 # --- 4h. refused vs completed: only the accounting fills the counters (0.0.44e E1) -------
 cat >"$WORK/run-export-state.sh" <<'WRAP'
@@ -810,16 +814,26 @@ fi
 check_live "install.sh plan mentions the database export when projects exist" \
     "$INSTALL_CORE" \
     -q 'export ddev databases'
-check "install.sh deploys ddev-migrate.sh to the library (lib_deploy manifest)" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh 644' \"\$2\" && grep -q 'opencode-permissions-kit-lib/bin/ddev-migrate 755' \"\$2\" && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\"" _ "$INSTALL_CORE" "$DEPLOYLIB"
+if live_src "$DEPLOYLIB" | grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh 644' &&
+    live_src "$DEPLOYLIB" | grep -q 'opencode-permissions-kit-lib/bin/ddev-migrate 755' &&
+    live_src "$INSTALL_CORE" | grep -q 'lib_deploy "$SCRIPT_DIR" "$LIBDIR"'; then
+    pass "install.sh deploys ddev-migrate.sh to the library (lib_deploy manifest)"
+else
+    fail "install.sh deploys ddev-migrate.sh to the library (lib_deploy manifest)"
+fi
 
 # --- 7. update.sh / status.sh wiring ------------------------------------------------
 
 check_live "update.sh KIT_FILES includes ddev-migrate.sh" \
     "$UPDATE" \
     -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh'
-check "update.sh deploys ddev-migrate.sh (lib_deploy manifest)" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh 644' \"\$2\" && grep -q 'opencode-permissions-kit-lib/bin/ddev-migrate 755' \"\$2\" && grep -q 'lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"' \"\$1\"" _ "$UPDATE_CORE" "$DEPLOYLIB"
+if live_src "$DEPLOYLIB" | grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh 644' &&
+    live_src "$DEPLOYLIB" | grep -q 'opencode-permissions-kit-lib/bin/ddev-migrate 755' &&
+    live_src "$UPDATE_CORE" | grep -q 'lib_deploy "$FILES_ROOT" "$LIBDIR"'; then
+    pass "update.sh deploys ddev-migrate.sh (lib_deploy manifest)"
+else
+    fail "update.sh deploys ddev-migrate.sh (lib_deploy manifest)"
+fi
 if live_src "$STATUS_CORE" | grep -q 'db dumps' &&
     live_src "$STATUS_CORE" | grep -q 'bin/ddev-migrate import'; then
     pass "status.sh reports dumps waiting for import"
@@ -1082,8 +1096,11 @@ assert_eq "registry cmd: narrow root -> 1 export, 11 outside" "1 11" \
 # wiring: the outside warning + the install/status gap detectors exist
 check_live "export warns about registry projects outside the roots" "$MIG" -q 'OUTSIDE the given roots'
 _mig_gap_n="$(live_src "$INSTALL_CORE" | grep -c '_ddev_mig_gap_warn' || true)"
-check "install.sh warns on skip branches when the registry outgrew the manifest (warn sites: $_mig_gap_n, need >=3)" \
-    sh -c "grep -q '_ddev_mig_gap_warn' \"\$1\" && [ \"\$2\" -ge 3 ]" _ "$INSTALL_CORE" "$_mig_gap_n"
+if live_src "$INSTALL_CORE" | grep -q '_ddev_mig_gap_warn' && [ "$_mig_gap_n" -ge 3 ]; then
+    pass "install.sh warns on skip branches when the registry outgrew the manifest (warn sites: $_mig_gap_n, need >=3)"
+else
+    fail "install.sh warns on skip branches when the registry outgrew the manifest (warn sites: $_mig_gap_n, need >=3)"
+fi
 if live_src "$STATUS_CORE" | grep -q 'INCOMPLETE — registry lists' &&
     live_src "$STATUS_CORE" | grep -q 'ddev-migrate registry'; then
     pass "status.sh reports INCOMPLETE dumps vs the dev registry"

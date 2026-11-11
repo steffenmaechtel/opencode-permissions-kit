@@ -229,14 +229,22 @@ then, 304 residual sites converted): single-leg presence greps go to
 `check_live`, multi-leg and extraction pipelines (awk ranges,
 `grep -A/-B` context, `sed -n` spans, `head`/`tr`/`cut` consumers) to
 parent-if + `live_src` pipes (the strip substitutes empty lines, so
-NR bookkeeping stays true). Shapes where `live_src` would change the
-semantics unwrap RAW instead, un-ridden: behavioral probes (`. "$1"`
-sourcing, `sh "$1"` execution, `make -n` dry-runs, numeric gate
-checks — a commented-out construct changes the probe's behavior, so
-the survivor trap does not apply) and pins over CAPTURED strings
-(`sh -c` output captures, printf-stdin payloads, extract_func blocks
-— the detector's transitive registration over-approximates these;
-live_src is files-only and captured bytes cannot be comment-sabotaged).
+NR bookkeeping stays true) — the gate covers the detector's grammar
+(single positional file, presence-only, var-bound); sibling spellings
+(multi-operand payloads, literal-path bindings, if-form shapes)
+escape it and convert on sight like the counted shape did. Shapes
+where `live_src` would change the semantics unwrap RAW instead,
+un-ridden: behavioral probes (`. "$1"` sourcing, `sh "$1"` execution,
+`make -n` dry-runs, numeric gate checks — a commented-out construct
+changes the probe's behavior, so the survivor trap does not apply)
+and pins over CAPTURED OUTPUT (`sh -c` output captures, printf-stdin
+payloads — what the process printed carries no comment-line
+structure; the detector's transitive registration over-approximates
+these). This exemption does NOT cover SOURCE-TEXT captures: an
+unstripped `sed -n` span or extract_func block carries comment lines
+verbatim, so a raw pin over one still matches a commented-out
+construct — ride `live_src`, or strip the block at capture (the
+inline block-strip sanction above).
 The `|| true` rule keeps its per-shape semantics: rc-observed shapes
 omit it (the consumer's rc must be able to fail the check); piped
 shapes (`grep -c … | grep -q "^[N-M]$"`) and extraction-leg pipelines

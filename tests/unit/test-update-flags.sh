@@ -308,9 +308,12 @@ check "#163: no direct sudo-cp onto/from SYSTEM_BIN remains" \
         && ! grep -qF 'sudo cp \"\$src\" \"\$SYSTEM_BIN\"' \"\$2\" \
         && ! grep -qF 'sudo cp \"\$SYSTEM_BIN\" \"\$BACKUP_DIR/opencode.current\"' \"\$2\" \
         && ! grep -qF 'sudo cp \"\$BACKUP_DIR/opencode.current\" \"\$SYSTEM_BIN\"' \"\$2\"" _ "$UPDATE" "$UPDATE_CORE"
-check_live "#163: the missing-lib fallback fails loud for the helper too" \
-    "$UPDATE" \
-    -A1 -F 'copy_binary_atomic() {' | grep -qF 'echo "error: copy_binary_atomic unavailable'
+if live_src "$UPDATE" | grep -A1 -F 'copy_binary_atomic() {' |
+    grep -qF 'echo "error: copy_binary_atomic unavailable'; then
+    pass "#163: the missing-lib fallback fails loud for the helper too"
+else
+    fail "#163: the missing-lib fallback fails loud for the helper too"
+fi
 check_live "#163: the manual-restore advice teaches the atomic shape" \
     "$UPDATE_CORE" \
     -qF 'sudo mv ${SYSTEM_BIN}.tmp $SYSTEM_BIN'
@@ -333,9 +336,12 @@ if live_src "$UPDATE" | grep -qF 'for _opk_a in "$@"' &&
 else
     fail "no kit self-fetch in binary-only mode (library runs stay offline for kit files)"
 fi
-check_live "--binary-path alone does NOT skip the self-fetch (full update + binary swap, review 0.0.29)" \
-    "$UPDATE" \
-    -A2 -F -- '--only-binary)' | tr -s '[:space:]' ' ' | grep -qF '_opk_binonly=true break'
+if live_src "$UPDATE" | grep -A2 -F -- '--only-binary)' |
+    tr -s '[:space:]' ' ' | grep -qF '_opk_binonly=true break'; then
+    pass "--binary-path alone does NOT skip the self-fetch (full update + binary swap, review 0.0.29)"
+else
+    fail "--binary-path alone does NOT skip the self-fetch (full update + binary swap, review 0.0.29)"
+fi
 check_live "library runs fall back to the installed version stamp" "$UPDATE" -q 's/^VERSION=//p'
 check_live "gating: confirm prompt reflects binary-only mode" "$UPDATE" -q 'Only upgrade the opencode binary'
 check_live "summary: binary-only mode reports Mode instead of Kit/Configs" \
@@ -518,11 +524,19 @@ if live_src "$UPDATE_CORE" | grep -q 'registry.npmjs.org/@opencode/cli-' &&
 else
     fail "resolve: 2.x channel is the npm registry (with scope fallback)"
 fi
-check "tui: registration flips with the major (sync function, both directions)" \
-    sh -c "grep -q '^sync_tui_registration() {' \"\$1\" && grep -q 'tui_plugin_sync_user \"\$_str_major\"' \"\$1\" && grep -qF 'rm -rf \"\${_tp_user_dir:?}/plugins/opencode-permissions-kit\"' \"\$2\"" _ "$UPDATE_CORE" "$TUIPLUGIN"
-check_live "tui: a major flip re-anchors the registration even in --only-binary runs" \
-    "$UPDATE_CORE" \
-    -n 'sync_tui_registration "$_maj_after"' | head -1 | cut -d: -f1 | grep -q .
+if live_src "$UPDATE_CORE" | grep -q '^sync_tui_registration() {' &&
+    live_src "$UPDATE_CORE" | grep -q 'tui_plugin_sync_user "$_str_major"' &&
+    live_src "$TUIPLUGIN" | grep -qF 'rm -rf "${_tp_user_dir:?}/plugins/opencode-permissions-kit"'; then
+    pass "tui: registration flips with the major (sync function, both directions)"
+else
+    fail "tui: registration flips with the major (sync function, both directions)"
+fi
+if live_src "$UPDATE_CORE" | grep -n 'sync_tui_registration "$_maj_after"' |
+    head -1 | cut -d: -f1 | grep -q .; then
+    pass "tui: a major flip re-anchors the registration even in --only-binary runs"
+else
+    fail "tui: a major flip re-anchors the registration even in --only-binary runs"
+fi
 
 # OPENCODE_MAJOR re-stamp discipline (0.0.44a V5/V20, hardened 0.0.44b
 # W4): a RETURNED version line is always a major (2.x prints "opencode
@@ -715,9 +729,9 @@ if live_src "$UPDATE_CORE" | grep -qF '_oc_expected=' &&
 else
     fail "update re-apply is byte-gated on kit-shaped content (0.0.47a F1)"
 fi
-check "install twin carries the same admin-content gate (0.0.47a F1)" \
-    sh -c "grep -qF 'diverges from the kit pin' \"\$1\"" _ \
-    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/install-core.sh"
+check_live "install twin carries the same admin-content gate (0.0.47a F1)" \
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/install-core.sh" \
+    -qF 'diverges from the kit pin'
 
 # --- issue #164: presence probes run at the write's authority ---------------------
 # The openchamber gate probed /etc/openchamber/policy.json at INVOKING-user
