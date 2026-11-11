@@ -178,9 +178,12 @@ check_live "install.sh validates --container-backend (rootless only)" "$INSTALL_
 check_live "install.sh aborts on provisioning failure (no docker-group fallback)" "$INSTALL_CORE" \
     -Fq 'Container backend provisioning failed'
 check_live "install.sh fetches socket-check.sh" "$INSTALL" -Fq 'opencode-permissions-kit-lib/bin/socket-check'
-check "install.sh deploys socket-check.sh to LIBDIR/bin (lib_deploy manifest)" \
-    sh -c 'grep -qF "opencode-permissions-kit-lib/bin/socket-check 755" "$2" \
-        && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL_CORE" "$DEPLOYLIB"
+if live_src "$DEPLOYLIB" | grep -qF 'opencode-permissions-kit-lib/bin/socket-check 755' &&
+    live_src "$INSTALL_CORE" | grep -qF 'lib_deploy "$SCRIPT_DIR" "$LIBDIR"'; then
+    pass "install.sh deploys socket-check.sh to LIBDIR/bin (lib_deploy manifest)"
+else
+    fail "install.sh deploys socket-check.sh to LIBDIR/bin (lib_deploy manifest)"
+fi
 check_live "install.sh fetches setup-container-backend" "$INSTALL" \
     -Fq 'opencode-permissions-kit-lib/bin/setup-container-backend'
 check_live "install.sh deploys setup-container-backend to LIBDIR" "$INSTALL_CORE" \
@@ -193,14 +196,20 @@ check_live "install.sh adds the developer to the opencode usergroup" "$INSTALL_C
 echo ""
 echo "-- update.sh wiring --"
 check_live "update.sh KIT_FILES includes socket-check.sh" "$UPDATE" -Fq 'opencode-permissions-kit-lib/bin/socket-check'
-check "update.sh deploys socket-check.sh to LIBDIR/bin (lib_deploy manifest)" \
-    sh -c 'grep -qF "opencode-permissions-kit-lib/bin/socket-check 755" "$2" \
-        && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE_CORE" "$DEPLOYLIB"
+if live_src "$DEPLOYLIB" | grep -qF 'opencode-permissions-kit-lib/bin/socket-check 755' &&
+    live_src "$UPDATE_CORE" | grep -qF 'lib_deploy "$FILES_ROOT" "$LIBDIR"'; then
+    pass "update.sh deploys socket-check.sh to LIBDIR/bin (lib_deploy manifest)"
+else
+    fail "update.sh deploys socket-check.sh to LIBDIR/bin (lib_deploy manifest)"
+fi
 check_live "update.sh KIT_FILES includes setup-container-backend" "$UPDATE" \
     -Fq 'opencode-permissions-kit-lib/bin/setup-container-backend'
-check "update.sh deploys setup-container-backend to LIBDIR (lib_deploy manifest)" \
-    sh -c 'grep -qF "opencode-permissions-kit-lib/bin/setup-container-backend 755" "$2" \
-        && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE_CORE" "$DEPLOYLIB"
+if live_src "$DEPLOYLIB" | grep -qF 'opencode-permissions-kit-lib/bin/setup-container-backend 755' &&
+    live_src "$UPDATE_CORE" | grep -qF 'lib_deploy "$FILES_ROOT" "$LIBDIR"'; then
+    pass "update.sh deploys setup-container-backend to LIBDIR (lib_deploy manifest)"
+else
+    fail "update.sh deploys setup-container-backend to LIBDIR (lib_deploy manifest)"
+fi
 check "update.sh KIT_FILES has NO migrate-denies.sh (legacy cleanup)" \
     sh -c "! sed -n 's/^KIT_FILES=\"\\(.*\\)\"$/\\1/p' \"\$1\" | grep -q migrate-denies" _ "$UPDATE"
 check "update.sh stamps no HARD_DENY_REMOVED key anymore" \

@@ -403,18 +403,43 @@ if sh -c 'rc=0; out=$(grep -vxF "$1" "$2" 2>/dev/null) || rc=$?; [ "$rc" -le 1 ]
 else
     pass "C3 (0.0.39g) / F4 (0.0.39h) control: grep rc 2 (read error) refuses the rewrite"
 fi
-check "C3 (0.0.39g) / F4 (0.0.39h) / 0.0.44a V11: config.sh narrows the guard (rc <= 1 ok, rc 2 dies) + stages per-process" \
-    sh -c 'grep -qF "_pr_out=\$(sudo grep -vxF \"\$p\" \"\$PROJECTS_CONF\" 2>/dev/null) || _pr_rc=\$?" "$1" && grep -qF "[ \"\$_pr_rc\" -le 1 ] || die" "$1" && grep -qF "_pr_tmp=\"\$PROJECTS_CONF.tmp.\$\$\"" "$1" && grep -qF "_tmp_track \"\$_pr_tmp\"" "$1"' _ "$CONFIG"
+if live_src "$CONFIG" | grep -qF '_pr_out=$(sudo grep -vxF "$p" "$PROJECTS_CONF" 2>/dev/null) || _pr_rc=$?' &&
+    live_src "$CONFIG" | grep -qF '[ "$_pr_rc" -le 1 ] || die' &&
+    live_src "$CONFIG" | grep -qF '_pr_tmp="$PROJECTS_CONF.tmp.$$"' &&
+    live_src "$CONFIG" | grep -qF '_tmp_track "$_pr_tmp"'; then
+    pass "C3 (0.0.39g) / F4 (0.0.39h) / 0.0.44a V11: config.sh narrows the guard (rc <= 1 ok, rc 2 dies) + stages per-process"
+else
+    fail "C3 (0.0.39g) / F4 (0.0.39h) / 0.0.44a V11: config.sh narrows the guard (rc <= 1 ok, rc 2 dies) + stages per-process"
+fi
 SD_LIB="$REPO/files/opencode-permissions-kit-lib/sh/sudoers-deploy.sh"
 WSL_LIB="$REPO/files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh"
-check "0.0.44b W16/V10: sudoers replace is stage+mv (atomic, not O_TRUNC cp)" \
-    sh -c 'grep -qF "mktemp" "$1" && grep -qF "mv -f \"\$_sd_stage\" \"\$_sd_conf/sudoers\"" "$1"' _ "$SD_LIB"
-check "0.0.44b W16/V10: wsl.conf replace is stage+mv via _bb_install_conf" \
-    sh -c 'grep -qF "_bb_install_conf" "$1" && grep -qF "mv -f \"\$_bb_stage\" \"\$_bb_conf\"" "$1"' _ "$WSL_LIB"
-check "0.0.39h F4/F6: update.sh install.conf rewrite is narrowed + atomic (temp + mv)" \
-    sh -c 'grep -qF "_ic_keep=\$(grep -v -e '"'"'^VERSION='"'"' -e '"'"'^OPENCODE_GROUP='"'"' -e '"'"'^KIT_CHANNEL='"'"'" "$1" && grep -qF "-e '"'"'^DDEV_VERSION='"'"' \"\$INSTALL_CONF\" 2>/dev/null) || _ic_rc=\$?" "$1" && grep -qF "_tmp_track \"\$_INSTALL_CONF_TMP\"" "$1" && grep -qF "mv -f \"\$_INSTALL_CONF_TMP\" \"\$CONFDIR/install.conf\"" "$1"' _ "$UPDATE_CORE"
-check "0.0.39h F4/F6: config.sh conf rewrites are narrowed + atomic (class sweep)" \
-    sh -c 'grep -qF "_ucb_keep=\$(grep -v" "$1" && grep -qF "mv -f \"\$_ucb_tmp\" \"\$INSTALL_CONF\"" "$1" && grep -qF "mv -f \"\$_udd_tmp\" \"\$INSTALL_CONF\"" "$1"' _ "$CONFIG"
+if live_src "$SD_LIB" | grep -qF 'mktemp' &&
+    live_src "$SD_LIB" | grep -qF 'mv -f "$_sd_stage" "$_sd_conf/sudoers"'; then
+    pass "0.0.44b W16/V10: sudoers replace is stage+mv (atomic, not O_TRUNC cp)"
+else
+    fail "0.0.44b W16/V10: sudoers replace is stage+mv (atomic, not O_TRUNC cp)"
+fi
+if live_src "$WSL_LIB" | grep -qF '_bb_install_conf' &&
+    live_src "$WSL_LIB" | grep -qF 'mv -f "$_bb_stage" "$_bb_conf"'; then
+    pass "0.0.44b W16/V10: wsl.conf replace is stage+mv via _bb_install_conf"
+else
+    fail "0.0.44b W16/V10: wsl.conf replace is stage+mv via _bb_install_conf"
+fi
+if live_src "$UPDATE_CORE" | grep -qF '_ic_keep=$(grep -v -e '"'"'^VERSION='"'"' -e '"'"'^OPENCODE_GROUP='"'"' -e '"'"'^KIT_CHANNEL='"'"'' &&
+    live_src "$UPDATE_CORE" | grep -qF '-e '"'"'^DDEV_VERSION='"'"' "$INSTALL_CONF" 2>/dev/null) || _ic_rc=$?' &&
+    live_src "$UPDATE_CORE" | grep -qF '_tmp_track "$_INSTALL_CONF_TMP"' &&
+    live_src "$UPDATE_CORE" | grep -qF 'mv -f "$_INSTALL_CONF_TMP" "$CONFDIR/install.conf"'; then
+    pass "0.0.39h F4/F6: update.sh install.conf rewrite is narrowed + atomic (temp + mv)"
+else
+    fail "0.0.39h F4/F6: update.sh install.conf rewrite is narrowed + atomic (temp + mv)"
+fi
+if live_src "$CONFIG" | grep -qF '_ucb_keep=$(grep -v' &&
+    live_src "$CONFIG" | grep -qF 'mv -f "$_ucb_tmp" "$INSTALL_CONF"' &&
+    live_src "$CONFIG" | grep -qF 'mv -f "$_udd_tmp" "$INSTALL_CONF"'; then
+    pass "0.0.39h F4/F6: config.sh conf rewrites are narrowed + atomic (class sweep)"
+else
+    fail "0.0.39h F4/F6: config.sh conf rewrites are narrowed + atomic (class sweep)"
+fi
 
 # --- 4. ensure_local_file (C4) ----------------------------------------------------
 # Extracted from update.sh (the CLI runs its main on source), with a
@@ -463,18 +488,28 @@ check "ensure_local_file: no empty file deployed" test ! -e "$WORK/fr/empty.txt"
 
 # --- 5. wiring (C5 + the shipped lists) --------------------------------------------
 
-check "C5: install.conf stamp written via temp + mv" \
-    sh -c 'grep -qF "_INSTALL_CONF_TMP=" "$1" && grep -qF "mv -f \"\$_INSTALL_CONF_TMP\"" "$1"' _ "$INSTALL_CORE"
+if live_src "$INSTALL_CORE" | grep -qF '_INSTALL_CONF_TMP=' &&
+    live_src "$INSTALL_CORE" | grep -qF 'mv -f "$_INSTALL_CONF_TMP"'; then
+    pass "C5: install.conf stamp written via temp + mv"
+else
+    fail "C5: install.conf stamp written via temp + mv"
+fi
 check_live "wiring: install.sh fetch list carries staged-write.sh" "$INSTALL" \
     -qF 'opencode-permissions-kit-lib/sh/staged-write.sh \'
-check "wiring: install.sh deploys staged-write.sh (lib_deploy manifest)" \
-    sh -c 'grep -qF "opencode-permissions-kit-lib/sh/staged-write.sh 644" "$2" \
-        && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL_CORE" "$DEPLOYLIB"
+if live_src "$DEPLOYLIB" | grep -qF 'opencode-permissions-kit-lib/sh/staged-write.sh 644' &&
+    live_src "$INSTALL_CORE" | grep -qF 'lib_deploy "$SCRIPT_DIR" "$LIBDIR"'; then
+    pass "wiring: install.sh deploys staged-write.sh (lib_deploy manifest)"
+else
+    fail "wiring: install.sh deploys staged-write.sh (lib_deploy manifest)"
+fi
 check_live "wiring: update.sh KIT_FILES carries staged-write.sh" "$UPDATE" \
     -qF 'opencode-permissions-kit-lib/sh/staged-write.sh \'
-check "wiring: update.sh deploys staged-write.sh (lib_deploy manifest)" \
-    sh -c 'grep -qF "opencode-permissions-kit-lib/sh/staged-write.sh 644" "$2" \
-        && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE_CORE" "$DEPLOYLIB"
+if live_src "$DEPLOYLIB" | grep -qF 'opencode-permissions-kit-lib/sh/staged-write.sh 644' &&
+    live_src "$UPDATE_CORE" | grep -qF 'lib_deploy "$FILES_ROOT" "$LIBDIR"'; then
+    pass "wiring: update.sh deploys staged-write.sh (lib_deploy manifest)"
+else
+    fail "wiring: update.sh deploys staged-write.sh (lib_deploy manifest)"
+fi
 check_live "wiring: config.sh sources staged-write.sh" "$CONFIG" \
     -qF 'for cand in "$SCRIPT_DIR/../sh/staged-write.sh" "$LIBDIR/sh/staged-write.sh"'
 check_live "wiring: update.sh tui.json write goes through staged_write" "$UPDATE_CORE" \
@@ -497,15 +532,27 @@ _iac_n="$(live_src "$INSTALL_CORE" | grep -c '_oc_install_agent_config' || true)
 check "wiring: install.sh config writes go through staged_write (0.0.39h F8: offline-rendered, ONE write per branch; render sites: $_iac_n, need 3-9)" \
     sh -c '[ "$2" -ge 3 ] && [ "$2" -le 9 ] && ! grep -q "sed -i .*opencode\.jsonc" "$1" && ! grep -q "sed -i .*opencode\.jsonc" "$3"' _ "$INSTALL_CORE" "$_iac_n" "$INSTALL"
 _gca_n="$(live_src "$CONFIG" | grep -c 'staged_write 664' || true)"
-check "wiring: config.sh git_config_apply renders offline, ONE staged_write (0.0.39h F8; staged_write sites: $_gca_n of 2)" \
-    sh -c 'grep -qF "_gca_tmp" "$1" && [ "$2" = 2 ] && ! grep -qF "sed -i '"'"'s|" "$1"' _ "$CONFIG" "$_gca_n"
+# Mixed shape (0.0.39h F8): the presence leg rides live_src; the count
+# guard and the ABSENCE legs stay bare (a commented-out forbidden sed -i
+# SHOULD keep counting -- conventions.md "Source-counting pins").
+if live_src "$CONFIG" | grep -qF '_gca_tmp' &&
+    [ "$_gca_n" = 2 ] &&
+    ! grep -qF 'sed -i '"'"'s|' "$CONFIG"; then
+    pass "wiring: config.sh git_config_apply renders offline, ONE staged_write (0.0.39h F8; staged_write sites: $_gca_n of 2)"
+else
+    fail "wiring: config.sh git_config_apply renders offline, ONE staged_write (0.0.39h F8; staged_write sites: $_gca_n of 2)"
+fi
 OPK="$REPO/files/opencode-permissions-kit-lib/bin/opk"
 # The handover arm's logic lives in sh/handover-core.sh since the #415
 # ride-along extraction — the F10/F4 pins follow the movement (the
 # dispatcher keeps only the resolver + pairing guard).
 HOCORE_SW="$REPO/files/opencode-permissions-kit-lib/sh/handover-core.sh"
-check "0.0.39h F10: opk handover refuses symlinked operands + rechecks between the ops" \
-    sh -c 'grep -qF "[ -L \"\$_ho_a\" ]" "$1" && grep -qF "[ ! -L \"\$_ho_a\" ]" "$1"' _ "$HOCORE_SW"
+if live_src "$HOCORE_SW" | grep -qF '[ -L "$_ho_a" ]' &&
+    live_src "$HOCORE_SW" | grep -qF '[ ! -L "$_ho_a" ]'; then
+    pass "0.0.39h F10: opk handover refuses symlinked operands + rechecks between the ops"
+else
+    fail "0.0.39h F10: opk handover refuses symlinked operands + rechecks between the ops"
+fi
 check_live "0.0.39i F4: opk handover --dry-run previews the symlink refuse" "$HOCORE_SW" -qF "would refuse"
 check "0.0.39h F12: no 1;33 color definition remains repo-wide (files/)" \
     sh -c '! grep -rq "1;33" "$1"' _ "$REPO/files"
@@ -535,8 +582,8 @@ check "walker: the home itself passes" \
 
 # --- 7. wiring: the 0.0.39h gates ----------------------------------------------
 UNINSTALL="$REPO/files/opencode-permissions-kit-lib/management/uninstall.sh"
-check "gates: install.sh ~/.ddev operand gate" \
-    sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"/home/\$OPENCODE_USER/.ddev\"" "$1"' _ "$INSTALL_CORE"
+check_live "gates: install.sh ~/.ddev operand gate" "$INSTALL_CORE" \
+    -qF 'agent_home_sane "$OPENCODE_USER" "/home/$OPENCODE_USER/.ddev"'
 _ahg_n="$(live_src "$INSTALL_CORE" | grep -c 'agent_home_sane "$OPENCODE_USER" /home/opencode/' || true)"
 check "gates: install.sh Step 8 operand gates (.config/.config/opencode/.agents; gate sites: $_ahg_n, need 3-9)" \
     sh -c '[ "$2" -ge 3 ] && [ "$2" -le 9 ]' _ "$INSTALL_CORE" "$_ahg_n"
@@ -550,10 +597,10 @@ check "gates: install.sh Step 8 mkdir sits inside the operand gates (0.0.39i F1;
 # 0.0.39j F1: every Step 8 operand carries its own chown — gate 2's mkdir
 # runs after gate 1's chown -R, so without its own chown the fresh-install
 # leaf ends root-owned.
-check "gates: install.sh Step 8 chowns every operand it creates (0.0.39j F1)" \
-    sh -c 'grep -qF "sudo chown -R \"\$OPENCODE_USER:\$OPENCODE_GROUP\" /home/opencode/.config/opencode" "$1"' _ "$INSTALL_CORE"
-check "gates: install.sh agents-migration operand gate" \
-    sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$_opk_dst\"" "$1"' _ "$INSTALL_CORE"
+check_live "gates: install.sh Step 8 chowns every operand it creates (0.0.39j F1)" \
+    "$INSTALL_CORE" -qF 'sudo chown -R "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode/.config/opencode'
+check_live "gates: install.sh agents-migration operand gate" \
+    "$INSTALL_CORE" -qF 'agent_home_sane "$OPENCODE_USER" "$_opk_dst"'
 # 0.0.45e W1: the migration chmod walks run before the chown hand-over
 # (walk while the copied-in tree is still dev-owned; chown-first is the
 # scan-then-act window on re-installs over a live agent) — static line
@@ -566,24 +613,31 @@ if [ -n "$_mig_chmod" ] && [ -n "$_mig_chown" ] && [ "$_mig_chmod" -lt "$_mig_ch
 else
     fail "gates: install.sh agents migration order violated (W1: chmod=$_mig_chmod chown=$_mig_chown)"
 fi
-check "gates: install.sh mkcert chain gate" \
-    sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$caroot\"" "$1"' _ "$INSTALL_CORE"
+check_live "gates: install.sh mkcert chain gate" "$INSTALL_CORE" \
+    -qF 'agent_home_sane "$OPENCODE_USER" "$caroot"'
 # split legs (#346 wave 3): the chain gates live in do_deploy_phase
 # (install-core.sh), the kit_source stays in the entry's bootstrap.
-check "gates: install.sh agent-config + tui + plugin chain gates" \
-    sh -c 'grep -q "agent_home_sane \"\$OPENCODE_USER\" /home/opencode/.config/opencode" "$1" \
-        && grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$OC_TUI_DIR\"" "$1" \
-        && grep -qF "kit_source \"\$SCRIPT_DIR/opencode-permissions-kit-lib/sh/tui-plugin.sh\"" "$2"' _ "$INSTALL_CORE" "$INSTALL"
-check "gates: update.sh sources staged-write.sh early + walker fallback" \
-    sh -c 'grep -q "command -v agent_home_sane >/dev/null 2>&1 \|\| agent_home_sane() { return 0; }" "$1"' _ "$UPDATE"
-check "gates: update.sh sync_tui_registration + tui.json chain gates" \
-    sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$OC_TUI_DIR\"" "$1" \
-        && grep -qF "sh/tui-plugin.sh" "$2" && grep -qF "agent_home_sane \"\$_tp_oc_user\" \"\$_tp_user_dir\"" "$3"' _ "$UPDATE_CORE" "$UPDATE" "$TUIPLUGIN"
-check "gates: config.sh git_config_apply chain gate" \
-    sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$(dirname \"\$target\")\"" "$1"' _ "$CONFIG"
-check "gates: uninstall.sh plugin-removal chain gate" \
-    sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$_un_dir\"" "$1"' _ \
-    "$REPO/files/opencode-permissions-kit-lib/sh/uninstall-core.sh"
+if live_src "$INSTALL_CORE" | grep -q 'agent_home_sane "$OPENCODE_USER" /home/opencode/.config/opencode' &&
+    live_src "$INSTALL_CORE" | grep -qF 'agent_home_sane "$OPENCODE_USER" "$OC_TUI_DIR"' &&
+    live_src "$INSTALL" | grep -qF 'kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/tui-plugin.sh"'; then
+    pass "gates: install.sh agent-config + tui + plugin chain gates"
+else
+    fail "gates: install.sh agent-config + tui + plugin chain gates"
+fi
+check_live "gates: update.sh sources staged-write.sh early + walker fallback" "$UPDATE" \
+    -q 'command -v agent_home_sane >/dev/null 2>&1 \|\| agent_home_sane() { return 0; }'
+if live_src "$UPDATE_CORE" | grep -qF 'agent_home_sane "$OPENCODE_USER" "$OC_TUI_DIR"' &&
+    live_src "$UPDATE" | grep -qF 'sh/tui-plugin.sh' &&
+    live_src "$TUIPLUGIN" | grep -qF 'agent_home_sane "$_tp_oc_user" "$_tp_user_dir"'; then
+    pass "gates: update.sh sync_tui_registration + tui.json chain gates"
+else
+    fail "gates: update.sh sync_tui_registration + tui.json chain gates"
+fi
+check_live "gates: config.sh git_config_apply chain gate" "$CONFIG" \
+    -qF 'agent_home_sane "$OPENCODE_USER" "$(dirname "$target")"'
+check_live "gates: uninstall.sh plugin-removal chain gate" \
+    "$REPO/files/opencode-permissions-kit-lib/sh/uninstall-core.sh" \
+    -qF 'agent_home_sane "$OPENCODE_USER" "$_un_dir"'
 check_live "0.0.39h F3: staged-write.sh refuses a directory destination" "$STAGEDWRITE" \
     -qF 'destination '"'"'$_sw_dst'"'"' is a directory'
 
