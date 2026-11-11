@@ -147,6 +147,27 @@ jobs:
           restore-keys: |
             opencode-e2e-2x-
             opencode-e2e-latest
+      - name: Point build DNS at a resolver battery
+        run: |
+          # Azure's resolver (168.63.129.16, the runner's systemd-resolved
+          # upstream) returns SERVFAIL for the ubuntu archive domains since
+          # 2026-11-11 midday (dns-diag sandbox Q1+Q3: host getent FAILs,
+          # @168.63.129.16 SERVFAILs, public resolvers answer instantly).
+          # PUBLIC RESOLVERS FIRST: dockerd's embedded DNS (the path every
+          # docker RUN container takes) relays the first upstream answer —
+          # with Azure's fast SERVFAIL first in the list, container apt
+          # flapped and provisioning died on missing candidates. Public-
+          # first wins that race deterministically; Azure stays LAST only
+          # as the internal-cloudapp fallback. The restart makes dockerd/
+          # buildkitd re-read the file.
+          {
+            printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\nnameserver 9.9.9.9\n'
+            UPSTREAM="$(resolvectl status | grep -oP 'DNS Servers: \K.*' | grep . | head -1)"
+            if [ -n "$UPSTREAM" ]; then printf 'nameserver %s\n' $UPSTREAM; fi
+          } | sudo tee /etc/resolv.conf
+          cat /etc/resolv.conf
+          sudo systemctl restart docker
+          sleep 3
       - name: Run real-ddev E2E test
         env:
           E2E_DDEV_SITE: >-
@@ -157,6 +178,10 @@ jobs:
           # 504s (2026-10) killed every suite at metadata resolve. (Inner
           # ddev image pulls still go to Docker Hub directly.)
           E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04
+          # Build network = host (archive.ubuntu.com DNS flakes 2026-11):
+          # RUN steps in the docker bridge lost apt DNS while the runner's
+          # own resolver worked — host networking shares it.
+          E2E_BUILD_NETWORK: host
           # Authorize api.github.com calls (rate-limit resilience, lib.sh
           # gh_latest_tag resolves the ddev version) — the ephemeral
           # workflow token, no secret needed.
@@ -227,6 +252,27 @@ jobs:
           key: opencode-e2e-latest${{ steps.version.outputs.OC_VERSION }}
           restore-keys: |
             opencode-e2e-latest
+      - name: Point build DNS at a resolver battery
+        run: |
+          # Azure's resolver (168.63.129.16, the runner's systemd-resolved
+          # upstream) returns SERVFAIL for the ubuntu archive domains since
+          # 2026-11-11 midday (dns-diag sandbox Q1+Q3: host getent FAILs,
+          # @168.63.129.16 SERVFAILs, public resolvers answer instantly).
+          # PUBLIC RESOLVERS FIRST: dockerd's embedded DNS (the path every
+          # docker RUN container takes) relays the first upstream answer —
+          # with Azure's fast SERVFAIL first in the list, container apt
+          # flapped and provisioning died on missing candidates. Public-
+          # first wins that race deterministically; Azure stays LAST only
+          # as the internal-cloudapp fallback. The restart makes dockerd/
+          # buildkitd re-read the file.
+          {
+            printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\nnameserver 9.9.9.9\n'
+            UPSTREAM="$(resolvectl status | grep -oP 'DNS Servers: \K.*' | grep . | head -1)"
+            if [ -n "$UPSTREAM" ]; then printf 'nameserver %s\n' $UPSTREAM; fi
+          } | sudo tee /etc/resolv.conf
+          cat /etc/resolv.conf
+          sudo systemctl restart docker
+          sleep 3
       - name: Run real-ddev E2E test (opencode 1.x pin)
         env:
           E2E_DDEV_SITE: >-
@@ -240,6 +286,10 @@ jobs:
           # 504s (2026-10) killed every suite at metadata resolve. (Inner
           # ddev image pulls still go to Docker Hub directly.)
           E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04
+          # Build network = host (archive.ubuntu.com DNS flakes 2026-11):
+          # RUN steps in the docker bridge lost apt DNS while the runner's
+          # own resolver worked — host networking shares it.
+          E2E_BUILD_NETWORK: host
           # Authorize api.github.com calls (rate-limit resilience, lib.sh
           # gh_latest_tag resolves the ddev version) — the ephemeral
           # workflow token, no secret needed.
