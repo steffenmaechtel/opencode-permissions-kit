@@ -210,7 +210,10 @@ jobs:
           # Git channel explicit in both halves of the pair (convention:
           # no suffix = git-distro) — travels via env into lib.sh's
           # --build-arg GIT_CHANNEL.
-          E2E_GIT_CHANNEL: distro
+          # TEMP 2026-11-11: lane env disabled during the launchpad/archive
+          # outage — runs on the lib.sh distro default like the green -1x
+          # leg; uncomment when Canonical recovered.
+          # E2E_GIT_CHANNEL: distro
           # Base image via the Google Docker Hub mirror: auth.docker.io
           # 504s (2026-10) killed every suite at metadata resolve.
           E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04
@@ -301,7 +304,10 @@ jobs:
           # PPA leg of the git pair (issue #118) — travels via env into
           # lib.sh's --build-arg GIT_CHANNEL; run.sh asserts the PPA git
           # landed.
-          E2E_GIT_CHANNEL: latest
+          # TEMP 2026-11-11: lane env disabled during the launchpad/archive
+          # outage (the PPA leg cannot install without launchpad) — runs on
+          # the lib.sh distro default; uncomment when Canonical recovered.
+          # E2E_GIT_CHANNEL: latest
           # Base image via the Google Docker Hub mirror: auth.docker.io
           # 504s (2026-10) killed every suite at metadata resolve.
           E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04
