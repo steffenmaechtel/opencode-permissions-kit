@@ -553,8 +553,12 @@ has "HOST_REACHED=1" "9.8 ... reaches the real body end (truncation discriminato
 #     red: a commented-out construct counts again -- exactly the
 #     #261/#244 g W1 trap the rider exists to kill
 #   - delete live_src from harness.sh -> every pipeline-exercising
-#     10.x pin goes red; 10.10 and 10.12-10.14 stay green (their
-#     guards fire before any live_src call -- round a A3)
+#     10.x pin reds. Green survivors (round b B1 precise): 10.10,
+#     10.13, 10.14 -- check_live's ARG guards precede any live_src
+#     call. 10.12 reds DIFFERENTLY (rc 127 / "not found" instead of
+#     1 / "no files given": its guard lives INSIDE live_src and dies
+#     with it) and its check-wrapped arm stays red via rc 127 -- the
+#     deletion stays detected either way.
 #   - break check_live's pipe (grep the FILE directly) -> 10.9 reds
 #     while 10.1 stays green (discrimination runs through the strip,
 #     not through the fixture)

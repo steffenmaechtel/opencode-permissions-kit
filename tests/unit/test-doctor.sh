@@ -587,7 +587,10 @@ fi
 # ui.sh hard-fail; accepted residual, pin-cost budget). Structural pin
 # instead: the PS_LIB block must sit AFTER the ui.sh sourcing -- the
 # error path needs ui_error, which only exists once ui.sh loaded
-_nl_src=$(live_src "$DOCTOR")
+# round b B2 (class sweep, twin of the ddev sites): || true keeps the
+# one-red-row failure path under set -e (a failed strip streams empty
+# content; the downstream -n probes and greps red their rows).
+_nl_src=$(live_src "$DOCTOR") || true
 _nl_uilib=$(printf '%s\n' "$_nl_src" | grep -nF 'UI_LIB=' | head -1 | cut -d: -f1)
 _nl_pslib=$(printf '%s\n' "$_nl_src" | grep -nF 'PS_LIB=' | head -1 | cut -d: -f1)
 if [ -n "$_nl_uilib" ] && [ -n "$_nl_pslib" ] && [ "$_nl_uilib" -lt "$_nl_pslib" ]; then
@@ -1129,7 +1132,7 @@ fi
 # the design's depth -- hermetic execution of the DEFAULT arm would scan
 # the host's real tree, so the claim is source-pinned instead. (#448:
 # the literals moved with the all block into sh/doctor-core.sh.)
-_nl_src="$(live_src "$DOCTOR_CORE")"
+_nl_src="$(live_src "$DOCTOR_CORE")" || true
 if printf '%s' "$_nl_src" | grep -qF '[ -d /var/www/vhosts ]' &&
     printf '%s' "$_nl_src" | grep -qF 'projects.conf' &&
     printf '%s' "$_nl_src" | grep -qF -- '-maxdepth 3'; then
