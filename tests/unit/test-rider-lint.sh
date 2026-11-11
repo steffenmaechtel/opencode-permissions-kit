@@ -408,12 +408,15 @@ fi
 # exempts a strict shape from rule 2, so appending it must stay a
 # conscious, reviewable act -- the detector cannot verify the inversion
 # claim (that the pinned literal is a full-line comment), so the COUNT
-# is the control. One trailing-marker site is sanctioned outside this
+# is the control. One marker-mention site is sanctioned outside this
 # suite today (the container-backend comment-literal pin); this suite's
 # own planted arm is machinery and rides the same self-allowlist as the
-# sweeps above. A new marker (or one stamped onto a live pin) fails
-# loud here until the site carries a conventions.md "Source-counting
-# pins" justification in the same diff.
+# sweeps above. Precision note (review b B1, #468): the count pattern
+# matches a marker mention ANYWHERE on a live (non-comment-initial)
+# line, not only in trailing position -- it can only over-count (fail
+# loud), never false-pass. A new marker (or one stamped onto a live
+# pin) fails loud here until the site carries a conventions.md
+# "Source-counting pins" justification in the same diff.
 _inv_expected=1
 _inv_found=0
 for _f in "$SCRIPT_DIR"/test-*.sh; do

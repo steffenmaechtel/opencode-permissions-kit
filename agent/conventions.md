@@ -242,9 +242,10 @@ unmatchable — such a site (the documented-disposition marker pin
 annotation naming the inversion instead of the rider (#459 a B3);
 the rider lint's rule 2 honors the `# rider-inversion` marker as
 that exemption. New inversion sites are a registered exception, not a
-free pass: the rider lint asserts the exact trailing-marker count
-across the suites (the inversion tripwire, review a X3) -- a new
-marker fails the lint until the diff documents the site here.
+free pass: the rider lint asserts the exact marker-mention count
+across the suites (lines carrying the marker anywhere; the inversion
+tripwire, review a X3 + b B1) -- a new marker fails the lint until the
+diff documents the site here.
 Full-line strip only (#244 h W6 residual: trailing comments after
 live lines still count). Precedent: `test-install-args.sh` (v2 URL,
 the canonical shape) and the #261 rider pin in `test-project-paths.sh`;
