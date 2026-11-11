@@ -139,7 +139,8 @@ assert_eq "status dispatches" "status:euid=$(id -u):args=" "$out"
 # doctor dispatches like status: no sudo, path passed through (#313)
 out="$(run_kit doctor /tmp)" || true
 assert_eq "doctor dispatches with the path" "doctor:euid=$(id -u):args=/tmp" "$out"
-check "doctor dispatches to management/doctor.sh (no sudo hop)" grep -qF 'exec sh "$LIBDIR/management/doctor.sh" "$@"' "$KIT"
+check_live "doctor dispatches to management/doctor.sh (no sudo hop)" "$KIT" \
+    -qF 'exec sh "$LIBDIR/management/doctor.sh" "$@"'
 
 # config/update dispatch with args passed through (fake sudo passes them on;
 # stubs run as the current user either way)
@@ -176,12 +177,20 @@ assert_eq "uninstall passes flags" "uninstall:euid=$(id -u):args=--dry-run" "$ou
 # grep'd the arm body in bin/opk re-target the lib; the dispatcher
 # pins stay on $KIT). oc_bypass_bin stays in bin/opk (dispatcher-level
 # helper): its definition is pinned on $KIT, its USE sites on $OCCORE.
-check "openchamber-secure dispatch exists" grep -q '    openchamber-secure)' "$KIT"
-check "openchamber-secure auto-elevates with flags intact" grep -qF 'exec sudo sh "$LIBDIR/bin/opk" openchamber-secure "$@"' "$OCCORE"
-grep -qF 'mv -f "$_ocp_tmp" /etc/openchamber/policy.json' "$OCCORE" &&
-    check "openchamber-secure writes the pin (atomic) + records the opt-in" grep -qF 'mv -f "$_ocp_tmp" /etc/openchamber/policy.json' "$OCCORE" grep -qF 'OPENCHAMBER_POLICY=yes' "$OCCORE"
+check_live "openchamber-secure dispatch exists" "$KIT" -q '    openchamber-secure)'
+check_live "openchamber-secure auto-elevates with flags intact" "$OCCORE" \
+    -qF 'exec sudo sh "$LIBDIR/bin/opk" openchamber-secure "$@"'
+# review a S1 (#468): this compound was doubly broken -- the leading
+# raw grep duplicated the first half and the trailing OPENCHAMBER grep
+# was dead operand bytes (`-q` exits before it), so "records the
+# opt-in" was never asserted. Both halves are ridden pins now.
+check_live "openchamber-secure writes the policy pin (atomic)" "$OCCORE" \
+    -qF 'mv -f "$_ocp_tmp" /etc/openchamber/policy.json'
+check_live "openchamber-secure records the policy opt-in" "$OCCORE" \
+    -qF 'OPENCHAMBER_POLICY=yes'
 # 0.0.47a F1: replacing divergent policy content is announced, never silent
-check "openchamber-secure announces replacing divergent content (F1)" grep -qF 'diverges from the kit pin — replacing it' "$OCCORE"
+check_live "openchamber-secure announces replacing divergent content (F1)" "$OCCORE" \
+    -qF 'diverges from the kit pin — replacing it'
 # 0.0.47a F3: the kit-symlink exemption helper exists and is used at the
 # detection, listing and removal sites
 # Comment-strip riders (#261, the #244 g W1 class): commented-out lines
@@ -1614,7 +1623,7 @@ fi
 # pr-00263 a F21: the settings-edit failure message names the entry as
 # key-or-value — the grep can match the literal as a VALUE, "remove the
 # line" was wrong for that arm.
-check "settings-edit failure names key-or-value (pr-00263 a F21)" grep -qF 'entry (key or value) by hand' "$OCCORE"
+check_live "settings-edit failure names key-or-value (pr-00263 a F21)" "$OCCORE" -qF 'entry (key or value) by hand'
 
 echo ""
 _kit_pi=$(live_src "$OCCORE" | grep -c 'python3 -I' || true)

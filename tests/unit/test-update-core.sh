@@ -365,7 +365,10 @@ else
     fail "update.sh must call the guard after sourcing update-core.sh (#413)"
 fi
 _pg_missing=""
-_pg_entfns="$(grep -oE '^[[:space:]]*update_[a-z_]+[[:space:]]*$' "$UPDATE" |
+# A2 (#460): the digit class the #457 standard names -- no digit-bearing
+# entry call exists today (latent), but a future update_2x_sync call
+# would silently escape the extraction without it.
+_pg_entfns="$(grep -oE '^[[:space:]]*update_[a-z0-9_]+[[:space:]]*$' "$UPDATE" |
     awk '{gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print}' | sort -u)"
 # emptiness probe (#457, the #455 a C2 contract -- the sibling-note
 # sweep): an empty extraction would run the loop zero times and the

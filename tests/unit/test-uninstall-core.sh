@@ -1872,6 +1872,14 @@ else
     fail "uninstall.sh must call the guard after sourcing uninstall-core.sh (#413)"
 fi
 _pg_missing=""
+# C1 (#460 context note): the whole-line extraction is deliberately
+# blind to MID-LINE calls -- uninstall.sh's `ans=$(prompt_yn "Proceed
+# with uninstall?" "n")` never matches `^[[:space:]]*prompt_yn$`, so
+# prompt_yn's lib definition is not enforced HERE; the _defs sourcing
+# pin (the helpers list) covers it redundantly today. Extending the
+# ERE to mid-line calls would over-capture (definitions, assignments)
+# for no coverage gain -- accepted residual, revisit only if the
+# _defs pin goes.
 _pg_entfns="$(grep -oE '^[[:space:]]*(un_[a-z_0-9]+|prompt_yn)[[:space:]]*$' "$UNINSTALL" |
     awk '{gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print}' | sort -u)"
 # emptiness probe (#457, the #455 a C2 contract -- the sibling-note

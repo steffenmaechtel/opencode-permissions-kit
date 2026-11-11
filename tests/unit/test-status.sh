@@ -42,9 +42,9 @@ _trap_cleanup() {
 trap _trap_cleanup EXIT INT TERM
 
 # --- 0. dev-owned mode line (internal/records/ddev-dev-owned-projects.md) -------------
-if grep -q 'ui_kv "ddev settings"' "$STATUS_CORE" &&
-    grep -q 'dev-owned — kit writes disable_settings_management' "$STATUS_CORE" &&
-    grep -qF 'DDEV_DEV_OWNED=' "$STATUS_CORE"; then
+if live_src "$STATUS_CORE" | grep -q 'ui_kv "ddev settings"' &&
+    live_src "$STATUS_CORE" | grep -q 'dev-owned — kit writes disable_settings_management' &&
+    live_src "$STATUS_CORE" | grep -qF 'DDEV_DEV_OWNED='; then
     pass "status.sh reports the ddev settings mode (stamp-driven)"
 else
     fail "status.sh reports the ddev settings mode (stamp-driven)"
@@ -55,9 +55,9 @@ fi
 # #199 a W3: a missing or outdated helper renders the counted warn row at
 # the call site (section g2 pins it); the old fail-soft contract
 # ("a missing helper just drops the row") is retired.
-if grep -q 'git_status_row' "$STATUS_CORE" &&
-    grep -q 'sh/git-check.sh' "$STATUS" &&
-    grep -q 'command -v git_status_row' "$STATUS_CORE"; then
+if live_src "$STATUS_CORE" | grep -q 'git_status_row' &&
+    live_src "$STATUS" | grep -q 'sh/git-check.sh' &&
+    live_src "$STATUS_CORE" | grep -q 'command -v git_status_row'; then
     pass "status.sh reports the host git via the shared git-check helper"
 else
     fail "status.sh reports the host git via the shared git-check helper"
@@ -341,9 +341,9 @@ fi
 # --- 1b. root-equivalent access audit (issue #37) --------------------------------
 # The audit ships two pure helpers (stat math only); they are extracted and
 # unit-tested directly, plus static assertions on the section wiring.
-if grep -q 'ui_section "Root-equivalent access' "$STATUS_CORE" &&
-    grep -q 'ROOT_EQUIV_SOCKS' "$STATUS_CORE" &&
-    grep -q '/mnt/wsl' "$STATUS_CORE"; then
+if live_src "$STATUS_CORE" | grep -q 'ui_section "Root-equivalent access' &&
+    live_src "$STATUS_CORE" | grep -q 'ROOT_EQUIV_SOCKS' &&
+    live_src "$STATUS_CORE" | grep -q '/mnt/wsl'; then
     pass "status.sh carries the root-equivalent access section (issue #37)"
 else
     fail "status.sh carries the root-equivalent access section (issue #37)"
@@ -515,7 +515,7 @@ fi
 # fallback: no binary answers -> the stamp, annotated (static assert: the
 # standard locations /usr/local/bin/ddev and /usr/bin/ddev exist on real
 # hosts and cannot be shadowed in-process)
-if grep -q 'recorded at install time' "$STATUS_CORE"; then
+if live_src "$STATUS_CORE" | grep -q 'recorded at install time'; then
     pass "ddev version: stamp fallback annotated when no binary answers"
 else
     fail "ddev version: stamp fallback annotated when no binary answers"
@@ -562,7 +562,7 @@ else
 fi
 
 # the helper tier must never prompt for a password inside a status output
-if grep -q 'sudo -n -u' "$STATUS_CORE"; then
+if live_src "$STATUS_CORE" | grep -q 'sudo -n -u'; then
     pass "ddev version: helper probe uses sudo -n (no password prompt)"
 else
     fail "ddev version: helper probe uses sudo -n (no password prompt)"
@@ -607,9 +607,9 @@ fi
 # --- 1f. management footer uses the opk shorthand (issue #62) ---------------------
 # The footer is the hint users copy-paste; it must print the short CLI
 # commands, not the library paths behind them.
-if grep -qF 'ui_detail "sudo opk config' "$STATUS_CORE" &&
-    grep -qF 'ui_detail "sudo opk update' "$STATUS_CORE" &&
-    grep -qF 'ui_detail "opk uninstall' "$STATUS_CORE" &&
+if live_src "$STATUS_CORE" | grep -qF 'ui_detail "sudo opk config' &&
+    live_src "$STATUS_CORE" | grep -qF 'ui_detail "sudo opk update' &&
+    live_src "$STATUS_CORE" | grep -qF 'ui_detail "opk uninstall' &&
     ! grep -q 'management/config\.sh.*change settings' "$STATUS" "$STATUS_CORE" &&
     ! grep -q 'management/update\.sh.*re-deploy' "$STATUS" "$STATUS_CORE" &&
     ! grep -q 'management/uninstall\.sh.*remove the kit' "$STATUS" "$STATUS_CORE"; then
@@ -709,6 +709,12 @@ if awk '/ADV_VER=\$\(/,/head -1 \|\| true/' "$STATUS_CORE" | grep -q 'timeout 10
 else
     fail "advisory probe is timeout-bounded (0.0.43b W3)"
 fi
+# Inversion (conventions.md "Source-counting pins", the #459 a B3
+# class): the pinned literal IS a full-line comment (status-core.sh's
+# parity note) -- a rider would delete the pinned bytes. Bare grep is
+# the sanctioned shape. (No in-place marker here: this pin is an
+# if-form, not a rule-2 check shape -- the marker would be decorative;
+# review a Q7, #468.)
 if grep -qF 'BOUNDED pattern as the wrapper' "$STATUS_CORE"; then
     pass "the probe comment states the bounded parity truthfully"
 else
@@ -716,7 +722,7 @@ else
 fi
 
 # --- 0.0.44b W12b/W15/W16: unscannable render, line-wise roots, null coercion -----------
-if grep -qF 'scan_unscannable=true' "$STATUS_CORE" && grep -qF 'agent config unscannable' "$STATUS_CORE"; then
+if live_src "$STATUS_CORE" | grep -qF 'scan_unscannable=true' && live_src "$STATUS_CORE" | grep -qF 'agent config unscannable'; then
     pass "status.sh renders unscannable (never false-green) for parser rc != 0 (W12b)"
 else
     fail "status.sh renders unscannable (never false-green) for parser rc != 0 (W12b)"
@@ -830,17 +836,17 @@ fi
 # advice when OpenChamber is present but unpinned, shadow note when only
 # self-installed binaries exist without OpenChamber (0.0.47a F4). Static
 # pins below; the verdict matrix itself runs functionally further down.
-if grep -q 'secured via policy pin' "$STATUS_CORE" &&
-    grep -q 'BYPASSED' "$STATUS_CORE" &&
-    grep -q "sudo opk openchamber-secure" "$STATUS_CORE"; then
+if live_src "$STATUS_CORE" | grep -q 'secured via policy pin' &&
+    live_src "$STATUS_CORE" | grep -q 'BYPASSED' &&
+    live_src "$STATUS_CORE" | grep -q "sudo opk openchamber-secure"; then
     pass "status shows the OpenChamber state (secured/bypassed/advice)"
 else
     fail "status lost the OpenChamber state line"
 fi
 # detection reuses the wrapper's semantics: a pin on the kit wrapper itself
 # is not a bypass, an empty pin counts as unset
-if grep -q '_oc_secured=true' "$STATUS_CORE" &&
-    grep -qF '[ "$_oc_pin" = "/usr/local/bin/opencode" ]' "$STATUS_CORE"; then
+if live_src "$STATUS_CORE" | grep -q '_oc_secured=true' &&
+    live_src "$STATUS_CORE" | grep -qF '[ "$_oc_pin" = "/usr/local/bin/opencode" ]'; then
     pass "status pin detection matches the wrapper semantics"
 else
     fail "status pin detection diverges from the wrapper"
@@ -850,8 +856,8 @@ fi
 # Literals updated for #211 a F9: the default chain deepened to
 # ${USER:-} so set -u survives both-unset (cron env) — same getent
 # resolution, same fallback shape, one level deeper.
-if grep -q 'getent passwd "${DEFAULT_USER:-${USER:-}}"' "$STATUS_CORE" &&
-    grep -qF '_oc_home="${_oc_home:-/home/${DEFAULT_USER:-${USER:-}}}"' "$STATUS_CORE"; then
+if live_src "$STATUS_CORE" | grep -q 'getent passwd "${DEFAULT_USER:-${USER:-}}"' &&
+    live_src "$STATUS_CORE" | grep -qF '_oc_home="${_oc_home:-/home/${DEFAULT_USER:-${USER:-}}}"'; then
     pass "openchamber verdicts resolve the home via getent (0.0.47b W2)"
 else
     fail "openchamber home resolution regressed to /home hardcode (0.0.47b W2)"
@@ -1096,7 +1102,7 @@ fi
 # anymore — every verdict row goes through the semantic helpers, so the
 # summary cannot miss one (class sweep of the 62 sites, 0.0.46a F2 style).
 if ! grep -qE '"\$UI_(GREEN|YELLOW|RED)"' "$STATUS" "$STATUS_CORE" &&
-    grep -q 'ui_kv_ok ' "$STATUS_CORE" && grep -q 'ui_kv_bad ' "$STATUS_CORE"; then
+    live_src "$STATUS_CORE" | grep -q 'ui_kv_ok ' && live_src "$STATUS_CORE" | grep -q 'ui_kv_bad '; then
     pass "status.sh: all colored rows use semantic helpers (countable)"
 else
     fail "status.sh: raw colored ui_kv row survived the sweep"
@@ -1111,9 +1117,9 @@ fi
 # Severity tallies only see MAIN-shell rows: the three scanning loops
 # feed from temp files via redirect, never from a `cmd | while` pipe
 # (counter bumps inside a pipe subshell die there). Shape pins per site.
-if grep -qF 'done <"$_st_share_list"' "$STATUS_CORE" &&
-    grep -qF 'done <"$_st_hosts_list"' "$STATUS_CORE" &&
-    grep -qF '_st_dbdump_gap "$DEFAULT_USER" <"$_st_gap_roots"' "$STATUS_CORE"; then
+if live_src "$STATUS_CORE" | grep -qF 'done <"$_st_share_list"' &&
+    live_src "$STATUS_CORE" | grep -qF 'done <"$_st_hosts_list"' &&
+    live_src "$STATUS_CORE" | grep -qF '_st_dbdump_gap "$DEFAULT_USER" <"$_st_gap_roots"'; then
     pass "scan loops run in the main shell (redirect, not pipe)"
 else
     fail "a scan loop prints its findings from a pipe subshell again"
@@ -1122,7 +1128,7 @@ fi
 # One-line mode must be exactly one line: no raw echo/printf leaks past
 # UI_SILENT (the hosts-scan add-lines and the leak-scan hit list are the
 # two raw-print sites; both are guarded/converted).
-if grep -qF 'ui_detail "add: opk ddev-hosts-add' "$STATUS_CORE" &&
+if live_src "$STATUS_CORE" | grep -qF 'ui_detail "add: opk ddev-hosts-add' &&
     ! grep -qF 'echo "     add' "$STATUS" "$STATUS_CORE"; then
     pass "--short: raw-print sites converted/guarded (one-line discipline)"
 else
@@ -1136,9 +1142,9 @@ fi
 # (checkout-first, unchanged) with stdin runs pinned to the deployed lib;
 # resolved through readlink since #434 (a symlinked entry keeps the
 # checkout-first lookup).
-if grep -qF 'UI_LIB="$ST_CALL_DIR/../sh/ui.sh"' "$STATUS" &&
-    grep -qF 'GIT_CHECK_LIB="$ST_CALL_DIR/../sh/git-check.sh"' "$STATUS" &&
-    grep -qF 'ST_CALL_DIR="$(dirname "$(readlink -f "$0" 2>/dev/null || printf '"'"'%s'"'"' "$0")")"' "$STATUS"; then
+if live_src "$STATUS" | grep -qF 'UI_LIB="$ST_CALL_DIR/../sh/ui.sh"' &&
+    live_src "$STATUS" | grep -qF 'GIT_CHECK_LIB="$ST_CALL_DIR/../sh/git-check.sh"' &&
+    live_src "$STATUS" | grep -qF 'ST_CALL_DIR="$(dirname "$(readlink -f "$0" 2>/dev/null || printf '"'"'%s'"'"' "$0")")"'; then
     pass "status.sh resolves ui.sh/git-check.sh checkout-first"
 else
     fail "status.sh resolves ui.sh/git-check.sh deployed-first (pre-#158 skew)"
@@ -1436,10 +1442,10 @@ fi
 # (#244 h W6 residual).
 _sock_n="$(live_src "$STATUS_CORE" |
     grep -cF 'ui_kv "socket" "unknown — needs root to check' || true)"
-if grep -qF 'ui_kv "opencode version" "unknown — probe failed' "$STATUS_CORE" &&
+if live_src "$STATUS_CORE" | grep -qF 'ui_kv "opencode version" "unknown — probe failed' &&
     [ "$_sock_n" = "2" ] &&
-    grep -qF 'ui_kv "mkcert CA" "unknown — needs root to check' "$STATUS_CORE" &&
-    grep -qF 'ui_kv "mkcert CA" "missing (optional' "$STATUS_CORE" &&
+    live_src "$STATUS_CORE" | grep -qF 'ui_kv "mkcert CA" "unknown — needs root to check' &&
+    live_src "$STATUS_CORE" | grep -qF 'ui_kv "mkcert CA" "missing (optional' &&
     ! grep -qE 'ui_kv_warn "[^"]*" "unknown — (needs root|probe failed)' "$STATUS" "$STATUS_CORE" &&
     ! grep -qF 'ui_kv_warn "mkcert CA" "missing (optional' "$STATUS" "$STATUS_CORE"; then
     pass "W3: unknown/optional rows are uncounted (plain ui_kv, both socket twins)"
@@ -2642,8 +2648,8 @@ if grep -q '^_st_progress_tee() {' "$STATUS_CORE" &&
 else
     fail "#210: scan helpers not found in the section lib (anchor drift?)"
 fi
-if grep -qF '_st_ddev_scan "ddev share: scanning $_st_root" "$_st_root" "$_st_share_list"' "$STATUS_CORE" &&
-    grep -qF '_st_ddev_scan "win hosts: scanning $_st_root" "$_st_root" "$_st_hosts_list"' "$STATUS_CORE" &&
+if live_src "$STATUS_CORE" | grep -qF '_st_ddev_scan "ddev share: scanning $_st_root" "$_st_root" "$_st_share_list"' &&
+    live_src "$STATUS_CORE" | grep -qF '_st_ddev_scan "win hosts: scanning $_st_root" "$_st_root" "$_st_hosts_list"' &&
     ! grep -qE 'find "\$_st_root" .* -name \.ddev' "$STATUS" "$STATUS_CORE"; then
     pass "#210: both scan sites run through the shared helper (emitter sweep)"
 else
@@ -2784,6 +2790,9 @@ if grep -qF 'or ""))'"'"' 2>/dev/null); then' "$STATUS" "$STATUS_CORE"; then
 else
     pass "#244 c S3: advisory parse no longer discards interpreter stderr"
 fi
+# Absence pin in if-found-then-fail shape: the leak-scan parser must
+# NOT discard its stderr -- a commented-out forbidden line SHOULD keep
+# counting (conventions.md "Source-counting pins"), bare by design.
 if grep -qF 'python3 "$PARSER" "$SCAN_CFG" 2>/dev/null' "$STATUS" "$STATUS_CORE"; then
     fail "#244 c S3: leak-scan parser must not discard its diagnostic stderr"
 else
@@ -2954,9 +2963,9 @@ fi
 #    (sh -n) and carry the tee's full body — an early col-0 brace in the
 #    lib leaves def ticker/draw behind; unterminated quoting fails sh -n.
 if sh -n "$STATUS_CORE" 2>/dev/null &&
-    grep -q 'def draw' "$STATUS_CORE" &&
-    grep -q 'def ticker' "$STATUS_CORE" &&
-    grep -q 'read1' "$STATUS_CORE"; then
+    live_src "$STATUS_CORE" | grep -q 'def draw' &&
+    live_src "$STATUS_CORE" | grep -q 'def ticker' &&
+    live_src "$STATUS_CORE" | grep -q 'read1'; then
     pass "#221: section lib parses and carries the full tee body"
 else
     fail "#221: sh/status-core.sh truncated or unparsable"

@@ -213,24 +213,39 @@ rider lint (tests/unit/test-rider-lint.sh, rule 1), which matches
 the three historical byte forms with a same-line operand; exotic
 re-spellings (tab after the expression, `sed -e`, a `g` suffix, a
 continuation-line operand) escape the detector and stay the
-reviewer's call. The pre-#460 strict `check … grep … "$SRCVAR"`
-single-file sites (66 measured 2026-11-11) are grandfathered until
-the #460 census wave converts them (record: test-rider-lint.sh
-rule 2).
+reviewer's call. The strict `check "desc" grep … "$SRCVAR"`
+single-file presence shape is GATED (rule 2, converted by the #460
+census wave: 85 sites to check_live, one to the inversion below -- 86
+total):
+registration derives from the suite's assignments — a variable whose
+value references the repo/shipped tree (`$REPO/`, `$FILES/`,
+`$SCRIPT_DIR/../../`, `$SCRIPT_DIR/../sh/`, `../e2e/`, `.github/`)
+directly or through another registered variable. Slash-comment
+sources (values ending `.jsonc/.json/.ts/.tsx`) register but stay
+EXEMPT pending the deferred JSONC `//` decision. The `sh -c`
+indirection of the same shape (`sh -c 'grep … "$1"' _ "$SRCVAR"`)
+is recorded as a down-only ratchet (rule 3) — convert on sight.
 The `|| true` rule keeps its per-shape semantics: rc-observed shapes
 omit it (the consumer's rc must be able to fail the check); piped
 shapes (`grep -c … | grep -q "^[N-M]$"`) and extraction-leg pipelines
 ending in a consumer (`cut -d: -f1`) ride `live_src` but no
 `|| true` — the final consumer takes the rc and the empty case is
-guarded downstream. Absence pins (`= 0`) are out of scope — a
-commented-out forbidden line SHOULD keep counting there (bare grep,
-no `live_src`) — and so are deliberate bare control arms (the #261
-pin's own un-ridden leg). A presence pin whose pinned literal is
-itself a full-line comment is the recorded INVERSION of this rule:
-the strip would delete the pinned bytes and make the pin unmatchable
-— such a site (the documented-disposition marker pin
+guarded downstream. Absence pins stay un-ridden in BOTH spellings —
+the negated leg (`! grep`) and if-found-then-fail (`if grep …; then
+fail`): a commented-out forbidden line SHOULD keep counting there
+(bare grep, no `live_src`) — and so are deliberate bare control arms
+(the #261 pin's own un-ridden leg). A presence pin whose pinned
+literal is itself a full-line comment is the recorded INVERSION of
+this rule: the strip would delete the pinned bytes and make the pin
+unmatchable — such a site (the documented-disposition marker pin
 `'#428 disposition'` in `test-install-core.sh`) carries an in-place
-annotation naming the inversion instead of the rider (#459 a B3).
+annotation naming the inversion instead of the rider (#459 a B3);
+the rider lint's rule 2 honors the `# rider-inversion` marker as
+that exemption. New inversion sites are a registered exception, not a
+free pass: the rider lint asserts the exact marker-mention count
+across the suites (lines carrying the marker anywhere; the inversion
+tripwire, review a X3 + b B1) -- a new marker fails the lint until the
+diff documents the site here.
 Full-line strip only (#244 h W6 residual: trailing comments after
 live lines still count). Precedent: `test-install-args.sh` (v2 URL,
 the canonical shape) and the #261 rider pin in `test-project-paths.sh`;

@@ -248,9 +248,9 @@ done
 
 # --- 7. wiring -----------------------------------------------------------------------------
 
-if grep -q '/sh/advisories.sh' "$WRAPPER_CORE" &&
-    grep -q "WARNING: the installed opencode .* is affected by a known security advisory" "$WRAPPER_CORE" &&
-    grep -q "Please upgrade opencode with 'opk upgrade-opencode'" "$WRAPPER_CORE"; then
+if live_src "$WRAPPER_CORE" | grep -q '/sh/advisories.sh' &&
+    live_src "$WRAPPER_CORE" | grep -q "WARNING: the installed opencode .* is affected by a known security advisory" &&
+    live_src "$WRAPPER_CORE" | grep -q "Please upgrade opencode with 'opk upgrade-opencode'"; then
     pass "wrapper: sources the database, warns, hints the upgrade command"
 else
     fail "wrapper: sources the database, warns, hints the upgrade command"
@@ -273,14 +273,14 @@ if [ -n "$_verline" ] && [ -n "$_advline" ] && [ "$_verline" -lt "$_advline" ] &
 else
     fail "wrapper: --version early-exec stays ahead of the advisory check ($_verline vs $_advline; calls $_call_pass vs $_call_adv)"
 fi
-if grep -q 'timeout 5 /usr/bin/sudo -n -u opencode' "$WRAPPER_CORE" && grep -q 'bin/opencode --version' "$WRAPPER_CORE"; then
+if live_src "$WRAPPER_CORE" | grep -q 'timeout 5 /usr/bin/sudo -n -u opencode' && live_src "$WRAPPER_CORE" | grep -q 'bin/opencode --version'; then
     pass "wrapper: the --version probe is timeout-bounded (wedged 2.x service, issue #80)"
 else
     fail "wrapper: the --version probe is timeout-bounded (wedged 2.x service, issue #80)"
 fi
-if grep -q 'ui_section "Security advisories"' "$STATUS_CORE" &&
-    grep -q 'https://api.github.com/repos/anomalyco/opencode/security-advisories' "$STATUS_CORE" &&
-    grep -q 'opk upgrade-opencode' "$STATUS_CORE"; then
+if live_src "$STATUS_CORE" | grep -q 'ui_section "Security advisories"' &&
+    live_src "$STATUS_CORE" | grep -q 'https://api.github.com/repos/anomalyco/opencode/security-advisories' &&
+    live_src "$STATUS_CORE" | grep -q 'opk upgrade-opencode'; then
     pass "status.sh: advisory section, upstream live check, upgrade hint"
 else
     fail "status.sh: advisory section, upstream live check, upgrade hint"
@@ -360,8 +360,8 @@ else
 fi
 # quoting discipline stays in place: the id only ever reaches argv inside
 # double quotes, free text only the body file
-if grep -q -- '--search "\$ID in:title"' "$SCAN" &&
-    grep -q -- '--title "New upstream advisory \$ID affects opencode"' "$SCAN" &&
+if live_src "$SCAN" | grep -q -- '--search "\$ID in:title"' &&
+    live_src "$SCAN" | grep -q -- '--title "New upstream advisory \$ID affects opencode"' &&
     ! grep -q 'eval ' "$SCAN"; then
     pass "advisory-watch.sh: quoted argv only, no eval"
 else

@@ -133,18 +133,18 @@ for f in "$INSTALL_CORE" "$UPDATE_CORE" "$CONFIG"; do
         fail "$(basename "$f") runs the baseline through fs_baseline_root"
     fi
 done
-grep -q 'opencode-permissions-kit-lib/sh/fs-baseline.sh' "$INSTALL" &&
+live_src "$INSTALL" | grep -q 'opencode-permissions-kit-lib/sh/fs-baseline.sh' &&
     pass "install.sh fetch list includes fs-baseline.sh" ||
     fail "install.sh fetch list includes fs-baseline.sh"
-grep -q 'opencode-permissions-kit-lib/sh/fs-baseline.sh' "$UPDATE" &&
+live_src "$UPDATE" | grep -q 'opencode-permissions-kit-lib/sh/fs-baseline.sh' &&
     pass "update.sh KIT_FILES includes fs-baseline.sh" ||
     fail "update.sh KIT_FILES includes fs-baseline.sh"
-grep -q 'large trees: this can take a while' "$UPDATE_CORE" &&
+live_src "$UPDATE_CORE" | grep -q 'large trees: this can take a while' &&
     pass "update.sh hints before the ddev handover scan (issue #14)" ||
     fail "update.sh hints before the ddev handover scan (issue #14)"
 # The hint line lives in do_plan_phase's getfacl backup (install-core.sh
 # since #346 wave 3).
-grep -q 'large trees: this can take minutes' "$INSTALL_CORE" &&
+live_src "$INSTALL_CORE" | grep -q 'large trees: this can take minutes' &&
     pass "install.sh hints before the getfacl backup (issue #14)" ||
     fail "install.sh hints before the getfacl backup (issue #14)"
 
@@ -248,10 +248,10 @@ else
 fi
 
 # --- 8. Makefile + CI wiring -----------------------------------------------------------
-grep -q 'test-fs-baseline' "$MAKEFILE" &&
+live_src "$MAKEFILE" | grep -q 'test-fs-baseline' &&
     pass "Makefile test target includes test-fs-baseline" ||
     fail "Makefile test target includes test-fs-baseline"
-grep -q 'tests/unit/test-fs-baseline.sh' "$TEST_CI" &&
+live_src "$TEST_CI" | grep -q 'tests/unit/test-fs-baseline.sh' &&
     pass "test-unit.yml run step includes the new test" ||
     fail "test-unit.yml run step includes the new test"
 # fs-baseline.sh is a sourced lib (install.sh, config.sh, update.sh) —

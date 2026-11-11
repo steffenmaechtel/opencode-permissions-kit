@@ -42,6 +42,14 @@ UNINSTALL_CORE="$REPO/files/opencode-permissions-kit-lib/sh/uninstall-core.sh"
 check() {
     desc="$1"
     shift
+    # review a S2 (#468): mirror the harness F6 guard -- an empty
+    # command must fail loud, not pass as a redirection-only rc 0 (the
+    # shadow stays because it suppresses the checked command's output,
+    # review #398 a F2).
+    if [ "$#" -eq 0 ]; then
+        fail "$desc (check: no command given)"
+        return
+    fi
     if "$@" >/dev/null 2>&1; then pass "$desc"; else fail "$desc"; fi
 }
 
@@ -116,30 +124,27 @@ check_no "plugin never touches the user's theme (no theme.set/install)" \
     grep -qE 'theme\.(set|install)' "$PLUGIN"
 
 # --- install.sh wiring --------------------------------------------------------
-check "install.sh fetch list includes the tui payload" \
-    grep -q 'opencode-permissions-kit-lib/tui/kit-mode.tsx' "$INSTALL"
+check_live "install.sh fetch list includes the tui payload" "$INSTALL" \
+    -q 'opencode-permissions-kit-lib/tui/kit-mode.tsx'
 check "install.sh deploys the plugin to LIBDIR/tui (lib_deploy manifest)" \
     sh -c 'grep -qF "opencode-permissions-kit-lib/tui/kit-mode.tsx 644" "$2" && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL_CORE" "$DEPLOYLIB"
-check "install.sh installs the opencode-user tui.json (marker policy)" \
-    grep -q 'grep -q .\"_opencode_permissions_kit\". \"\$OC_TUI_CONF\"' "$INSTALL_CORE"
-check "install.sh installs the default-user danger theme" \
-    grep -q 'opencode-danger.theme.json" "$DEFAULT_THEME_DIR' "$INSTALL_CORE"
-check "install.sh keeps user-managed tui.json (skip branch)" \
-    grep -q 'existing $OC_TUI_CONF kept' "$INSTALL_CORE"
+check_live "install.sh installs the opencode-user tui.json (marker policy)" "$INSTALL_CORE" \
+    -q 'grep -q .\"_opencode_permissions_kit\". \"\$OC_TUI_CONF\"'
+check_live "install.sh installs the default-user danger theme" "$INSTALL_CORE" \
+    -q 'opencode-danger.theme.json" "$DEFAULT_THEME_DIR'
+check_live "install.sh keeps user-managed tui.json (skip branch)" "$INSTALL_CORE" -q 'existing $OC_TUI_CONF kept'
 
 # --- update.sh wiring ---------------------------------------------------------
-check "update.sh KIT_FILES includes the tui payload" \
-    grep -q 'opencode-permissions-kit-lib/tui/kit-mode.tsx' "$UPDATE"
+check_live "update.sh KIT_FILES includes the tui payload" "$UPDATE" -q 'opencode-permissions-kit-lib/tui/kit-mode.tsx'
 check "update.sh re-deploys the plugin to LIBDIR/tui (lib_deploy manifest)" \
     sh -c 'grep -qF "opencode-permissions-kit-lib/tui/kit-mode.tsx 644" "$2" && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE_CORE" "$DEPLOYLIB"
-check "update.sh refreshes the opencode-user tui.json (marker policy)" \
-    grep -q 'grep -q .\"_opencode_permissions_kit\". \"\$OC_TUI_CONF\"' "$UPDATE_CORE"
-check "update.sh refreshes the default-user danger theme" \
-    grep -q 'opencode-danger.theme.json" "$DEFAULT_THEME_DIR' "$UPDATE_CORE"
+check_live "update.sh refreshes the opencode-user tui.json (marker policy)" "$UPDATE_CORE" \
+    -q 'grep -q .\"_opencode_permissions_kit\". \"\$OC_TUI_CONF\"'
+check_live "update.sh refreshes the default-user danger theme" "$UPDATE_CORE" \
+    -q 'opencode-danger.theme.json" "$DEFAULT_THEME_DIR'
 
 # --- uninstall.sh hints -------------------------------------------------------
-check "uninstall.sh documents the tui.json leftovers" \
-    grep -q 'tui.json' "$UNINSTALL"
+check_live "uninstall.sh documents the tui.json leftovers" "$UNINSTALL" -q 'tui.json'
 
 # --- opencode 2.x port (issue #80) ---------------------------------------------
 PLUGIN2X="$TUIDIR/kit-mode-2x.tsx"
@@ -174,18 +179,22 @@ check "2x plugin colors follow theme tokens (subdued/info/error)" \
     grep -q 'text.subdued' "$PLUGIN2X" && grep -q 'feedback.info.default' "$PLUGIN2X" && grep -q 'feedback.error.default' "$PLUGIN2X"
 check "2x plugin render is defensive (try/catch)" \
     grep -q 'catch' "$PLUGIN2X"
-check "install.sh fetch list includes the 2x plugin" \
-    grep -q 'opencode-permissions-kit-lib/tui/kit-mode-2x.tsx' "$INSTALL"
+check_live "install.sh fetch list includes the 2x plugin" "$INSTALL" \
+    -q 'opencode-permissions-kit-lib/tui/kit-mode-2x.tsx'
 check "install.sh deploys the 2x plugin to LIBDIR/tui (lib_deploy manifest)" \
     sh -c 'grep -qF "opencode-permissions-kit-lib/tui/kit-mode-2x.tsx 644" "$2" && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL_CORE" "$DEPLOYLIB"
-check "install.sh registers the 2x plugin as a discovered plugin dir (major-gated, shared helper)"
-# split legs (#346 wave 3): kit_source bootstrap stays on the entry,
-# the 2x registration call lives in do_deploy_phase (the lib)
-sh -c 'grep -qF "kit_source \"\$SCRIPT_DIR/opencode-permissions-kit-lib/sh/tui-plugin.sh\"" "$2" && grep -qF "tui_plugin_sync_user \"\$OPENCODE_MAJOR\"" "$1"' _ "$INSTALL_CORE" "$INSTALL"
-check "install.sh unregisters inert cli.json path entries (2x cleanup, via sh/tui-plugin.sh)" \
-    grep -qF 'tui-register.py" "$_tp_user_dir/cli.json" unregister' "$TUIPLUGIN"
-check "update.sh fetch list includes the 2x plugin" \
-    grep -q 'opencode-permissions-kit-lib/tui/kit-mode-2x.tsx' "$UPDATE"
+# review a S2 (#468): the vacuous no-command check row plus the bare
+# rc-discarded sh -c below are one real pin now -- both legs ridden
+# (kit_source on the entry, the sync call in the deploy lib).
+if live_src "$INSTALL" | grep -qF 'kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/tui-plugin.sh"' &&
+    live_src "$INSTALL_CORE" | grep -qF 'tui_plugin_sync_user "$OPENCODE_MAJOR"'; then
+    pass "install.sh registers the 2x plugin as a discovered plugin dir (major-gated, shared helper)"
+else
+    fail "install.sh registers the 2x plugin as a discovered plugin dir (major-gated, shared helper)"
+fi
+check_live "install.sh unregisters inert cli.json path entries (2x cleanup, via sh/tui-plugin.sh)" "$TUIPLUGIN" \
+    -qF 'tui-register.py" "$_tp_user_dir/cli.json" unregister'
+check_live "update.sh fetch list includes the 2x plugin" "$UPDATE" -q 'opencode-permissions-kit-lib/tui/kit-mode-2x.tsx'
 check "update.sh re-registers the 2x plugin dir (major-gated, sync function)" \
     sh -c 'grep -qF "tui_plugin_sync_user \"\$_str_major\"" "$1" && grep -q "sync_tui_registration \"\$_oc_major\"" "$1" && grep -qF "sh/tui-plugin.sh" "$2"' _ "$UPDATE_CORE" "$UPDATE" &&
     grep -q 'sync_tui_registration "$_maj_after"' "$UPDATE_CORE"

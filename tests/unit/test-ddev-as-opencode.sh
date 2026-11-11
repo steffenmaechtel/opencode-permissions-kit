@@ -1796,12 +1796,12 @@ check "update.sh: exactly one project-root loop (loops: $_upd_loops_n, need 1 â€
 _upd_ho_n="$(live_src "$UPDATE_CORE" | grep -c 'ddev_handover_root "$root"' || true)"
 check "update.sh: handover call per root exactly once (sites: $_upd_ho_n, need 1 â€” issue #219)" \
     [ "$_upd_ho_n" -eq 1 ]
-check "update.sh: refresh success line kept verbatim (issue #219 move)" \
-    grep -qF 'ui_success "group baseline refreshed (chgrp + setgid + g+rw + default ACLs)"' "$UPDATE_CORE"
-check "update.sh: refresh section header kept (issue #219 move)" \
-    grep -qF 'ui_section "Refreshing group baseline"' "$UPDATE_CORE"
-check "update.sh: routine skip hint kept verbatim (issue #219 move)" \
-    grep -qF 'skipped group-baseline refresh (use --refresh to re-apply chgrp/setgid/default ACLs)' "$UPDATE_CORE"
+check_live "update.sh: refresh success line kept verbatim (issue #219 move)" "$UPDATE_CORE" \
+    -qF 'ui_success "group baseline refreshed (chgrp + setgid + g+rw + default ACLs)"'
+check_live "update.sh: refresh section header kept (issue #219 move)" "$UPDATE_CORE" \
+    -qF 'ui_section "Refreshing group baseline"'
+check_live "update.sh: routine skip hint kept verbatim (issue #219 move)" "$UPDATE_CORE" \
+    -qF 'skipped group-baseline refresh (use --refresh to re-apply chgrp/setgid/default ACLs)'
 check "install.sh: stamps after the install-time handover" \
     sh -c "grep -qF 'ddev_handover_stamp_write \"\$root\" \"\$OPENCODE_USER\" \"\$OPENCODE_GROUP\"' \"\$1\"" _ "$INSTALL_CORE"
 # Comment-strip riders (#261, the #244 g W1 class): commented-out lines

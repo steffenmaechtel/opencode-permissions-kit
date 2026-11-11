@@ -431,7 +431,10 @@ else
     fail "install.sh must call the guard after sourcing install-core.sh (#413)"
 fi
 _pg_missing=""
-_pg_entfns="$(grep -oE '^do_[a-z_]+$' "$INSTALL" | sort -u)"
+# A2 (#460): the digit class the #457 standard names -- latent today
+# (no digit-bearing do_ entry call exists), a future do_2x_sync would
+# silently escape the extraction without it.
+_pg_entfns="$(grep -oE '^do_[a-z0-9_]+$' "$INSTALL" | sort -u)"
 # emptiness probe (#457, the #455 a C2 contract -- the sibling-note
 # sweep): an empty extraction would run the loop zero times and the
 # rider would pass vacuously.

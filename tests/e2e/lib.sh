@@ -150,6 +150,15 @@ skipped=0
 check() {
     local desc="$1"
     shift
+    # F6 parity with the harness form (PR #468 meta-recheck M1): an
+    # empty command fails loud instead of vacuously passing through
+    # the null command (rc 0). Same shape as lib/harness.sh and the
+    # tui-mode/secure-binary/sudoers-deploy shadows (review a S2).
+    if [ "$#" -eq 0 ]; then
+        echo "  ${RED}FAIL${NC}  $desc (check: no command given)"
+        failures=$((failures + 1))
+        return
+    fi
     if "$@"; then
         echo "  ${GREEN}PASS${NC}  $desc"
         passed=$((passed + 1))

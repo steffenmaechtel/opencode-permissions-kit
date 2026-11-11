@@ -222,8 +222,8 @@ _v14i_bad="$(cat "$INSTALL" "$INSTALL_CORE" |
     grep -e '/home/\$DEFAULT_USER' -e '/home/\${DEFAULT_USER' 2>/dev/null |
     grep -v '^[[:space:]]*#' |
     grep -v '^[[:space:]]*DEV_HOME="/home/\$DEFAULT_USER"$' || true)"
-if grep -q 'DEV_HOME="/home/\$DEFAULT_USER"' "$INSTALL_CORE" &&
-    grep -q 'getent passwd "\$DEFAULT_USER"' "$INSTALL_CORE" &&
+if live_src "$INSTALL_CORE" | grep -q 'DEV_HOME="/home/\$DEFAULT_USER"' &&
+    live_src "$INSTALL_CORE" | grep -q 'getent passwd "\$DEFAULT_USER"' &&
     [ -z "$_v14i_bad" ]; then
     pass "install.sh: DEV_HOME via getent, no hardcoded /home/\$DEFAULT_USER left (V14)"
 else
@@ -351,8 +351,8 @@ else
 fi
 # the refusal names the whitespace cause when the flag is set
 # (static: the hint is flag-gated in do_plan_phase's validation)
-if grep -qF 'a --projects value contained whitespace' "$INSTALL_CORE" &&
-    grep -qF '"${PROJECTS_ARG_SPACED:-false}" = true' "$INSTALL_CORE"; then
+if live_src "$INSTALL_CORE" | grep -qF 'a --projects value contained whitespace' &&
+    live_src "$INSTALL_CORE" | grep -qF '"${PROJECTS_ARG_SPACED:-false}" = true'; then
     pass "path-gate refusal names the whitespace cause for spaced values (#372 A3)"
 else
     fail "whitespace cause missing from the path-gate refusal (#372 A3)"
@@ -367,10 +367,10 @@ fi
 # stamp writes live in install-core.sh since #346 wave 3 (the plan
 # phase moved); the ui_kv summary row stays in the entry's tail — each
 # leg greps the file that owns the literal (the wave-2 split-pin idiom).
-if grep -qF "KIT_CHANNEL=\$KIT_BRANCH" "$INSTALL_CORE" &&
-    grep -qF 'tee "$_INSTALL_CONF_TMP"' "$INSTALL_CORE" &&
-    grep -qF 'mv -f "$_INSTALL_CONF_TMP" /etc/opencode-permissions-kit/install.conf' "$INSTALL_CORE" &&
-    grep -qF 'ui_kv "Channel"' "$INSTALL"; then
+if live_src "$INSTALL_CORE" | grep -qF "KIT_CHANNEL=\$KIT_BRANCH" &&
+    live_src "$INSTALL_CORE" | grep -qF 'tee "$_INSTALL_CONF_TMP"' &&
+    live_src "$INSTALL_CORE" | grep -qF 'mv -f "$_INSTALL_CONF_TMP" /etc/opencode-permissions-kit/install.conf' &&
+    live_src "$INSTALL" | grep -qF 'ui_kv "Channel"'; then
     pass "install.sh stamps KIT_CHANNEL and reports the channel"
 else
     fail "install.sh stamps KIT_CHANNEL and reports the channel"
@@ -381,8 +381,12 @@ fi
 # The install's rc hook, profile PATH/umask and above all the sharing-group
 # membership (usermod -aG) only reach sessions started AFTER the install —
 # the final output must say so (mirrors the uninstall hint).
-if grep -qF 'Restart your terminal (or log in again)' "$INSTALL" &&
-    grep -qF 'sharing-group membership' "$INSTALL"; then
+# #460 census: the rider exposed this pin counting COMMENT lines only
+# (the phrase "sharing-group membership" lives in install.sh comments;
+# the final output itself says "no sharing-group"). The literal now
+# pins the LIVE warning text -- the actual issue-#73 output.
+if live_src "$INSTALL" | grep -qF 'Restart your terminal (or log in again)' &&
+    live_src "$INSTALL" | grep -qF 'the current session has no sharing-group'; then
     pass "install final output tells the user to restart the terminal (issue #73)"
 else
     fail "install final output tells the user to restart the terminal (issue #73)"
@@ -395,9 +399,9 @@ fi
 # signal handlers EXIT after cleanup (a resuming script would run on with
 # its scratch already deleted). The backup dir is deliberately NOT in the
 # trap (recovery material).
-if grep -qF 'trap cleanup EXIT' "$INSTALL" &&
-    grep -qF "trap 'cleanup; exit 1' INT TERM" "$INSTALL" &&
-    grep -qF '_FETCH_TREE="$base"' "$INSTALL"; then
+if live_src "$INSTALL" | grep -qF 'trap cleanup EXIT' &&
+    live_src "$INSTALL" | grep -qF "trap 'cleanup; exit 1' INT TERM" &&
+    live_src "$INSTALL" | grep -qF '_FETCH_TREE="$base"'; then
     pass "install.sh traps EXIT + exiting INT/TERM and registers the fetch tree for cleanup"
 else
     fail "install.sh traps EXIT + exiting INT/TERM and registers the fetch tree for cleanup"
@@ -448,7 +452,7 @@ else
     fail "fetch_kit aborts on an empty (200) body (rc=$FKRC out=$FKOUT)"
 fi
 UPDATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh"
-if grep -q '\[ ! -s "\$_fk_tmp" \]' "$UPDATE" && grep -q '_fk_url="\$KIT_BASE_URL/VERSION"' "$UPDATE"; then
+if live_src "$UPDATE" | grep -q '\[ ! -s "\$_fk_tmp" \]' && live_src "$UPDATE" | grep -q '_fk_url="\$KIT_BASE_URL/VERSION"'; then
     pass "update.sh fetch_kit carries the same empty-body guard (twin in sync)"
 else
     fail "update.sh fetch_kit carries the same empty-body guard"
@@ -545,7 +549,7 @@ unset _fkg_host _fkg_w _fkg_bin _fkg_name _fkg_out _fkg_rc _fkg_i
 # assignment must not exist.
 if ! grep -q '^    SCRIPT_DIR="$(fetch_kit)"' "$INSTALL" &&
     ! grep -q '^    SCRIPT_DIR="$(fetch_kit)"' "$UPDATE" &&
-    grep -q '_FK_DIR="\$dir"' "$INSTALL" && grep -q '_FK_DIR="\$dir"' "$UPDATE"; then
+    live_src "$INSTALL" | grep -q '_FK_DIR="\$dir"' && live_src "$UPDATE" | grep -q '_FK_DIR="\$dir"'; then
     pass "fetch_kit result leaves the shell via _FK_DIR, not a subshell echo"
 else
     fail "fetch_kit result leaves the shell via _FK_DIR, not a subshell echo"
@@ -573,8 +577,8 @@ parse_args --yes
     fail "force flag defaults to false"
 # The reads sit in do_plan_phase (install-core.sh since #346 wave 3);
 # the _distro_gate FUNCTION below stays in install.sh.
-if grep -qF 'sed -n '"'"'s/^ID=//p'"'"' /etc/os-release' "$INSTALL_CORE" &&
-    grep -qF 'sed -n '"'"'s/^VERSION_ID=//p'"'"' /etc/os-release' "$INSTALL_CORE"; then
+if live_src "$INSTALL_CORE" | grep -qF 'sed -n '"'"'s/^ID=//p'"'"' /etc/os-release' &&
+    live_src "$INSTALL_CORE" | grep -qF 'sed -n '"'"'s/^VERSION_ID=//p'"'"' /etc/os-release'; then
     pass "gate reads ID/VERSION_ID from /etc/os-release (sed, not sourced)"
 else
     fail "gate reads ID/VERSION_ID from /etc/os-release (sed, not sourced)"
@@ -762,7 +766,10 @@ if live_src "$INSTALL" |
 else
     fail "install.sh must kit_source ui.sh like every other lib (#456)"
 fi
-if live_src "$INSTALL" | grep -q 'ui_info() { echo'; then
+# Absence pin in if-found-then-fail shape: the retired stub must be
+# GONE -- a commented-out forbidden line SHOULD keep counting
+# (conventions.md "Source-counting pins"), so the leg stays bare.
+if grep -q 'ui_info() { echo' "$INSTALL"; then
     fail "the retired C5 output-stub fallback is fully removed (#456)"
 else
     pass "the retired C5 output-stub fallback is fully removed (#456)"
@@ -873,6 +880,9 @@ if [ "$_v2hits" -ge 2 ]; then
 else
     fail "bootstrap v2 installer URL missing (expected prompt + curl, found $_v2hits)"
 fi
+# Absence pin in if-found-then-fail shape: the v1 URL must be GONE --
+# a commented-out forbidden line SHOULD keep counting (conventions.md
+# "Source-counting pins"), so these legs stay bare by design.
 if grep -qF 'https://opencode.ai/install' "$INSTALL" ||
     grep -qF 'https://opencode.ai/install' "$INSTALL_CORE"; then
     fail "bootstrap still references the v1 installer URL (resolves 1.x)"
@@ -974,7 +984,7 @@ if [ -n "$(extract_func "$INSTALL" _py3_health_probe)" ]; then
     # that the old inline gate is GONE from the entry's main flow:
     # exactly one occurrence survives, the one inside the function
     # itself (which stays in install.sh).
-    if grep -qF '    _py3_health_probe' "$INSTALL_CORE"; then
+    if live_src "$INSTALL_CORE" | grep -qF '    _py3_health_probe'; then
         pass "pre-flight wires the health gate (verbatim call pin)"
     else
         fail "pre-flight wires the health gate (verbatim call pin)"
@@ -1205,7 +1215,7 @@ fi
 # replace arm's site with the arm itself. Net zero, both conscious.
 _bk_n="$(live_src "$INSTALL_CORE" | grep -c '_bk_fail' || true)"
 [ "$_bk_n" = 10 ] &&
-    grep -qF 'INCOMPLETE: $_BK_FAIL' "$INSTALL" &&
+    live_src "$INSTALL" | grep -qF 'INCOMPLETE: $_BK_FAIL' &&
     pass "backup failures record loudly + degrade the summary row (pr-00263 a F6 + d W1/W2)" ||
     fail "backup failure silence survived somewhere (pr-00263 a F6 + d W1/W2; _bk_fail sites: $_bk_n of 10)"
 # LOWS-1 (#372 I6): the count moved 2 -> 1 — the user-authored-config
@@ -1215,14 +1225,14 @@ _bk_n="$(live_src "$INSTALL_CORE" | grep -c '_bk_fail' || true)"
 _cba_n="$(live_src "$INSTALL_CORE" |
     grep -cF 'config backup FAILED — see Backup summary' || true)"
 [ "$_cba_n" = 1 ] &&
-    grep -qF 'binary backup FAILED — see Backup summary' "$INSTALL_CORE" &&
+    live_src "$INSTALL_CORE" | grep -qF 'binary backup FAILED — see Backup summary' &&
     pass "the swept backup sites degrade their announce on failure (pr-00263 d W1/W2)" ||
     fail "a backup announce still lies on failure (pr-00263 d W1/W2; config-announce sites: $_cba_n of 1)"
 _acl_n="$(live_src "$INSTALL_CORE" | grep -cF 'no ACL recovery material' || true)"
 [ "$_acl_n" = 2 ] &&
     pass "both getfacl backups announce failure instead of success (pr-00263 a F8)" ||
     fail "a getfacl success line still lies (pr-00263 a F8; no-ACL sites: $_acl_n of 2)"
-grep -qF 'the official opencode installer failed' "$INSTALL_CORE" &&
+live_src "$INSTALL_CORE" | grep -qF 'the official opencode installer failed' &&
     pass "official-installer pipe has the kit error wrapper (pr-00263 a F19)" ||
     fail "official-installer failure still bare (pr-00263 a F19)"
 
