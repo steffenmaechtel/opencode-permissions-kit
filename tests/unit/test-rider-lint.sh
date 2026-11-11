@@ -41,21 +41,26 @@
 # stay the reviewer's call; the census converted the inventory's
 # compound sites to parent-if blocks with live_src pipes.
 #
-# Rule 3 (measured 2026-11-11, deliberately NOT gating): the sh -c
-# indirection of the same strict shape (`check "desc" sh -c 'grep ...
-# \"$1\"' _ "$SRCVAR"`, single positional file, presence-only) -- 336
-# sites tree-wide before the census wave. The wave converted 32
-# inventory-suite sites (bypass-guard 11, mkcert-reuse 7, staged-write
-# 13, update-flags' #164 twin); container-backend, kit-cli and
-# tui-mode converted rule-2 direct shapes only, not sh -c sites
-# (review a Q1). Residual 304 (review a Q2, per suite): ddev-as-
-# opencode 142, update-flags 48, ddev-migrate 40, wsl-exposure 40,
-# ddev-hosts 23, container-backend 3, staged-write 4, kit-cli 2,
-# tui-mode 1, ui 1. Same survivor trap, same conversion path
-# (check_live for single legs, parent-if + live_src pipes for
-# multi-leg). Recorded as a ratchet: the count must only go DOWN; the
-# wave that drives it to zero flips it to a gating zero-count (the
-# same path rule 2 took).
+# Rule 3 (gating since the #470 wave, was a down-only ratchet until
+# then): the sh -c indirection of the same strict shape (`check "desc"
+# sh -c 'grep ... \"$1\"' _ "$SRCVAR"`, single positional file,
+# presence-only) must not exist -- 336 sites tree-wide before the #460
+# census wave, 304 after it. The #470 wave converted the residual to
+# the canonical shapes (check_live for single-leg presence greps,
+# parent-if + live_src pipes for multi-leg and extraction pipelines)
+# or to their honest non-sh -c equivalents where live_src would change
+# semantics: behavioral probes (. source / sh execution / make dry-run)
+# unwrap to parent-if probes with the operands substituted (a
+# commented-out construct changes the probe's behavior, so the survivor
+# trap does not apply); pins over CAPTURED strings (sh -c "$(…)"
+# captures, printf-stdin payloads, extract_func blocks -- the
+# detector's transitive registration over-approximates these) unwrap
+# raw, un-ridden: live_src is files-only and the captured bytes cannot
+# be comment-sabotaged; absence legs stay raw per conventions.md. ONE
+# recorded inversion remains (the #459 a B3 mechanism, registered in
+# conventions.md + the tripwire below): test-ddev-as-opencode's
+# browser-arm pin -- its literal is itself a full-line comment. Zero is
+# the contract; any new sh -c presence site fails loud.
 #
 # Discrimination arms (scratch fixtures, run BEFORE the tree sweep):
 #   - a planted single-quoted file-operand rider -> flagged
@@ -67,6 +72,8 @@
 #   - the same over a fixture var, negated, or a slash-family var
 #     -> not flagged (rule 2 exemptions)
 #   - a chained-var registration flags (rule 2 transitivity)
+#   - a planted sh -c indirection shape counts (rule 3) -- and the
+#     tree sweep at zero means a NEW one fails loud (gating since #470)
 # Sabotage (committed tree, then restore + re-run green): delete the
 # hit arm from a detector -> the planted-rider arms go red while
 # the sweep passes vacuously only if the arms are gone too.
@@ -408,16 +415,17 @@ fi
 # exempts a strict shape from rule 2, so appending it must stay a
 # conscious, reviewable act -- the detector cannot verify the inversion
 # claim (that the pinned literal is a full-line comment), so the COUNT
-# is the control. One marker-mention site is sanctioned outside this
-# suite today (the container-backend comment-literal pin); this suite's
-# own planted arm is machinery and rides the same self-allowlist as the
+# is the control. Two marker-mention sites are sanctioned outside this
+# suite today (the container-backend comment-literal pin; the
+# ddev-as-opencode browser-arm pin since #470); this suite's own
+# planted arm is machinery and rides the same self-allowlist as the
 # sweeps above. Precision note (review b B1, #468): the count pattern
 # matches a marker mention ANYWHERE on a live (non-comment-initial)
 # line, not only in trailing position -- it can only over-count (fail
 # loud), never false-pass. A new marker (or one stamped onto a live
 # pin) fails loud here until the site carries a conventions.md
 # "Source-counting pins" justification in the same diff.
-_inv_expected=1
+_inv_expected=2
 _inv_found=0
 for _f in "$SCRIPT_DIR"/test-*.sh; do
     [ "$(basename "$_f")" = "test-rider-lint.sh" ] && continue
@@ -426,20 +434,20 @@ done
 check "rider-inversion markers stay a registered exception ($_inv_found/$_inv_expected)" \
     test "$_inv_found" = "$_inv_expected"
 
-# --- 4. rule-3 ratchet (measured, NOT gating): sh -c single-file presence -------
-_r3=0
+# --- 4. rule-3 sweep (gating since #470, was a ratchet until then):
+# sh -c single-file presence shapes must not exist ------------------------
+_total=0
 for _f in "$SCRIPT_DIR"/test-*.sh; do
     [ "$(basename "$_f")" = "test-rider-lint.sh" ] && continue
-    _n="$(_rule2_detect "$_f" | grep -c SHC1)"
-    _r3=$((_r3 + _n))
+    _hits="$(_rule2_detect "$_f" | grep SHC1)"
+    if [ -n "$_hits" ]; then
+        fail "sh -c single-file presence shape in $(basename "$_f") -- use check_live / parent-if + live_src pipes (rule 3, #470)"
+        echo "$_hits" | sed 's/^/        /'
+        _total=$((_total + 1))
+    fi
 done
-# Ratchet baseline: the census wave (#460 PR 2) converted 32
-# inventory-suite sh -c sites (336 -> 304). Since the review-a fix
-# (#468) the detector splits statements into legs, so the count is
-# leg-scoped; absence-carrying payloads stay exempt (the census counts
-# presence-only shapes). The per-suite distribution is documented in
-# the rule-3 header above. Only downward motion is legal; the wave
-# that reaches zero flips this ratchet into a gating zero-count.
-check "sh -c single-file presence ratchet (rule 3, census residual: $_r3)" test "$_r3" -le 304
+if [ "$_total" -eq 0 ]; then
+    pass "no sh -c single-file presence shapes in tests/unit (rule 3, #470)"
+fi
 
 suite_done "rider lint tests"

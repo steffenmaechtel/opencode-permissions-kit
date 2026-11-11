@@ -134,18 +134,25 @@ assert_eq "missing: absent hosts file => all hostnames reported" \
 
 # --- 3. add: uses ddev's own elevation path as the developer -------------------
 
-check "add runs ddev hostname <name> 127.0.0.1 (ddev native UAC flow, via _dha_hostname)" \
-    sh -c "grep -qF '\"\$dha_bin\" hostname \"\$1\" 127.0.0.1' \"\$1\" && grep -qF '_dha_hostname \"\$dha_h\"' \"\$1\"" _ "$HOSTS"
-check "add re-execs as the DEFAULT user when called via sudo (pr-309 c M1: through the neutral-hop helper)" \
-    sh -c "grep -qF 'sudo -u \"\$dha_dev\" env HOME=\"\$dha_dev_h\"' \"\$1\" && grep -qF \"sh -c 'cd / && exec\" \"\$1\"" _ "$HOSTS"
-check "add is a no-op when nothing is missing" \
-    sh -c "grep -q 'nothing to do' \"\$1\"" _ "$HOSTS"
-check "add prints a manual PowerShell fallback on failure" \
-    sh -c "grep -q 'Add-Content' \"\$1\"" _ "$HOSTS"
+if live_src "$HOSTS" | grep -qF '"$dha_bin" hostname "$1" 127.0.0.1' &&
+    live_src "$HOSTS" | grep -qF '_dha_hostname "$dha_h"'; then
+    pass "add runs ddev hostname <name> 127.0.0.1 (ddev native UAC flow, via _dha_hostname)"
+else
+    fail "add runs ddev hostname <name> 127.0.0.1 (ddev native UAC flow, via _dha_hostname)"
+fi
+if live_src "$HOSTS" | grep -qF 'sudo -u "$dha_dev" env HOME="$dha_dev_h"' &&
+    live_src "$HOSTS" | grep -qF "sh -c 'cd / && exec"; then
+    pass "add re-execs as the DEFAULT user when called via sudo (pr-309 c M1: through the neutral-hop helper)"
+else
+    fail "add re-execs as the DEFAULT user when called via sudo (pr-309 c M1: through the neutral-hop helper)"
+fi
+check_live "add is a no-op when nothing is missing" "$HOSTS" -q 'nothing to do'
+check_live "add prints a manual PowerShell fallback on failure" "$HOSTS" -q 'Add-Content'
 check "PowerShell hint uses a placeholder, never the interpolated hostname (0.0.39a S5)" \
     sh -c "! grep -qF -- \"-Value '127.0.0.1 \$dha_arg'\" \"\$1\" && grep -qF -- \"-Value '127.0.0.1 <hostname>'\" \"\$1\"" _ "$HOSTS"
-check "hostname charset gate: non [A-Za-z0-9.-] names are dropped (0.0.39a S5)" \
-    sh -c "grep -qF '*[!A-Za-z0-9.-]*) continue ;;' \"\$1\"" _ "$HOSTS"
+check_live "hostname charset gate: non [A-Za-z0-9.-] names are dropped (0.0.39a S5)" \
+    "$HOSTS" \
+    -qF '*[!A-Za-z0-9.-]*) continue ;;'
 check_fail "add never writes the hosts file itself (no shell redirection)" \
     sh -c "grep -qE '(>>?|tee).*(winhosts|WIN_HOSTS|drivers/etc/hosts)' \"\$1\"" _ "$HOSTS"
 
@@ -179,53 +186,44 @@ assert_eq "add: hostname mode adds exactly the given name (issue #21)" \
 
 # --- 4. kit CLI wiring ----------------------------------------------------------
 
-check "kit CLI has ddev-hosts-add" \
-    sh -c "grep -q 'ddev-hosts-add' \"\$1\"" _ "$KIT"
-check "kit CLI has ddev-hosts-check" \
-    sh -c "grep -q 'ddev-hosts-check' \"\$1\"" _ "$KIT"
-check "kit CLI re-execs as the developer when called under sudo" \
-    sh -c "grep -q 'exec sudo -u \"\$_kitsu\"' \"\$1\"" _ "$KIT"
-check "kit CLI refuses to run the bridge as root without a resolvable user" \
-    sh -c "grep -q 'cannot resolve the developer user' \"\$1\"" _ "$KIT"
+check_live "kit CLI has ddev-hosts-add" "$KIT" -q 'ddev-hosts-add'
+check_live "kit CLI has ddev-hosts-check" "$KIT" -q 'ddev-hosts-check'
+check_live "kit CLI re-execs as the developer when called under sudo" "$KIT" -q 'exec sudo -u "$_kitsu"'
+check_live "kit CLI refuses to run the bridge as root without a resolvable user" \
+    "$KIT" \
+    -q 'cannot resolve the developer user'
 
 # --- 5. ddev() hook: hint after start/restart -----------------------------------
 
-check "hook prints the missing-hostnames hint after start/restart" \
-    sh -c "grep -qF 'start | restart) _opk_hosts_hint' \"\$1\"" _ "$FUNC"
-check "hook hint shows the ready-made add command" \
-    sh -c "grep -q 'ddev-hosts-add' \"\$1\"" _ "$FUNC"
-check "hook stays silent without a project in the cwd" \
-    sh -c "grep -qF '[ -f \"\$PWD/.ddev/config.yaml\" ]' \"\$1\"" _ "$FUNC"
-check "hook preserves ddev's exit code" \
-    sh -c "grep -q 'return \"\$_opk_rc\"' \"\$1\"" _ "$FUNC"
+check_live "hook prints the missing-hostnames hint after start/restart" "$FUNC" -qF 'start | restart) _opk_hosts_hint'
+check_live "hook hint shows the ready-made add command" "$FUNC" -q 'ddev-hosts-add'
+check_live "hook stays silent without a project in the cwd" "$FUNC" -qF '[ -f "$PWD/.ddev/config.yaml" ]'
+check_live "hook preserves ddev's exit code" "$FUNC" -q 'return "$_opk_rc"'
 
 # --- 6. deploy wiring -------------------------------------------------------------
 
-check "install.sh fetch list includes ddev-hosts.sh" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh' \"\$1\"" _ "$INSTALL"
+check_live "install.sh fetch list includes ddev-hosts.sh" \
+    "$INSTALL" \
+    -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh'
 # lib_deploy call site: install-core.sh since #346 wave 3
 check "install.sh deploys ddev-hosts.sh (lib_deploy manifest)" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh 644' \"\$2\" && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\"" _ "$INSTALL_CORE" "$DEPLOYLIB"
-check "update.sh KIT_FILES includes ddev-hosts.sh" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh' \"\$1\"" _ "$UPDATE"
+check_live "update.sh KIT_FILES includes ddev-hosts.sh" "$UPDATE" -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh'
 check "update.sh deploys ddev-hosts.sh (lib_deploy manifest)" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh 644' \"\$2\" && grep -q 'lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"' \"\$1\"" _ "$UPDATE_CORE" "$DEPLOYLIB"
-check "status.sh reports missing Windows hostnames" \
-    sh -c "grep -q 'hosts (win)' \"\$1\"" _ "$STATUS_CORE"
-check "status.sh scan prunes vendor dirs (issue #21)" \
-    sh -c "grep -qF -e '-name vendor' \"\$1\"" _ "$STATUS_CORE"
-check "status.sh scan prunes node_modules dirs (issue #21)" \
-    sh -c "grep -qF -e '-name node_modules' \"\$1\"" _ "$STATUS_CORE"
-check "status.sh prints one add command per hostname (issue #21)" \
-    sh -c "grep -qF 'ddev-hosts-add \$_st_h' \"\$1\"" _ "$STATUS_CORE"
-check "hook hint prints one add command per hostname (issue #21)" \
-    sh -c "grep -qF 'ddev-hosts-add \$_opk_h' \"\$1\"" _ "$FUNC"
-check "kit CLI usage documents the hostname mode (issue #21)" \
-    sh -c "grep -qF 'ddev-hosts-add [dir|hostname]' \"\$1\"" _ "$KIT"
-check "kit CLI check output shows per-hostname add commands" \
-    sh -c "grep -qF 'ddev-hosts-add /' \"\$1\"" _ "$KIT"
-check "make lint covers ddev-hosts.sh (disk-derived list, 0.0.42d C4)" \
-    sh -c "make -C \"\$2/../..\" -n lint 2>/dev/null | grep -q 'ddev-hosts.sh' && grep -qF 'shellcheck shell=' \"\$1\"" _ "$MAKEFILE" "$SCRIPT_DIR"
+check_live "status.sh reports missing Windows hostnames" "$STATUS_CORE" -q 'hosts (win)'
+check_live "status.sh scan prunes vendor dirs (issue #21)" "$STATUS_CORE" -qF -e '-name vendor'
+check_live "status.sh scan prunes node_modules dirs (issue #21)" "$STATUS_CORE" -qF -e '-name node_modules'
+check_live "status.sh prints one add command per hostname (issue #21)" "$STATUS_CORE" -qF 'ddev-hosts-add $_st_h'
+check_live "hook hint prints one add command per hostname (issue #21)" "$FUNC" -qF 'ddev-hosts-add $_opk_h'
+check_live "kit CLI usage documents the hostname mode (issue #21)" "$KIT" -qF 'ddev-hosts-add [dir|hostname]'
+check_live "kit CLI check output shows per-hostname add commands" "$KIT" -qF 'ddev-hosts-add /'
+if make -C "$SCRIPT_DIR/../.." -n lint 2>/dev/null | grep -q 'ddev-hosts.sh' &&
+    live_src "$MAKEFILE" | grep -qF 'shellcheck shell='; then
+    pass "make lint covers ddev-hosts.sh (disk-derived list, 0.0.42d C4)"
+else
+    fail "make lint covers ddev-hosts.sh (disk-derived list, 0.0.42d C4)"
+fi
 # ddev-hosts.sh is a sourced lib (opk, ddev-terminal, status.sh) — per
 # the repo invariant (755 <=> executed by path) it must be tracked 100644;
 # the deploy manifest re-asserts its LIBDIR mode on install/update.

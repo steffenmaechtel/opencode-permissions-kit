@@ -42,125 +42,173 @@ check "install.sh passes sh -n" sh -n "$INSTALL"
 check "update.sh passes sh -n" sh -n "$UPDATE"
 
 # --- warning wiring -------------------------------------------------------------
-check "status.sh gates the section on /mnt/c existing" \
-    sh -c "grep -qF '[ -d /mnt/c ]' \"\$1\"" _ "$STATUS_CORE"
-check "status.sh checks the world-readable (other) bit of the mount mode" \
-    sh -c "grep -q '0004' \"\$1\"" _ "$STATUS_CORE"
-check "status.sh prints a world-readable warning" \
-    sh -c "grep -q 'world-readable' \"\$1\"" _ "$STATUS_CORE"
-check "status.sh names the asset at risk (Windows profile)" \
-    sh -c "grep -q 'Windows profile' \"\$1\"" _ "$STATUS_CORE"
-check "status.sh shows the wsl.conf automount fix" \
-    sh -c "grep -qF '[automount]' \"\$1\" && grep -q 'uid=1000,gid=1000,dmask=027,fmask=037' \"\$1\"" _ "$STATUS_CORE"
-check "status.sh mentions 'wsl --shutdown'" \
-    sh -c "grep -q 'wsl --shutdown' \"\$1\"" _ "$STATUS_CORE"
-check "status.sh stays silent when the mount is restricted" \
-    sh -c "grep -qF 'restricted' \"\$1\"" _ "$STATUS_CORE"
-check "status.sh detects a configured-but-pending fix (wsl --shutdown)" \
-    sh -c "grep -q 'pending' \"\$1\" && grep -q \"options *=.*dmask\" \"\$1\"" _ "$STATUS_CORE"
+check_live "status.sh gates the section on /mnt/c existing" "$STATUS_CORE" -qF '[ -d /mnt/c ]'
+check_live "status.sh checks the world-readable (other) bit of the mount mode" "$STATUS_CORE" -q '0004'
+check_live "status.sh prints a world-readable warning" "$STATUS_CORE" -q 'world-readable'
+check_live "status.sh names the asset at risk (Windows profile)" "$STATUS_CORE" -q 'Windows profile'
+if live_src "$STATUS_CORE" | grep -qF '[automount]' &&
+    live_src "$STATUS_CORE" | grep -q 'uid=1000,gid=1000,dmask=027,fmask=037'; then
+    pass "status.sh shows the wsl.conf automount fix"
+else
+    fail "status.sh shows the wsl.conf automount fix"
+fi
+check_live "status.sh mentions 'wsl --shutdown'" "$STATUS_CORE" -q 'wsl --shutdown'
+check_live "status.sh stays silent when the mount is restricted" "$STATUS_CORE" -qF 'restricted'
+if live_src "$STATUS_CORE" | grep -q 'pending' &&
+    live_src "$STATUS_CORE" | grep -q "options *=.*dmask"; then
+    pass "status.sh detects a configured-but-pending fix (wsl --shutdown)"
+else
+    fail "status.sh detects a configured-but-pending fix (wsl --shutdown)"
+fi
 
 # --- install.sh report-only restriction (consent policy) ------------------------
 # The kit never writes /etc/wsl.conf (internal/records/wsl-conf-consent.md):
 # install prints the snippet, the user applies it.
-check "install.sh gates the exposure info on /mnt/c existing" \
-    sh -c "grep -qF '[ -d /mnt/c ]' \"\$1\"" _ "$INSTALL"
-check "install.sh warns about the exposure" \
-    sh -c "grep -qF 'ui_warn \"/mnt/c is world-readable' \"\$1\"" _ "$INSTALL_CORE"
+check_live "install.sh gates the exposure info on /mnt/c existing" "$INSTALL" -qF '[ -d /mnt/c ]'
+check_live "install.sh warns about the exposure" "$INSTALL_CORE" -qF 'ui_warn "/mnt/c is world-readable'
 # absence pins cover BOTH files since #346 wave 3 (the exposure section
 # lives in do_plan_phase, the lib)
 check "install.sh never writes /etc/wsl.conf (no tee/append)" \
     sh -c "! grep -q 'tee -a /etc/wsl.conf' \"\$1\" && ! grep -q 'tee -a /etc/wsl.conf' \"\$2\"" _ "$INSTALL" "$INSTALL_CORE"
 check "install.sh no longer prompts for the restriction (explicit consent)" \
     sh -c "! grep -q 'Restrict /mnt/c to your user' \"\$1\" && ! grep -q 'Restrict /mnt/c to your user' \"\$2\"" _ "$INSTALL" "$INSTALL_CORE"
-check "install.sh prints the [automount] snippet with dmask/fmask" \
-    sh -c "grep -qF '[automount]' \"\$1\" && grep -q 'dmask=027,fmask=037' \"\$1\"" _ "$INSTALL_CORE"
-check "install.sh resolves uid/gid for the snippet from the default user" \
-    sh -c "grep -qF 'id -u \"\$DEFAULT_USER\"' \"\$1\" && grep -qF 'id -g \"\$DEFAULT_USER\"' \"\$1\"" _ "$INSTALL_CORE"
-check "install.sh leaves a pre-existing [automount] section untouched" \
-    sh -c "grep -q 'already has an \[automount\]' \"\$1\"" _ "$INSTALL_CORE"
-check "install.sh names the activation step (wsl --shutdown)" \
-    sh -c "grep -q 'wsl --shutdown' \"\$1\"" _ "$INSTALL"
-check "install.sh skips silently when the mount is already restricted" \
-    sh -c "grep -qF '/mnt/c already restricted' \"\$1\"" _ "$INSTALL_CORE"
-check "install.sh warns again in the final summary while /mnt/c is exposed" \
-    sh -c "grep -q 'still world-readable' \"\$1\" && grep -q 'warn on every start' \"\$1\"" _ "$INSTALL"
-check "install.sh points WSL users at the opt-in bridge command" \
-    sh -c "grep -q 'opk wsl-add-opencode-1-fix' \"\$1\"" _ "$INSTALL_CORE"
+if live_src "$INSTALL_CORE" | grep -qF '[automount]' &&
+    live_src "$INSTALL_CORE" | grep -q 'dmask=027,fmask=037'; then
+    pass "install.sh prints the [automount] snippet with dmask/fmask"
+else
+    fail "install.sh prints the [automount] snippet with dmask/fmask"
+fi
+if live_src "$INSTALL_CORE" | grep -qF 'id -u "$DEFAULT_USER"' &&
+    live_src "$INSTALL_CORE" | grep -qF 'id -g "$DEFAULT_USER"'; then
+    pass "install.sh resolves uid/gid for the snippet from the default user"
+else
+    fail "install.sh resolves uid/gid for the snippet from the default user"
+fi
+check_live "install.sh leaves a pre-existing [automount] section untouched" \
+    "$INSTALL_CORE" \
+    -q 'already has an \[automount\]'
+check_live "install.sh names the activation step (wsl --shutdown)" "$INSTALL" -q 'wsl --shutdown'
+check_live "install.sh skips silently when the mount is already restricted" \
+    "$INSTALL_CORE" \
+    -qF '/mnt/c already restricted'
+if live_src "$INSTALL" | grep -q 'still world-readable' &&
+    live_src "$INSTALL" | grep -q 'warn on every start'; then
+    pass "install.sh warns again in the final summary while /mnt/c is exposed"
+else
+    fail "install.sh warns again in the final summary while /mnt/c is exposed"
+fi
+check_live "install.sh points WSL users at the opt-in bridge command" "$INSTALL_CORE" -q 'opk wsl-add-opencode-1-fix'
 
 # --- wrapper startup warning ------------------------------------------------------
 # The WSL checks live in the lib's wrapper_wsl_checks since #449; both
 # files must stay parseable and the markers target the lib.
 check "wrapper passes sh -n" sh -n "$WRAPPER"
 check "wrapper core lib passes sh -n" sh -n "$WRAPPER_CORE"
-check "wrapper gates the warning on /mnt/c existing" \
-    sh -c "grep -qF '[ -d /mnt/c ]' \"\$1\"" _ "$WRAPPER_CORE"
-check "wrapper checks the world-readable (other) bit of the mount mode" \
-    sh -c "grep -q '0004' \"\$1\"" _ "$WRAPPER_CORE"
-check "wrapper warns about the world-readable /mnt/c on every start" \
-    sh -c "grep -q 'WARNING: /mnt/c is world-readable' \"\$1\"" _ "$WRAPPER_CORE"
-check "wrapper shows the wsl.conf automount fix" \
-    sh -c "grep -qF '[automount]' \"\$1\" && grep -q 'dmask=027,fmask=037' \"\$1\"" _ "$WRAPPER_CORE"
-check "wrapper names the activation step (wsl --shutdown)" \
-    sh -c "grep -q 'wsl --shutdown' \"\$1\"" _ "$WRAPPER_CORE"
-check "wrapper points at the opt-in bridge command" \
-    sh -c "grep -q 'opk wsl-add-opencode-1-fix' \"\$1\"" _ "$WRAPPER_CORE"
-check "wrapper detects a configured-but-pending restriction" \
-    sh -c "grep -q 'PENDING' \"\$1\" && grep -q \"options *=.*dmask\" \"\$1\"" _ "$WRAPPER_CORE"
-check "wrapper stays silent when the mount is restricted (other bit off)" \
-    sh -c "! awk '/if \[ -d \/mnt\/c \]/,/^    fi$/' \"\$1\" | grep -q 'already restricted'" _ "$WRAPPER_CORE"
-check "wrapper skips the bridge warning for open@11 versions (1.18.33 / 2.0.18)" \
-    sh -c "grep -qF 'advisories_version_cmp' \"\$1\" && grep -qF '1.18.33' \"\$1\" && grep -qF '2.0.18' \"\$1\"" _ "$WRAPPER_CORE"
+check_live "wrapper gates the warning on /mnt/c existing" "$WRAPPER_CORE" -qF '[ -d /mnt/c ]'
+check_live "wrapper checks the world-readable (other) bit of the mount mode" "$WRAPPER_CORE" -q '0004'
+check_live "wrapper warns about the world-readable /mnt/c on every start" \
+    "$WRAPPER_CORE" \
+    -q 'WARNING: /mnt/c is world-readable'
+if live_src "$WRAPPER_CORE" | grep -qF '[automount]' &&
+    live_src "$WRAPPER_CORE" | grep -q 'dmask=027,fmask=037'; then
+    pass "wrapper shows the wsl.conf automount fix"
+else
+    fail "wrapper shows the wsl.conf automount fix"
+fi
+check_live "wrapper names the activation step (wsl --shutdown)" "$WRAPPER_CORE" -q 'wsl --shutdown'
+check_live "wrapper points at the opt-in bridge command" "$WRAPPER_CORE" -q 'opk wsl-add-opencode-1-fix'
+if live_src "$WRAPPER_CORE" | grep -q 'PENDING' &&
+    live_src "$WRAPPER_CORE" | grep -q "options *=.*dmask"; then
+    pass "wrapper detects a configured-but-pending restriction"
+else
+    fail "wrapper detects a configured-but-pending restriction"
+fi
+if ! awk '/if \[ -d \/mnt\/c \]/,/^    fi$/' "$WRAPPER_CORE" | grep -q 'already restricted'; then
+    pass "wrapper stays silent when the mount is restricted (other bit off)"
+else
+    fail "wrapper stays silent when the mount is restricted (other bit off)"
+fi
+if live_src "$WRAPPER_CORE" | grep -qF 'advisories_version_cmp' &&
+    live_src "$WRAPPER_CORE" | grep -qF '1.18.33' &&
+    live_src "$WRAPPER_CORE" | grep -qF '2.0.18'; then
+    pass "wrapper skips the bridge warning for open@11 versions (1.18.33 / 2.0.18)"
+else
+    fail "wrapper skips the bridge warning for open@11 versions (1.18.33 / 2.0.18)"
+fi
 
 # --- update.sh report-only hint (the section lives in sh/update-core.sh,
 # #346 wave 2) ------------------------------------------------------------------
-check "update.sh warns about the world-readable /mnt/c (no prompt)" \
-    sh -c "grep -qF 'ui_warn \"/mnt/c is world-readable' \"\$1\" && ! sed -n '/restriction configured but still pending/,/kit never edits \\/etc\\/wsl.conf/p' \"\$1\" | grep -Eq 'ui_confirm|ui_ask|ui_menu'" _ "$UPDATE_CORE"
-check "update.sh prints the recommended wsl.conf options" \
-    sh -c "grep -qF '[automount]' \"\$1\" && grep -q 'dmask=027' \"\$1\"" _ "$UPDATE_CORE"
-check "update.sh reminds about a configured-but-pending restriction" \
-    sh -c "grep -q \"pending 'wsl --shutdown'\" \"\$1\"" _ "$UPDATE_CORE"
+if live_src "$UPDATE_CORE" | grep -qF 'ui_warn "/mnt/c is world-readable' &&
+    ! sed -n '/restriction configured but still pending/,/kit never edits \/etc\/wsl.conf/p' "$UPDATE_CORE" |
+    grep -Eq 'ui_confirm|ui_ask|ui_menu'; then
+    pass "update.sh warns about the world-readable /mnt/c (no prompt)"
+else
+    fail "update.sh warns about the world-readable /mnt/c (no prompt)"
+fi
+if live_src "$UPDATE_CORE" | grep -qF '[automount]' &&
+    live_src "$UPDATE_CORE" | grep -q 'dmask=027'; then
+    pass "update.sh prints the recommended wsl.conf options"
+else
+    fail "update.sh prints the recommended wsl.conf options"
+fi
+check_live "update.sh reminds about a configured-but-pending restriction" "$UPDATE_CORE" -q "pending 'wsl --shutdown'"
 check "update.sh never writes /etc/wsl.conf (carrier left to the user)" \
     sh -c "! grep -q 'browser_bridge_write_conf' \"\$1\" && ! grep -q 'browser_bridge_write_conf' \"\$2\" && grep -q 'opk wsl-add-opencode-1-fix' \"\$1\"" _ "$UPDATE_CORE" "$UPDATE"
 
 # --- the explicit-consent command (opk wsl-add-opencode-1-fix) -------------------
-check "opk implements the wsl-add-opencode-1-fix subcommand" \
-    sh -c "grep -q 'wsl-add-opencode-1-fix)' \"\$1\"" _ "$OPK"
-check "opk wsl-add-opencode-1-fix elevates via sudo and runs write_conf" \
-    sh -c "awk '/wsl-add-opencode-1-fix\)/,/;;/' \"\$1\" | grep -q 'sudo' && awk '/wsl-add-opencode-1-fix\)/,/;;/' \"\$1\" | grep -q 'browser_bridge_write_conf'" _ "$OPK"
+check_live "opk implements the wsl-add-opencode-1-fix subcommand" "$OPK" -q 'wsl-add-opencode-1-fix)'
+if live_src "$OPK" | awk '/wsl-add-opencode-1-fix\)/,/;;/' | grep -q 'sudo' &&
+    live_src "$OPK" | awk '/wsl-add-opencode-1-fix\)/,/;;/' | grep -q 'browser_bridge_write_conf'; then
+    pass "opk wsl-add-opencode-1-fix elevates via sudo and runs write_conf"
+else
+    fail "opk wsl-add-opencode-1-fix elevates via sudo and runs write_conf"
+fi
 check "opk wsl-add-opencode-1-fix is the ONLY shipped entry point calling write_conf" \
     sh -c "! grep -rl 'browser_bridge_write_conf' \"\$1\" 2>/dev/null | grep -v 'sh/wsl-browser-bridge.sh$' | grep -v 'bin/opk$' | grep -q ." _ "$SCRIPT_DIR/../../files"
-check "status.sh points at the opt-in bridge command" \
-    sh -c "grep -q 'opk wsl-add-opencode-1-fix' \"\$1\"" _ "$STATUS_CORE"
-check "status.sh skips the bridge warning for open@11 versions (1.18.33 / 2.0.18)" \
-    sh -c "grep -qF 'advisories_version_cmp' \"\$1\" && grep -qF '1.18.33' \"\$1\" && grep -qF '2.0.18' \"\$1\" && grep -qF 'not needed' \"\$1\"" _ "$STATUS_CORE"
+check_live "status.sh points at the opt-in bridge command" "$STATUS_CORE" -q 'opk wsl-add-opencode-1-fix'
+if live_src "$STATUS_CORE" | grep -qF 'advisories_version_cmp' &&
+    live_src "$STATUS_CORE" | grep -qF '1.18.33' &&
+    live_src "$STATUS_CORE" | grep -qF '2.0.18' &&
+    live_src "$STATUS_CORE" | grep -qF 'not needed'; then
+    pass "status.sh skips the bridge warning for open@11 versions (1.18.33 / 2.0.18)"
+else
+    fail "status.sh skips the bridge warning for open@11 versions (1.18.33 / 2.0.18)"
+fi
 
 # --- xdg-open fallback shim (opencode 1.18.33+ / 2.0.18+ login fix) ---------------
-check "lib manifest deploys bin/xdg-open 755" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/bin/xdg-open 755' \"\$1\"" _ "$DEPLOYLIB"
+check_live "lib manifest deploys bin/xdg-open 755" "$DEPLOYLIB" -q 'opencode-permissions-kit-lib/bin/xdg-open 755'
 # split legs (#346 wave 3): the path literal is the fetch-list entry
 # (stays in install.sh), the guarded ln sits in do_deploy_phase (the lib)
 check "install.sh deploys the xdg-open shim (guarded, never shadows a real one)" \
     sh -c "grep -q 'opencode-permissions-kit-lib/bin/xdg-open' \"\$1\" && grep -qF 'ln -s \"\$LIBDIR/bin/xdg-open\" /usr/local/bin/xdg-open' \"\$2\"" _ "$INSTALL" "$INSTALL_CORE"
 check "update.sh refreshes and heals the xdg-open shim (stands back for a real one)" \
     sh -c "grep -q 'opencode-permissions-kit-lib/bin/xdg-open' \"\$2\" && grep -qF 'xdg_open_real_exists' \"\$1\" && ! grep -qF '/usr/bin/xdg-open' \"\$1\" && ! grep -qF '/usr/bin/xdg-open' \"\$2\"" _ "$UPDATE_CORE" "$UPDATE"
-check "status.sh reports the xdg-open fallback state" \
-    sh -c "grep -qF 'xdg-open fallback' \"\$1\"" _ "$STATUS_CORE"
-check "status.sh never-shadow verdict uses the shared PATH probe (0.0.42d S1)" \
-    sh -c "grep -qF 'xdg_open_real_exists' \"\$1\"" _ "$STATUS_CORE"
-check "status.sh flags a dangling kit shim instead of green (0.0.42d C2)" \
-    sh -c "grep -qF 'shim symlink dangles' \"\$1\"" _ "$STATUS_CORE"
+check_live "status.sh reports the xdg-open fallback state" "$STATUS_CORE" -qF 'xdg-open fallback'
+check_live "status.sh never-shadow verdict uses the shared PATH probe (0.0.42d S1)" \
+    "$STATUS_CORE" \
+    -qF 'xdg_open_real_exists'
+check_live "status.sh flags a dangling kit shim instead of green (0.0.42d C2)" \
+    "$STATUS_CORE" \
+    -qF 'shim symlink dangles'
 
 # --- uninstall consent (internal/records/wsl-conf-consent.md) --------------------------
 UNINSTALL="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/uninstall.sh"
 UNINSTALL_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/uninstall-core.sh"
-check "uninstall removes only the kit-owned xdg-open symlink" \
-    sh -c "grep -qF 'not kit-owned' \"\$1\"" _ "$UNINSTALL_CORE"
+check_live "uninstall removes only the kit-owned xdg-open symlink" "$UNINSTALL_CORE" -qF 'not kit-owned'
 check "uninstall.sh passes sh -n" sh -n "$UNINSTALL"
 check "uninstall-core.sh passes sh -n" sh -n "$UNINSTALL_CORE"
-check "uninstall.sh asks before removing kit-owned wsl.conf content" \
-    sh -c "grep -q \"Remove the kit's wsl.conf bridge block?\" \"\$1\" && grep -q 'prompt_yn' \"\$1\"" _ "$UNINSTALL_CORE"
-check "uninstall.sh prints the manual line range when declined" \
-    sh -c "grep -q 'browser bridge -- begin\\\$' \"\$1\" && grep -q 'left untouched' \"\$1\"" _ "$UNINSTALL_CORE"
+if live_src "$UNINSTALL_CORE" | grep -q "Remove the kit's wsl.conf bridge block?" &&
+    live_src "$UNINSTALL_CORE" | grep -q 'prompt_yn'; then
+    pass "uninstall.sh asks before removing kit-owned wsl.conf content"
+else
+    fail "uninstall.sh asks before removing kit-owned wsl.conf content"
+fi
+if live_src "$UNINSTALL_CORE" | grep -q 'browser bridge -- begin\$' &&
+    live_src "$UNINSTALL_CORE" | grep -q 'left untouched'; then
+    pass "uninstall.sh prints the manual line range when declined"
+else
+    fail "uninstall.sh prints the manual line range when declined"
+fi
 check "install.sh and update.sh deploy bin/browser-bridge into the library (lib_deploy manifest)" \
     sh -c "grep -q 'opencode-permissions-kit-lib/bin/browser-bridge 755' \"\$3\" \
         && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\" && grep -q 'lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"' \"\$2\"" _ "$INSTALL_CORE" "$UPDATE_CORE" "$DEPLOYLIB"

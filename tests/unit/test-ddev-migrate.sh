@@ -595,14 +595,18 @@ else
 fi
 
 # --- 4g. accounting and installer ride the authoritative path (0.0.44d F1/F4) -----------
-check "export accounting reads the stage copy, not the dump-dir manifest (C2/F4)" \
-    sh -c "grep -q 'manifest.auth' \"\$1\" && ! sed -n '/^    DD_MIG_OK=/,/DD_MIG_FAIL=/p' \"\$1\" | grep -q 'manifest.conf'" _ "$MIG"
-check "finalize keeps the manifest root-owned for the resume seed (F2)" \
-    sh -c "grep -q 'chown \"root:' \"\$1\"" _ "$MIG"
+if live_src "$MIG" | grep -q 'manifest.auth' &&
+    ! sed -n '/^    DD_MIG_OK=/,/DD_MIG_FAIL=/p' "$MIG" | grep -q 'manifest.conf'; then
+    pass "export accounting reads the stage copy, not the dump-dir manifest (C2/F4)"
+else
+    fail "export accounting reads the stage copy, not the dump-dir manifest (C2/F4)"
+fi
+check_live "finalize keeps the manifest root-owned for the resume seed (F2)" "$MIG" -q 'chown "root:'
 check "install.sh prints the FAIL list from the function state, never a re-grep (F1)" \
     sh -c "grep -q 'DD_MIG_FAILLIST' \"\$1\" && ! grep -q \"grep -c '^OK|' \\\"\\\$DD_MIG_DUMP_DIR/manifest.conf\\\"\" \"\$1\"" _ "$INSTALL_CORE"
-check "export return state starts EMPTY — counters signal completion (E1)" \
-    sh -c "grep -A3 -F 'DD_MIG_DUMP_DIR=\"\"' \"\$1\" | tr -s '[:space:]' ' ' | grep -qF 'DD_MIG_DUMP_DIR=\"\" DD_MIG_OK=\"\" DD_MIG_FAIL=\"\" DD_MIG_FAILLIST=\"\"' " _ "$MIG"
+check_live "export return state starts EMPTY — counters signal completion (E1)" \
+    "$MIG" \
+    -A3 -F 'DD_MIG_DUMP_DIR=""' | tr -s '[:space:]' ' ' | grep -qF 'DD_MIG_DUMP_DIR="" DD_MIG_OK="" DD_MIG_FAIL="" DD_MIG_FAILLIST=""'
 
 # --- 4h. refused vs completed: only the accounting fills the counters (0.0.44e E1) -------
 cat >"$WORK/run-export-state.sh" <<'WRAP'
@@ -700,53 +704,64 @@ fi
 
 # --- 5. import loop (static wiring) ---------------------------------------------
 
-check "import reads the manifest and runs as the opencode user" \
-    sh -c "grep -q 'ddev_migrate_import' \"\$1\" && grep -q 'sudo -u \"\$dm_oc\" env' \"\$1\"" _ "$MIG"
-check "import addresses projects by NAME, not path" \
-    sh -c "grep -qF 'start \"\$dm_n\"' \"\$1\" && grep -qF 'import-db \"\$dm_n\"' \"\$1\"" _ "$MIG"
-check "import builds DOCKER_HOST from the configured backend" \
-    sh -c "grep -q 'OPENCODE_DOCKER_HOST' \"\$1\" && grep -q 'OPENCODE_PODMAN_SOCKET' \"\$1\"" _ "$MIG"
+if live_src "$MIG" | grep -q 'ddev_migrate_import' &&
+    live_src "$MIG" | grep -q 'sudo -u "$dm_oc" env'; then
+    pass "import reads the manifest and runs as the opencode user"
+else
+    fail "import reads the manifest and runs as the opencode user"
+fi
+if live_src "$MIG" | grep -qF 'start "$dm_n"' &&
+    live_src "$MIG" | grep -qF 'import-db "$dm_n"'; then
+    pass "import addresses projects by NAME, not path"
+else
+    fail "import addresses projects by NAME, not path"
+fi
+if live_src "$MIG" | grep -q 'OPENCODE_DOCKER_HOST' &&
+    live_src "$MIG" | grep -q 'OPENCODE_PODMAN_SOCKET'; then
+    pass "import builds DOCKER_HOST from the configured backend"
+else
+    fail "import builds DOCKER_HOST from the configured backend"
+fi
 check "import never deletes dumps on failure" \
     sh -c "! grep -q 'rm -rf.*DDEV_MIG_BACKUP_ROOT' \"\$1\"" _ "$MIG"
-check "standalone list mode exists (bin dispatcher)" \
-    sh -c "grep -q 'list)' \"\$1\"" _ "$BIN_MIG"
+check_live "standalone list mode exists (bin dispatcher)" "$BIN_MIG" -q 'list)'
 
 # --- 6. install.sh wiring ----------------------------------------------------------
 
-check "install.sh documents --skip-ddev-migration in the header" \
-    sh -c "grep -q -- '--skip-ddev-migration' \"\$1\"" _ "$INSTALL"
-check "install.sh parses --skip-ddev-migration" \
-    sh -c "grep -q -- '--skip-ddev-migration) SKIP_DDEV_MIGRATION=true' \"\$1\"" _ "$INSTALL"
-check "install.sh sources ddev-migrate.sh" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh' \"\$1\"" _ "$INSTALL"
-check "install.sh fetch list includes ddev-migrate.sh" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh' \"\$1\"" _ "$INSTALL"
+check_live "install.sh documents --skip-ddev-migration in the header" "$INSTALL" -q -- '--skip-ddev-migration'
+check_live "install.sh parses --skip-ddev-migration" \
+    "$INSTALL" \
+    -q -- '--skip-ddev-migration) SKIP_DDEV_MIGRATION=true'
+check_live "install.sh sources ddev-migrate.sh" "$INSTALL" -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh'
+check_live "install.sh fetch list includes ddev-migrate.sh" \
+    "$INSTALL" \
+    -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh'
 # round a B1: || true keeps the one-red-row failure path under set -e.
 _fm_exp_src=$(live_src "$INSTALL_CORE") || true
 check "install.sh runs the export in Step 4b (before the Step 5 handover)" \
     sh -c 'export_ln=$(printf "%s\n" "$1" | grep -n "ddev_migrate_export \"" | head -1 | cut -d: -f1);
         hand_ln=$(printf "%s\n" "$1" | grep -n "ddev_handover_root \"" | head -1 | cut -d: -f1);
         [ -n "$export_ln" ] && [ -n "$hand_ln" ] && [ "$export_ln" -lt "$hand_ln" ]' _ "$_fm_exp_src"
-check "install.sh stamps DDEV_EXPORTED=1 after a successful export" \
-    sh -c "grep -q 'DDEV_EXPORTED=1' \"\$1\"" _ "$INSTALL_CORE"
-check "install.sh gates the DDEV_EXPORTED stamp on zero failures" \
-    sh -c "grep -qF '[ \"\$DD_MIG_FAIL\" -eq 0 ]' \"\$1\"" _ "$INSTALL_CORE"
+check_live "install.sh stamps DDEV_EXPORTED=1 after a successful export" "$INSTALL_CORE" -q 'DDEV_EXPORTED=1'
+check_live "install.sh gates the DDEV_EXPORTED stamp on zero failures" "$INSTALL_CORE" -qF '[ "$DD_MIG_FAIL" -eq 0 ]'
 # 0.0.44d F1: the counts now come from the export function's return
 # state (set from the authoritative stage copy BEFORE the finalize hands
 # the tree to the agent). A re-grep of the dump-dir manifest here would
 # read an agent-owned file as root — the old pin demanded exactly that.
 check "install.sh uses the propagated DD_MIG_* counts, never a manifest re-grep (F1)" \
     sh -c "grep -qF '[ -n \"\${DD_MIG_OK:-}\${DD_MIG_FAIL:-}\" ]' \"\$1\" && ! grep -qF 'grep -c \"^OK|\"' \"\$1\"" _ "$INSTALL_CORE"
-check "install.sh lists failed projects before continuing" \
-    sh -c "grep -q 'could NOT be exported' \"\$1\"" _ "$INSTALL_CORE"
-check "install.sh asks before continuing with failed exports (default: abort)" \
-    sh -c "grep -q 'ui_confirm \"Continue the install anyway?' \"\$1\" && grep -q '\"n\"' \"\$1\"" _ "$INSTALL_CORE"
-check "install.sh aborts BEFORE the handover when the user declines" \
-    sh -c "grep -q 'the .ddev handover did NOT run' \"\$1\"" _ "$INSTALL_CORE"
-check "install.sh keeps exporting the remaining projects on failure (non-fatal loop)" \
-    sh -c "grep -qF 'continue' \"\$1\"" _ "$MIG"
-check "install.sh skips the export when already stamped" \
-    sh -c "grep -q 'DDEV_EXPORTED_PRE' \"\$1\"" _ "$INSTALL_CORE"
+check_live "install.sh lists failed projects before continuing" "$INSTALL_CORE" -q 'could NOT be exported'
+if live_src "$INSTALL_CORE" | grep -q 'ui_confirm "Continue the install anyway?' &&
+    live_src "$INSTALL_CORE" | grep -q '"n"'; then
+    pass "install.sh asks before continuing with failed exports (default: abort)"
+else
+    fail "install.sh asks before continuing with failed exports (default: abort)"
+fi
+check_live "install.sh aborts BEFORE the handover when the user declines" \
+    "$INSTALL_CORE" \
+    -q 'the .ddev handover did NOT run'
+check_live "install.sh keeps exporting the remaining projects on failure (non-fatal loop)" "$MIG" -qF 'continue'
+check_live "install.sh skips the export when already stamped" "$INSTALL_CORE" -q 'DDEV_EXPORTED_PRE'
 
 # --- 6b. production-WSL findings (nb-laptop burn-in; workspace notes deleted) ----
 
@@ -754,48 +769,80 @@ check "install.sh skips the export when already stamped" \
 # version` can come up empty as root while working as the actual user.
 # (HOME rides DEV_HOME since 0.0.44a V14 — getent-resolved, /home/<name>
 # only the fallback.)
-check "install.sh probes the ddev version as the DEFAULT user too" \
-    sh -c "grep -q 'DDEV_BIN_DEV' \"\$1\" && grep -q 'sudo -u \"\$DEFAULT_USER\" env HOME=\"\$DEV_HOME\"' \"\$1\"" _ "$INSTALL_CORE"
-check "install.sh inventory distinguishes found-but-unreadable from missing" \
-    sh -c "grep -q 'version could not be read' \"\$1\" && grep -q 'not installed (optional' \"\$1\"" _ "$INSTALL_CORE"
-check "migration detection is gated on the registry, not the binary" \
-    sh -c "grep -qF 'if [ -d \"\$DEV_HOME/.ddev\" ]; then' \"\$1\"" _ "$INSTALL_CORE"
+if live_src "$INSTALL_CORE" | grep -q 'DDEV_BIN_DEV' &&
+    live_src "$INSTALL_CORE" | grep -q 'sudo -u "$DEFAULT_USER" env HOME="$DEV_HOME"'; then
+    pass "install.sh probes the ddev version as the DEFAULT user too"
+else
+    fail "install.sh probes the ddev version as the DEFAULT user too"
+fi
+if live_src "$INSTALL_CORE" | grep -q 'version could not be read' &&
+    live_src "$INSTALL_CORE" | grep -q 'not installed (optional'; then
+    pass "install.sh inventory distinguishes found-but-unreadable from missing"
+else
+    fail "install.sh inventory distinguishes found-but-unreadable from missing"
+fi
+check_live "migration detection is gated on the registry, not the binary" \
+    "$INSTALL_CORE" \
+    -qF 'if [ -d "$DEV_HOME/.ddev" ]; then'
 # _ddev_migrate_bin must consider per-user install paths (sudo -u does not
 # inherit the dev user's PATH).
-check "ddev resolution includes the user's private install paths" \
-    sh -c "grep -q '.local/bin/ddev' \"\$1\" && grep -q '.ddev/bin/ddev' \"\$1\"" _ "$MIG"
+if live_src "$MIG" | grep -q '.local/bin/ddev' &&
+    live_src "$MIG" | grep -q '.ddev/bin/ddev'; then
+    pass "ddev resolution includes the user's private install paths"
+else
+    fail "ddev resolution includes the user's private install paths"
+fi
 # Runtime db-less projects are SKIP, not FAIL (hotfix log: "service db
 # does not exist (state=doesnotexist)").
-check "runtime db-less export failure is classified no-db-service" \
-    sh -c "grep -q 'no-db-service' \"\$1\"" _ "$MIG"
-check "install.sh shows the dumps + import hint in the summary" \
-    sh -c "grep -q 'Ddev dumps' \"\$1\" && grep -q 'bin/ddev-migrate import' \"\$1\"" _ "$INSTALL"
-check "install.sh inventory counts the dev user's ddev projects" \
-    sh -c "grep -q 'ddev projects' \"\$1\" && grep -q 'ddev_migrate_registry' \"\$1\"" _ "$INSTALL_CORE"
-check "install.sh plan mentions the database export when projects exist" \
-    sh -c "grep -q 'export ddev databases' \"\$1\"" _ "$INSTALL_CORE"
+check_live "runtime db-less export failure is classified no-db-service" "$MIG" -q 'no-db-service'
+if live_src "$INSTALL" | grep -q 'Ddev dumps' &&
+    live_src "$INSTALL" | grep -q 'bin/ddev-migrate import'; then
+    pass "install.sh shows the dumps + import hint in the summary"
+else
+    fail "install.sh shows the dumps + import hint in the summary"
+fi
+if live_src "$INSTALL_CORE" | grep -q 'ddev projects' &&
+    live_src "$INSTALL_CORE" | grep -q 'ddev_migrate_registry'; then
+    pass "install.sh inventory counts the dev user's ddev projects"
+else
+    fail "install.sh inventory counts the dev user's ddev projects"
+fi
+check_live "install.sh plan mentions the database export when projects exist" \
+    "$INSTALL_CORE" \
+    -q 'export ddev databases'
 check "install.sh deploys ddev-migrate.sh to the library (lib_deploy manifest)" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh 644' \"\$2\" && grep -q 'opencode-permissions-kit-lib/bin/ddev-migrate 755' \"\$2\" && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\"" _ "$INSTALL_CORE" "$DEPLOYLIB"
 
 # --- 7. update.sh / status.sh wiring ------------------------------------------------
 
-check "update.sh KIT_FILES includes ddev-migrate.sh" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh' \"\$1\"" _ "$UPDATE"
+check_live "update.sh KIT_FILES includes ddev-migrate.sh" \
+    "$UPDATE" \
+    -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh'
 check "update.sh deploys ddev-migrate.sh (lib_deploy manifest)" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh 644' \"\$2\" && grep -q 'opencode-permissions-kit-lib/bin/ddev-migrate 755' \"\$2\" && grep -q 'lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"' \"\$1\"" _ "$UPDATE_CORE" "$DEPLOYLIB"
-check "status.sh reports dumps waiting for import" \
-    sh -c "grep -q 'db dumps' \"\$1\" && grep -q 'bin/ddev-migrate import' \"\$1\"" _ "$STATUS_CORE"
-check "status.sh import detection knows the ddev >= 1.23 project_list.yaml" \
-    sh -c "grep -q 'project_list.yaml' \"\$1\" && grep -q 'approot:' \"\$1\"" _ "$STATUS_CORE"
+if live_src "$STATUS_CORE" | grep -q 'db dumps' &&
+    live_src "$STATUS_CORE" | grep -q 'bin/ddev-migrate import'; then
+    pass "status.sh reports dumps waiting for import"
+else
+    fail "status.sh reports dumps waiting for import"
+fi
+if live_src "$STATUS_CORE" | grep -q 'project_list.yaml' &&
+    live_src "$STATUS_CORE" | grep -q 'approot:'; then
+    pass "status.sh import detection knows the ddev >= 1.23 project_list.yaml"
+else
+    fail "status.sh import detection knows the ddev >= 1.23 project_list.yaml"
+fi
 
 # --- 8. Makefile + CI wiring --------------------------------------------------------
 
-check "make lint covers ddev-migrate.sh (disk-derived list, 0.0.42d C4)" \
-    sh -c "make -C \"\$2/../..\" -n lint 2>/dev/null | grep -q 'ddev-migrate.sh' && grep -qF 'shellcheck shell=' \"\$1\"" _ "$MAKEFILE" "$SCRIPT_DIR"
-check "Makefile has a test-ddev-migrate target in the test: list" \
-    sh -c "grep -q 'test: .*test-ddev-migrate' \"\$1\"" _ "$MAKEFILE"
-check "test-unit.yml run step mentions the new test" \
-    sh -c "grep -q 'test-ddev-migrate.sh' \"\$1\"" _ "$TEST_CI"
+if make -C "$SCRIPT_DIR/../.." -n lint 2>/dev/null | grep -q 'ddev-migrate.sh' &&
+    live_src "$MAKEFILE" | grep -qF 'shellcheck shell='; then
+    pass "make lint covers ddev-migrate.sh (disk-derived list, 0.0.42d C4)"
+else
+    fail "make lint covers ddev-migrate.sh (disk-derived list, 0.0.42d C4)"
+fi
+check_live "Makefile has a test-ddev-migrate target in the test: list" "$MAKEFILE" -q 'test: .*test-ddev-migrate'
+check_live "test-unit.yml run step mentions the new test" "$TEST_CI" -q 'test-ddev-migrate.sh'
 # ddev-migrate.sh is a sourced lib (bin/ddev-migrate dispatcher, status.sh)
 # — per the repo invariant (755 <=> executed by path) it must be 100644.
 check "ddev-migrate.sh is a sourced lib (git 100644, not executed by path)" \
@@ -844,10 +891,15 @@ OUT=$(sh -c 'set -e
 assert_eq "rc=1 (not needed) never trips set -e in the caller pattern" "survived" "$OUT"
 
 CONFIG_SH="$FILES/opencode-permissions-kit-lib/management/config.sh"
-check "install.sh wires the bind-mounts switch (backend + version gated)" \
-    sh -c "grep -q 'ddev_rootless_bindmounts \"\$OPENCODE_USER\"' \"\$1\" && grep -qF '[ -n \"\$DDEV_BIN\" ] && [ -n \"\$DDEV_VERSION\" ]' \"\$1\"" _ "$INSTALL_CORE"
-check "config.sh wires the bind-mounts switch on backend changes" \
-    sh -c "grep -q 'ddev_rootless_bindmounts \"\$OPENCODE_USER\"' \"\$1\"" _ "$CONFIG_SH"
+if live_src "$INSTALL_CORE" | grep -q 'ddev_rootless_bindmounts "$OPENCODE_USER"' &&
+    live_src "$INSTALL_CORE" | grep -qF '[ -n "$DDEV_BIN" ] && [ -n "$DDEV_VERSION" ]'; then
+    pass "install.sh wires the bind-mounts switch (backend + version gated)"
+else
+    fail "install.sh wires the bind-mounts switch (backend + version gated)"
+fi
+check_live "config.sh wires the bind-mounts switch on backend changes" \
+    "$CONFIG_SH" \
+    -q 'ddev_rootless_bindmounts "$OPENCODE_USER"'
 
 # --- 10. partial-export hardening (production finding: 1 of 12) --------------------
 # Registry fixture preserving the SHAPES of a real-world production
@@ -961,8 +1013,12 @@ check "gap: manifest delivery is find -type f into a root-owned temp (S6)" \
     sh -c 'grep -qF "dmg_found=\$(find \"\$dmg_dir\" -maxdepth 1 -type f -name manifest.conf" "$1" && ! grep -q "dmg_dir/manifest.conf" "$1"' _ "$MIG"
 check "import: the read loop parses the staged copy, never the dump-dir manifest (S6)" \
     sh -c 'grep -qF "done <\"\$dm_manifest\"" "$1" && ! grep -qF "done <\"\$dm_dir/manifest.conf\"" "$1"' _ "$MIG"
-check "import: manifest delivery is find -type f with a bounded cat (S6)" \
-    sh -c 'grep -qF "dm_found=\$(find \"\$dm_dir\" -maxdepth 1 -type f -name manifest.conf" "$1" && grep -qF "timeout 5 cat \"\$dm_found\" >\"\$dm_manifest\"" "$1"' _ "$MIG"
+if live_src "$MIG" | grep -qF "dm_found=\$(find \"\$dm_dir\" -maxdepth 1 -type f -name manifest.conf" &&
+    live_src "$MIG" | grep -qF "timeout 5 cat \"\$dm_found\" >\"\$dm_manifest\""; then
+    pass "import: manifest delivery is find -type f with a bounded cat (S6)"
+else
+    fail "import: manifest delivery is find -type f with a bounded cat (S6)"
+fi
 
 # --- #322: find's stderr is kept — an unreadable dump dir never folds into
 # "no manifest". Gap: skip-with-note (no gap claimed, the unreadable dir
@@ -1024,15 +1080,17 @@ assert_eq "registry cmd: narrow root -> 1 export, 11 outside" "1 11" \
     "$(printf '%s\n' "$OUT" | grep -c '^  export:') $(printf '%s\n' "$OUT" | grep -c '^  outside:')"
 
 # wiring: the outside warning + the install/status gap detectors exist
-check "export warns about registry projects outside the roots" \
-    sh -c "grep -q 'OUTSIDE the given roots' \"\$1\"" _ "$MIG"
+check_live "export warns about registry projects outside the roots" "$MIG" -q 'OUTSIDE the given roots'
 _mig_gap_n="$(live_src "$INSTALL_CORE" | grep -c '_ddev_mig_gap_warn' || true)"
 check "install.sh warns on skip branches when the registry outgrew the manifest (warn sites: $_mig_gap_n, need >=3)" \
     sh -c "grep -q '_ddev_mig_gap_warn' \"\$1\" && [ \"\$2\" -ge 3 ]" _ "$INSTALL_CORE" "$_mig_gap_n"
-check "status.sh reports INCOMPLETE dumps vs the dev registry" \
-    sh -c "grep -q 'INCOMPLETE — registry lists' \"\$1\" && grep -q 'ddev-migrate registry' \"\$1\"" _ "$STATUS_CORE"
-check "bin dispatcher has the registry subcommand" \
-    sh -c "grep -q 'registry)' \"\$1\"" _ "$BIN_MIG"
+if live_src "$STATUS_CORE" | grep -q 'INCOMPLETE — registry lists' &&
+    live_src "$STATUS_CORE" | grep -q 'ddev-migrate registry'; then
+    pass "status.sh reports INCOMPLETE dumps vs the dev registry"
+else
+    fail "status.sh reports INCOMPLETE dumps vs the dev registry"
+fi
+check_live "bin dispatcher has the registry subcommand" "$BIN_MIG" -q 'registry)'
 
 # --- 6c. spaced-home quoting (0.0.43a F6) --------------------------------------------
 # A developer home with whitespace must not split the per-user ddev
@@ -1186,10 +1244,10 @@ rm -rf "${_w5i:?}"
 
 # static: the import loop builds HOME via getent and rides conditional
 # backend vars as single quoted arguments (0.0.43a F6/F12).
-check "import resolves the agent HOME via getent (not /home/<user>)" \
-    sh -c "grep -qF 'dm_oc_h=\$(getent passwd' \"\$1\"" _ "$MIG"
-check "import passes HOME/XDG as single quoted arguments" \
-    sh -c "grep -qF 'env \"HOME=\$dm_oc_h\" \"XDG_RUNTIME_DIR=/run/user/\$dm_oc_i\"' \"\$1\"" _ "$MIG"
+check_live "import resolves the agent HOME via getent (not /home/<user>)" "$MIG" -qF 'dm_oc_h=$(getent passwd'
+check_live "import passes HOME/XDG as single quoted arguments" \
+    "$MIG" \
+    -qF 'env "HOME=$dm_oc_h" "XDG_RUNTIME_DIR=/run/user/$dm_oc_i"'
 check_fail "import no longer word-splits an env string" \
     sh -c "grep -q 'env \$dm_env' \"\$1\"" _ "$MIG"
 

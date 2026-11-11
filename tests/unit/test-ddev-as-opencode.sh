@@ -129,26 +129,21 @@ else
 fi
 
 # --- 2. helper ddev-resolution / env / exec logic (static) ---------------------
-check "helper resolves the real ddev via PATH" \
-    sh -c "grep -q 'command -v ddev' \"\$1\"" _ "$HELPER"
-check "helper falls back to /usr/local/bin/ddev" \
-    sh -c "grep -qF '/usr/local/bin/ddev' \"\$1\"" _ "$HELPER"
-check "helper falls back to /usr/bin/ddev" \
-    sh -c "grep -qF '/usr/bin/ddev' \"\$1\"" _ "$HELPER"
-check "helper exits 127 with a hint when ddev is missing" \
-    sh -c "grep -q 'exit 127' \"\$1\"" _ "$HELPER"
-check "helper re-sets HOME for the opencode user" \
-    sh -c "grep -qF 'export HOME=\"\${OC_HOME:-/home/\$OPENCODE_USER}\"' \"\$1\" && grep -qF 'OC_HOME=\"\$(getent passwd \"\$OPENCODE_USER\"' \"\$1\"" _ "$HELPER"
-check "helper re-sets XDG_RUNTIME_DIR" \
-    sh -c "grep -q 'XDG_RUNTIME_DIR' \"\$1\"" _ "$HELPER"
-check "helper exports DOCKER_HOST for docker-rootless" \
-    sh -c "grep -q 'OPENCODE_DOCKER_HOST' \"\$1\"" _ "$HELPER"
-check "helper exports DOCKER_HOST for podman-rootless" \
-    sh -c "grep -q 'OPENCODE_PODMAN_SOCKET' \"\$1\"" _ "$HELPER"
-check "helper applies umask 002" \
-    sh -c "grep -q 'umask 002' \"\$1\"" _ "$HELPER"
-check "helper execs the resolved ddev binary" \
-    sh -c "grep -q 'exec \"\$DDEV\" \"\$@\"' \"\$1\"" _ "$HELPER"
+check_live "helper resolves the real ddev via PATH" "$HELPER" -q 'command -v ddev'
+check_live "helper falls back to /usr/local/bin/ddev" "$HELPER" -qF '/usr/local/bin/ddev'
+check_live "helper falls back to /usr/bin/ddev" "$HELPER" -qF '/usr/bin/ddev'
+check_live "helper exits 127 with a hint when ddev is missing" "$HELPER" -q 'exit 127'
+if live_src "$HELPER" | grep -qF 'export HOME="${OC_HOME:-/home/$OPENCODE_USER}"' &&
+    live_src "$HELPER" | grep -qF 'OC_HOME="$(getent passwd "$OPENCODE_USER"'; then
+    pass "helper re-sets HOME for the opencode user"
+else
+    fail "helper re-sets HOME for the opencode user"
+fi
+check_live "helper re-sets XDG_RUNTIME_DIR" "$HELPER" -q 'XDG_RUNTIME_DIR'
+check_live "helper exports DOCKER_HOST for docker-rootless" "$HELPER" -q 'OPENCODE_DOCKER_HOST'
+check_live "helper exports DOCKER_HOST for podman-rootless" "$HELPER" -q 'OPENCODE_PODMAN_SOCKET'
+check_live "helper applies umask 002" "$HELPER" -q 'umask 002'
+check_live "helper execs the resolved ddev binary" "$HELPER" -q 'exec "$DDEV" "$@"'
 check_fail "helper never references the removed legacy bin/ddev shim" \
     sh -c "grep -qE 'opencode-permissions-kit/bin/ddev(\$|[^-])' \"\$1\"" _ "$HELPER"
 
@@ -166,12 +161,16 @@ check_fail "helper never references the removed legacy bin/ddev shim" \
 # process can SIT in a directory it cannot search (exactly what sudo's
 # cwd inheritance produces) but [ -x . ] is false there — the condition
 # behind Go's stat(".") EACCES.
-check "helper probes the inherited cwd for search permission (issue #51)" \
-    sh -c "grep -qF 'if ! [ -x . ]; then' \"\$1\"" _ "$HELPER"
-check "helper falls back to the opencode home on an unreadable cwd" \
-    sh -c "grep -qF 'cd \"\$HOME\" 2>/dev/null || true' \"\$1\"" _ "$HELPER"
-check "helper notes the fallback on stderr and never aborts the run" \
-    sh -c "grep -q 'not accessible to the opencode user - continuing in ' \"\$1\" && grep -qF '>&2' \"\$1\"" _ "$HELPER"
+check_live "helper probes the inherited cwd for search permission (issue #51)" "$HELPER" -qF 'if ! [ -x . ]; then'
+check_live "helper falls back to the opencode home on an unreadable cwd" \
+    "$HELPER" \
+    -qF 'cd "$HOME" 2>/dev/null || true'
+if live_src "$HELPER" | grep -q 'not accessible to the opencode user - continuing in ' &&
+    live_src "$HELPER" | grep -qF '>&2'; then
+    pass "helper notes the fallback on stderr and never aborts the run"
+else
+    fail "helper notes the fallback on stderr and never aborts the run"
+fi
 
 WF=$(mktemp -d)
 mkdir -p "$WF/stub"
@@ -241,8 +240,11 @@ check "heal: missing target is a clean no-op (exit 0)" [ "$_hmt_rc" = 0 ]
 # and the resolve block must not run for it. (#285: the walk runs over a
 # comment-stripped copy -- substitute, not delete, so the NR bookkeeping
 # stays true; a commented-out handler can no longer satisfy the anchor.)
-check "heal: handled before the ddev binary resolution" \
-    sh -c "sed 's/^[[:space:]]*#.*\$//' \"\$1\" | awk '/--opk-ensure-shared/{h=NR} /DDEV=\"\"/{d=NR} END{exit !(h>0 && d>0 && h<d)}'" _ "$HELPER"
+if live_src "$HELPER" | awk '/--opk-ensure-shared/{h=NR} /DDEV=""/{d=NR} END{exit !(h>0 && d>0 && h<d)}'; then
+    pass "heal: handled before the ddev binary resolution"
+else
+    fail "heal: handled before the ddev binary resolution"
+fi
 
 rm -rf "$SH" "$SH_STUB"
 
@@ -287,12 +289,15 @@ DF_NONE_OUT=$(DDEV_DEV_OWNED=true PATH="$DF_STUB:$PATH" sh "$HELPER" --opk-devow
 check "devowned-flag: project without .ddev/config.yaml is a clean no-op" \
     [ "$DF_NONE_RC" = 0 ] && [ -z "$DF_NONE_OUT" ]
 
-check "devowned-flag: helper sources the sibling ddev-handover.sh lib" \
-    sh -c "grep -q 'sh/ddev-handover.sh' \"\$1\"" _ "$HELPER"
-check "devowned-flag: handled before the ddev binary resolution" \
-    sh -c "sed 's/^[[:space:]]*#.*\$//' \"\$1\" | awk '/--opk-devowned-flag/{h=NR} /DDEV=\"\"/{d=NR} END{exit !(h>0 && d>0 && h<d)}'" _ "$HELPER"
-check "devowned-flag: helper respects the OPK_INSTALL_CONF override" \
-    sh -c "grep -qF 'INSTALL_CONF=\"\${OPK_INSTALL_CONF:-/etc/opencode-permissions-kit/install.conf}\"' \"\$1\"" _ "$HELPER"
+check_live "devowned-flag: helper sources the sibling ddev-handover.sh lib" "$HELPER" -q 'sh/ddev-handover.sh'
+if live_src "$HELPER" | awk '/--opk-devowned-flag/{h=NR} /DDEV=""/{d=NR} END{exit !(h>0 && d>0 && h<d)}'; then
+    pass "devowned-flag: handled before the ddev binary resolution"
+else
+    fail "devowned-flag: handled before the ddev binary resolution"
+fi
+check_live "devowned-flag: helper respects the OPK_INSTALL_CONF override" \
+    "$HELPER" \
+    -qF 'INSTALL_CONF="${OPK_INSTALL_CONF:-/etc/opencode-permissions-kit/install.conf}"'
 
 # 0.0.46b W1: the delivery pins. The hook's sudo call runs this mode as
 # `... 2>/dev/null || true`, so everything on stderr is discarded on
@@ -322,8 +327,12 @@ check "W1 delivery: mktemp warning arrives on stdout (class sweep, 0.0.46b W1)" 
 DFW_LNK=$(DDEV_DEV_OWNED=true PATH="$DF_STUB:$PATH" sh "$HELPER" --opk-devowned-flag "$DFW/lnk" 2>/dev/null)
 check "W1 delivery: symlink-gate warning arrives on stdout (pre-existing 0.0.39g S2 class, 0.0.46b W1)" \
     sh -c "printf '%s\n' \"\$1\" | grep -q 'config.yaml is a symlink'" _ "$DFW_LNK"
-check "W1 delivery: the flag mode carries the stdout merge (exec 2>&1 inside the branch, 0.0.46b W1)" \
-    sh -c "sed 's/^[[:space:]]*#.*\$//' \"\$1\" | awk 'b&&/^[[:space:]]*exec 2>&1\$/{e=NR} /--opk-devowned-flag/{if(!b)b=NR} b&&/^fi\$/{f=NR} END{exit !(e>0 && e>b && e<f)}'" _ "$HELPER"
+if live_src "$HELPER" |
+    awk 'b&&/^[[:space:]]*exec 2>&1$/{e=NR} /--opk-devowned-flag/{if(!b)b=NR} b&&/^fi$/{f=NR} END{exit !(e>0 && e>b && e<f)}'; then
+    pass "W1 delivery: the flag mode carries the stdout merge (exec 2>&1 inside the branch, 0.0.46b W1)"
+else
+    fail "W1 delivery: the flag mode carries the stdout merge (exec 2>&1 inside the branch, 0.0.46b W1)"
+fi
 chmod 755 "$DFW/tmp/.ddev"
 rm -rf "$DFW"
 
@@ -339,8 +348,11 @@ echo "REAL_DDEV_RAN:$*"
 FAKE
 chmod +x "$TMPDIR/bin/ddev"
 
-check "function file sources cleanly (defines a ddev shell function)" \
-    sh -c ". \"\$1\" && type ddev 2>&1 | grep -q function" _ "$FUNC"
+if (. "$FUNC" && type ddev 2>&1 | grep -q function); then
+    pass "function file sources cleanly (defines a ddev shell function)"
+else
+    fail "function file sources cleanly (defines a ddev shell function)"
+fi
 # Already the opencode user? The function must exec the REAL ddev (fake id +
 # a fake ddev on PATH proves no recursion and no sudo).
 RESULT=$(
@@ -397,10 +409,10 @@ else
     fail "_opk_json_get: absent python3 must stay silent (err=$(cat "$TMPDIR/gj-abs.err"))"
 fi
 
-check "function execs the kit's sudoers helper for the developer" \
-    sh -c "grep -q 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode' \"\$1\"" _ "$FUNC"
-check "function uses 'command ddev' in the opencode branch" \
-    sh -c "grep -q 'command ddev' \"\$1\"" _ "$FUNC"
+check_live "function execs the kit's sudoers helper for the developer" \
+    "$FUNC" \
+    -q 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode'
+check_live "function uses 'command ddev' in the opencode branch" "$FUNC" -q 'command ddev'
 
 # --- 3a. browser commands (issue #20) ------------------------------------------
 # `ddev launch` & co read their URL from `ddev describe -j` AS OPENCODE
@@ -412,22 +424,29 @@ check "function uses 'command ddev' in the opencode branch" \
 # sudo arms are static checks (the arm calls the absolute /usr/bin/sudo
 # — not interceptable in unit tests; the e2e suite covers the full
 # chain).
-check "browser arm describes the project as opencode via the helper (issue #20)" \
-    sh -c "grep -qF 'ddev-as-opencode describe -j' \"\$1\"" _ "$FUNC"
-check "browser arm starts a stopped project first (launch-script parity)" \
-    sh -c "grep -qF 'ddev-as-opencode start' \"\$1\"" _ "$FUNC"
-check "browser arm prints the bootstrap hint before its internal start" \
-    sh -c "grep -qF '_opk_bootstrap_hint' \"\$1\"" _ "$FUNC"
-check "browser arm prints the hosts-file hint after its internal start (direct-start parity)" \
-    sh -c "grep -qF '_opk_hosts_hint' \"\$1\"" _ "$FUNC"
-check "browser arm opens the URL with the developer's interop (explorer.exe/xdg-open)" \
-    sh -c "grep -q 'explorer.exe' \"\$1\" && grep -q 'xdg-open' \"\$1\"" _ "$FUNC"
+check_live "browser arm describes the project as opencode via the helper (issue #20)" \
+    "$FUNC" \
+    -qF 'ddev-as-opencode describe -j'
+check_live "browser arm starts a stopped project first (launch-script parity)" "$FUNC" -qF 'ddev-as-opencode start'
+check_live "browser arm prints the bootstrap hint before its internal start" "$FUNC" -qF '_opk_bootstrap_hint'
+check_live "browser arm prints the hosts-file hint after its internal start (direct-start parity)" \
+    "$FUNC" \
+    -qF '_opk_hosts_hint'
+if live_src "$FUNC" | grep -q 'explorer.exe' &&
+    live_src "$FUNC" | grep -q 'xdg-open'; then
+    pass "browser arm opens the URL with the developer's interop (explorer.exe/xdg-open)"
+else
+    fail "browser arm opens the URL with the developer's interop (explorer.exe/xdg-open)"
+fi
+# rider-inversion: the pinned literal ("browser open is skipped") is itself
+# a full-line comment in ddev-terminal.sh (the strip would delete the
+# pinned bytes) -- this pin stays RAW (conventions.md, recorded inversion).
 check "browser arm plain-runs commands without a describe URL (prompts stay interactive)" \
-    sh -c "grep -qF 'browser open is skipped' \"\$1\"" _ "$FUNC"
-check "browser arm parses the describe JSON with python3 (kit prerequisite)" \
-    sh -c "grep -q 'python3' \"\$1\"" _ "$FUNC"
-check "sudoers env_keep keeps the transport vars" \
-    sh -c "grep -q 'env_keep += \"DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME\"' \"\$1\"" _ "$SUDOERS"
+    grep -qF 'browser open is skipped' "$FUNC" # rider-inversion
+check_live "browser arm parses the describe JSON with python3 (kit prerequisite)" "$FUNC" -q 'python3'
+check_live "sudoers env_keep keeps the transport vars" \
+    "$SUDOERS" \
+    -q 'env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME"'
 check_fail "sudoers no longer keep DDEV_DEBUG (describe transport needs none)" \
     sh -c "grep -q 'DDEV_DEBUG' \"\$1\"" _ "$SUDOERS"
 check_fail "function file no longer uses the FULLURL debug contract" \
@@ -496,8 +515,9 @@ assert_eq "routing: conf file adds custom browser commands (issue #20 follow-up)
 assert_eq "routing: conf entries are whitespace/comment tolerant" "yes" \
     "$(env OPK_BROWSER_CMDS_CONF="$CONF" sh -c '. "$1" && if _opk_is_browser_cmd spaced-tool; then echo yes; else echo no; fi' _ "$FUNC")"
 rm -f "$CONF"
-check "non-launch commands still route through the sudoers helper (case arm)" \
-    sh -c "grep -qF 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode \"\$@\"' \"\$1\"" _ "$FUNC"
+check_live "non-launch commands still route through the sudoers helper (case arm)" \
+    "$FUNC" \
+    -qF 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode "$@"'
 check_fail "function never references the removed legacy bin/ddev shim" \
     sh -c "grep -qE 'opencode-permissions-kit/bin/ddev(\$|[^-])' \"\$1\"" _ "$FUNC"
 
@@ -507,12 +527,9 @@ check_fail "function never references the removed legacy bin/ddev shim" \
 # BASH_VERSION), so `type -t ddev` in the child reports "function" and
 # `command -v ddev` resolves to it. Nested bash chain:
 # sh -> bash (source + export -f) -> bash (import via environment).
-check "function file exports ddev for bash children" \
-    sh -c "grep -qF 'export -f ddev' \"\$1\"" _ "$FUNC"
-check "export block is guarded (never runs in dash/zsh)" \
-    sh -c "grep -qF '[ -n \"\${BASH_VERSION:-}\" ]' \"\$1\"" _ "$FUNC"
-check "function body is set -u safe (\${1:-} in the hosts-hint case)" \
-    sh -c "grep -qF 'case \"\${1:-}\" in' \"\$1\"" _ "$FUNC"
+check_live "function file exports ddev for bash children" "$FUNC" -qF 'export -f ddev'
+check_live "export block is guarded (never runs in dash/zsh)" "$FUNC" -qF '[ -n "${BASH_VERSION:-}" ]'
+check_live "function body is set -u safe (\${1:-} in the hosts-hint case)" "$FUNC" -qF 'case "${1:-}" in'
 check "exported ddev() reaches a child bash script (type -t)" \
     env OPK_FUNC="$FUNC" sh -c 'bash -c ". \"\$OPK_FUNC\" 2>/dev/null; bash -c \"type -t ddev\"" | grep -q function'
 check "exported ddev() is what command -v resolves to in a child bash script" \
@@ -528,8 +545,12 @@ VCHAIN=$(mktemp -d)
 printf '#!/usr/bin/env sh\nexec "%s/target.sh" "$@"\n' "$VCHAIN" >"$VCHAIN/wrapper.sh"
 printf '#!/usr/bin/env bash\ntype -t ddev\n' >"$VCHAIN/target.sh"
 chmod +x "$VCHAIN/wrapper.sh" "$VCHAIN/target.sh"
-check "hook sets BASH_ENV (self-referential, empty-guarded)" \
-    sh -c "grep -qF '[ -z \"\${BASH_ENV:-}\" ]' \"\$1\" && grep -q 'export BASH_ENV=' \"\$1\"" _ "$FUNC"
+if live_src "$FUNC" | grep -qF '[ -z "${BASH_ENV:-}" ]' &&
+    live_src "$FUNC" | grep -q 'export BASH_ENV='; then
+    pass "hook sets BASH_ENV (self-referential, empty-guarded)"
+else
+    fail "hook sets BASH_ENV (self-referential, empty-guarded)"
+fi
 check "ddev() survives a #!/bin/sh wrapper into the bash target (issue #18)" \
     env OPK_FUNC="$FUNC" OPK_CHAIN="$VCHAIN" sh -c 'bash -c ". \"\$OPK_FUNC\" 2>/dev/null; \"\$OPK_CHAIN/wrapper.sh\" -s phpstan" | grep -q function'
 check "hook does not clobber a user-set BASH_ENV" \
@@ -537,8 +558,9 @@ check "hook does not clobber a user-set BASH_ENV" \
 rm -rf "$VCHAIN"
 
 # --- 4. sudoers rule -----------------------------------------------------------
-check "sudoers.template grants the ddev-as-opencode helper" \
-    sh -c "grep -q 'NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode' \"\$1\"" _ "$SUDOERS"
+check_live "sudoers.template grants the ddev-as-opencode helper" \
+    "$SUDOERS" \
+    -q 'NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode'
 
 # --- 4b. credential-import gate (ddev auth ssh) ---------------------------------
 check "template denies 'ddev auth ssh*' (incl. sudo)" \
@@ -556,59 +578,75 @@ check "template still parses cleanly with the new rules" \
 # Phase-internal literals (lib_deploy call, rc hooks, probes, stamps,
 # handover calls) live in install-core.sh since #346 wave 3; fetch-list
 # and parse_args pins stay on the entry.
-check "install.sh fetches both new files (fetch_kit list)" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh' \"\$1\" && grep -q 'opencode-permissions-kit-lib/bin/ddev-as-opencode' \"\$1\"" _ "$INSTALL"
+if live_src "$INSTALL" | grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh' &&
+    live_src "$INSTALL" | grep -q 'opencode-permissions-kit-lib/bin/ddev-as-opencode'; then
+    pass "install.sh fetches both new files (fetch_kit list)"
+else
+    fail "install.sh fetches both new files (fetch_kit list)"
+fi
 check "install.sh deploys the function file (lib_deploy manifest)" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh 644' \"\$2\" && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\"" _ "$INSTALL_CORE" "$DEPLOYLIB"
 check "install.sh deploys the helper (mode 755, lib_deploy manifest)" \
     sh -c "grep -q 'opencode-permissions-kit-lib/bin/ddev-as-opencode 755' \"\$2\" && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\"" _ "$INSTALL_CORE" "$DEPLOYLIB"
-check "install.sh hooks the function into the developer rc files" \
-    sh -c "grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' \"\$1\"" _ "$INSTALL_CORE"
+check_live "install.sh hooks the function into the developer rc files" \
+    "$INSTALL_CORE" \
+    -q 'opencode-permissions-kit/sh/ddev-terminal.sh'
 # The hook line is splice-wrapped in the canonical dq form (#300 tier 1,
 # #255 stage 0a idiom): frag2's opening quote sits at EOL, so both pinned
 # literals are raw-matched per line -- the guard prefix with its quote
 # boundary on the head line, the sourced path + kit marker on the
 # continuation line.
-check "install.sh hooks use the [ -f ] uninstall-safe guard" \
-    sh -c "grep -qF '\"[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . \"' \"\$1\" && grep -qF '/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh  # opencode permissions kit' \"\$1\"" _ "$INSTALL_CORE"
+if live_src "$INSTALL_CORE" | grep -qF '"[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . "' &&
+    live_src "$INSTALL_CORE" |
+    grep -qF '/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh  # opencode permissions kit'; then
+    pass "install.sh hooks use the [ -f ] uninstall-safe guard"
+else
+    fail "install.sh hooks use the [ -f ] uninstall-safe guard"
+fi
 # #407 a P1: bare-name pin retargeted to the lib — install.sh's only
 # remaining match was the bootstrap stub definer (vacuous pass, its
 # label lied); the real handover call lives in do_deploy_phase.
 # Call-form pattern since #407 d D1 (same sweep as C1/C2): the opening
 # quote matches CALL SITES only — stub definers, echo error arms and
 # comments cannot keep a leg green after the real call is deleted.
-check "install.sh hands over ddev paths in the filesystem step" \
-    sh -c "grep -q 'ddev_handover_root \"' \"\$1\"" _ "$INSTALL_CORE"
+check_live "install.sh hands over ddev paths in the filesystem step" "$INSTALL_CORE" -q 'ddev_handover_root "'
 
 # --- 6. update.sh wiring -------------------------------------------------------
-check "update.sh KIT_FILES includes both new files" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh' \"\$1\" && grep -q 'opencode-permissions-kit-lib/bin/ddev-as-opencode' \"\$1\"" _ "$UPDATE"
-check "update.sh KIT_FILES includes the handover helper" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-handover.sh' \"\$1\"" _ "$UPDATE"
+if live_src "$UPDATE" | grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh' &&
+    live_src "$UPDATE" | grep -q 'opencode-permissions-kit-lib/bin/ddev-as-opencode'; then
+    pass "update.sh KIT_FILES includes both new files"
+else
+    fail "update.sh KIT_FILES includes both new files"
+fi
+check_live "update.sh KIT_FILES includes the handover helper" \
+    "$UPDATE" \
+    -q 'opencode-permissions-kit-lib/sh/ddev-handover.sh'
 check "update.sh deploys the function file (lib_deploy manifest)" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh 644' \"\$2\" && grep -q 'lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"' \"\$1\"" _ "$UPDATE_CORE" "$DEPLOYLIB"
 check "update.sh deploys the helper (mode 755, lib_deploy manifest)" \
     sh -c "grep -q 'opencode-permissions-kit-lib/bin/ddev-as-opencode 755' \"\$2\" && grep -q 'lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"' \"\$1\"" _ "$UPDATE_CORE" "$DEPLOYLIB"
-check "update.sh heals the rc-file hook idempotently" \
-    sh -c "grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' \"\$1\"" _ "$UPDATE_CORE"
-check "update.sh runs the ddev handover unconditionally" \
-    sh -c "grep -q 'ddev_handover_root \"' \"\$1\"" _ "$UPDATE_CORE"
+check_live "update.sh heals the rc-file hook idempotently" \
+    "$UPDATE_CORE" \
+    -q 'opencode-permissions-kit/sh/ddev-terminal.sh'
+check_live "update.sh runs the ddev handover unconditionally" "$UPDATE_CORE" -q 'ddev_handover_root "'
 
 # --- 7. handover helper + call sites ---------------------------------------------
-check "handover helper searches .ddev at any depth" \
-    sh -c "grep -qF 'find \"\$dhr_root\"' \"\$1\" && grep -qF -- '-type d -name .ddev -prune -print' \"\$1\"" _ "$HANDOVER"
-check "handover scan prunes vendor/node_modules (issue #21 pattern)" \
-    sh -c "grep -qF -- '-name vendor -o -name node_modules' \"\$1\"" _ "$HANDOVER"
-check "handover helper chowns recursively with g+w" \
-    sh -c "grep -q 'chmod -R g+w' \"\$1\"" _ "$HANDOVER"
-check "handover helper maps typo3 settings dirs (config/system, typo3conf)" \
-    sh -c "grep -qF 'echo \"config/system \$dts_docroot/typo3conf typo3conf\"' \"\$1\"" _ "$HANDOVER"
-check "handover helper maps drupal settings dirs (sites/default)" \
-    sh -c "grep -qF '\$dts_docroot/sites/default' \"\$1\"" _ "$HANDOVER"
-check "handover helper skips unknown app types" \
-    sh -c "grep -qF 'return 0' \"\$1\"" _ "$HANDOVER"
-check "config.sh projects add uses the handover helper" \
-    sh -c "grep -q 'ddev_handover_root \"' \"\$1\"" _ "$CONFIG"
+if live_src "$HANDOVER" | grep -qF 'find "$dhr_root"' &&
+    live_src "$HANDOVER" | grep -qF -- '-type d -name .ddev -prune -print'; then
+    pass "handover helper searches .ddev at any depth"
+else
+    fail "handover helper searches .ddev at any depth"
+fi
+check_live "handover scan prunes vendor/node_modules (issue #21 pattern)" \
+    "$HANDOVER" \
+    -qF -- '-name vendor -o -name node_modules'
+check_live "handover helper chowns recursively with g+w" "$HANDOVER" -q 'chmod -R g+w'
+check_live "handover helper maps typo3 settings dirs (config/system, typo3conf)" \
+    "$HANDOVER" \
+    -qF 'echo "config/system $dts_docroot/typo3conf typo3conf"'
+check_live "handover helper maps drupal settings dirs (sites/default)" "$HANDOVER" -qF '$dts_docroot/sites/default'
+check_live "handover helper skips unknown app types" "$HANDOVER" -qF 'return 0'
+check_live "config.sh projects add uses the handover helper" "$CONFIG" -q 'ddev_handover_root "'
 
 # --- 7b. project-root handover (TYPO3 bootstrap, EPERM on fresh clones) ---------
 # ddev's settings-path fallback targets the APP ROOT while TYPO3 is not
@@ -695,16 +733,24 @@ check "root-file types: flagged project gets the root back (handback)" \
 # _s245_dhr), not an oversight of the extract_func wave. (Parent-shell
 # loop-RANGE awk elsewhere in this file, e.g. the projects.conf reader,
 # is a different shape extract_func cannot express at any shell level.)
-check "hint: covers maho/modx settings dirs (issue #149 finding 5)" \
-    sh -c "awk '/^_opk_bootstrap_hint\(\)/,/^}/' \"\$1\" | grep -q 'maho | modx'" _ "$FUNC"
-check "hint: covers the root-file types (codeigniter/shopware6/symfony)" \
-    sh -c "awk '/^_opk_bootstrap_hint\(\)/,/^}/' \"\$1\" | grep -q 'codeigniter | shopware6 | symfony'" _ "$FUNC"
-check "hint: typo3 wording unchanged (e2e greps it)" \
-    sh -c "awk '/^_opk_bootstrap_hint\(\)/,/^}/' \"\$1\" | grep -q 'hint: fresh typo3 clone'" _ "$FUNC"
+if live_src "$FUNC" | awk '/^_opk_bootstrap_hint\(\)/,/^}/' | grep -q 'maho | modx'; then
+    pass "hint: covers maho/modx settings dirs (issue #149 finding 5)"
+else
+    fail "hint: covers maho/modx settings dirs (issue #149 finding 5)"
+fi
+if live_src "$FUNC" | awk '/^_opk_bootstrap_hint\(\)/,/^}/' | grep -q 'codeigniter | shopware6 | symfony'; then
+    pass "hint: covers the root-file types (codeigniter/shopware6/symfony)"
+else
+    fail "hint: covers the root-file types (codeigniter/shopware6/symfony)"
+fi
+if live_src "$FUNC" | awk '/^_opk_bootstrap_hint\(\)/,/^}/' | grep -q 'hint: fresh typo3 clone'; then
+    pass "hint: typo3 wording unchanged (e2e greps it)"
+else
+    fail "hint: typo3 wording unchanged (e2e greps it)"
+fi
 printf 'type: typo3\n' >"$HWORK/proj/.ddev/config.yaml"
 
-check "handover_root signature carries the dev user (handback target)" \
-    sh -c "grep -qF 'dhr_dev=\"\${4:-}\"' \"\$1\"" _ "$HANDOVER"
+check_live "handover_root signature carries the dev user (handback target)" "$HANDOVER" -qF 'dhr_dev="${4:-}"'
 
 # Functional prune check: a .ddev inside vendor/ is NOT handed over (a
 # shipped test fixture, not a project — issue #21 pattern), the real
@@ -712,23 +758,32 @@ check "handover_root signature carries the dev user (handback target)" \
 rm -rf "${HWORK:?}/scan"
 mkdir -p "$HWORK/scan/proj/.ddev" "$HWORK/scan/proj/vendor/some/pkg/.ddev"
 SCAN_OUT=$(sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\"" _ "$HANDOVER" "$HWORK/scan" 2>/dev/null || true)
-check "handover scan skips .ddev inside vendor/" \
-    sh -c "! printf '%s\n' \"\$1\" | grep -q 'vendor/some/pkg/.ddev'" _ "$SCAN_OUT"
-check "handover scan still hands over the project .ddev" \
-    sh -c "printf '%s\n' \"\$1\" | grep -q 'proj/.ddev'" _ "$SCAN_OUT"
+if ! printf '%s\n' "$SCAN_OUT" | grep -q 'vendor/some/pkg/.ddev'; then
+    pass "handover scan skips .ddev inside vendor/"
+else
+    fail "handover scan skips .ddev inside vendor/"
+fi
+if printf '%s\n' "$SCAN_OUT" | grep -q 'proj/.ddev'; then
+    pass "handover scan still hands over the project .ddev"
+else
+    fail "handover scan still hands over the project .ddev"
+fi
 rm -rf "${HWORK:?}/scan"
 
 # --- 7c. config.sh handover subcommand (fresh-clone EPERM repair) -----------------
-check "config.sh dispatches the handover action" \
-    sh -c "grep -q 'handover)' \"\$1\"" _ "$CONFIG"
-check "config.sh handover uses the handover helper (no baseline)" \
-    sh -c "awk '/^handover\(\)/,/^}/' \"\$1\" | grep -q 'ddev_handover_root'" _ "$CONFIG"
-check "config.sh handover screens system paths" \
-    sh -c "awk '/^handover\(\)/,/^}/' \"\$1\" | grep -q 'project_path_sane'" _ "$CONFIG"
-check "config.sh header documents the handover usage" \
-    sh -c "grep -q 'config.sh handover' \"\$1\"" _ "$CONFIG"
-check "kit CLI usage documents the handover command" \
-    sh -c "grep -q 'handover <path...>' \"\$1\"" _ "$KIT"
+check_live "config.sh dispatches the handover action" "$CONFIG" -q 'handover)'
+if live_src "$CONFIG" | awk '/^handover\(\)/,/^}/' | grep -q 'ddev_handover_root'; then
+    pass "config.sh handover uses the handover helper (no baseline)"
+else
+    fail "config.sh handover uses the handover helper (no baseline)"
+fi
+if live_src "$CONFIG" | awk '/^handover\(\)/,/^}/' | grep -q 'project_path_sane'; then
+    pass "config.sh handover screens system paths"
+else
+    fail "config.sh handover screens system paths"
+fi
+check_live "config.sh header documents the handover usage" "$CONFIG" -q 'config.sh handover'
+check_live "kit CLI usage documents the handover command" "$KIT" -q 'handover <path...>'
 
 # --- 7c-2. config.sh handover tail note: rootless metadata ownership (#312) -------
 # Functional (7b extraction pattern): the note must fire for BOTH rootless
@@ -761,8 +816,11 @@ check "tail note stays silent for a non-rootless backend value" \
     sh -c "! printf '%s\n' \"\$1\" | grep -qF 'EPERM ... futime'" _ "$HRH_DOCKER"
 check "tail note stays silent for an empty backend value" \
     sh -c "! printf '%s\n' \"\$1\" | grep -qF 'EPERM ... futime'" _ "$HRH_EMPTY"
-check "config.sh handover wires the tail note after the repair loop" \
-    sh -c "awk '/^handover\(\)/,/^}/' \"\$1\" | grep -q '_handover_rootless_hint'" _ "$CONFIG"
+if live_src "$CONFIG" | awk '/^handover\(\)/,/^}/' | grep -q '_handover_rootless_hint'; then
+    pass "config.sh handover wires the tail note after the repair loop"
+else
+    fail "config.sh handover wires the tail note after the repair loop"
+fi
 rm -rf "${HRH:?}"
 
 # --- 7d. ddev() hook: typo3 bootstrap hint ----------------------------------------
@@ -770,20 +828,24 @@ rm -rf "${HRH:?}"
 # start fails with EPERM. The hook must name the one-command fix BEFORE
 # the run; silent in every other case (grep-based, mirrors the hosts-hint
 # tests — the fixed /usr/local lib path prevents a functional test).
-check "hook prints the typo3-bootstrap hint before start/restart" \
-    sh -c "grep -qE 'start\\\|restart\\) _opk_bootstrap_hint' \"\$1\"" _ "$FUNC"
-check "hook bootstrap hint shows the ready-made handover command" \
-    sh -c "grep -q 'config handover' \"\$1\"" _ "$FUNC"
-check "hook bootstrap hint is gated on a project in the cwd" \
-    sh -c "grep -qF '[ -f \"\$PWD/.ddev/config.yaml\" ]' \"\$1\"" _ "$FUNC"
-check "hook bootstrap hint reuses the kit typo3 detection" \
-    sh -c "grep -q 'ddev_typo3_detected' \"\$1\"" _ "$FUNC"
-check "hook bootstrap hint stays silent for dev-owned flagged projects" \
-    sh -c "awk '/^_opk_bootstrap_hint\(\)/,/^}/' \"\$1\" | grep -q 'ddev_devowned_flagged \"\$PWD\" && return 0'" _ "$FUNC"
-check "hook bootstrap hint stays silent when the root is already handed over" \
-    sh -c "grep -qF '[ \"\$(stat -c %U \"\$PWD\" 2>/dev/null)\" = \"opencode\" ]' \"\$1\"" _ "$FUNC"
-check "hook exports the bootstrap hint for bash children" \
-    sh -c "grep -q 'export -f ddev _opk_hosts_hint _opk_bootstrap_hint' \"\$1\"" _ "$FUNC"
+check_live "hook prints the typo3-bootstrap hint before start/restart" \
+    "$FUNC" \
+    -qE 'start\\|restart\) _opk_bootstrap_hint'
+check_live "hook bootstrap hint shows the ready-made handover command" "$FUNC" -q 'config handover'
+check_live "hook bootstrap hint is gated on a project in the cwd" "$FUNC" -qF '[ -f "$PWD/.ddev/config.yaml" ]'
+check_live "hook bootstrap hint reuses the kit typo3 detection" "$FUNC" -q 'ddev_typo3_detected'
+if live_src "$FUNC" | awk '/^_opk_bootstrap_hint\(\)/,/^}/' |
+    grep -q 'ddev_devowned_flagged "$PWD" && return 0'; then
+    pass "hook bootstrap hint stays silent for dev-owned flagged projects"
+else
+    fail "hook bootstrap hint stays silent for dev-owned flagged projects"
+fi
+check_live "hook bootstrap hint stays silent when the root is already handed over" \
+    "$FUNC" \
+    -qF '[ "$(stat -c %U "$PWD" 2>/dev/null)" = "opencode" ]'
+check_live "hook exports the bootstrap hint for bash children" \
+    "$FUNC" \
+    -q 'export -f ddev _opk_hosts_hint _opk_bootstrap_hint'
 
 # --- 7d-1b. maho/modx hint arms, functional (0.0.46a F6) ------------------------
 # Static greps cannot catch a typo'd target path, and e2e DD16 covers
@@ -818,18 +880,36 @@ rm -rf "$BH"
 # (ddev's explicit 0755/0644 modes cap the inherited ACL mask, AND its
 # command-list walk re-chmods .ddev/commands/** on every invocation —
 # describe/--version included), through the sudoers helper's heal mode.
-check "reshare: _opk_ddev_reshare calls the helper's heal mode" \
-    sh -c "awk '/^_opk_ddev_reshare\(\)/,/^}/' \"\$1\" | grep -q -- '--opk-ensure-shared' " _ "$FUNC"
-check "reshare: heal follows EVERY ddev command — no command gate (issue #279)" \
-    sh -c "awk '/^ddev\(\)/,/^}/' \"\$1\" | grep -qE '^[[:space:]]*_opk_ddev_reshare[[:space:]]*$' && ! awk '/^ddev\(\)/,/^}/' \"\$1\" | grep -q 'config | get | start | restart'" _ "$FUNC"
-check "reshare: heal is silent and never changes the ddev exit code" \
-    sh -c "awk '/^_opk_ddev_reshare\(\)/,/^}/' \"\$1\" | grep -qF '|| true' && awk '/^_opk_ddev_reshare\(\)/,/^}/' \"\$1\" | grep -qF 'return 0'" _ "$FUNC"
-check "reshare: no heal without a project in the cwd" \
-    sh -c "awk '/^_opk_ddev_reshare\(\)/,/^}/' \"\$1\" | grep -qF '[ -d \"\$PWD/.ddev\" ]'" _ "$FUNC"
-check "reshare: exported for bash children (issue #18)" \
-    sh -c "grep -q 'export -f ddev _opk_hosts_hint _opk_bootstrap_hint _opk_ddev_reshare' \"\$1\"" _ "$FUNC"
-check "reshare: browser arm has no separate heal — the ddev() tail covers it (issue #279)" \
-    sh -c "! awk '/_opk_ddev_browser\(\)/,/^}/' \"\$1\" | grep -q _opk_ddev_reshare" _ "$FUNC"
+if live_src "$FUNC" | awk '/^_opk_ddev_reshare\(\)/,/^}/' | grep -q -- '--opk-ensure-shared'; then
+    pass "reshare: _opk_ddev_reshare calls the helper's heal mode"
+else
+    fail "reshare: _opk_ddev_reshare calls the helper's heal mode"
+fi
+if live_src "$FUNC" | awk '/^ddev\(\)/,/^}/' | grep -qE '^[[:space:]]*_opk_ddev_reshare[[:space:]]*$' &&
+    ! awk '/^ddev\(\)/,/^}/' "$FUNC" | grep -q 'config | get | start | restart'; then
+    pass "reshare: heal follows EVERY ddev command — no command gate (issue #279)"
+else
+    fail "reshare: heal follows EVERY ddev command — no command gate (issue #279)"
+fi
+if live_src "$FUNC" | awk '/^_opk_ddev_reshare\(\)/,/^}/' | grep -qF '|| true' &&
+    live_src "$FUNC" | awk '/^_opk_ddev_reshare\(\)/,/^}/' | grep -qF 'return 0'; then
+    pass "reshare: heal is silent and never changes the ddev exit code"
+else
+    fail "reshare: heal is silent and never changes the ddev exit code"
+fi
+if live_src "$FUNC" | awk '/^_opk_ddev_reshare\(\)/,/^}/' | grep -qF '[ -d "$PWD/.ddev" ]'; then
+    pass "reshare: no heal without a project in the cwd"
+else
+    fail "reshare: no heal without a project in the cwd"
+fi
+check_live "reshare: exported for bash children (issue #18)" \
+    "$FUNC" \
+    -q 'export -f ddev _opk_hosts_hint _opk_bootstrap_hint _opk_ddev_reshare'
+if ! awk '/_opk_ddev_browser\(\)/,/^}/' "$FUNC" | grep -q _opk_ddev_reshare; then
+    pass "reshare: browser arm has no separate heal — the ddev() tail covers it (issue #279)"
+else
+    fail "reshare: browser arm has no separate heal — the ddev() tail covers it (issue #279)"
+fi
 
 # --- 7d-2. dev-owned flag wiring (issue #149, finding 1) --------------------------
 # The ddev() function must flag a fresh project right after `ddev config`
@@ -838,20 +918,33 @@ check "reshare: browser arm has no separate heal — the ddev() tail covers it (
 DFH=$(mktemp -d)
 mkdir -p "$DFH/proj/.ddev"
 printf 'name: dfh\ntype: typo3\ndocroot: public\n' >"$DFH/proj/.ddev/config.yaml"
-check "devowned hook: _opk_devowned_flag calls the helper's flag mode" \
-    sh -c "awk '/^_opk_devowned_flag\(\)/,/^}/' \"\$1\" | grep -q -- '--opk-devowned-flag'" _ "$FUNC"
-check "devowned hook: flag write runs after ddev config" \
-    sh -c "grep -q 'config) _opk_devowned_flag' \"\$1\"" _ "$FUNC"
-check "devowned hook: gated on the dev-owned mode (ddev_devowned_enabled)" \
-    sh -c "awk '/^_opk_devowned_flag\(\)/,/^}/' \"\$1\" | grep -q 'ddev_devowned_enabled || return 0'" _ "$FUNC"
-check "devowned hook: already-flagged projects skip the sudo call" \
-    sh -c "awk '/^_opk_devowned_flag\(\)/,/^}/' \"\$1\" | grep -q 'ddev_devowned_flagged \"\$PWD\" && return 0'" _ "$FUNC"
-check "devowned hook: sudo never prompts (-n, V22 pattern)" \
-    sh -c "awk '/^_opk_devowned_flag\(\)/,/^}/' \"\$1\" | grep -qF 'sudo -n -u opencode'" _ "$FUNC"
-check "devowned hook: best-effort — never fails the ddev command" \
-    sh -c "awk '/^_opk_devowned_flag\(\)/,/^}/' \"\$1\" | grep -qF '|| true'" _ "$FUNC"
-check "devowned hook: exported for bash children (issue #18)" \
-    sh -c "grep -q '_opk_ddev_reshare _opk_devowned_flag' \"\$1\"" _ "$FUNC"
+if live_src "$FUNC" | awk '/^_opk_devowned_flag\(\)/,/^}/' | grep -q -- '--opk-devowned-flag'; then
+    pass "devowned hook: _opk_devowned_flag calls the helper's flag mode"
+else
+    fail "devowned hook: _opk_devowned_flag calls the helper's flag mode"
+fi
+check_live "devowned hook: flag write runs after ddev config" "$FUNC" -q 'config) _opk_devowned_flag'
+if live_src "$FUNC" | awk '/^_opk_devowned_flag\(\)/,/^}/' | grep -q 'ddev_devowned_enabled || return 0'; then
+    pass "devowned hook: gated on the dev-owned mode (ddev_devowned_enabled)"
+else
+    fail "devowned hook: gated on the dev-owned mode (ddev_devowned_enabled)"
+fi
+if live_src "$FUNC" | awk '/^_opk_devowned_flag\(\)/,/^}/' | grep -q 'ddev_devowned_flagged "$PWD" && return 0'; then
+    pass "devowned hook: already-flagged projects skip the sudo call"
+else
+    fail "devowned hook: already-flagged projects skip the sudo call"
+fi
+if live_src "$FUNC" | awk '/^_opk_devowned_flag\(\)/,/^}/' | grep -qF 'sudo -n -u opencode'; then
+    pass "devowned hook: sudo never prompts (-n, V22 pattern)"
+else
+    fail "devowned hook: sudo never prompts (-n, V22 pattern)"
+fi
+if live_src "$FUNC" | awk '/^_opk_devowned_flag\(\)/,/^}/' | grep -qF '|| true'; then
+    pass "devowned hook: best-effort — never fails the ddev command"
+else
+    fail "devowned hook: best-effort — never fails the ddev command"
+fi
+check_live "devowned hook: exported for bash children (issue #18)" "$FUNC" -q '_opk_ddev_reshare _opk_devowned_flag'
 # Functional mode pins, hermetic via OPK_DDEV_HANDOVER_LIB (0.0.46a F2):
 # the old check sourced the FIXED deployed lib path — on CI (no deployed
 # kit) the lib gate returned before the mode gate ever ran, so "mode off
@@ -880,8 +973,9 @@ check "devowned hook: mode on reaches the flag write gating (hermetic, 0.0.46a F
     env OPK_DDEV_HANDOVER_LIB="$DFH2/on-lib.sh" sh -c "cd \"\$2/on\" && . \"\$1\" && _opk_devowned_flag && test -f .opk-f2-flaggate" _ "$FUNC" "$DFH2"
 check "devowned hook: mode off stops before the flag gate (hermetic, 0.0.46a F2)" \
     env OPK_DDEV_HANDOVER_LIB="$DFH2/off-lib.sh" sh -c "cd \"\$2/off\" && . \"\$1\" && _opk_devowned_flag && ! test -e .opk-f2-flaggate && ! grep -q '^disable_settings_management:' .ddev/config.yaml" _ "$FUNC" "$DFH2"
-check "devowned hook: the lib path is stubbable via OPK_DDEV_HANDOVER_LIB (0.0.46a F2)" \
-    sh -c "grep -qF '_opk_dhl=\"\${OPK_DDEV_HANDOVER_LIB:-/usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh}\"' \"\$1\"" _ "$FUNC"
+check_live "devowned hook: the lib path is stubbable via OPK_DDEV_HANDOVER_LIB (0.0.46a F2)" \
+    "$FUNC" \
+    -qF '_opk_dhl="${OPK_DDEV_HANDOVER_LIB:-/usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh}"'
 rm -rf "$DFH" "$DFH2"
 
 # --- 7d-3. reshare detection (issue #149, finding 2) ------------------------------
@@ -915,18 +1009,31 @@ check "reshare detect: pruned db_snapshots does not count (heal parity)" \
 # error path (stderr swallowed, output empty, `!` holds); the -user
 # filter's exclusivity against a live second user is real but would
 # need root to construct and stays unpinned.
-check "reshare detect: unknown user yields no findings (find -user error path; live second-user exclusivity needs root)" \
-    sh -c ". \"\$1\" && ! ddev_reshare_needed \"\$2/proj/.ddev\" \"opencode-no-such-user-424242\"" _ "$HANDOVER" "$RN"
+if (. "$HANDOVER" && ! ddev_reshare_needed "$RN/proj/.ddev" "opencode-no-such-user-424242"); then
+    pass "reshare detect: unknown user yields no findings (find -user error path; live second-user exclusivity needs root)"
+else
+    fail "reshare detect: unknown user yields no findings (find -user error path; live second-user exclusivity needs root)"
+fi
 check "reshare detect: missing dir is a clean no-need" \
     sh -c ". \"\$1\" && ! ddev_reshare_needed \"\$2/does-not-exist\" \"\$3\"" _ "$HANDOVER" "$RN" "$RN_U"
-check "reshare detect: status.sh wires ddev_reshare_needed per project root" \
-    sh -c "grep -q 'ddev_reshare_needed' \"\$1\" && grep -qF 'ui_kv_warn \"ddev share\"' \"\$1\"" _ "$STATUS_CORE"
-check "reshare detect: status.sh prints the opk ensure-shared one-command fix (issue #159)" \
-    sh -c "grep -qF 'opk ensure-shared \\\"\$_st_d\\\"' \"\$1\"" _ "$STATUS_CORE"
+if live_src "$STATUS_CORE" | grep -q 'ddev_reshare_needed' &&
+    live_src "$STATUS_CORE" | grep -qF 'ui_kv_warn "ddev share"'; then
+    pass "reshare detect: status.sh wires ddev_reshare_needed per project root"
+else
+    fail "reshare detect: status.sh wires ddev_reshare_needed per project root"
+fi
+check_live "reshare detect: status.sh prints the opk ensure-shared one-command fix (issue #159)" \
+    "$STATUS_CORE" \
+    -qF 'opk ensure-shared \"$_st_d\"'
 check "reshare detect: status.sh fix line is the short form only (no raw helper call)" \
     sh -c "! grep -q -- '--opk-ensure-shared' \"\$1\" && ! grep -q -- '--opk-ensure-shared' \"\$2\"" _ "$STATUS" "$STATUS_CORE"
-check "reshare detect: status.sh resolves the lib checkout-first (0.0.46a F4; rides the entry's ST_CALL_DIR anchor #405)" \
-    sh -c "grep -qF '_st_dhl=\"\${ST_CALL_DIR:-\$(cd \"\$(dirname \"\$0\")\" 2>/dev/null && pwd)}/../sh/ddev-handover.sh\"' \"\$1\" && grep -qF '[ -f \"\$_st_dhl\" ] || _st_dhl=\"\$LIBDIR/sh/ddev-handover.sh\"' \"\$1\"" _ "$STATUS_CORE"
+if live_src "$STATUS_CORE" |
+    grep -qF '_st_dhl="${ST_CALL_DIR:-$(cd "$(dirname "$0")" 2>/dev/null && pwd)}/../sh/ddev-handover.sh"' &&
+    live_src "$STATUS_CORE" | grep -qF '[ -f "$_st_dhl" ] || _st_dhl="$LIBDIR/sh/ddev-handover.sh"'; then
+    pass "reshare detect: status.sh resolves the lib checkout-first (0.0.46a F4; rides the entry's ST_CALL_DIR anchor #405)"
+else
+    fail "reshare detect: status.sh resolves the lib checkout-first (0.0.46a F4; rides the entry's ST_CALL_DIR anchor #405)"
+fi
 check "reshare detect: status fix names 'any ddev command' — every invocation heals (0.0.46a F7 wording inverted by issue #279)" \
     sh -c "grep -q 'any ddev command in this project' \"\$1\" && ! grep -q 'tree-creating ddev command (config/get/start/restart' \"\$1\" && ! grep -q 'tree-creating ddev command (config/get/start/restart' \"\$2\"" _ "$STATUS_CORE" "$STATUS"
 check "reshare detect: warn line names the general cause, not only agent runs (issue #279)" \
@@ -963,8 +1070,9 @@ VN_MARKER="$VN/marker" OPK_INSTALL_CONF="$VN/install.conf" PATH="$VN/bin:$PATH" 
 VN_CWD=$(sed -n 's/^cwd=\(.*\) args=--version$/\1/p' "$VN/marker" 2>/dev/null)
 check "version probe: --version execs ddev from the agent home, not the project (issue #279)" \
     sh -c "[ -n \"\$1\" ] && [ \"\$1\" = \"\$2\" ]" _ "$VN_CWD" "$(getent passwd "$(id -un)" | cut -d: -f6)"
-check "version probe: the neutral cd is gated on --version alone (other args keep the cwd)" \
-    sh -c "grep -qF '[ \"\$#\" -eq 1 ] && [ \"\$1\" = \"--version\" ]' \"\$1\"" _ "$HELPER"
+check_live "version probe: the neutral cd is gated on --version alone (other args keep the cwd)" \
+    "$HELPER" \
+    -qF '[ "$#" -eq 1 ] && [ "$1" = "--version" ]'
 rm -rf "$VN"
 
 # --- 7d-5. round-a fix-wave pins (pr-309 a: M1+S1+Q1, M2, Q3, M3, M4, S3) ---------
@@ -984,13 +1092,20 @@ _ecl_str="$(extract_func "$E2ELIB" e2e_cleanup | sed 's/^[[:space:]]*#.*$//')"
 _efn_str="$(extract_func "$E2ELIB" e2e_finish | sed 's/^[[:space:]]*#.*$//')"
 check "fix a M2: e2e dump hooked in e2e_cleanup (every exit path), not e2e_finish" \
     sh -c "test -n \"\$1\" && test -n \"\$2\" && printf '%s\n' \"\$1\" | grep -q e2e_dump_container && ! printf '%s\n' \"\$2\" | grep -q e2e_dump_container" _ "$_ecl_str" "$_efn_str"
-check "fix a M2: the dump precedes the cleanup rm (evidence before destruction)" \
-    sh -c "printf '%s\n' \"\$1\" | awk '/e2e_dump_container/{if (d == 0) d = NR} /^[[:space:]]*docker rm -f/{if (r == 0) r = NR} END{exit !(d > 0 && r > 0 && d < r)}'" _ "$_ecl_str"
+if printf '%s\n' "$_ecl_str" |
+    awk '/e2e_dump_container/{if (d == 0) d = NR} /^[[:space:]]*docker rm -f/{if (r == 0) r = NR} END{exit !(d > 0 && r > 0 && d < r)}'; then
+    pass "fix a M2: the dump precedes the cleanup rm (evidence before destruction)"
+else
+    fail "fix a M2: the dump precedes the cleanup rm (evidence before destruction)"
+fi
 # _e2e_dump_strip body, comment-stripped (#387 c c1 / d d1 — the whole
 # block greps stripped streams; the raw shape stays in the deferred family)
 _eds_str="$(extract_func "$E2ELIB" _e2e_dump_strip | sed 's/^[[:space:]]*#.*$//')"
-check "fix a S3: symlinks stripped from the dump (docker cp preserves them)" \
-    sh -c "printf '%s\n' \"\$1\" | grep -q -- '-type l -delete'" _ "$_eds_str"
+if printf '%s\n' "$_eds_str" | grep -q -- '-type l -delete'; then
+    pass "fix a S3: symlinks stripped from the dump (docker cp preserves them)"
+else
+    fail "fix a S3: symlinks stripped from the dump (docker cp preserves them)"
+fi
 check "fix a Q3: install.sh probes the ddev version subcommand from /" \
     sh -c 'grep -q "env HOME=\"\$DEV_HOME\" sh -c .cd / && exec" "$1" && ! grep -q "\"\$DDEV_BIN_DEV\" version" "$1"' _ "$INSTALL_CORE"
 check "fix a M3: config.sh probes the ddev version from /" \
@@ -1006,10 +1121,16 @@ check "fix a M4: opk usage tells the generalized story, not 'agent-side'" \
 # (verified round b: root never walks on any 1.25.x).
 HANDOVERSH="$FILES/opencode-permissions-kit-lib/sh/ddev-handover.sh"
 MIGRATESH="$FILES/opencode-permissions-kit-lib/sh/ddev-migrate.sh"
-check "fix b M2: handover runner hops through a neutral cwd" \
-    sh -c "awk '/^_ddev_handover_run_as\(\)/,/^}/' \"\$1\" | grep -qF \"sh -c 'cd / && exec\"" _ "$HANDOVERSH"
-check "fix b M3: migrate runner hops through a neutral cwd" \
-    sh -c "awk '/^_ddev_migrate_run_as\(\)/,/^}/' \"\$1\" | grep -qF \"sh -c 'cd / && exec\"" _ "$MIGRATESH"
+if live_src "$HANDOVERSH" | awk '/^_ddev_handover_run_as\(\)/,/^}/' | grep -qF "sh -c 'cd / && exec"; then
+    pass "fix b M2: handover runner hops through a neutral cwd"
+else
+    fail "fix b M2: handover runner hops through a neutral cwd"
+fi
+if live_src "$MIGRATESH" | awk '/^_ddev_migrate_run_as\(\)/,/^}/' | grep -qF "sh -c 'cd / && exec"; then
+    pass "fix b M3: migrate runner hops through a neutral cwd"
+else
+    fail "fix b M3: migrate runner hops through a neutral cwd"
+fi
 # Comment-strip rider (#261, the #244 g W1 class — pr-00320 b F1):
 # commented-out invocations stop counting; full-line comments only
 # (#244 h W6 residual). The combined pattern is the old pipeline's
@@ -1021,14 +1142,29 @@ check "fix b M1: install.sh root probe from / (consistency)" \
     sh -c 'grep -qF "(cd / && \"\$DDEV_BIN\" version)" "$1" && ! grep -qF "\"\$DDEV_BIN\" version 2>/dev/null" "$1"' _ "$INSTALL_CORE"
 check "fix b M1: update.sh root fallback probe from / (consistency)" \
     sh -c 'grep -qF "(cd / && \"\$_ddev_bin\" --version)" "$1" && ! grep -qF "\"\$_ddev_bin\" --version 2>/dev/null" "$1" && ! grep -qF "\"\$_ddev_bin\" --version 2>/dev/null" "$2"' _ "$UPDATE_CORE" "$UPDATE"
-check "fix b M4/S3: dump gate sees the exit status, not only counted failures" \
-    sh -c "printf '%s\n' \"\$1\" | grep -qF '_ecc_rc=\$?' && printf '%s\n' \"\$1\" | grep -qF '\"\$_ecc_rc\" -ne 0'" _ "$_ecl_str"
-check "fix b M4: dump fires before the keep branches (red --debug runs get evidence)" \
-    sh -c "printf '%s\n' \"\$1\" | awk '/e2e_dump_container/{if (d == 0) d = NR} /E2E_KEEP.*keeping container/{if (k == 0) k = NR} END{exit !(d > 0 && k > 0 && d < k)}'" _ "$_ecl_str"
-check "fix b M4: E2E_KEEP stays dump-free by design" \
-    sh -c "printf '%s\n' \"\$1\" | grep -qF '[ \"\${E2E_KEEP:-0}\" != \"1\" ]'" _ "$_ecl_str"
-check "fix b S1: strip notice is conditional — success and failure arms both named" \
-    sh -c "printf '%s\n' \"\$1\" | grep -q 'symlinks stripped' && printf '%s\n' \"\$1\" | grep -q 'strip failed'" _ "$_eds_str"
+if printf '%s\n' "$_ecl_str" | grep -qF '_ecc_rc=$?' &&
+    printf '%s\n' "$_ecl_str" | grep -qF '"$_ecc_rc" -ne 0'; then
+    pass "fix b M4/S3: dump gate sees the exit status, not only counted failures"
+else
+    fail "fix b M4/S3: dump gate sees the exit status, not only counted failures"
+fi
+if printf '%s\n' "$_ecl_str" |
+    awk '/e2e_dump_container/{if (d == 0) d = NR} /E2E_KEEP.*keeping container/{if (k == 0) k = NR} END{exit !(d > 0 && k > 0 && d < k)}'; then
+    pass "fix b M4: dump fires before the keep branches (red --debug runs get evidence)"
+else
+    fail "fix b M4: dump fires before the keep branches (red --debug runs get evidence)"
+fi
+if printf '%s\n' "$_ecl_str" | grep -qF '[ "${E2E_KEEP:-0}" != "1" ]'; then
+    pass "fix b M4: E2E_KEEP stays dump-free by design"
+else
+    fail "fix b M4: E2E_KEEP stays dump-free by design"
+fi
+if printf '%s\n' "$_eds_str" | grep -q 'symlinks stripped' &&
+    printf '%s\n' "$_eds_str" | grep -q 'strip failed'; then
+    pass "fix b S1: strip notice is conditional — success and failure arms both named"
+else
+    fail "fix b S1: strip notice is conditional — success and failure arms both named"
+fi
 # Functional L1 pin for the strip failure path (find untraversable subdir):
 # extract _e2e_dump_strip, run it against a scratch dump with a 000-dir and
 # a surviving symlink — the WARNING arm must fire and the link must survive.
@@ -1060,16 +1196,24 @@ fi
 # The c(review) findings, fixed in the c(fix) wave; the class sweep with
 # variable-indirection resolution is recorded in the c(fix) commit message.
 HOSTSSH="$FILES/opencode-permissions-kit-lib/sh/ddev-hosts.sh"
-check "fix c M1: ddev-hosts helper hops through a neutral cwd (sudo + direct arms)" \
-    sh -c "awk '/^_dha_hostname\(\)/,/^}/' \"\$1\" | grep -qF \"sh -c 'cd / && exec\" && awk '/^_dha_hostname\(\)/,/^}/' \"\$1\" | grep -qF '(cd / && \"\$dha_bin\" hostname'" _ "$HOSTSSH"
+if live_src "$HOSTSSH" | awk '/^_dha_hostname\(\)/,/^}/' | grep -qF "sh -c 'cd / && exec" &&
+    live_src "$HOSTSSH" | awk '/^_dha_hostname\(\)/,/^}/' | grep -qF '(cd / && "$dha_bin" hostname'; then
+    pass "fix c M1: ddev-hosts helper hops through a neutral cwd (sudo + direct arms)"
+else
+    fail "fix c M1: ddev-hosts helper hops through a neutral cwd (sudo + direct arms)"
+fi
 # Comment-strip rider (#261, the #244 g W1 class — pr-00320 c F1):
 # a commented-out twin invocation stops counting; full-line comments
 # only (#244 h W6 residual).
 _dha_n="$(live_src "$HOSTSSH" | grep -cF '"$dha_bin" hostname' || true)"
 check "fix c M1: no bare ddev-hosts invocation remains outside the helper (invocation sites: $_dha_n of 2)" \
     [ "$_dha_n" = 2 ]
-check "fix c S1: ddev-migrate absolutizes a relative dump-dir" \
-    sh -c "grep -qF 'dm_dir=\"\$PWD/\$dm_dir\"' \"\$1\" && grep -qF 'case \"\$dm_dir\" in' \"\$1\"" _ "$MIGRATESH"
+if live_src "$MIGRATESH" | grep -qF 'dm_dir="$PWD/$dm_dir"' &&
+    live_src "$MIGRATESH" | grep -qF 'case "$dm_dir" in'; then
+    pass "fix c S1: ddev-migrate absolutizes a relative dump-dir"
+else
+    fail "fix c S1: ddev-migrate absolutizes a relative dump-dir"
+fi
 # round a B1: || true keeps the one-red-row failure path under set -e
 # (a failed strip streams empty content; the child's -n probes red the
 # check) instead of aborting the whole suite at the assignment.
@@ -1078,10 +1222,18 @@ check "fix d M1: empty-dir refusal precedes the absolutization (guard hoisted)" 
     sh -c 'g=$(printf "%s\n" "$1" | grep -nF "[ -n \"\$dm_dir\" ] ||" | head -1 | cut -d: -f1);
         c=$(printf "%s\n" "$1" | grep -nF "case \"\$dm_dir\" in" | head -1 | cut -d: -f1);
         test -n "$g" && test -n "$c" && test "$g" -lt "$c"' _ "$_dv_m1_src"
-check "fix c L1: container guard precedes the dumps mkdir" \
-    sh -c "awk '/^e2e_dump_container\(\)/,/^}/' \"\$1\" | grep -vE '^[[:space:]]*#' | awk '/E2E_CONTAINER/{if (g == 0) g = NR} /mkdir -p/{if (m == 0) m = NR} END{exit !(g > 0 && m > 0 && g < m)}'" _ "$E2ELIB"
-check "fix c L2: the rc capture is the FIRST statement of the trap handler" \
-    sh -c "awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | grep -vE '^[[:space:]]*#' | grep -n . | sed -n '2p' | grep -qF '_ecc_rc=\$?'" _ "$E2ELIB"
+if live_src "$E2ELIB" | awk '/^e2e_dump_container\(\)/,/^}/' | grep -vE '^[[:space:]]*#' |
+    awk '/E2E_CONTAINER/{if (g == 0) g = NR} /mkdir -p/{if (m == 0) m = NR} END{exit !(g > 0 && m > 0 && g < m)}'; then
+    pass "fix c L1: container guard precedes the dumps mkdir"
+else
+    fail "fix c L1: container guard precedes the dumps mkdir"
+fi
+if live_src "$E2ELIB" | awk '/^e2e_cleanup\(\)/,/^}/' | grep -vE '^[[:space:]]*#' | grep -n . | sed -n '2p' |
+    grep -qF '_ecc_rc=$?'; then
+    pass "fix c L2: the rc capture is the FIRST statement of the trap handler"
+else
+    fail "fix c L2: the rc capture is the FIRST statement of the trap handler"
+fi
 
 # --- 7e. dev-owned mode (internal/records/ddev-dev-owned-projects.md) ------------------
 # Mode on: the scan writes disable_settings_management: true; a FLAGGED
@@ -1145,10 +1297,18 @@ F1A_RC=0
 F1A_OUT=$(sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\"" _ "$HANDOVER" "$DWORK/f1a" 2>&1) || F1A_RC=$?
 check "flag writer: unwritable config.yaml warns instead of lying (0.0.46a F1)" \
     sh -c "[ \"\$2\" = 0 ] && printf '%s\n' \"\$1\" | grep -q 'dev-owned flag write to .* failed' && ! printf '%s\n' \"\$1\" | grep -q 'flag written'" _ "$F1A_OUT" "$F1A_RC"
-check "flag writer: failed write never claims NOT written — ENOSPC may leave a partial file (0.0.46b W2)" \
-    sh -c "! printf '%s\n' \"\$1\" | grep -q 'flag NOT'" _ "$F1A_OUT"
-check "flag writer: retry hint names the explicit paths, not the stamp-skipped scan (0.0.46b W2)" \
-    sh -c "printf '%s\n' \"\$1\" | grep -q 'sudo opk config handover' && printf '%s\n' \"\$1\" | grep -q 'opk update --refresh' && ! printf '%s\n' \"\$1\" | grep -q 'next root-run scan retries'" _ "$F1A_OUT"
+if ! printf '%s\n' "$F1A_OUT" | grep -q 'flag NOT'; then
+    pass "flag writer: failed write never claims NOT written — ENOSPC may leave a partial file (0.0.46b W2)"
+else
+    fail "flag writer: failed write never claims NOT written — ENOSPC may leave a partial file (0.0.46b W2)"
+fi
+if printf '%s\n' "$F1A_OUT" | grep -q 'sudo opk config handover' &&
+    printf '%s\n' "$F1A_OUT" | grep -q 'opk update --refresh' &&
+    ! printf '%s\n' "$F1A_OUT" | grep -q 'next root-run scan retries'; then
+    pass "flag writer: retry hint names the explicit paths, not the stamp-skipped scan (0.0.46b W2)"
+else
+    fail "flag writer: retry hint names the explicit paths, not the stamp-skipped scan (0.0.46b W2)"
+fi
 F1A_RETRY="sudo opk config handover \"$DWORK/f1a\""
 check "flag writer: retry hint is verbatim-runnable — prints the root's path (0.0.46c C1)" \
     sh -c "printf '%s\n' \"\$1\" | grep -F \"\$2\"" _ "$F1A_OUT" "$F1A_RETRY"
@@ -1185,18 +1345,28 @@ check "scan mode on: .ddev inside testdata/ is skipped entirely (issue #29)" \
     sh -c "! grep -q 'disable_settings_management:' \"\$1/ddev-checkout/pkg/ddevapp/testdata/TestHooksMerge/proj/.ddev/config.yaml\" && ! printf '%s\n' \"\$2\" | grep -q 'testdata'" _ "$DWORK/on" "$DON_OUT"
 check "scan mode on: undetected typo3 root stays dev-owned 2775 (no bootstrap handover)" \
     sh -c "test \"\$(stat -c %a \"\$1\")\" = 2775" _ "$DWORK/on/proj"
-check "scan mode on: settings dir stays with the developer" \
-    sh -c "printf '%s\n' \"\$1\" | grep -q 'dev-owned handback: .*config/system'" _ "$DON_OUT"
-check "scan mode on: .ddev still handed over" \
-    sh -c "printf '%s\n' \"\$1\" | grep -q '.ddev handover:'" _ "$DON_OUT"
+if printf '%s\n' "$DON_OUT" | grep -q 'dev-owned handback: .*config/system'; then
+    pass "scan mode on: settings dir stays with the developer"
+else
+    fail "scan mode on: settings dir stays with the developer"
+fi
+if printf '%s\n' "$DON_OUT" | grep -q '.ddev handover:'; then
+    pass "scan mode on: .ddev still handed over"
+else
+    fail "scan mode on: .ddev still handed over"
+fi
 
 # scan: mode OFF + repo-committed flag -> handback anyway, no flag write
 mkdir -p "$DWORK/off/proj/.ddev" "$DWORK/off/proj/config/system"
 printf 'type: typo3\ndisable_settings_management: true\n' >"$DWORK/off/proj/.ddev/config.yaml"
 chmod 2755 "$DWORK/off/proj"
 DOFF_OUT=$(DDEV_DEV_OWNED=false sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\"" _ "$HANDOVER" "$DWORK/off" 2>/dev/null || true)
-check "scan mode off: committed flag honored (handback, not handover)" \
-    sh -c "printf '%s\n' \"\$1\" | grep -q 'dev-owned handback:' && ! printf '%s\n' \"\$1\" | grep -q 'dev-owned flag written'" _ "$DOFF_OUT"
+if printf '%s\n' "$DOFF_OUT" | grep -q 'dev-owned handback:' &&
+    ! printf '%s\n' "$DOFF_OUT" | grep -q 'dev-owned flag written'; then
+    pass "scan mode off: committed flag honored (handback, not handover)"
+else
+    fail "scan mode off: committed flag honored (handback, not handover)"
+fi
 check "scan mode off: flagged root handed back to 2775" \
     sh -c "test \"\$(stat -c %a \"\$1\")\" = 2775" _ "$DWORK/off/proj"
 
@@ -1221,10 +1391,16 @@ unset DDEV_DEV_OWNED
 rm -rf "${HWORK:?}/gitprune"
 mkdir -p "$HWORK/gitprune/proj/.ddev" "$HWORK/gitprune/proj/.git/modules/sub/.ddev"
 GITPRUNE_OUT=$(sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\"" _ "$HANDOVER" "$HWORK/gitprune" 2>/dev/null || true)
-check "handover scan skips .ddev inside .git/ (issue #112)" \
-    sh -c "! printf '%s\n' \"\$1\" | grep -q '.git/modules'" _ "$GITPRUNE_OUT"
-check "handover scan still hands over the project .ddev next to .git/" \
-    sh -c "printf '%s\n' \"\$1\" | grep -q 'proj/.ddev'" _ "$GITPRUNE_OUT"
+if ! printf '%s\n' "$GITPRUNE_OUT" | grep -q '.git/modules'; then
+    pass "handover scan skips .ddev inside .git/ (issue #112)"
+else
+    fail "handover scan skips .ddev inside .git/ (issue #112)"
+fi
+if printf '%s\n' "$GITPRUNE_OUT" | grep -q 'proj/.ddev'; then
+    pass "handover scan still hands over the project .ddev next to .git/"
+else
+    fail "handover scan still hands over the project .ddev next to .git/"
+fi
 rm -rf "${HWORK:?}/gitprune"
 
 # Top-inode fast path: the FIRST pass chowns/chmods and echoes; the
@@ -1237,10 +1413,16 @@ mkdir -p "$HWORK/fastpath/proj/.ddev" "$HWORK/fastpath/proj/config/system" \
 printf 'type: typo3\n' >"$HWORK/fastpath/proj/.ddev/config.yaml"
 touch "$HWORK/fastpath/proj/vendor/typo3/cms-core/Classes/Information/Typo3Version.php"
 FP1=$(sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\"" _ "$HANDOVER" "$HWORK/fastpath" 2>/dev/null || true)
-check "fast path: first pass hands .ddev over" \
-    sh -c "printf '%s\n' \"\$1\" | grep -q '.ddev handover:'" _ "$FP1"
-check "fast path: first pass hands the settings dir over" \
-    sh -c "printf '%s\n' \"\$1\" | grep -q 'ddev settings handover: .*config/system'" _ "$FP1"
+if printf '%s\n' "$FP1" | grep -q '.ddev handover:'; then
+    pass "fast path: first pass hands .ddev over"
+else
+    fail "fast path: first pass hands .ddev over"
+fi
+if printf '%s\n' "$FP1" | grep -q 'ddev settings handover: .*config/system'; then
+    pass "fast path: first pass hands the settings dir over"
+else
+    fail "fast path: first pass hands the settings dir over"
+fi
 # 0.0.40a F2: rc must be captured, not swallowed — "no handover echoes"
 # would also hold for a run that died before printing (|| true alone
 # made the silence assertion pass vacuously).
@@ -1248,8 +1430,11 @@ FP2_RC=0
 FP2=$(sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\"" _ "$HANDOVER" "$HWORK/fastpath" 2>/dev/null) || FP2_RC=$?
 check "fast path: second pass completes (rc 0)" \
     sh -c '[ "$1" -eq 0 ]' _ "$FP2_RC"
-check "fast path: second pass is silent for .ddev + settings dirs" \
-    sh -c "! printf '%s\n' \"\$1\" | grep -qe '.ddev handover:' -e 'ddev settings handover:'" _ "$FP2"
+if ! printf '%s\n' "$FP2" | grep -qe '.ddev handover:' -e 'ddev settings handover:'; then
+    pass "fast path: second pass is silent for .ddev + settings dirs"
+else
+    fail "fast path: second pass is silent for .ddev + settings dirs"
+fi
 # ...and the skip is a MODE fact, not luck: the top inode carries g+w now.
 check "fast path: .ddev top inode is group-writable after the pass" \
     sh -c "case \"\$(stat -c %A \"\$1\")\" in ?????w*) exit 0 ;; *) exit 1 ;; esac" _ "$HWORK/fastpath/proj/.ddev"
@@ -1712,32 +1897,62 @@ mkdir -p "$_112_dir/stamps"
 sh -c ". \"\$1\" && ddev_handover_stamp_write \"\$2\" \"\$3\" \"\$4\"" _ "$HANDOVER" "/srv/projects" ocuser ocgroup || true
 check "stamp: written into the override dir" \
     sh -c "ls \"\$1\"/*.stamp >/dev/null 2>&1" _ "$_112_dir/stamps"
-check "stamp: valid for the same root/user/group" \
-    sh -c ". \"\$1\" && ddev_handover_stamp_valid \"/srv/projects\" ocuser ocgroup" _ "$HANDOVER"
-check "stamp: invalid for a different user" \
-    sh -c ". \"\$1\" && if ddev_handover_stamp_valid \"/srv/projects\" otheruser ocgroup; then exit 1; fi" _ "$HANDOVER"
-check "stamp: invalid for a different group" \
-    sh -c ". \"\$1\" && if ddev_handover_stamp_valid \"/srv/projects\" ocuser othergroup; then exit 1; fi" _ "$HANDOVER"
-check "stamp: invalid for a different root" \
-    sh -c ". \"\$1\" && if ddev_handover_stamp_valid \"/srv/other\" ocuser ocgroup; then exit 1; fi" _ "$HANDOVER"
-check "stamp: invalid when missing entirely" \
-    sh -c ". \"\$1\" && if ddev_handover_stamp_valid \"/srv/never-scanned\" ocuser ocgroup; then exit 1; fi" _ "$HANDOVER"
+if (. "$HANDOVER" && ddev_handover_stamp_valid "/srv/projects" ocuser ocgroup); then
+    pass "stamp: valid for the same root/user/group"
+else
+    fail "stamp: valid for the same root/user/group"
+fi
+if (. "$HANDOVER" && if ddev_handover_stamp_valid "/srv/projects" otheruser ocgroup; then exit 1; fi); then
+    pass "stamp: invalid for a different user"
+else
+    fail "stamp: invalid for a different user"
+fi
+if (. "$HANDOVER" && if ddev_handover_stamp_valid "/srv/projects" ocuser othergroup; then exit 1; fi); then
+    pass "stamp: invalid for a different group"
+else
+    fail "stamp: invalid for a different group"
+fi
+if (. "$HANDOVER" && if ddev_handover_stamp_valid "/srv/other" ocuser ocgroup; then exit 1; fi); then
+    pass "stamp: invalid for a different root"
+else
+    fail "stamp: invalid for a different root"
+fi
+if (. "$HANDOVER" && if ddev_handover_stamp_valid "/srv/never-scanned" ocuser ocgroup; then exit 1; fi); then
+    pass "stamp: invalid when missing entirely"
+else
+    fail "stamp: invalid when missing entirely"
+fi
 # The toggle is a STANDALONE assignment, never a prefix before the dot
 # (issue #342): bash's default mode DROPS a prefix assignment once the
 # `.` special builtin completes (dash keeps it, POSIX), and the
 # stamp_valid call runs AFTER the dot — under bash the mode silently
 # stayed "off" and the stamp kept validating. Standalone assignments
 # persist in both shells.
-check "stamp: dev-owned toggle invalidates (mode is part of the shape)" \
-    sh -c "DDEV_DEV_OWNED=true; . \"\$1\" && if ddev_handover_stamp_valid \"/srv/projects\" ocuser ocgroup; then exit 1; fi" _ "$HANDOVER"
+if (
+    DDEV_DEV_OWNED=true
+    . "$HANDOVER" &&
+        if ddev_handover_stamp_valid "/srv/projects" ocuser ocgroup; then
+            exit 1
+        fi
+); then
+    pass "stamp: dev-owned toggle invalidates (mode is part of the shape)"
+else
+    fail "stamp: dev-owned toggle invalidates (mode is part of the shape)"
+fi
 # 0.0.40a F1: the dev user (handback target) is part of the shape — a
 # DEFAULT_USER re-base must invalidate, not wait for --refresh.
 # (0.0.40b: guarded — same set -e cleanup rationale as above.)
 sh -c ". \"\$1\" && ddev_handover_stamp_write \"\$2\" \"\$3\" \"\$4\" \"\$5\"" _ "$HANDOVER" "/srv/projects" ocuser ocgroup devuser || true
-check "stamp: valid for the same dev user (4-arg shape, 0.0.40a F1)" \
-    sh -c ". \"\$1\" && ddev_handover_stamp_valid \"/srv/projects\" ocuser ocgroup devuser" _ "$HANDOVER"
-check "stamp: invalid for a different dev user (0.0.40a F1)" \
-    sh -c ". \"\$1\" && if ddev_handover_stamp_valid \"/srv/projects\" ocuser ocgroup otherdev; then exit 1; fi" _ "$HANDOVER"
+if (. "$HANDOVER" && ddev_handover_stamp_valid "/srv/projects" ocuser ocgroup devuser); then
+    pass "stamp: valid for the same dev user (4-arg shape, 0.0.40a F1)"
+else
+    fail "stamp: valid for the same dev user (4-arg shape, 0.0.40a F1)"
+fi
+if (. "$HANDOVER" && if ddev_handover_stamp_valid "/srv/projects" ocuser ocgroup otherdev; then exit 1; fi); then
+    pass "stamp: invalid for a different dev user (0.0.40a F1)"
+else
+    fail "stamp: invalid for a different dev user (0.0.40a F1)"
+fi
 _112_stampfile=$(ls "$_112_dir/stamps"/*.stamp 2>/dev/null || true)
 if [ -n "$_112_stampfile" ]; then
     # 0.0.40a F3: guarded — under the suite's set -e an unguarded sed/mv
@@ -1748,8 +1963,11 @@ if [ -n "$_112_stampfile" ]; then
     sed 's/|1|/|99|/' "$_112_stampfile" >"$_112_stampfile.new" &&
         mv "$_112_stampfile.new" "$_112_stampfile" || true
 fi
-check "stamp: a scan-rev mismatch invalidates" \
-    sh -c ". \"\$1\" && if ddev_handover_stamp_valid \"/srv/projects\" ocuser ocgroup devuser; then exit 1; fi" _ "$HANDOVER"
+if (. "$HANDOVER" && if ddev_handover_stamp_valid "/srv/projects" ocuser ocgroup devuser; then exit 1; fi); then
+    pass "stamp: a scan-rev mismatch invalidates"
+else
+    fail "stamp: a scan-rev mismatch invalidates"
+fi
 rm -rf "$_112_dir"
 unset OPK_HANDOVER_STAMP_DIR
 
@@ -1759,14 +1977,28 @@ unset OPK_HANDOVER_STAMP_DIR
 # issue #219: --refresh rides the SAME loop (baseline arm loop-local) —
 # update.sh keeps exactly one project-root loop and one handover call
 # per root; comment-strip riders (#261) guard the counts.
-check "update.sh: plain-update loop gates the skip on REFRESH + stamp_valid" \
-    sh -c "grep -qF '[ \"\$REFRESH\" != true ]' \"\$1\" && grep -qF 'ddev_handover_stamp_valid \"\$root\" \"\$OPENCODE_USER\" \"\$NEW_OPENCODE_GROUP\" \"\$DEFAULT_USER\"; then' \"\$1\"" _ "$UPDATE_CORE"
-check "update.sh: stamps the root after the handover" \
-    sh -c "grep -qF 'ddev_handover_stamp_write \"\$root\" \"\$OPENCODE_USER\" \"\$NEW_OPENCODE_GROUP\"' \"\$1\"" _ "$UPDATE_CORE"
-check "update.sh: the scanning detail is printed only for roots actually scanned" \
-    sh -c "grep -qF '_ho_announced=false' \"\$1\" && grep -qF 'if [ \"\$_ho_announced\" = false ]' \"\$1\"" _ "$UPDATE_CORE"
-check "update.sh: skip message names both force paths" \
-    sh -c "grep -q 'opk update --refresh' \"\$1\" && grep -q 'config handover' \"\$1\"" _ "$UPDATE_CORE"
+if live_src "$UPDATE_CORE" | grep -qF '[ "$REFRESH" != true ]' &&
+    live_src "$UPDATE_CORE" |
+    grep -qF 'ddev_handover_stamp_valid "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"; then'; then
+    pass "update.sh: plain-update loop gates the skip on REFRESH + stamp_valid"
+else
+    fail "update.sh: plain-update loop gates the skip on REFRESH + stamp_valid"
+fi
+check_live "update.sh: stamps the root after the handover" \
+    "$UPDATE_CORE" \
+    -qF 'ddev_handover_stamp_write "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP"'
+if live_src "$UPDATE_CORE" | grep -qF '_ho_announced=false' &&
+    live_src "$UPDATE_CORE" | grep -qF 'if [ "$_ho_announced" = false ]'; then
+    pass "update.sh: the scanning detail is printed only for roots actually scanned"
+else
+    fail "update.sh: the scanning detail is printed only for roots actually scanned"
+fi
+if live_src "$UPDATE_CORE" | grep -q 'opk update --refresh' &&
+    live_src "$UPDATE_CORE" | grep -q 'config handover'; then
+    pass "update.sh: skip message names both force paths"
+else
+    fail "update.sh: skip message names both force paths"
+fi
 # pr-00381 a1/a2/a7 + b1/b2: the file-global presence/order pins were
 # comment-blind and position-free — hoisting the arm out of the loop,
 # dropping its REFRESH wrapper or commenting it out all stayed green.
@@ -1802,8 +2034,9 @@ check_live "update.sh: refresh section header kept (issue #219 move)" "$UPDATE_C
     -qF 'ui_section "Refreshing group baseline"'
 check_live "update.sh: routine skip hint kept verbatim (issue #219 move)" "$UPDATE_CORE" \
     -qF 'skipped group-baseline refresh (use --refresh to re-apply chgrp/setgid/default ACLs)'
-check "install.sh: stamps after the install-time handover" \
-    sh -c "grep -qF 'ddev_handover_stamp_write \"\$root\" \"\$OPENCODE_USER\" \"\$OPENCODE_GROUP\"' \"\$1\"" _ "$INSTALL_CORE"
+check_live "install.sh: stamps after the install-time handover" \
+    "$INSTALL_CORE" \
+    -qF 'ddev_handover_stamp_write "$root" "$OPENCODE_USER" "$OPENCODE_GROUP"'
 # Comment-strip riders (#261, the #244 g W1 class): commented-out lines
 # stop counting; full-line comments only (#244 h W6 residual). The count
 # binds the CALL FORM — the opening quote of the first argument, the
@@ -1815,46 +2048,48 @@ check "install.sh: stamps after the install-time handover" \
 _stampw_n="$(live_src "$CONFIG" | grep -c 'ddev_handover_stamp_write "' || true)"
 check "config.sh: refresh + projects add + handover re-stamp (call sites: $_stampw_n, need exactly 3 — #408)" \
     [ "$_stampw_n" -eq 3 ]
-check "handover.sh: stamp dir defaults to /etc/opencode-permissions-kit/handover" \
-    sh -c "grep -qF 'OPK_HANDOVER_STAMP_DIR:-/etc/opencode-permissions-kit/handover' \"\$1\"" _ "$HANDOVER"
-check "handover.sh: stamp stubs fail open (valid=1) when the lib is missing" \
-    sh -c "grep -qF 'ddev_handover_stamp_valid() { return 1; }' \"\$1\" && grep -qF 'ddev_handover_stamp_write() { :; }' \"\$1\"" _ "$UPDATE_CORE"
+check_live "handover.sh: stamp dir defaults to /etc/opencode-permissions-kit/handover" \
+    "$HANDOVER" \
+    -qF 'OPK_HANDOVER_STAMP_DIR:-/etc/opencode-permissions-kit/handover'
+if live_src "$UPDATE_CORE" | grep -qF 'ddev_handover_stamp_valid() { return 1; }' &&
+    live_src "$UPDATE_CORE" | grep -qF 'ddev_handover_stamp_write() { :; }'; then
+    pass "handover.sh: stamp stubs fail open (valid=1) when the lib is missing"
+else
+    fail "handover.sh: stamp stubs fail open (valid=1) when the lib is missing"
+fi
 
 # wiring: config.sh / install.sh / status.sh / hook / kit CLI
-check "config.sh dispatches ddev-settings" \
-    sh -c "grep -q 'ddev-settings)' \"\$1\"" _ "$CONFIG"
-check "config.sh ddev-settings has status + apply" \
-    sh -c "grep -q 'ddev_settings_status' \"\$1\" && grep -q 'ddev_settings_apply' \"\$1\"" _ "$CONFIG"
-check "config.sh ddev-settings re-stamps install.conf" \
-    sh -c "grep -q 'update_install_conf_ddev_owned' \"\$1\"" _ "$CONFIG"
-check "config.sh menu offers ddev-settings" \
-    sh -c "grep -q 'ddev-settings: dev-owned projects on/off' \"\$1\"" _ "$CONFIG"
-check "install.sh parses --ddev-settings" \
-    sh -c "grep -q -- '--ddev-settings' \"\$1\"" _ "$INSTALL"
-check "install.sh defaults to dev-owned (DDEV_DEV_OWNED=true)" \
-    sh -c "grep -qF 'DDEV_DEV_OWNED=true' \"\$1\"" _ "$INSTALL"
-check "install.sh stamps DDEV_DEV_OWNED into install.conf" \
-    sh -c "grep -qF 'DDEV_DEV_OWNED=\$DDEV_DEV_OWNED' \"\$1\"" _ "$INSTALL_CORE"
+check_live "config.sh dispatches ddev-settings" "$CONFIG" -q 'ddev-settings)'
+if live_src "$CONFIG" | grep -q 'ddev_settings_status' &&
+    live_src "$CONFIG" | grep -q 'ddev_settings_apply'; then
+    pass "config.sh ddev-settings has status + apply"
+else
+    fail "config.sh ddev-settings has status + apply"
+fi
+check_live "config.sh ddev-settings re-stamps install.conf" "$CONFIG" -q 'update_install_conf_ddev_owned'
+check_live "config.sh menu offers ddev-settings" "$CONFIG" -q 'ddev-settings: dev-owned projects on/off'
+check_live "install.sh parses --ddev-settings" "$INSTALL" -q -- '--ddev-settings'
+check_live "install.sh defaults to dev-owned (DDEV_DEV_OWNED=true)" "$INSTALL" -qF 'DDEV_DEV_OWNED=true'
+check_live "install.sh stamps DDEV_DEV_OWNED into install.conf" "$INSTALL_CORE" -qF 'DDEV_DEV_OWNED=$DDEV_DEV_OWNED'
 _dsetq_n="$(live_src "$INSTALL_CORE" | grep -c 'ddev settings management? (dev-owned projects)' || true)"
 check "install.sh asks the ddev-settings question (standard + advanced; question sites: $_dsetq_n, need >=2)" \
     [ "$_dsetq_n" -ge 2 ]
-check "status.sh reports the ddev settings mode" \
-    sh -c "grep -q 'ddev settings' \"\$1\"" _ "$STATUS_CORE"
-check "hook hint mentions the dev-owned effect" \
-    sh -c "grep -q 'disable_settings_management:' \"\$1\"" _ "$FUNC"
-check "kit CLI usage documents ddev-settings" \
-    sh -c "grep -q 'ddev-settings on|off|status' \"\$1\"" _ "$KIT"
-check "install.sh passes DEFAULT_USER to the handover" \
-    sh -c "grep -qF 'ddev_handover_root \"\$root\" \"\$OPENCODE_USER\" \"\$OPENCODE_GROUP\" \"\$DEFAULT_USER\"' \"\$1\"" _ "$INSTALL_CORE"
-check "update.sh passes DEFAULT_USER to the handover" \
-    sh -c "grep -qF 'ddev_handover_root \"\$root\" \"\$OPENCODE_USER\" \"\$NEW_OPENCODE_GROUP\" \"\$DEFAULT_USER\"' \"\$1\"" _ "$UPDATE_CORE"
-check "config.sh passes DEFAULT_USER to the handover" \
-    sh -c "grep -qF 'ddev_handover_root \"\$p\" \"\$OPENCODE_USER\" \"\$OPENCODE_GROUP\" \"\$DEFAULT_USER\"' \"\$1\"" _ "$CONFIG"
+check_live "status.sh reports the ddev settings mode" "$STATUS_CORE" -q 'ddev settings'
+check_live "hook hint mentions the dev-owned effect" "$FUNC" -q 'disable_settings_management:'
+check_live "kit CLI usage documents ddev-settings" "$KIT" -q 'ddev-settings on|off|status'
+check_live "install.sh passes DEFAULT_USER to the handover" \
+    "$INSTALL_CORE" \
+    -qF 'ddev_handover_root "$root" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"'
+check_live "update.sh passes DEFAULT_USER to the handover" \
+    "$UPDATE_CORE" \
+    -qF 'ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"'
+check_live "config.sh passes DEFAULT_USER to the handover" \
+    "$CONFIG" \
+    -qF 'ddev_handover_root "$p" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"'
 rm -rf "$HWORK"
 
 # --- 8. status.sh reporting ----------------------------------------------------
-check "status.sh reports ddev-as-opencode state" \
-    sh -c "grep -q 'ddev-as-opencode' \"\$1\"" _ "$STATUS_CORE"
+check_live "status.sh reports ddev-as-opencode state" "$STATUS_CORE" -q 'ddev-as-opencode'
 
 # --- 8b. config.sh ui.sh fallback (0.0.45c C9) ----------------------------------
 # The body calls ui_have/ui_atten (projects list) and ui_confirm/ui_menu/
@@ -1878,10 +2113,8 @@ else
 fi
 
 # --- 9. Makefile + CI wiring ---------------------------------------------------
-check "Makefile has a test-ddev-as-opencode target in the test: list" \
-    sh -c "grep -q 'test-ddev-as-opencode' \"\$1\"" _ "$MAKEFILE"
-check "test-unit.yml run step mentions the new test" \
-    sh -c "grep -q 'test-ddev-as-opencode.sh' \"\$1\"" _ "$TEST_CI"
+check_live "Makefile has a test-ddev-as-opencode target in the test: list" "$MAKEFILE" -q 'test-ddev-as-opencode'
+check_live "test-unit.yml run step mentions the new test" "$TEST_CI" -q 'test-ddev-as-opencode.sh'
 check "bin/ddev-as-opencode is executed by path (git 100755)" \
     sh -c '[ "$(git -C "$2" ls-files -s -- files/opencode-permissions-kit-lib/bin/ddev-as-opencode | cut -d" " -f1)" = "100755" ]' _ x "$SCRIPT_DIR/../.."
 

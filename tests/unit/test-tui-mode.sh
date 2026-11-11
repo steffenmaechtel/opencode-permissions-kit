@@ -198,9 +198,12 @@ check_live "update.sh fetch list includes the 2x plugin" "$UPDATE" -q 'opencode-
 check "update.sh re-registers the 2x plugin dir (major-gated, sync function)" \
     sh -c 'grep -qF "tui_plugin_sync_user \"\$_str_major\"" "$1" && grep -q "sync_tui_registration \"\$_oc_major\"" "$1" && grep -qF "sh/tui-plugin.sh" "$2"' _ "$UPDATE_CORE" "$UPDATE" &&
     grep -q 'sync_tui_registration "$_maj_after"' "$UPDATE_CORE"
-check "uninstall.sh removes the 2x plugin dir and cli.json entries" \
-    sh -c 'grep -q "plugins/opencode-permissions-kit" "$1" && grep -q "kit-mode-2x.tsx" "$1"' _ \
-    "$UNINSTALL_CORE"
+if live_src "$UNINSTALL_CORE" | grep -q "plugins/opencode-permissions-kit" &&
+    live_src "$UNINSTALL_CORE" | grep -q "kit-mode-2x.tsx"; then
+    pass "uninstall.sh removes the 2x plugin dir and cli.json entries"
+else
+    fail "uninstall.sh removes the 2x plugin dir and cli.json entries"
+fi
 
 # tui-register.py functional behavior (cli.json is user-owned state)
 check "tui-register.py exists" test -f "$REGISTER"
