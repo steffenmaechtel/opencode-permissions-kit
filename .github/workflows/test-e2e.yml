@@ -193,6 +193,10 @@ jobs:
           # Base image via the Google Docker Hub mirror: auth.docker.io
           # 504s (2026-10) killed every suite at metadata resolve.
           E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04
+          # Build network = host (archive.ubuntu.com DNS flakes 2026-11):
+          # RUN steps in the docker bridge lost apt DNS while the runner's
+          # own resolver worked — host networking shares it.
+          E2E_BUILD_NETWORK: host
 
   # Core setuid-docker suite, opencode 2.x lane, git-latest — the
   # floating half of the git pair (issue #118): builds the image with
@@ -259,6 +263,10 @@ jobs:
           # Base image via the Google Docker Hub mirror: auth.docker.io
           # 504s (2026-10) killed every suite at metadata resolve.
           E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04
+          # Build network = host (archive.ubuntu.com DNS flakes 2026-11):
+          # RUN steps in the docker bridge lost apt DNS while the runner's
+          # own resolver worked — host networking shares it.
+          E2E_BUILD_NETWORK: host
 
   # docker-rootless daemon e2e (Phase 3). Same triggers + shared binary cache;
   # needs systemd-in-container + nested user namespaces, and SKIPs wholesale
@@ -311,6 +319,10 @@ jobs:
           # Base image via the Google Docker Hub mirror: auth.docker.io
           # 504s (2026-10) killed every suite at metadata resolve.
           E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04
+          # Build network = host (archive.ubuntu.com DNS flakes 2026-11):
+          # RUN steps in the docker bridge lost apt DNS while the runner's
+          # own resolver worked — host networking shares it.
+          E2E_BUILD_NETWORK: host
 
   # opencode 1.x lane (issue #197): the same suite against the CURRENT
   # 1.x release, resolved from GitHub releases/latest at run time — the
@@ -379,6 +391,10 @@ jobs:
           # Base image via the Google Docker Hub mirror: auth.docker.io
           # 504s (2026-10) killed every suite at metadata resolve.
           E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04
+          # Build network = host (archive.ubuntu.com DNS flakes 2026-11):
+          # RUN steps in the docker bridge lost apt DNS while the runner's
+          # own resolver worked — host networking shares it.
+          E2E_BUILD_NETWORK: host
 
   # docker-rootless daemon e2e, opencode 1.x lane (issue #197) — the
   # same mirrored trigger/cache layout as its 2x twin above; see
@@ -435,3 +451,7 @@ jobs:
           # Base image via the Google Docker Hub mirror: auth.docker.io
           # 504s (2026-10) killed every suite at metadata resolve.
           E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04
+          # Build network = host (archive.ubuntu.com DNS flakes 2026-11):
+          # RUN steps in the docker bridge lost apt DNS while the runner's
+          # own resolver worked — host networking shares it.
+          E2E_BUILD_NETWORK: host

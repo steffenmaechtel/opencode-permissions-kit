@@ -157,6 +157,10 @@ jobs:
           # 504s (2026-10) killed every suite at metadata resolve. (Inner
           # ddev image pulls still go to Docker Hub directly.)
           E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04
+          # Build network = host (archive.ubuntu.com DNS flakes 2026-11):
+          # RUN steps in the docker bridge lost apt DNS while the runner's
+          # own resolver worked — host networking shares it.
+          E2E_BUILD_NETWORK: host
           # Authorize api.github.com calls (rate-limit resilience, lib.sh
           # gh_latest_tag resolves the ddev version) — the ephemeral
           # workflow token, no secret needed.
@@ -240,6 +244,10 @@ jobs:
           # 504s (2026-10) killed every suite at metadata resolve. (Inner
           # ddev image pulls still go to Docker Hub directly.)
           E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04
+          # Build network = host (archive.ubuntu.com DNS flakes 2026-11):
+          # RUN steps in the docker bridge lost apt DNS while the runner's
+          # own resolver worked — host networking shares it.
+          E2E_BUILD_NETWORK: host
           # Authorize api.github.com calls (rate-limit resilience, lib.sh
           # gh_latest_tag resolves the ddev version) — the ephemeral
           # workflow token, no secret needed.

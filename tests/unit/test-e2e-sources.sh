@@ -216,6 +216,35 @@ check "workflows export the mirror base image to the e2e steps" \
     sh -c "grep -q 'E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04' \"\$1\" \
 && grep -q 'E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04' \"\$2\"" _ "$WF_E2E" "$WF_DDEV"
 
+# --- build network knob (archive.ubuntu.com DNS flake 2026-11): RUN steps in
+# the docker bridge intermittently lost apt DNS while the runner's OWN
+# resolver worked in the same run. CI builds with --network=host so build
+# steps share the host resolver. Same contract class as E2E_BASE_IMAGE:
+# knob in lib.sh, forwarded on BOTH builder paths, exported by BOTH
+# workflow files; the empty default keeps the docker bridge for local
+# runs. ---
+check "lib.sh reads the E2E_BUILD_NETWORK knob (default empty)" \
+    grep_q 'E2E_BUILD_NETWORK="\${E2E_BUILD_NETWORK:-}"'
+# Guarded comment-stripped count, the GIT_CHANNEL/BASE_IMAGE family: both
+# builder paths must forward the knob, or the classic setuid rebuild (and
+# the rootless suite) silently falls back to the flaky bridge.
+_net_build_args=$(live_src "$LIB" | grep -c -- '--network "\$E2E_BUILD_NETWORK"' || true)
+if [ "$_net_build_args" -ge 2 ]; then
+    pass "build network forwarded on both builder paths (BuildKit + classic)"
+else
+    fail "build network forwarded on $_net_build_args of 2 builder paths"
+fi
+# The effective network must be visible at build start (incident aid, the
+# container-name-print convention): a knob that silently does not apply is
+# indistinguishable from a green bridge run. Comment-stripped likewise.
+if live_src "$LIB" | grep -q 'build network: \${E2E_BUILD_NETWORK:-docker default bridge}'; then
+    pass "e2e_start_container prints the effective build network"
+else
+    fail "e2e_start_container does not print the effective build network"
+fi
+check "workflows export the host build network to the e2e steps" \
+    sh -c "grep -q 'E2E_BUILD_NETWORK: host' \"\$1\" && grep -q 'E2E_BUILD_NETWORK: host' \"\$2\"" _ "$WF_E2E" "$WF_DDEV"
+
 # --- per-worktree container names (issue #366): two checkouts running the
 # SAME suite on one docker daemon shared the fixed container name — the
 # second start's rm -f tore the first run's container down mid-suite
