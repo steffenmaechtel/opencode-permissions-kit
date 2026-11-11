@@ -532,6 +532,18 @@ if sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -qE '^command -v ddev_migrate_g
 else
     fail "ddev_migrate gap/export stubs must be top-level command -v arms (#461 a Q4)"
 fi
+# X1 pin: the link-gate stub fails CLOSED and loud — the rc-0 draft left
+# the direct-sudo gated writes (~/.ddev, ~/.config, ~/.agents) running
+# with the gate silently off on truncation. Shape pin (inline arm, not
+# extractable): fail-closed rc + named message.
+if sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -A2 -F 'agent_home_sane() {' |
+    grep -qF 'link gate closed, gated writes skip loudly' &&
+    sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -A2 -F 'agent_home_sane() {' |
+    grep -qF 'return 1'; then
+    pass "agent_home_sane stub fails closed and loud (X1: direct-sudo gates never run ungated) (#461 a X1)"
+else
+    fail "agent_home_sane stub must fail closed (rc 1 + named message) (#461 a X1)"
+fi
 
 # --- 8. LOWS-1 (#371/#372/#340): install.sh residual hygiene ----------------------
 

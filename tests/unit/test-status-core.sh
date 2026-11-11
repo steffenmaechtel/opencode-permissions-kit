@@ -409,6 +409,25 @@ if printf '%s' "$_gate_db_out" | grep -qF 'sh/ddev-migrate.sh outdated'; then
 else
     fail "db-dump gate must fire on a truncated ddev-migrate.sh (out=$_gate_db_out) (#456)"
 fi
+# S5 variant (#461 a): PARTIAL truncation — the trio (gap/projects/home)
+# survives, only ddev_migrate_latest_dir (defined :651, ~500 lines after
+# its caller) is gone. The pre-fix gate passed this shape and the gap
+# probe rc-127'd inside $(…) with no counted row.
+printf '# partial: trio present, callee gone\nddev_migrate_gap() { :; }\nddev_migrate_projects() { :; }\nddev_migrate_home() { :; }\n' \
+    >"${_gate_scratch:?}/lib/sh/ddev-migrate.sh"
+_gate_db2_out="$(PATH='/usr/bin:/bin' sh -c '
+    . "$1"
+    DEFAULT_USER=dev
+    LIBDIR="$2/lib"
+    PROJECTS_CONF=""
+    eval "$3"
+    _st_ddev_db_dumps
+' x "$_gate_ui" "$_gate_scratch" "$(extract_func "$LIB" _st_ddev_db_dumps)" 2>&1)"
+if printf '%s' "$_gate_db2_out" | grep -qF 'sh/ddev-migrate.sh outdated'; then
+    pass "db-dump gate fires when ONLY ddev_migrate_latest_dir is missing (executed, #461 a S5)"
+else
+    fail "db-dump gate must fire on the latest_dir-only truncation (out=$_gate_db2_out) (#461 a S5)"
+fi
 # OPENCODE_USER names a nonexistent user so the uid guard enters the
 # scan arm deterministically on every host (an environment-dependent
 # pin is vacuous somewhere, L4b).
