@@ -294,7 +294,7 @@ fi
 # fix: sudo opk update"; before the fix no abort path printed any
 # hint (the row lied). Comment-stripped count pin: exactly two
 # refusal lines, each with the hint.
-_pg_hint=$(sed 's/^[[:space:]]*#.*$//' "$STATUS_ENTRY" | grep -c 'refusing to run (fix: sudo opk update)')
+_pg_hint=$(live_src "$STATUS_ENTRY" | grep -c 'refusing to run (fix: sudo opk update)')
 if [ "$_pg_hint" -eq 2 ]; then
     pass "both wiring-abort guards print the repair hint (docs row is true) (#461 b B2)"
 else
@@ -379,19 +379,19 @@ fi
 # environment-dependent (vacuous on non-WSL CI, the L4b class), and
 # weakening the extraction to reach the gate would pin a copy, not
 # the code.
-if printf '%s\n' "$(sed 's/^[[:space:]]*#.*$//' "$LIB")" |
+if printf '%s\n' "$(live_src "$LIB")" |
     grep -qF 'ui_kv_warn "kit update" "not checked — kit file sh/update-check.sh outdated (fix: sudo opk update)"'; then
     pass "update-check truncation gate renders a counted warn row (#461 a Q3)"
 else
     fail "update-check truncation gate must render a counted warn row (#461 a Q3)"
 fi
-if printf '%s\n' "$(sed 's/^[[:space:]]*#.*$//' "$LIB")" |
+if printf '%s\n' "$(live_src "$LIB")" |
     grep -qF 'ui_kv_warn "advisories database" "not checked — kit file sh/advisories.sh outdated (fix: sudo opk update)"'; then
     pass "advisories truncation gate renders a counted warn row (#461 a Q3)"
 else
     fail "advisories truncation gate must render a counted warn row (#461 a Q3)"
 fi
-if printf '%s\n' "$(sed 's/^[[:space:]]*#.*$//' "$LIB")" |
+if printf '%s\n' "$(live_src "$LIB")" |
     grep -qF 'ui_kv_warn "hosts (win)" "not checked — kit file sh/ddev-hosts.sh outdated (fix: sudo opk update)"'; then
     pass "hosts(win) truncation gate renders a counted warn row (#461 a Q3)"
 else
