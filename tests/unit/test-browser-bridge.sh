@@ -353,7 +353,7 @@ fi
 chmod 755 "$WORK/ro-dir"
 OPK="$REPO/files/opencode-permissions-kit-lib/bin/opk"
 if grep -q 'if browser_bridge_write_conf "$LIBDIR"; then' "$OPK" &&
-    grep -q 'could not write the carrier to /etc/wsl.conf' "$OPK"; then
+    live_src "$OPK" | grep -q 'could not write the carrier to /etc/wsl.conf'; then
     pass "opk wsl-add-opencode-1-fix reports failure instead of lying (C4)"
 else
     fail "opk wsl-add-opencode-1-fix reports failure instead of lying (C4)"
@@ -674,10 +674,12 @@ PATH="$_op"
 unset _op
 # wiring: update.sh and status.sh route their guards through the helper
 # (update's guard lives in sh/update-core.sh since #346 wave 2)
-grep -qF 'xdg_open_real_exists' "$REPO/files/opencode-permissions-kit-lib/sh/update-core.sh" &&
+live_src "$REPO/files/opencode-permissions-kit-lib/sh/update-core.sh" |
+    grep -qF 'xdg_open_real_exists' &&
     pass "update.sh never-shadow guard uses the shared probe" ||
     fail "update.sh never-shadow guard uses the shared probe (0.0.42d S1/C1)"
-grep -qF 'xdg_open_real_exists' "$REPO/files/opencode-permissions-kit-lib/sh/status-core.sh" &&
+live_src "$REPO/files/opencode-permissions-kit-lib/sh/status-core.sh" |
+    grep -qF 'xdg_open_real_exists' &&
     pass "status.sh never-shadow verdict uses the shared probe" ||
     fail "status.sh never-shadow verdict uses the shared probe (0.0.42d S1/C1)"
 

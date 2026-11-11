@@ -243,31 +243,31 @@ fi
 # Wiring: all three call sites must use the shared helper.
 # #346 wave 3: the kit_source stays in the entry's bootstrap; the call
 # moved into do_plan_phase (install-core.sh).
-if grep -q 'kit_source.*sh/git-check.sh' "$INSTALL" &&
-    grep -q '^[[:space:]]*git_check_report$' "$INSTALL_CORE"; then
+if live_src "$INSTALL" | grep -q 'kit_source.*sh/git-check.sh' &&
+    live_src "$INSTALL_CORE" | grep -q '^[[:space:]]*git_check_report$'; then
     pass "issue #118: install.sh sources + calls git_check_report (pre-flight)"
 else
     fail "issue #118: install.sh git-check wiring missing"
 fi
-if grep -q 'sh/git-check.sh' "$UPDATE" &&
-    grep -q '^[[:space:]]*git_check_report$' "$UPDATE"; then
+if live_src "$UPDATE" | grep -q 'sh/git-check.sh' &&
+    live_src "$UPDATE" | grep -q '^[[:space:]]*git_check_report$'; then
     pass "issue #118: update.sh sources + calls git_check_report (banner phase)"
 else
     fail "issue #118: update.sh git-check wiring missing"
 fi
-if grep -q 'sh/git-check.sh' "$STATUS" &&
-    grep -q '^[[:space:]]*git_status_row$' "$STATUS_CORE"; then
+if live_src "$STATUS" | grep -q 'sh/git-check.sh' &&
+    live_src "$STATUS_CORE" | grep -q '^[[:space:]]*git_status_row$'; then
     pass "issue #118: status.sh sources + calls git_status_row (Core row)"
 else
     fail "issue #118: status.sh git-check wiring missing"
 fi
-if grep -q 'opencode-permissions-kit-lib/sh/git-check.sh 644' "$DEPLOYLIB"; then
+if live_src "$DEPLOYLIB" | grep -q 'opencode-permissions-kit-lib/sh/git-check.sh 644'; then
     pass "issue #118: git-check.sh is in the lib_deploy manifest"
 else
     fail "issue #118: git-check.sh missing from the lib_deploy manifest"
 fi
 
-if grep -q '^SECURE_GIT_CONFIG=true' "$INSTALL"; then
+if live_src "$INSTALL" | grep -q '^SECURE_GIT_CONFIG=true'; then
     pass "install.sh: default is git BLOCKED (SECURE_GIT_CONFIG=true)"
 else
     fail "install.sh: default is git BLOCKED (SECURE_GIT_CONFIG=true)"
@@ -280,7 +280,7 @@ else
     fail "install.sh: Standard 'allow git' maps to SECURE_GIT_CONFIG=false"
 fi
 
-if grep -q 'ui_kv "Git".*blocked for the agent' "$INSTALL" &&
+if live_src "$INSTALL" | grep -q 'ui_kv "Git".*blocked for the agent' &&
     ! grep -q 'ui_kv "Git".*allowed (soft-only' "$INSTALL"; then
     pass "install.sh: completion panel maps true=blocked / false=allowed"
 else
@@ -289,8 +289,8 @@ fi
 
 # The re-install path must back up + re-render the agent config with the
 # chosen git setting (never silently keep a stale one).
-if grep -q 'opencode.jsonc-existing' "$INSTALL_CORE" &&
-    grep -q 'config re-applied' "$INSTALL_CORE"; then
+if live_src "$INSTALL_CORE" | grep -q 'opencode.jsonc-existing' &&
+    live_src "$INSTALL_CORE" | grep -q 'config re-applied'; then
     pass "install.sh: re-install re-renders the agent config (backup kept)"
 else
     fail "install.sh: re-install re-renders the agent config (backup kept)"
@@ -299,8 +299,8 @@ fi
 # The config.sh toggle must have the same data-safety: back up an existing
 # agent config before the template overwrite (review 0.0.39a D1 / 0.0.39b D3).
 CONFIG="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh"
-if grep -q '\.bak-' "$CONFIG" &&
-    grep -q 'previous config backed up' "$CONFIG"; then
+if live_src "$CONFIG" | grep -q '\.bak-' &&
+    live_src "$CONFIG" | grep -q 'previous config backed up'; then
     pass "config.sh: git-config toggle backs up the existing agent config"
 else
     fail "config.sh: git-config toggle backs up the existing agent config"
@@ -310,7 +310,7 @@ fi
 # propagates staged_write's rc past the trailing rm (the install-core
 # _oc_install_agent_config fix's same-shape sibling — the L2 sweep found
 # it); the success leg falls through to the toggle rows below.
-if grep -qF '_gca_rc=$?' "$CONFIG" &&
+if live_src "$CONFIG" | grep -qF '_gca_rc=$?' &&
     grep -A2 -F '_gca_rc=$?' "$CONFIG" | grep -qF 'return "$_gca_rc"'; then
     pass "config.sh: git-config apply propagates staged_write rc (#371 A4R twin)"
 else
@@ -454,9 +454,12 @@ fi
 echo ""
 echo "===================================="
 # conf-user homes (0.0.44b W16): the git-config paths ride the conf user
-grep -q '"/home/${OPENCODE_USER:-opencode}/.config/opencode/opencode.jsonc"' "$CONFIG" &&
+live_src "$CONFIG" | grep -q '"/home/${OPENCODE_USER:-opencode}/.config/opencode/opencode.jsonc"' &&
     pass "git-config paths ride the conf user (V16)" ||
     fail "git-config paths ride the conf user (V16)"
+# Absence pin in if-found-then-fail shape: config.sh must carry NO
+# literal /home/opencode path -- a commented-out forbidden line SHOULD
+# keep counting (conventions.md "Source-counting pins"), bare by design.
 if grep -q '/home/opencode/' "$CONFIG"; then
     fail "config.sh carries no literal /home/opencode path (V16)"
 else

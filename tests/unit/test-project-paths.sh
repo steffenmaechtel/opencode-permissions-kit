@@ -66,11 +66,11 @@ done
 # Wiring: install.sh kit_source's the lib (aborts loud when missing);
 # config.sh carries both lookup legs (checkout copy first, deployed
 # LIBDIR fallback).
-grep -q 'kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/path-sane.sh"' "$INSTALL" &&
+live_src "$INSTALL" | grep -q 'kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/path-sane.sh"' &&
     pass "install.sh sources sh/path-sane.sh via kit_source (issue #216)" ||
     fail "install.sh sources sh/path-sane.sh via kit_source (issue #216)"
-if grep -q '"$SCRIPT_DIR/../sh/path-sane.sh"' "$CONFIG" &&
-    grep -q '"$LIBDIR/sh/path-sane.sh"' "$CONFIG"; then
+if live_src "$CONFIG" | grep -q '"$SCRIPT_DIR/../sh/path-sane.sh"' &&
+    live_src "$CONFIG" | grep -q '"$LIBDIR/sh/path-sane.sh"'; then
     pass "config.sh sources sh/path-sane.sh (checkout first, LIBDIR fallback) (issue #216)"
 else
     fail "config.sh sources sh/path-sane.sh (checkout first, LIBDIR fallback) (issue #216)"
@@ -292,6 +292,9 @@ if [ "$_q1i" -eq 3 ] && [ "$_q1c" -eq 2 ]; then
 else
     fail "caller refusal messages must enumerate the real causes (install=$_q1i/3 config=$_q1c/2) (a Q1)"
 fi
+# Absence pin in if-found-then-fail shape: no caller message may claim
+# 'is a system path' -- a commented-out forbidden line SHOULD keep
+# counting (conventions.md "Source-counting pins"), bare by design.
 if grep -qF 'is a system path' "$INSTALL" "$INSTALL_CORE" "$CONFIG"; then
     fail "no caller message may claim 'is a system path' for every refusal (a Q1)"
 else
@@ -479,8 +482,8 @@ if [ "$_norm_sites" -ge 3 ]; then
 else
     fail "install.sh uses _PP_NORM in all project entry points (only $_norm_sites sites)"
 fi
-if grep -q '_fp_norm="$_fp_norm \$_PP_NORM"' "$INSTALL_CORE" &&
-    grep -q '_custom="$_custom \$_PP_NORM"' "$INSTALL_CORE"; then
+if live_src "$INSTALL_CORE" | grep -q '_fp_norm="$_fp_norm \$_PP_NORM"' &&
+    live_src "$INSTALL_CORE" | grep -q '_custom="$_custom \$_PP_NORM"'; then
     pass "install.sh: --projects and custom dialog store the expanded path"
 else
     fail "install.sh: --projects and custom dialog store the expanded path"
@@ -586,7 +589,7 @@ fi
 # spelling — a relocated agent home refuses too (the path policy lives in
 # sh/path-sane.sh since issue #216; uninstall.sh twin; the opk/status.sh
 # pattern).
-grep -q '_pp_agent_home' "$PATH_SANE" &&
+live_src "$PATH_SANE" | grep -q '_pp_agent_home' &&
     pass "path policy agent-home refusal getent-aware (pr-00263 a F10)" ||
     fail "path policy agent-home refusal literal-only (pr-00263 a F10)"
 
@@ -604,10 +607,10 @@ HANDOVER_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/handover-
 _opr_defs=$(live_src "$PATH_SANE" "$DOCTOR" "$DOCTOR_CORE" "$OPK" "$HANDOVER_CORE" |
     grep -c '^opk_policy_root() {' || true)
 if [ "$_opr_defs" = 1 ] &&
-    grep -q 'opk_policy_root "$DOCTOR_ROOT"' "$DOCTOR_CORE" &&
-    grep -q 'opk_policy_root "$_ho_policy_dir"' "$HANDOVER_CORE" &&
-    grep -q '\. "$PS_LIB"' "$DOCTOR" &&
-    grep -q 'sh/path-sane.sh' "$OPK"; then
+    live_src "$DOCTOR_CORE" | grep -q 'opk_policy_root "$DOCTOR_ROOT"' &&
+    live_src "$HANDOVER_CORE" | grep -q 'opk_policy_root "$_ho_policy_dir"' &&
+    live_src "$DOCTOR" | grep -q '\. "$PS_LIB"' &&
+    live_src "$OPK" | grep -q 'sh/path-sane.sh'; then
     pass "opk_policy_root defined once in the lib, called (not copied) by both consumers"
 else
     fail "opk_policy_root defined once in the lib, called (not copied) by both consumers (defs=$_opr_defs)"
