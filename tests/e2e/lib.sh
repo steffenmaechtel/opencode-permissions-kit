@@ -49,6 +49,12 @@
 #                    endpoint, 2026-10) kills every suite at metadata
 #                    resolution, before a single check runs. Local runs
 #                    stay on docker.io.
+#   E2E_BUILD_NETWORK  docker build --network mode for the image build
+#                    (default: EMPTY = docker's default bridge, unchanged
+#                    local behavior). CI sets 'host': RUN steps inside the
+#                    build bridge intermittently lost DNS (apt hosts
+#                    unresolvable, 2026-11) while the runner's OWN resolver
+#                    worked in the same run — host networking shares it.
 #
 # Daemon quirk (setuid): a docker daemon unpacking images through the
 # containerd snapshotter — the kit's own rootless docker does this — can strip
@@ -87,6 +93,10 @@ E2E_OLD_VERSION="${E2E_OLD_VERSION:-1.18.15}"
 E2E_GIT_CHANNEL="${E2E_GIT_CHANNEL:-distro}"
 # Base image knob — see the header block.
 E2E_BASE_IMAGE="${E2E_BASE_IMAGE:-ubuntu:24.04}"
+# Build network knob — see the header block. Forwarded verbatim as
+# --network on both builder paths (e2e_start_container); empty = docker's
+# default bridge.
+E2E_BUILD_NETWORK="${E2E_BUILD_NETWORK:-}"
 # Pin the opencode version under test (e.g. E2E_OC_VERSION=1.18.15 for an
 # explicit 1.x lane run, issue #197). Pinned versions are fetched on demand:
 # 1.x from GitHub release assets, 2.x from the npm registry (2.x ships no
@@ -466,7 +476,9 @@ e2e_start_container() {
     if [ "$E2E_SKIP_BUILD" != "1" ]; then
         echo ""
         echo "--- Building Docker image ($E2E_DOCKERFILE, git channel: $E2E_GIT_CHANNEL, base: $E2E_BASE_IMAGE) ---"
-        docker build --build-arg GIT_CHANNEL="$E2E_GIT_CHANNEL" \
+        echo "    build network: ${E2E_BUILD_NETWORK:-docker default bridge}"
+        docker build ${E2E_BUILD_NETWORK:+--network "$E2E_BUILD_NETWORK"} \
+            --build-arg GIT_CHANNEL="$E2E_GIT_CHANNEL" \
             --build-arg BASE_IMAGE="$E2E_BASE_IMAGE" \
             -t "$E2E_IMAGE" -f "$SCRIPT_DIR/$E2E_DOCKERFILE" "$SCRIPT_DIR"
 
@@ -483,7 +495,8 @@ e2e_start_container() {
         if ! docker run --rm --entrypoint sh "$E2E_IMAGE" -c 'test -u /usr/bin/sudo' >/dev/null 2>&1; then
             echo "  ${YELLOW}NOTE${NC} this daemon's BuildKit unpack strips setuid bits (containerd snapshotter) —"
             echo "  rebuilding with the classic builder (DOCKER_BUILDKIT=0) so sudo works in the container..."
-            if ! DOCKER_BUILDKIT=0 docker build --build-arg GIT_CHANNEL="$E2E_GIT_CHANNEL" \
+            if ! DOCKER_BUILDKIT=0 docker build ${E2E_BUILD_NETWORK:+--network "$E2E_BUILD_NETWORK"} \
+                --build-arg GIT_CHANNEL="$E2E_GIT_CHANNEL" \
                 --build-arg BASE_IMAGE="$E2E_BASE_IMAGE" \
                 -t "$E2E_IMAGE" -f "$SCRIPT_DIR/$E2E_DOCKERFILE" "$SCRIPT_DIR"; then
                 echo "  ${RED}FAIL${NC} classic-builder rebuild failed (removed in this Docker version?)."
