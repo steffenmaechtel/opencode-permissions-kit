@@ -33,21 +33,35 @@
 #                        temporarily commented-out pinned construct
 #                        stops counting). Full-line strip only --
 #                        trailing comments after live lines still count
-#                        (#244 h W6 residual, deliberate). The consumer
-#                        owns the rc: sed's own error surfaces on a
-#                        missing file, the downstream grep sees empty
-#                        input and the pin fails loud (no silent pass;
-#                        unlike extract_func there is no emptiness
-#                        ambiguity a -f guard would resolve).
+#                        (#244 h W6 residual, deliberate). The strip
+#                        is LINE-PRESERVING (comment lines become
+#                        empty lines): grep -n extraction legs keep
+#                        raw-file line numbers. Loudness is shape-
+#                        dependent (round a A1): single-file presence
+#                        fails loud on a missing file (sed's own error
+#                        surfaces, downstream grep sees empty input and
+#                        reds); a MULTI-FILE count pin or any
+#                        zero-count pin passes rc-silently on a
+#                        missing operand (the historical sed A B C
+#                        masked identically) -- such pins need their
+#                        own missing-file conjunct when that drift
+#                        matters. A call site may add 2>/dev/null; it
+#                        owns the muting then (pre-existing shape,
+#                        test-install-args).
 #   check_live <desc> <file> <grep-args...>
 #                        pass/fail around grep over the file's LIVE
 #                        lines -- the dominant single-file presence
 #                        shape (#460). The grep flags and pattern pass
 #                        through verbatim (-qF, -Eq, -c, --, …): call
 #                        sites keep their exact matching semantics,
-#                        only the rider moves inside. Multi-file shapes
-#                        stay `check … sh -c 'live_src "$1" "$2" |
-#                        grep …' _ A B` (boundary: one canonical
+#                        only the rider moves inside. Multi-file
+#                        presence stays `live_src "$A" "$B" | grep …`
+#                        or per-file conjunctions; compound shapes
+#                        keep live_src in the PARENT and pass the
+#                        stripped content into the child as an
+#                        argument -- sh -c children never source the
+#                        harness, live_src must not appear inside
+#                        sh -c code (boundary: one canonical
 #                        single-file sugar, no separator parsing).
 #   extract_func <file> <name>
 #                        print a top-level `name() { … }` definition
@@ -146,15 +160,33 @@ live_src() {
     # The strip expression is byte-identical to the historical inline
     # rider; the multi-file loop concatenates so `grep -qF pat` matches
     # if ANY file carries the live construct (presence semantics of
-    # `grep -qF pat A B`); count pins over several files stay per-file
-    # calls -- a concatenation sums them.
+    # `grep -qF pat A B`). A concatenation SUMS per-file counts: a
+    # multi-file count pin asserts on the union; per-file counts need
+    # per-file calls. No-args guard (round a A4): a conversion slip
+    # dropping the file must fail loud, never pass vacuously.
     local _ls_f
+    if [ "$#" -eq 0 ]; then
+        echo "live_src: no files given" >&2
+        return 1
+    fi
     for _ls_f in "$@"; do
         sed 's/^[[:space:]]*#.*$//' "$_ls_f"
     done
 }
 
 check_live() {
+    # Arg-count guards BEFORE any shift (round a A5): dash aborts the
+    # whole suite on `shift 2` overflow (rc 2, no fail row, no summary
+    # gate), and an unbound $2 under set -u kills the 0-arg shape --
+    # both slip shapes must land in a counted FAIL row instead.
+    if [ "$#" -eq 0 ]; then
+        fail "check_live: no arguments given (desc and file required)"
+        return
+    fi
+    if [ "$#" -lt 2 ]; then
+        fail "$1 (check_live: file argument missing)"
+        return
+    fi
     local _cl_desc="$1" _cl_file="$2"
     shift 2
     # Mirror of check's F6 guard: a conversion slip dropping the grep

@@ -204,10 +204,19 @@ stops counting (the survivor trap, #261/#244 g W1). The shapes:
 `live_src "$FILE" | grep …` for pipes, counts and extraction legs;
 `check_live "desc" "$FILE" -qF 'literal'` for the single-file
 presence check; `live_src "$A" "$B" | grep …` for the multi-file
-presence. The helper strips full lines only (`#…` after optional
-leading whitespace — the byte-identical semantics of the historical
-inline rider `sed 's/^[[:space:]]*#.*$//'`, which no longer appears
-inline in the suites; a raw inline rider in a NEW pin is a finding).
+presence (a concatenation sums per-file counts). Stripping an
+extracted BLOCK (extract_func output, a printf-fed variable) keeps
+the INLINE `sed 's/^[[:space:]]*#.*$//'` — live_src is files-only;
+that stdin shape is sanctioned, not a finding. What IS a finding: a
+raw inline rider over a FILE operand in a NEW pin — gated by the
+rider lint (tests/unit/test-rider-lint.sh, rule 1), which matches
+the three historical byte forms with a same-line operand; exotic
+re-spellings (tab after the expression, `sed -e`, a `g` suffix, a
+continuation-line operand) escape the detector and stay the
+reviewer's call. The pre-#460 strict `check … grep … "$SRCVAR"`
+single-file sites (66 measured 2026-11-11) are grandfathered until
+the #460 census wave converts them (record: test-rider-lint.sh
+rule 2).
 The `|| true` rule keeps its per-shape semantics: rc-observed shapes
 omit it (the consumer's rc must be able to fail the check); piped
 shapes (`grep -c … | grep -q "^[N-M]$"`) and extraction-leg pipelines

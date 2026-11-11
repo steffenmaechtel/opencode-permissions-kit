@@ -37,10 +37,12 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/lib/harness.sh"
 
-# Detector: literal index() over the three historical byte forms
-# (single-quoted; double-quoted \$ inside sh -c code; double-quoted
-# plain $). Built from pieces so this suite's own source never
-# contains the contiguous rider bytes.
+# Built from pieces so this suite's own source avoids contiguous
+# rider bytes where it can: p1 is fully piece-built; p2/p3 carry
+# their full prefixes as literals -- both are covered by the
+# self-allowlist below, which skips this whole file by exact
+# basename (the trust boundary is the file, tighter scoping would
+# sweep detector lines).
 _rh_core='s/^[[:space:]]*#.*'
 _rh_p1="sed '"${_rh_core}'$//'"' "
 _rh_p2='sed "s/^[[:space:]]*#.*\$//" '
@@ -48,10 +50,16 @@ _rh_p3='sed "s/^[[:space:]]*#.*$//" '
 
 # _rider_hits <file>: prints "<NR>: <line>" for every file-operand
 # inline rider. Full-comment lines are skipped; an operand start is
-# any next byte except the command terminators (|);& ) and EOL --
-# exactly the stdin/block-strip shapes. awk -v processes backslash
-# escapes in assigned values, so backslashes are doubled on the way
-# in (the \$ byte of the sh -c form survives as \$).
+# any next byte except the command terminators and EOL -- the
+# stdin/block-strip shapes, including output redirection into a
+# file (round a C2: `>` and backtick join the terminator class).
+# awk -v processes backslash escapes in assigned values, so
+# backslashes are doubled on the way in (the \$ byte of the sh -c
+# form survives as \$). KNOWN BOUNDARY (round a C3): the detector
+# is byte-form-exact -- a TAB after the expression, `sed -e`/
+# `--expression` forms, a `g` suffix, or an operand on a
+# continuation line escape rule 1; conventions.md scopes the
+# finding claim accordingly.
 _rh_av() { printf '%s' "$1" | sed 's/\\/\\\\/g'; }
 _rider_hits() {
     awk -v p1="$(_rh_av "$_rh_p1")" -v p2="$(_rh_av "$_rh_p2")" \
@@ -61,15 +69,15 @@ _rider_hits() {
             hit = 0
             if (i = index($0, p1)) {
                 c = substr($0, i + length(p1), 1)
-                if (c != "" && c !~ /[|);&]/) hit = 1
+                if (c != "" && c !~ /[|);&>`]/) hit = 1
             }
             if (!hit && (i = index($0, p2))) {
                 c = substr($0, i + length(p2), 1)
-                if (c != "" && c !~ /[|);&]/) hit = 1
+                if (c != "" && c !~ /[|);&>`]/) hit = 1
             }
             if (!hit && (i = index($0, p3))) {
                 c = substr($0, i + length(p3), 1)
-                if (c != "" && c !~ /[|);&]/) hit = 1
+                if (c != "" && c !~ /[|);&>`]/) hit = 1
             }
             if (hit) printf "%s:%d: %s\n", f, NR, $0
         }
@@ -92,6 +100,8 @@ printf '%s\n' "sh -c 'sed \"s/^[[:space:]]*#.*\$//\" \"\$1\" | grep -qF p' _ \"\
     >"$_cell/dollar.sh"
 printf '%s\n' "_blk=\$(printf '%s\n' \"\$B\" | sed '${_rh_core}\$//')" \
     >"$_cell/stdin.sh"
+printf '%s\n' "_blk=\$(printf '%s\n' \"\$B\" | sed '${_rh_core}\$//' > \"\$cell/o.txt\")" \
+    >"$_cell/stdinredir.sh"
 printf '%s\n' "# doc: sed '${_rh_core}\$//' \"\$F\" | grep -q x" \
     >"$_cell/comment.sh"
 printf '%s\n' 'live_src "$F" | grep -q x' >"$_cell/livesrc.sh"
@@ -104,6 +114,8 @@ _n="$(_rider_hits "$_cell/dollar.sh" | wc -l | tr -d ' ')"
 check "planted double-quoted \$ rider flags (1 hit)" test "$_n" = 1
 _n="$(_rider_hits "$_cell/stdin.sh" | wc -l | tr -d ' ')"
 check "stdin/block strip stays unflagged" test "$_n" = 0
+_n="$(_rider_hits "$_cell/stdinredir.sh" | wc -l | tr -d ' ')"
+check "stdin strip with output redirect stays unflagged (a C2)" test "$_n" = 0
 _n="$(_rider_hits "$_cell/comment.sh" | wc -l | tr -d ' ')"
 check "full-comment rider mention stays unflagged" test "$_n" = 0
 _n="$(_rider_hits "$_cell/livesrc.sh" | wc -l | tr -d ' ')"
