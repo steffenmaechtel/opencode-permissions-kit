@@ -88,10 +88,12 @@ further window — ddev-handover.sh `ddev_handover_root` (:593) calls
 `ddev_handover_project` (:865) / `_back` (:754) — which degrades
 LOUD (plain call under `set -e`, no tolerant arm): the refuse-loud
 direction, deliberately left as is. The X1 fail-closed
-`agent_home_sane` stub routes the 13 gated sites into skip arms
-whose texts name BOTH causes (symlink user-managed, or the gate
-unavailable — #461 b B3): under truncation no operand is a link,
-and the persistent log must not assert one. Accepted cost (#461 c
+`agent_home_sane` stub routes the 13 install-core gated sites —
+plus the tui-plugin.sh twin (:44, reached through
+`tui_plugin_sync_user`): a 14th install-reachable gate, #461 d D1 —
+into skip arms whose texts name BOTH causes (symlink user-managed,
+or the gate unavailable — #461 b B3): under truncation no operand is
+a link, and the persistent log must not assert one. Accepted cost (#461 c
 C3): the amended tui-plugin.sh text also renders in UPDATE runs,
 where update.sh's permissive rc-0 stub means the arm is entered
 only via the REAL gate — the gate-unavailable disjunct is then
