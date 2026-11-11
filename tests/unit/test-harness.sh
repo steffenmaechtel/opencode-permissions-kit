@@ -68,7 +68,7 @@ _meta_cleanup() {
     rm -rf "${_lc_iso:-}" "${_lc_cell:-}" "${_sgi_iso:-}" \
         "${_sgi_scratch:-}" "${_afc_out:-}" "${_afc_cell:-}" \
         "${_a1h_out:-}" "${_a1h_cell:-}" "${_a1h_a:-}" "${_a1h_b:-}" \
-        "${_ef_fix:-}" "${_ls_fix:-}"
+        "${_ef_fix:-}" "${_ls_fix:-}" "${_tc_fix:-}"
     rm -f "${_sgi_out:-}"
 }
 trap _meta_cleanup EXIT INT TERM
@@ -654,6 +654,62 @@ has "no arguments given" "10.14 ... the guard fires before any unset access (A5)
 # numbers. A deletion dialect (`/d`) must go red here.
 arm "_ls=\$(live_src \"$_ls_fix/subject.sh\" | wc -l | tr -d ' '); _raw=\$(wc -l < \"$_ls_fix/subject.sh\" | tr -d ' '); printf 'LINES=%s/%s' \"\$_ls\" \"\$_raw\""
 has "LINES=7/7" "10.15 line-preserving dialect: comment lines become empty lines (A6)"
+
+# --- 11. test_chain (#464): the wrapped make-test chain reader -----------------
+# The one-prerequisite-per-line chain layout is RULE-enforced in the
+# Makefile (layout pin in test-workflows.sh); test_chain is the READER
+# every membership pin uses. Fixture pins pin SHAPE, not the live
+# chain's contents -- suites get added, counts belong to no meta-pin.
+# Sabotage note: delete test_chain from harness.sh -> every 11.x pin
+# goes red.
+_tc_fix="$(mktemp -d)"
+printf '%s\n' \
+    '.PHONY: x' \
+    'test: lint \' \
+    '      test-docs \' \
+    '      test-kit-cli' \
+    '' \
+    '	@echo hi' >"$_tc_fix/wrapped.mk"
+printf '%s\n' \
+    'test: lint test-docs test-kit-cli' \
+    '' \
+    '	@echo hi' >"$_tc_fix/unwrapped.mk"
+printf '%s\n' \
+    '.PHONY: x \' \
+    '    test-docs' \
+    'test: lint' \
+    '' \
+    '	@echo hi' >"$_tc_fix/phony-only.mk"
+
+# 11.1 exact output: head token stripped, one prerequisite per line,
+# recipe line excluded (the span stops at the first TAB line).
+arm "_tc_out=\$(test_chain \"$_tc_fix/wrapped.mk\"); printf 'OUT:%s|END' \"\$_tc_out\""
+rc_is 0 "11.1 test_chain exits 0 on a wrapped chain"
+has "OUT:lint
+test-docs
+test-kit-cli|END" "11.1 wrapped chain: stripped head, one name per line, recipe excluded"
+
+# 11.2 the reader is layout-independent: an unwrapped single-line chain
+# yields the same token stream (membership must not depend on wrapping).
+arm "printf 'OUT:%s|END' \"\$(test_chain \"$_tc_fix/unwrapped.mk\")\""
+has "OUT:lint
+test-docs
+test-kit-cli|END" "11.2 unwrapped chain: same token stream"
+
+# 11.3 the stray-dog discriminator: the name only in a .PHONY
+# continuation must NOT count as chain membership -- this exact slip
+# shipped in the first #464 fix wave and the sabotage run caught it.
+arm "test_chain \"$_tc_fix/phony-only.mk\" | grep -qxF 'test-docs'"
+rc_is 1 "11.3 .PHONY-only name is not chain membership"
+
+# 11.4 guards fail loud (L1): wrong arity and missing file, both before
+# any vacuous empty output can read as a green membership probe.
+arm 'test_chain'
+rc_is 1 "11.4 arity guard: no argument"
+has "test_chain: exactly one Makefile path required" "11.4 arity guard names the contract"
+arm 'test_chain /nonexistent/nowhere.mk'
+rc_is 1 "11.4 missing-file guard"
+has "no such file" "11.4 missing-file guard names the path"
 
 # --- summary gate (independent on purpose -- see header) ------------------------
 echo ""

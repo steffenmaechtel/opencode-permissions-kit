@@ -150,8 +150,11 @@ fi
 # developer's `make test`. Resolves through recipes, not names: the pin
 # maps each suite file to the Makefile target whose recipe executes it
 # (test-parser -> test-jsonc-parser.sh is the one alias) and checks that
-# target's chain membership.
-_chain="$(sed -n 's/^test: //p' "$REPO/Makefile" | tr -s ' ' '\n')"
+# target's chain membership. The chain is wrapped one prerequisite per
+# line since issue #464 -- the awk span reads the whole continuation
+# block (head line + space-indented continuations, up to the first
+# recipe line), never assuming a single physical line.
+_chain="$(test_chain "$REPO/Makefile")"
 _orphans=""
 for _t in "$REPO"/tests/unit/test-*.sh; do
     _base="$(basename "$_t")"
@@ -169,6 +172,35 @@ if [ -z "$_orphans" ]; then
     pass "make test chain: every unit suite runs under make test (recipes resolved)"
 else
     fail "make test chain: suite(s) no chain target executes:$_orphans"
+fi
+
+# Chain layout pin (issue #464): the wrapped prerequisite form is a RULE --
+# .PHONY and test: carry exactly ONE name per physical line, and
+# continuation lines are SPACE-indented (a TAB line is recipe syntax, not
+# a continuation). One-per-line keeps every suite addition a one-line diff
+# and the chain reviewable at a glance; the 975-char single-line test:
+# chain this replaced was neither. The pin fails when a block line carries
+# the wrong count (head: target token + exactly one name; continuation:
+# exactly one name), starts with a TAB, or when a block regresses to an
+# unwrapped single line.
+_layout_bad="$(awk '
+    /^\.PHONY:/ || /^test:/ { _in = 1 }
+    _in {
+        _n = NF
+        if ($0 ~ /\\$/) _n--
+        _want = 1
+        if ($0 ~ /^\.PHONY:/ || $0 ~ /^test:/) _want = 2
+        _bad = 0
+        if (substr($0, 1, 1) == "\t") _bad = 1
+        if (_n != _want) _bad = 1
+        if (_bad) print NR ":" $0
+        if ($0 !~ /\\$/) _in = 0
+    }
+' "$REPO/Makefile")"
+if [ -z "$_layout_bad" ]; then
+    pass "Makefile chain layout: .PHONY and test: keep one prerequisite per line"
+else
+    fail "Makefile chain layout: unwrapped or multi-name lines:$_layout_bad"
 fi
 
 # Behavioral pin of the command-position rule itself (0.0.42e C2): an

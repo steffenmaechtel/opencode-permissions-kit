@@ -202,6 +202,27 @@ check_live() {
     fi
 }
 
+test_chain() {
+    # $1 = Makefile path. Prints the test: prerequisite chain one token
+    # per line, the `test:` head token stripped. The awk span reads the
+    # head line plus the space-indented continuation block up to the
+    # first recipe line -- the wrapped one-prerequisite-per-line chain
+    # layout of issue #464. Callers pin chain membership with
+    # `test_chain ... | grep -qxF <target>`; a bare grep over the raw
+    # Makefile would also match the suite's .PHONY continuation line and
+    # pass without chain membership (the stray-dog class this replaced).
+    if [ "$#" -ne 1 ]; then
+        echo "test_chain: exactly one Makefile path required" >&2
+        return 1
+    fi
+    if [ ! -f "$1" ]; then
+        echo "test_chain: no such file: $1" >&2
+        return 1
+    fi
+    awk '/^test:/{_in=1; sub(/^test:[ \t]*/, ""); if (length($0)) print; next}
+        _in && /^\t/{_in=0} _in{print}' "$1" | tr -d '\n\\' | tr -s ' \t' '\n'
+}
+
 extract_func() {
     # $1 = subject file, $2 = function name. Prints the block; the
     # caller owns the emptiness probe, the eval, and any post-pipeline
