@@ -90,8 +90,8 @@ echo "======================================"
 echo ""
 
 echo "-- sudoers.template structure --"
-check "template keeps DOCKER_HOST + XDG_RUNTIME_DIR + OPENCODE_SERVER_PASSWORD + USERNAME env_keep" \
-    grep -Fq 'env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME"' "$SUDOERS"
+check_live "template keeps DOCKER_HOST + XDG_RUNTIME_DIR + OPENCODE_SERVER_PASSWORD + USERNAME env_keep" "$SUDOERS" \
+    -Fq 'env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME"'
 check "template has NO DDEV_DEBUG env_keep (describe URL transport needs none)" \
     grep_absent -Fq 'DDEV_DEBUG' "$SUDOERS"
 check "template has NO OPENCODE_LAUNCH_CWD env_keep" \
@@ -104,10 +104,10 @@ check "template has NO root-side helper grants (protect-projects/ddev-transactio
     grep_absent -Fq 'protect-projects' "$SUDOERS"
 check "template has NO ddev-transaction grant" \
     grep_absent -Fq 'ddev-transaction' "$SUDOERS"
-check "base (opencode) RunAs for the binary is present" \
-    grep -Eq 'ALL=\(opencode\) NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/opencode \*' "$SUDOERS"
-check "template has the rootless socket-check NOPASSWD rule" \
-    grep -Fq 'ALL=(opencode)  NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/socket-check *' "$SUDOERS"
+check_live "base (opencode) RunAs for the binary is present" "$SUDOERS" \
+    -Eq 'ALL=\(opencode\) NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/opencode \*'
+check_live "template has the rootless socket-check NOPASSWD rule" "$SUDOERS" \
+    -Fq 'ALL=(opencode)  NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/socket-check *'
 
 echo ""
 echo "-- sudoers render --"
@@ -133,83 +133,71 @@ assert_eq "empty backend + requested -> none" "none" "$(resolve_backend '' true 
 
 echo ""
 echo "-- wrapper static wiring --"
-check "wrapper normalizes backends to rootless-or-empty (no docker-group default)" \
-    grep -Fq 'CONTAINER_BACKEND="${CONTAINER_BACKEND:-}"' "$WRAPPER"
-check "wrapper accepts docker-rootless/podman-rootless backends" \
-    grep -Fq 'docker-rootless | podman-rootless' "$WRAPPER"
-check "wrapper exports DOCKER_HOST for rootless" \
-    grep -Fq 'export DOCKER_HOST="$CONTAINER_DOCKER_HOST"' "$WRAPPER"
-check "wrapper warns about unknown/missing backend instead of downgrading" \
-    grep -Fq 'no rootless container backend configured' "$WRAPPER_CORE"
-check "wrapper has podman-CLI path (daemonless, no DOCKER_HOST)" \
-    grep -Fq 'CONTAINER_PODMAN=true' "$WRAPPER_CORE"
-check "wrapper verifies 'command -v podman' for the podman-CLI path" \
-    grep -Fq 'command -v podman' "$WRAPPER_CORE"
-check "wrapper warns when podman-rootless but podman not installed" \
-    grep -Fq "'podman' is not installed" "$WRAPPER_CORE"
+check_live "wrapper normalizes backends to rootless-or-empty (no docker-group default)" "$WRAPPER" \
+    -Fq 'CONTAINER_BACKEND="${CONTAINER_BACKEND:-}"'
+check_live "wrapper accepts docker-rootless/podman-rootless backends" "$WRAPPER" -Fq 'docker-rootless | podman-rootless'
+check_live "wrapper exports DOCKER_HOST for rootless" "$WRAPPER" -Fq 'export DOCKER_HOST="$CONTAINER_DOCKER_HOST"'
+check_live "wrapper warns about unknown/missing backend instead of downgrading" "$WRAPPER_CORE" \
+    -Fq 'no rootless container backend configured'
+check_live "wrapper has podman-CLI path (daemonless, no DOCKER_HOST)" "$WRAPPER_CORE" -Fq 'CONTAINER_PODMAN=true'
+check_live "wrapper verifies 'command -v podman' for the podman-CLI path" "$WRAPPER_CORE" -Fq 'command -v podman'
+check_live "wrapper warns when podman-rootless but podman not installed" "$WRAPPER_CORE" -Fq "'podman' is not installed"
 
 echo ""
 echo "-- wrapper rootless socket probe (socket-check.sh) --"
 SOCKCHECK="$REPO/files/opencode-permissions-kit-lib/bin/socket-check"
 check "socket-check exists" [ -f "$SOCKCHECK" ]
 check "socket-check has shebang" sh -c 'test "$(head -1 "$1")" = "#!/bin/sh"' _ "$SOCKCHECK"
-check "socket-check only does test -S (no command execution)" \
-    grep -Fq '[ -n "$sock" ] && [ -S "$sock" ]' "$SOCKCHECK"
-check "socket-check strips a unix:// prefix" \
-    grep -Fq 'sock="${sock#unix://}"' "$SOCKCHECK"
-check "wrapper has a sock_reachable probe function" \
-    grep -Fq 'sock_reachable()' "$WRAPPER_CORE"
-check "wrapper probes the socket directly first (root/opencode contexts)" \
-    grep -Fq '[ -S "$sock" ] 2>/dev/null && return 0' "$WRAPPER_CORE"
-check "wrapper re-probes as the opencode user via socket-check.sh" \
-    grep -Fq 'sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/socket-check "$sock"' "$WRAPPER_CORE"
-check "docker-rootless branch uses sock_reachable" \
-    grep -Fq 'if sock_reachable "$sock_host"; then' "$WRAPPER_CORE"
-check "podman-rootless socket branch uses sock_reachable" \
-    grep -Fq 'if sock_reachable "$sock_host"; then' "$WRAPPER_CORE"
+check_live "socket-check only does test -S (no command execution)" "$SOCKCHECK" -Fq '[ -n "$sock" ] && [ -S "$sock" ]'
+check_live "socket-check strips a unix:// prefix" "$SOCKCHECK" -Fq 'sock="${sock#unix://}"'
+check_live "wrapper has a sock_reachable probe function" "$WRAPPER_CORE" -Fq 'sock_reachable()'
+check_live "wrapper probes the socket directly first (root/opencode contexts)" "$WRAPPER_CORE" \
+    -Fq '[ -S "$sock" ] 2>/dev/null && return 0'
+check_live "wrapper re-probes as the opencode user via socket-check.sh" "$WRAPPER_CORE" \
+    -Fq 'sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/socket-check "$sock"'
+check_live "docker-rootless branch uses sock_reachable" "$WRAPPER_CORE" -Fq 'if sock_reachable "$sock_host"; then'
+check_live "podman-rootless socket branch uses sock_reachable" "$WRAPPER_CORE" \
+    -Fq 'if sock_reachable "$sock_host"; then'
 
 echo ""
 echo "-- install.sh wiring --"
 # The install.conf stamp heredoc, the backend validation/arm texts and
 # the provisioning call sites live in the phase lib — install-core.sh
 # since #346 wave 3 (fetch-list pins stay on the entry).
-check "install.sh records CONTAINER_BACKEND in install.conf" \
-    grep -Fq 'CONTAINER_BACKEND=$CONTAINER_BACKEND' "$INSTALL_CORE"
-check "install.sh records OPENCODE_DOCKER_HOST in install.conf" \
-    grep -Fq 'OPENCODE_DOCKER_HOST=$OPENCODE_DOCKER_HOST' "$INSTALL_CORE"
-check "install.sh records OPENCODE_PODMAN_SOCKET in install.conf" \
-    grep -Fq 'OPENCODE_PODMAN_SOCKET=$OPENCODE_PODMAN_SOCKET' "$INSTALL_CORE"
-check "install.sh records DDEV_VERSION in install.conf" \
-    grep -Fq 'DDEV_VERSION=$DDEV_VERSION' "$INSTALL_CORE"
-check "install.sh preserves an existing backend on re-install" \
-    grep -Eq 'sed -n '"'"'s/\^CONTAINER_BACKEND=//p'"'"' /etc/opencode-permissions-kit/install.conf' "$INSTALL_CORE"
-check "install.sh validates --container-backend (rootless only)" \
-    grep -Fq 'docker-rootless | podman-rootless' "$INSTALL_CORE"
-check "install.sh aborts on provisioning failure (no docker-group fallback)" \
-    grep -Fq 'Container backend provisioning failed' "$INSTALL_CORE"
-check "install.sh fetches socket-check.sh" \
-    grep -Fq 'opencode-permissions-kit-lib/bin/socket-check' "$INSTALL"
+check_live "install.sh records CONTAINER_BACKEND in install.conf" "$INSTALL_CORE" \
+    -Fq 'CONTAINER_BACKEND=$CONTAINER_BACKEND'
+check_live "install.sh records OPENCODE_DOCKER_HOST in install.conf" "$INSTALL_CORE" \
+    -Fq 'OPENCODE_DOCKER_HOST=$OPENCODE_DOCKER_HOST'
+check_live "install.sh records OPENCODE_PODMAN_SOCKET in install.conf" "$INSTALL_CORE" \
+    -Fq 'OPENCODE_PODMAN_SOCKET=$OPENCODE_PODMAN_SOCKET'
+check_live "install.sh records DDEV_VERSION in install.conf" "$INSTALL_CORE" -Fq 'DDEV_VERSION=$DDEV_VERSION'
+check_live "install.sh preserves an existing backend on re-install" "$INSTALL_CORE" \
+    -Eq 'sed -n '"'"'s/\^CONTAINER_BACKEND=//p'"'"' /etc/opencode-permissions-kit/install.conf'
+check_live "install.sh validates --container-backend (rootless only)" "$INSTALL_CORE" \
+    -Fq 'docker-rootless | podman-rootless'
+check_live "install.sh aborts on provisioning failure (no docker-group fallback)" "$INSTALL_CORE" \
+    -Fq 'Container backend provisioning failed'
+check_live "install.sh fetches socket-check.sh" "$INSTALL" -Fq 'opencode-permissions-kit-lib/bin/socket-check'
 check "install.sh deploys socket-check.sh to LIBDIR/bin (lib_deploy manifest)" \
     sh -c 'grep -qF "opencode-permissions-kit-lib/bin/socket-check 755" "$2" \
         && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL_CORE" "$DEPLOYLIB"
-check "install.sh fetches setup-container-backend" \
-    grep -Fq 'opencode-permissions-kit-lib/bin/setup-container-backend' "$INSTALL"
-check "install.sh deploys setup-container-backend to LIBDIR" \
-    grep -Fq '"$LIBDIR/bin/setup-container-backend"' "$INSTALL_CORE"
-check "install.sh records OPENCODE_GROUP=opencode usergroup" \
-    grep -Fq 'OPENCODE_GROUP=$(id -gn "$OPENCODE_USER"' "$INSTALL_CORE"
-check "install.sh adds the developer to the opencode usergroup" \
-    grep -Fq 'usermod -aG "$OPENCODE_GROUP" "$DEFAULT_USER"' "$INSTALL_CORE"
+check_live "install.sh fetches setup-container-backend" "$INSTALL" \
+    -Fq 'opencode-permissions-kit-lib/bin/setup-container-backend'
+check_live "install.sh deploys setup-container-backend to LIBDIR" "$INSTALL_CORE" \
+    -Fq '"$LIBDIR/bin/setup-container-backend"'
+check_live "install.sh records OPENCODE_GROUP=opencode usergroup" "$INSTALL_CORE" \
+    -Fq 'OPENCODE_GROUP=$(id -gn "$OPENCODE_USER"'
+check_live "install.sh adds the developer to the opencode usergroup" "$INSTALL_CORE" \
+    -Fq 'usermod -aG "$OPENCODE_GROUP" "$DEFAULT_USER"'
 
 echo ""
 echo "-- update.sh wiring --"
-check "update.sh KIT_FILES includes socket-check.sh" \
-    grep -Fq 'opencode-permissions-kit-lib/bin/socket-check' "$UPDATE"
+check_live "update.sh KIT_FILES includes socket-check.sh" "$UPDATE" -Fq 'opencode-permissions-kit-lib/bin/socket-check'
 check "update.sh deploys socket-check.sh to LIBDIR/bin (lib_deploy manifest)" \
     sh -c 'grep -qF "opencode-permissions-kit-lib/bin/socket-check 755" "$2" \
         && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE_CORE" "$DEPLOYLIB"
-check "update.sh KIT_FILES includes setup-container-backend" \
-    grep -Fq 'opencode-permissions-kit-lib/bin/setup-container-backend' "$UPDATE"
+check_live "update.sh KIT_FILES includes setup-container-backend" "$UPDATE" \
+    -Fq 'opencode-permissions-kit-lib/bin/setup-container-backend'
 check "update.sh deploys setup-container-backend to LIBDIR (lib_deploy manifest)" \
     sh -c 'grep -qF "opencode-permissions-kit-lib/bin/setup-container-backend 755" "$2" \
         && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE_CORE" "$DEPLOYLIB"
@@ -225,12 +213,15 @@ check "update.sh KIT_FILES has NO ddev shim" \
     sh -c '! grep -Eq "opencode-permissions-kit-lib/bin/ddev([[:space:]]|$)" "$1" && ! grep -Eq "opencode-permissions-kit-lib/bin/ddev([[:space:]]|$)" "$2"' _ "$UPDATE" "$UPDATE_CORE"
 check "update.sh KIT_FILES has NO git hooks" \
     sh -c '! grep -Fq "hooks/post-" "$1" && ! grep -Fq "hooks/post-" "$2"' _ "$UPDATE" "$UPDATE_CORE"
-check "update.sh re-stamps OPENCODE_GROUP to the opencode usergroup" \
-    grep -Fq 'echo "OPENCODE_GROUP=$NEW_OPENCODE_GROUP"' "$UPDATE_CORE"
+check_live "update.sh re-stamps OPENCODE_GROUP to the opencode usergroup" "$UPDATE_CORE" \
+    -Fq 'echo "OPENCODE_GROUP=$NEW_OPENCODE_GROUP"'
 check "update.sh strips no legacy keys on re-stamp (cleanup done)" \
     sh -c '! grep -Fq "e '"'"'^WWW_GROUP='"'"'" "$1" && ! grep -Fq "e '"'"'^WWW_GROUP='"'"'" "$2"' _ "$UPDATE" "$UPDATE_CORE"
-check "update.sh comment documents the re-base" \
-    grep -Fq 'OPENCODE_GROUP re-base' "$UPDATE"
+# Inversion (conventions.md "Source-counting pins", the #459 a B3
+# class): the pinned literal IS a full-line comment (update.sh's
+# OPENCODE_GROUP re-base note at its head) -- a comment-strip rider
+# would delete the pinned bytes. Bare grep is the sanctioned shape.
+check "update.sh comment documents the re-base" grep -Fq 'OPENCODE_GROUP re-base' "$UPDATE" # rider-inversion (comment-literal pin)
 
 echo ""
 echo "-- OPENCODE_GROUP (legacy WWW_GROUP removed) --"
@@ -246,20 +237,15 @@ check "no remaining WWW_GROUP variable use in install.sh" \
 
 echo ""
 echo "-- config.sh wiring --"
-check "config.sh recognizes container-backend action" \
-    grep -Fq 'container-backend)' "$CONFIG"
-check "config.sh has container_backend_status" \
-    grep -Fq 'container_backend_status()' "$CONFIG"
-check "config.sh has container_backend_apply" \
-    grep -Fq 'container_backend_apply()' "$CONFIG"
-check "config.sh accepts only rootless backends" \
-    grep -Fq 'docker-rootless | podman-rootless' "$CONFIG"
+check_live "config.sh recognizes container-backend action" "$CONFIG" -Fq 'container-backend)'
+check_live "config.sh has container_backend_status" "$CONFIG" -Fq 'container_backend_status()'
+check_live "config.sh has container_backend_apply" "$CONFIG" -Fq 'container_backend_apply()'
+check_live "config.sh accepts only rootless backends" "$CONFIG" -Fq 'docker-rootless | podman-rootless'
 check "config.sh has NO ddev-mode action" \
     grep_absent -Fq 'ddev-mode)' "$CONFIG"
 check "config.sh has NO ddev_mode_apply" \
     grep_absent -Fq 'ddev_mode_apply' "$CONFIG"
-check "config.sh menu has a container backend entry" \
-    grep -Fq 'Switch container backend' "$CONFIG"
+check_live "config.sh menu has a container backend entry" "$CONFIG" -Fq 'Switch container backend'
 
 echo ""
 echo "-- status.sh wiring (section rows live in sh/status-core.sh, #346 wave 1) --"
@@ -286,15 +272,14 @@ if live_src "$STATUS_CORE" | grep -Fq -- 'docker-rootless)' &&
 else
     fail "status.sh backend dispatch: rootless case arms"
 fi
-check "status.sh reports socket reachability" \
-    grep -Fq 'NOT reachable' "$STATUS_CORE"
+check_live "status.sh reports socket reachability" "$STATUS_CORE" -Fq 'NOT reachable'
 check "status.sh has no migration-stamp section (legacy cleanup)" \
     sh -c '! grep -Fq "HARD_DENY_REMOVED" "$1" && ! grep -Fq "HARD_DENY_REMOVED" "$2"' _ "$STATUS" "$STATUS_CORE"
 
 echo ""
 echo "-- CI wiring (issue #123: exec bits live in the git index) --"
 git_mode() { git -C "$REPO" ls-files -s -- "$1" | cut -d' ' -f1; }
-check "test-unit.yml runs this test" grep -Fq 'Run container backend tests' "$TEST_YML"
+check_live "test-unit.yml runs this test" "$TEST_YML" -Fq 'Run container backend tests'
 check "setup-container-backend is executed by path (git 100755)" \
     [ "$(git_mode files/opencode-permissions-kit-lib/bin/setup-container-backend)" = "100755" ]
 check "socket-check is executed by path (git 100755)" \
@@ -307,17 +292,17 @@ echo "-- setup-container-backend structure --"
 SETUP="$REPO/files/opencode-permissions-kit-lib/bin/setup-container-backend"
 check "setup-container-backend exists" [ -f "$SETUP" ]
 check "setup has shebang" sh -c 'test "$(head -1 "$1")" = "#!/bin/sh"' _ "$SETUP"
-check "setup accepts rootless backends" grep -Fq 'docker-rootless | podman-rootless' "$SETUP"
-check "setup installs uidmap + dbus" grep -Fq 'apt_install uidmap' "$SETUP"
-check "setup auto-allocates subuid/subgid" grep -Fq 'allocate_subuid_subgid' "$SETUP"
-check "setup allocates non-overlapping range" grep -Fq 'allocate_range' "$SETUP"
-check "setup enables linger for docker-rootless" grep -Fq 'enable_linger' "$SETUP"
-check "setup runs dockerd-rootless-setuptool.sh as opencode" grep -Fq 'dockerd-rootless-setuptool.sh' "$SETUP"
-check "setup installs podman for podman-rootless" grep -Fq 'apt_install uidmap dbus-user-session podman' "$SETUP"
-check "setup adds Docker apt repo when docker-ce-rootless-extras missing" grep -Fq 'get.docker.com' "$SETUP"
-check "setup prints OPENCODE_DOCKER_HOST on stdout" grep -Fq 'echo "OPENCODE_DOCKER_HOST=$SOCK"' "$SETUP"
-check "setup reads opencode user from install.conf" grep -Fq 'OPENCODE_USER="opencode"' "$SETUP"
-check "setup checks systemd for docker-rootless" grep -Fq 'systemctl --user is-active dbus' "$SETUP"
+check_live "setup accepts rootless backends" "$SETUP" -Fq 'docker-rootless | podman-rootless'
+check_live "setup installs uidmap + dbus" "$SETUP" -Fq 'apt_install uidmap'
+check_live "setup auto-allocates subuid/subgid" "$SETUP" -Fq 'allocate_subuid_subgid'
+check_live "setup allocates non-overlapping range" "$SETUP" -Fq 'allocate_range'
+check_live "setup enables linger for docker-rootless" "$SETUP" -Fq 'enable_linger'
+check_live "setup runs dockerd-rootless-setuptool.sh as opencode" "$SETUP" -Fq 'dockerd-rootless-setuptool.sh'
+check_live "setup installs podman for podman-rootless" "$SETUP" -Fq 'apt_install uidmap dbus-user-session podman'
+check_live "setup adds Docker apt repo when docker-ce-rootless-extras missing" "$SETUP" -Fq 'get.docker.com'
+check_live "setup prints OPENCODE_DOCKER_HOST on stdout" "$SETUP" -Fq 'echo "OPENCODE_DOCKER_HOST=$SOCK"'
+check_live "setup reads opencode user from install.conf" "$SETUP" -Fq 'OPENCODE_USER="opencode"'
+check_live "setup checks systemd for docker-rootless" "$SETUP" -Fq 'systemctl --user is-active dbus'
 
 echo ""
 echo "-- late pins (arg no-op, daemon-start rc) --"
@@ -483,8 +468,8 @@ fi
 # prints for the caller (the wrapper re-probes every session start).
 # Exact count (d W4): capture + default + three gate/print sites = 5 —
 # a floor pin would survive deletion of the capture mechanism itself.
-check "failed daemon start warns instead of ready (pr-00263 a F13)" \
-    grep -Fq 'daemon start FAILED (rc=$_dc_start_rc)' "$SETUP"
+check_live "failed daemon start warns instead of ready (pr-00263 a F13)" "$SETUP" \
+    -Fq 'daemon start FAILED (rc=$_dc_start_rc)'
 # Comment-strip rider (#261, the #244 g W1 class — sweep find beyond the
 # issue list): a commented-out observation site stops counting.
 _dcsrc_n="$(live_src "$SETUP" | grep -c "_dc_start_rc" || true)"

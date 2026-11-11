@@ -257,8 +257,7 @@ check "dev-owned flag: real config.yaml gets the flag" \
     grep -q 'disable_settings_management: true' "$WORK/flagproj2/.ddev/config.yaml"
 # 0.0.39h F13: the exec-time recheck skip is ANNOUNCED (stderr note), not
 # silent like a plain failure.
-check "dev-owned flag: exec-time recheck skip is announced" \
-    grep -q 'changed to a symlink mid-write' "$HANDOVER"
+check_live "dev-owned flag: exec-time recheck skip is announced" "$HANDOVER" -q 'changed to a symlink mid-write'
 
 # --- 2c/2d. ddev_handover_root scan loop (0.0.39h F9 — S2's core had no
 # behavioral coverage): the .ddev tree reaches chown -R AND chmod -R, and
@@ -466,20 +465,20 @@ check "ensure_local_file: no empty file deployed" test ! -e "$WORK/fr/empty.txt"
 
 check "C5: install.conf stamp written via temp + mv" \
     sh -c 'grep -qF "_INSTALL_CONF_TMP=" "$1" && grep -qF "mv -f \"\$_INSTALL_CONF_TMP\"" "$1"' _ "$INSTALL_CORE"
-check "wiring: install.sh fetch list carries staged-write.sh" \
-    grep -qF 'opencode-permissions-kit-lib/sh/staged-write.sh \' "$INSTALL"
+check_live "wiring: install.sh fetch list carries staged-write.sh" "$INSTALL" \
+    -qF 'opencode-permissions-kit-lib/sh/staged-write.sh \'
 check "wiring: install.sh deploys staged-write.sh (lib_deploy manifest)" \
     sh -c 'grep -qF "opencode-permissions-kit-lib/sh/staged-write.sh 644" "$2" \
         && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL_CORE" "$DEPLOYLIB"
-check "wiring: update.sh KIT_FILES carries staged-write.sh" \
-    grep -qF 'opencode-permissions-kit-lib/sh/staged-write.sh \' "$UPDATE"
+check_live "wiring: update.sh KIT_FILES carries staged-write.sh" "$UPDATE" \
+    -qF 'opencode-permissions-kit-lib/sh/staged-write.sh \'
 check "wiring: update.sh deploys staged-write.sh (lib_deploy manifest)" \
     sh -c 'grep -qF "opencode-permissions-kit-lib/sh/staged-write.sh 644" "$2" \
         && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE_CORE" "$DEPLOYLIB"
-check "wiring: config.sh sources staged-write.sh" \
-    grep -qF 'for cand in "$SCRIPT_DIR/../sh/staged-write.sh" "$LIBDIR/sh/staged-write.sh"' "$CONFIG"
-check "wiring: update.sh tui.json write goes through staged_write" \
-    grep -qF 'staged_write 664 "$OPENCODE_USER:$NEW_OPENCODE_GROUP" "$LIBDIR/tui/tui.json"' "$UPDATE_CORE"
+check_live "wiring: config.sh sources staged-write.sh" "$CONFIG" \
+    -qF 'for cand in "$SCRIPT_DIR/../sh/staged-write.sh" "$LIBDIR/sh/staged-write.sh"'
+check_live "wiring: update.sh tui.json write goes through staged_write" "$UPDATE_CORE" \
+    -qF 'staged_write 664 "$OPENCODE_USER:$NEW_OPENCODE_GROUP" "$LIBDIR/tui/tui.json"'
 # Comment-strip riders (#261, the #244 g W1 class) on the range counts:
 # commented-out lines stop counting; full-line comments only (#244 h W6
 # residual). Guarded counts (#260): the || true sits INSIDE the
@@ -507,8 +506,7 @@ OPK="$REPO/files/opencode-permissions-kit-lib/bin/opk"
 HOCORE_SW="$REPO/files/opencode-permissions-kit-lib/sh/handover-core.sh"
 check "0.0.39h F10: opk handover refuses symlinked operands + rechecks between the ops" \
     sh -c 'grep -qF "[ -L \"\$_ho_a\" ]" "$1" && grep -qF "[ ! -L \"\$_ho_a\" ]" "$1"' _ "$HOCORE_SW"
-check "0.0.39i F4: opk handover --dry-run previews the symlink refuse" \
-    grep -qF "would refuse" "$HOCORE_SW"
+check_live "0.0.39i F4: opk handover --dry-run previews the symlink refuse" "$HOCORE_SW" -qF "would refuse"
 check "0.0.39h F12: no 1;33 color definition remains repo-wide (files/)" \
     sh -c '! grep -rq "1;33" "$1"' _ "$REPO/files"
 
@@ -586,8 +584,8 @@ check "gates: config.sh git_config_apply chain gate" \
 check "gates: uninstall.sh plugin-removal chain gate" \
     sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$_un_dir\"" "$1"' _ \
     "$REPO/files/opencode-permissions-kit-lib/sh/uninstall-core.sh"
-check "0.0.39h F3: staged-write.sh refuses a directory destination" \
-    grep -qF 'destination '"'"'$_sw_dst'"'"' is a directory' "$STAGEDWRITE"
+check_live "0.0.39h F3: staged-write.sh refuses a directory destination" "$STAGEDWRITE" \
+    -qF 'destination '"'"'$_sw_dst'"'"' is a directory'
 
 # --- summary -----------------------------------------------------------------------
 

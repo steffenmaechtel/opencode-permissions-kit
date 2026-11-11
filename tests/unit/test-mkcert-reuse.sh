@@ -47,16 +47,21 @@ check "status.sh passes sh -n" sh -n "$STATUS"
 # cover BOTH files).
 inst_win=$(line_of "$INSTALL_CORE" '/mnt/c/Users/*/AppData/Local/mkcert')
 inst_linux=$(line_of "$INSTALL_CORE" '$DEV_HOME/.local/share/mkcert/rootCA.pem')
-check "install.sh scans /mnt/c/Users profiles directly (glob)" \
-    sh -c "grep -qF '/mnt/c/Users/*/AppData/Local/mkcert' \"\$1\"" _ "$INSTALL_CORE"
+# Comment-strip riders (#460 census, conventions.md "Source-counting
+# pins"): presence legs ride live_src/check_live -- commented-out call
+# sites stop counting. The absence legs below (powershell.exe, cmd.exe,
+# legacy CA provisioning) stay un-ridden by design: a commented-out
+# forbidden line SHOULD keep counting there.
+check_live "install.sh scans /mnt/c/Users profiles directly (glob)" \
+    "$INSTALL_CORE" -qF '/mnt/c/Users/*/AppData/Local/mkcert'
 check "install.sh no longer invokes powershell.exe" \
     sh -c "! grep -q 'powershell.exe -NoProfile' \"\$1\" && ! grep -q 'powershell.exe -NoProfile' \"\$2\"" _ "$INSTALL" "$INSTALL_CORE"
 check "install.sh no longer invokes cmd.exe" \
     sh -c "! grep -q 'cmd.exe /c' \"\$1\" && ! grep -q 'cmd.exe /c' \"\$2\"" _ "$INSTALL" "$INSTALL_CORE"
-check "install.sh requires the CA key too (signing needs it)" \
-    sh -c "grep -qF '\"\$wca/rootCA-key.pem\"' \"\$1\"" _ "$INSTALL_CORE"
-check "install.sh keeps the developer-Linux CAROOT fallback" \
-    sh -c "grep -qF '\$DEV_HOME/.local/share/mkcert/rootCA.pem' \"\$1\"" _ "$INSTALL_CORE"
+check_live "install.sh requires the CA key too (signing needs it)" \
+    "$INSTALL_CORE" -qF '"$wca/rootCA-key.pem"'
+check_live "install.sh keeps the developer-Linux CAROOT fallback" \
+    "$INSTALL_CORE" -qF '$DEV_HOME/.local/share/mkcert/rootCA.pem'
 check "install.sh: Windows scan comes before the Linux fallback" \
     test -n "$inst_win" -a -n "$inst_linux" -a "$inst_win" -lt "$inst_linux"
 
@@ -69,14 +74,16 @@ check "update.sh has no CA provisioning left (legacy cleanup)" \
     sh -c "! grep -qF '/mnt/c/Users/*/AppData/Local/mkcert' \"\$1\" && ! grep -qF '/mnt/c/Users/*/AppData/Local/mkcert' \"\$2\"" _ "$UPDATE" "$UPDATE_CORE"
 
 # --- status.sh mismatch warning (rows live in sh/status-core.sh, #346 wave 1) --
-check "status.sh compares CA fingerprints" \
-    sh -c "grep -q 'fingerprint -sha256' \"\$1\"" _ "$STATUS_CORE"
-check "status.sh prints a MISMATCH warning" \
-    sh -c "grep -q 'MISMATCH' \"\$1\"" _ "$STATUS_CORE"
-check "status.sh points at the Windows CA source" \
-    sh -c "grep -qF '/mnt/c/Users/*/AppData/Local/mkcert/rootCA.pem' \"\$1\"" _ "$STATUS_CORE"
-check "status.sh names the fix (clear traefik certs + restart)" \
-    sh -c "grep -q 'traefik/certs' \"\$1\" && grep -q 'ddev restart' \"\$1\"" _ "$STATUS_CORE"
+check_live "status.sh compares CA fingerprints" "$STATUS_CORE" -q 'fingerprint -sha256'
+check_live "status.sh prints a MISMATCH warning" "$STATUS_CORE" -q 'MISMATCH'
+check_live "status.sh points at the Windows CA source" \
+    "$STATUS_CORE" -qF '/mnt/c/Users/*/AppData/Local/mkcert/rootCA.pem'
+if live_src "$STATUS_CORE" | grep -q 'traefik/certs' &&
+    live_src "$STATUS_CORE" | grep -q 'ddev restart'; then
+    pass "status.sh names the fix (clear traefik certs + restart)"
+else
+    fail "status.sh names the fix (clear traefik certs + restart)"
+fi
 
 # --- functional: glob + label extraction --------------------------------------
 # Simulate the install.sh scan logic against a fake profile tree (the same

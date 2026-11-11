@@ -70,25 +70,28 @@ check "shadow symlink to kit wrapper: quiet" [ -z "$out" ]
 out=$(run_warn "$TMP/clean-home" "$TMP/bin:/usr/bin:/bin")
 check "PATH resolves to non-wrapper opencode: warns" sh -c 'echo "$1" | grep -q "resolves to"' _ "$out"
 
-check "script is sourceable (uses return, not exit)" \
-    sh -c 'grep -Eq "return 0" "$1" && ! grep -Eq "^[[:space:]]*exit" "$1"' _ "$WARN"
+if live_src "$WARN" | grep -Eq 'return 0' &&
+    ! grep -Eq '^[[:space:]]*exit' "$WARN"; then
+    pass "script is sourceable (uses return, not exit)"
+else
+    fail "script is sourceable (uses return, not exit)"
+fi
 
 echo ""
 echo "-- umask.sh / wrapper wiring --"
-check "umask.sh sources shell-warn.sh" \
-    grep -Fq 'shell-warn.sh' "$UMASK"
-check "wrapper self-checks for shadow binary" \
-    grep -Fq 'self-installed opencode detected' "$WRAPPER_CORE"
-check "wrapper self-checks PATH resolution" \
-    grep -Fq "'opencode' on this PATH resolves to" "$WRAPPER_CORE"
+check_live "umask.sh sources shell-warn.sh" "$UMASK" -Fq 'shell-warn.sh'
+check_live "wrapper self-checks for shadow binary" "$WRAPPER_CORE" -Fq 'self-installed opencode detected'
+check_live "wrapper self-checks PATH resolution" "$WRAPPER_CORE" -Fq "'opencode' on this PATH resolves to"
 
 echo ""
 echo "-- install.sh wiring --"
-check "install.sh fetches shell-warn.sh" \
-    grep -Fq 'opencode-permissions-kit-lib/sh/shell-warn.sh' "$INSTALL"
-check "install.sh deploys shell-warn.sh to LIBDIR (lib_deploy manifest)" \
-    sh -c 'grep -qF "opencode-permissions-kit-lib/sh/shell-warn.sh 644" "$2" \
-        && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL_CORE" "$DEPLOYLIB"
+check_live "install.sh fetches shell-warn.sh" "$INSTALL" -Fq 'opencode-permissions-kit-lib/sh/shell-warn.sh'
+if live_src "$DEPLOYLIB" | grep -qF 'opencode-permissions-kit-lib/sh/shell-warn.sh 644' &&
+    live_src "$INSTALL_CORE" | grep -qF 'lib_deploy "$SCRIPT_DIR" "$LIBDIR"'; then
+    pass "install.sh deploys shell-warn.sh to LIBDIR (lib_deploy manifest)"
+else
+    fail "install.sh deploys shell-warn.sh to LIBDIR (lib_deploy manifest)"
+fi
 # #376 B3 class sweep — install.sh's twin of update.sh's VERSION gate
 # (behavioral, extraction-driven): the streamed/fetched VERSION is
 # remote-mirror content stamped into the root-sourced install.conf; a
@@ -114,14 +117,14 @@ fi
 # 644 by #377 F2 (review #370 a F2): nothing executes them by path (the
 # git index has been 644 all along); the manifest's own "sourced libs
 # 644" rule now applies to them too.
-check "install.sh deploys advisories.sh to LIBDIR (lib_deploy manifest, 644)" \
-    sh -c 'grep -qF "opencode-permissions-kit-lib/sh/advisories.sh 644" "$2"' _ "$INSTALL" "$DEPLOYLIB"
-check "install.sh deploys ui.sh to LIBDIR (lib_deploy manifest, 644)" \
-    sh -c 'grep -qF "opencode-permissions-kit-lib/sh/ui.sh 644" "$2"' _ "$INSTALL" "$DEPLOYLIB"
+check_live "install.sh deploys advisories.sh to LIBDIR (lib_deploy manifest, 644)" \
+    "$DEPLOYLIB" -qF 'opencode-permissions-kit-lib/sh/advisories.sh 644'
+check_live "install.sh deploys ui.sh to LIBDIR (lib_deploy manifest, 644)" \
+    "$DEPLOYLIB" -qF 'opencode-permissions-kit-lib/sh/ui.sh 644'
 # The rc-hook emissions live in do_deploy_phase — install-core.sh since
 # #346 wave 3 (the fetch-list pins above stay on the entry).
-check "install.sh hooks shell-warn.sh into rc files" \
-    grep -Fq 'opencode-permissions-kit/sh/shell-warn.sh' "$INSTALL_CORE"
+check_live "install.sh hooks shell-warn.sh into rc files" "$INSTALL_CORE" \
+    -Fq 'opencode-permissions-kit/sh/shell-warn.sh'
 # #331 b b-1: install.sh's hook emissions have no functional unit
 # renderer (root/sudo deploy phase; e2e covers them with substring
 # greps only). Pin the exact wrap construct on the JOINED source --
@@ -134,12 +137,24 @@ check "install.sh hooks shell-warn.sh into rc files" \
 # The join runs as a PIPE into grep -- the joined view of a ~150 KB
 # script must not travel through argv (the 128 KiB single-argument
 # limit makes the whole check E2BIG, a fail-loud trap).
-check "install.sh shell-warn wrap byte-exact on joined source (splice-seam pin)" \
-    sh -c "sed -e ':a' -e '/\\\\$/N; s/\\\\\\n//; ta' \"\$1\" | grep -qF '\"[ -f /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh ] && . \"\"/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh  # opencode permissions kit\"\" (wrapper bypass warning)\"'" _ "$INSTALL_CORE"
-check "install.sh ddev wrap byte-exact on joined source (splice-seam pin)" \
-    sh -c "sed -e ':a' -e '/\\\\$/N; s/\\\\\\n//; ta' \"\$1\" | grep -qF '\"[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . \"\"/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh  # opencode permissions kit\"\" (ddev always runs as opencode)\"'" _ "$INSTALL_CORE"
-check "install.sh restricts binary to root:group 750 (shared helper)" \
-    sh -c 'grep -Fq "chmod 750 \"\$_sb_bin\"" "$2" && grep -Fq "secure_binary \"\$SYSTEM_BIN\" \"\$BINARY_GROUP\"" "$1"' _ "$INSTALL_CORE" "$SECUREBIN"
+if live_src "$INSTALL_CORE" | sed -e ':a' -e '/\\$/N; s/\\\n//; ta' |
+    grep -qF '"[ -f /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh ] && . ""/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh  # opencode permissions kit"" (wrapper bypass warning)"'; then
+    pass "install.sh shell-warn wrap byte-exact on joined source (splice-seam pin)"
+else
+    fail "install.sh shell-warn wrap byte-exact on joined source (splice-seam pin)"
+fi
+if live_src "$INSTALL_CORE" | sed -e ':a' -e '/\\$/N; s/\\\n//; ta' |
+    grep -qF '"[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . ""/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh  # opencode permissions kit"" (ddev always runs as opencode)"'; then
+    pass "install.sh ddev wrap byte-exact on joined source (splice-seam pin)"
+else
+    fail "install.sh ddev wrap byte-exact on joined source (splice-seam pin)"
+fi
+if live_src "$INSTALL_CORE" | grep -Fq 'secure_binary "$SYSTEM_BIN" "$BINARY_GROUP"' &&
+    live_src "$SECUREBIN" | grep -Fq 'chmod 750 "$_sb_bin"'; then
+    pass "install.sh restricts binary to root:group 750 (shared helper)"
+else
+    fail "install.sh restricts binary to root:group 750 (shared helper)"
+fi
 # absence pin covers BOTH hosts since #346 wave 3 (the phases live in
 # the lib; the entry keeps the definitions and fallbacks)
 check "install.sh never uses world-executable binary mode" \
@@ -153,8 +168,12 @@ check "install.sh never uses world-executable binary mode" \
 # argument, so it counts CALL SITES only (the `command -v` wiring line
 # and the fallback definition don't match) — and -eq, not -ge: adding a
 # fifth site must be a conscious pin update, not a silent pass.
-check "install.sh defines the atomic-copy fallback for a missing lib (#163)" \
-    sh -c 'grep -A1 -F "copy_binary_atomic() {" "$1" | grep -Fq "echo \"error: copy_binary_atomic unavailable"' _ "$INSTALL"
+if live_src "$INSTALL" | grep -A1 -F 'copy_binary_atomic() {' |
+    grep -Fq 'echo "error: copy_binary_atomic unavailable'; then
+    pass "install.sh defines the atomic-copy fallback for a missing lib (#163)"
+else
+    fail "install.sh defines the atomic-copy fallback for a missing lib (#163)"
+fi
 # Comment-strip rider (#261, the #244 g W1 class): commented-out call
 # sites must not count. Full-line comments only (#244 h W6 residual):
 # a trailing comment after a live line still counts. The four call
@@ -180,11 +199,18 @@ check "install.sh no longer sudo-cps directly onto SYSTEM_BIN (#163)" \
 # prefix only; e2e checks existence + content, not mode). The old
 # in-place shape matches neither grep (its chmod orders 644 BEFORE
 # the path), so the combined pin discriminates both axes.
-check "install.sh defines the atomic-file fallback for a missing lib (0.0.49b C1)" \
-    sh -c 'grep -A1 -F "copy_file_atomic() {" "$1" | grep -Fq "echo \"error: copy_file_atomic unavailable"' _ "$INSTALL"
-check "install.sh deploys the umask profile through the atomic file helper at mode 644 (0.0.49b C1, 0.0.49c F2)" \
-    sh -c 'grep -Fq "copy_file_atomic \"\$SCRIPT_DIR/etc/umask.sh\"" "$1" \
-        && grep -Fq "opencode-permissions-kit-umask.sh 644" "$1"' _ "$INSTALL_CORE"
+if live_src "$INSTALL" | grep -A1 -F 'copy_file_atomic() {' |
+    grep -Fq 'echo "error: copy_file_atomic unavailable'; then
+    pass "install.sh defines the atomic-file fallback for a missing lib (0.0.49b C1)"
+else
+    fail "install.sh defines the atomic-file fallback for a missing lib (0.0.49b C1)"
+fi
+if live_src "$INSTALL_CORE" | grep -Fq 'copy_file_atomic "$SCRIPT_DIR/etc/umask.sh"' &&
+    live_src "$INSTALL_CORE" | grep -Fq 'opencode-permissions-kit-umask.sh 644'; then
+    pass "install.sh deploys the umask profile through the atomic file helper at mode 644 (0.0.49b C1, 0.0.49c F2)"
+else
+    fail "install.sh deploys the umask profile through the atomic file helper at mode 644 (0.0.49b C1, 0.0.49c F2)"
+fi
 # 0.0.49c F3: W6's count-pin shape for the new helper — the pattern
 # carries the opening quote, so it counts CALL SITES only (the
 # command -v wiring line and the fallback definition don't match);
@@ -199,20 +225,21 @@ check "install.sh no longer sudo-cps the umask profile in place (0.0.49b C1)" \
 
 echo ""
 echo "-- update.sh wiring --"
-check "update.sh fetches shell-warn.sh" \
-    grep -Fq 'opencode-permissions-kit-lib/sh/shell-warn.sh' "$UPDATE"
-check "update.sh deploys shell-warn.sh to LIBDIR (lib_deploy manifest)" \
-    sh -c 'grep -qF "opencode-permissions-kit-lib/sh/shell-warn.sh 644" "$2" \
-        && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE_CORE" "$DEPLOYLIB"
+check_live "update.sh fetches shell-warn.sh" "$UPDATE" -Fq 'opencode-permissions-kit-lib/sh/shell-warn.sh'
+if live_src "$DEPLOYLIB" | grep -qF 'opencode-permissions-kit-lib/sh/shell-warn.sh 644' &&
+    live_src "$UPDATE_CORE" | grep -qF 'lib_deploy "$FILES_ROOT" "$LIBDIR"'; then
+    pass "update.sh deploys shell-warn.sh to LIBDIR (lib_deploy manifest)"
+else
+    fail "update.sh deploys shell-warn.sh to LIBDIR (lib_deploy manifest)"
+fi
 # #211 b W4: update twins of the advisories/ui mode pins above
 # (755 -> 644 by #377 F2, review #370 a F2 — sourced libs, never
 # executed by path).
-check "update.sh deploys advisories.sh to LIBDIR (lib_deploy manifest, 644)" \
-    sh -c 'grep -qF "opencode-permissions-kit-lib/sh/advisories.sh 644" "$2"' _ "$UPDATE" "$DEPLOYLIB"
-check "update.sh deploys ui.sh to LIBDIR (lib_deploy manifest, 644)" \
-    sh -c 'grep -qF "opencode-permissions-kit-lib/sh/ui.sh 644" "$2"' _ "$UPDATE" "$DEPLOYLIB"
-check "update.sh hooks shell-warn.sh into rc files" \
-    grep -Fq 'opencode-permissions-kit/sh/shell-warn.sh' "$UPDATE_CORE"
+check_live "update.sh deploys advisories.sh to LIBDIR (lib_deploy manifest, 644)" \
+    "$DEPLOYLIB" -qF 'opencode-permissions-kit-lib/sh/advisories.sh 644'
+check_live "update.sh deploys ui.sh to LIBDIR (lib_deploy manifest, 644)" \
+    "$DEPLOYLIB" -qF 'opencode-permissions-kit-lib/sh/ui.sh 644'
+check_live "update.sh hooks shell-warn.sh into rc files" "$UPDATE_CORE" -Fq 'opencode-permissions-kit/sh/shell-warn.sh'
 # 0.0.49b C1 (update twin of the install pins above): the umask
 # re-deploy routes through the atomic file helper, never an in-place
 # sudo cp over the sourced profile. 0.0.49c F2/F3: mode-carrying
@@ -220,19 +247,31 @@ check "update.sh hooks shell-warn.sh into rc files" \
 # The call site and literals moved to sh/update-core.sh with the
 # re-deploy sections (#346 wave 2); the missing-lib fallback stub and
 # the sh/secure-binary.sh sourcing reference stay in update.sh.
-check "update.sh defines the atomic-file fallback for a missing lib (0.0.49b C1)" \
-    sh -c 'grep -A1 -F "copy_file_atomic() {" "$1" | grep -Fq "echo \"error: copy_file_atomic unavailable"' _ "$UPDATE"
-check "update.sh re-deploys the umask profile through the atomic file helper at mode 644 (0.0.49b C1, 0.0.49c F2)" \
-    sh -c 'grep -Fq "copy_file_atomic \"\$FILES_ROOT/etc/umask.sh\"" "$1" \
-        && grep -Fq "opencode-permissions-kit-umask.sh 644" "$1"' _ "$UPDATE_CORE"
+if live_src "$UPDATE" | grep -A1 -F 'copy_file_atomic() {' |
+    grep -Fq 'echo "error: copy_file_atomic unavailable'; then
+    pass "update.sh defines the atomic-file fallback for a missing lib (0.0.49b C1)"
+else
+    fail "update.sh defines the atomic-file fallback for a missing lib (0.0.49b C1)"
+fi
+if live_src "$UPDATE_CORE" | grep -Fq 'copy_file_atomic "$FILES_ROOT/etc/umask.sh"' &&
+    live_src "$UPDATE_CORE" | grep -Fq 'opencode-permissions-kit-umask.sh 644'; then
+    pass "update.sh re-deploys the umask profile through the atomic file helper at mode 644 (0.0.49b C1, 0.0.49c F2)"
+else
+    fail "update.sh re-deploys the umask profile through the atomic file helper at mode 644 (0.0.49b C1, 0.0.49c F2)"
+fi
 _cfa_u_n="$(live_src "$UPDATE_CORE" | grep -cF 'copy_file_atomic "' || true)"
 check "update.sh routes exactly one deploy through copy_file_atomic (0.0.49c F3; deploy sites: $_cfa_u_n of 1)" \
     [ "$_cfa_u_n" -eq 1 ]
 check "update.sh no longer sudo-cps the umask profile in place (0.0.49b C1)" \
     sh -c '! grep -Fq "sudo cp \"\$FILES_ROOT/etc/umask.sh\" /etc/profile.d" "$1" \
         && ! grep -Fq "sudo cp \"\$FILES_ROOT/etc/umask.sh\" /etc/profile.d" "$2"' _ "$UPDATE" "$UPDATE_CORE"
-check "update.sh re-asserts binary 750 (shared helper)" \
-    sh -c 'grep -Fq "secure_binary \"\$SYSTEM_BIN\" \"\$BINARY_GROUP\"" "$1" && grep -Fq "chmod 750 \"\$_sb_bin\"" "$2" && grep -Fq "sh/secure-binary.sh" "$3"' _ "$UPDATE_CORE" "$SECUREBIN" "$UPDATE"
+if live_src "$UPDATE_CORE" | grep -Fq 'secure_binary "$SYSTEM_BIN" "$BINARY_GROUP"' &&
+    live_src "$SECUREBIN" | grep -Fq 'chmod 750 "$_sb_bin"' &&
+    live_src "$UPDATE" | grep -Fq 'sh/secure-binary.sh'; then
+    pass "update.sh re-asserts binary 750 (shared helper)"
+else
+    fail "update.sh re-asserts binary 750 (shared helper)"
+fi
 check "update.sh never uses world-executable binary mode" \
     sh -c '! grep -Fq "chmod 755 \"\$SYSTEM_BIN\"" "$1" \
         && ! grep -Fq "chmod 755 \"\$SYSTEM_BIN\"" "$2"' _ "$UPDATE" "$UPDATE_CORE"
@@ -244,7 +283,6 @@ echo "-- CI wiring (issue #123: exec bits live in the git index) --"
 # deploy manifest re-asserts its LIBDIR mode on every install/update.
 check "shell-warn.sh is a sourced lib (git 100644, not executed by path)" \
     [ "$(git -C "$REPO" ls-files -s -- files/opencode-permissions-kit-lib/sh/shell-warn.sh | awk '{print $1}')" = "100644" ]
-check "test-unit.yml runs test-bypass-guard.sh" \
-    grep -Fq './tests/unit/test-bypass-guard.sh' "$TEST_YML"
+check_live "test-unit.yml runs test-bypass-guard.sh" "$TEST_YML" -Fq './tests/unit/test-bypass-guard.sh'
 
 suite_done "wrapper-bypass guard tests"
