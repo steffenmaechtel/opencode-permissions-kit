@@ -229,8 +229,9 @@ deletes live content — a docs reorg that leaves the pinned literal
 only in heading lines false-alarms a ridden pin, and extraction legs
 over markdown (a `sed -n '/^## …/,/^## /p'` span) use headings as
 their anchors, which riding would delete. The canonical docs-pin
-shape is therefore the raw un-ridden grep (`check "desc" grep -qF
-'literal' "$MD"`, if-form pipes likewise); a docs-presence sugar
+shape is therefore the raw un-ridden grep (`check "desc" grep -qF --
+'literal' "$MD"` — the `--` guards dash-leading flag literals, the
+common docs-pin class; if-form pipes likewise); a docs-presence sugar
 (`check_raw`/`raw_src`) enters the harness at the third
 strict-shape site per the rule of three — one exists today
 (test-update-flags.sh's cli.md `--only-binary` pin, un-ridden by
