@@ -400,7 +400,7 @@ fi
 # its scratch already deleted). The backup dir is deliberately NOT in the
 # trap (recovery material).
 if live_src "$INSTALL" | grep -qF 'trap cleanup EXIT' &&
-    grep -qF "trap 'cleanup; exit 1' INT TERM" "$INSTALL" &&
+    live_src "$INSTALL" | grep -qF "trap 'cleanup; exit 1' INT TERM" &&
     live_src "$INSTALL" | grep -qF '_FETCH_TREE="$base"'; then
     pass "install.sh traps EXIT + exiting INT/TERM and registers the fetch tree for cleanup"
 else

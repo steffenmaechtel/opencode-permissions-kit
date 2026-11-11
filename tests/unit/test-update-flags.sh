@@ -1528,7 +1528,10 @@ fi
 # pre_update_redeploy_xdg_shim helper) satisfied the order proof.
 # Whole-token equality in awk closes that window (and avoids the
 # delimiter-sharing trap of space-anchored case patterns on
-# single-space-separated tokens).
+# single-space-separated tokens). First-occurrence semantics: a and b
+# take only the FIRST position of each token (review a Q6, #468) — a
+# reordered list with a later duplicate now fails loud where the old
+# prefix match passed it.
 _pg_list="$(extract_func "$UPDATE" update_pairing_guard | sed 's/^[[:space:]]*#.*$//' | tr -d '\\' | tr -s '[:space:]' ' ')"
 _pg_a="$(printf '%s\n' "$_pg_list" | awk '{
     a = 0; b = 0

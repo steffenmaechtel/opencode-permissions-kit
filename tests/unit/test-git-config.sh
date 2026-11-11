@@ -311,7 +311,7 @@ fi
 # _oc_install_agent_config fix's same-shape sibling — the L2 sweep found
 # it); the success leg falls through to the toggle rows below.
 if live_src "$CONFIG" | grep -qF '_gca_rc=$?' &&
-    grep -A2 -F '_gca_rc=$?' "$CONFIG" | grep -qF 'return "$_gca_rc"'; then
+    live_src "$CONFIG" | grep -A2 -F '_gca_rc=$?' | grep -qF 'return "$_gca_rc"'; then
     pass "config.sh: git-config apply propagates staged_write rc (#371 A4R twin)"
 else
     fail "config.sh: git-config apply still masks staged_write rc (#371 A4R twin)"

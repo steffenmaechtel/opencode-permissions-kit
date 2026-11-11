@@ -275,7 +275,7 @@ _un_bad="$(grep -e '/home/\$DEFAULT_USER' -e '/home/\${DEFAULT_USER' "$UNINSTALL
     grep -v '^[[:space:]]*#' |
     grep -v '|| [[:alnum:]_]\{1,\}="/home/\$DEFAULT_USER"$' |
     grep -v '[[:alnum:]_]\{1,\}="\${[[:alnum:]_]\{1,\}:-/home/\${DEFAULT_USER:-\$USER}}"$' || true)"
-if grep -qF '_un_dev_home="$(getent passwd "$DEFAULT_USER" 2>/dev/null | cut -d: -f6 || true)"' "$UNINSTALL_CORE" &&
+if live_src "$UNINSTALL_CORE" | grep -qF '_un_dev_home="$(getent passwd "$DEFAULT_USER" 2>/dev/null | cut -d: -f6 || true)"' &&
     live_src "$UNINSTALL_CORE" | grep -qF '"$_un_dev_home/.config/opencode"' &&
     [ -z "$_un_bad" ]; then
     pass "uninstall.sh resolves the developer home via getent for the cleanup loop"

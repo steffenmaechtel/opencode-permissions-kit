@@ -215,7 +215,8 @@ re-spellings (tab after the expression, `sed -e`, a `g` suffix, a
 continuation-line operand) escape the detector and stay the
 reviewer's call. The strict `check "desc" grep … "$SRCVAR"`
 single-file presence shape is GATED (rule 2, converted by the #460
-census wave: 86 sites to check_live, one to the inversion below):
+census wave: 85 sites to check_live, one to the inversion below -- 86
+total):
 registration derives from the suite's assignments — a variable whose
 value references the repo/shipped tree (`$REPO/`, `$FILES/`,
 `$SCRIPT_DIR/../../`, `$SCRIPT_DIR/../sh/`, `../e2e/`, `.github/`)
@@ -240,7 +241,10 @@ unmatchable — such a site (the documented-disposition marker pin
 `'#428 disposition'` in `test-install-core.sh`) carries an in-place
 annotation naming the inversion instead of the rider (#459 a B3);
 the rider lint's rule 2 honors the `# rider-inversion` marker as
-that exemption.
+that exemption. New inversion sites are a registered exception, not a
+free pass: the rider lint asserts the exact trailing-marker count
+across the suites (the inversion tripwire, review a X3) -- a new
+marker fails the lint until the diff documents the site here.
 Full-line strip only (#244 h W6 residual: trailing comments after
 live lines still count). Precedent: `test-install-args.sh` (v2 URL,
 the canonical shape) and the #261 rider pin in `test-project-paths.sh`;

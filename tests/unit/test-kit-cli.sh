@@ -180,8 +180,14 @@ assert_eq "uninstall passes flags" "uninstall:euid=$(id -u):args=--dry-run" "$ou
 check_live "openchamber-secure dispatch exists" "$KIT" -q '    openchamber-secure)'
 check_live "openchamber-secure auto-elevates with flags intact" "$OCCORE" \
     -qF 'exec sudo sh "$LIBDIR/bin/opk" openchamber-secure "$@"'
-grep -qF 'mv -f "$_ocp_tmp" /etc/openchamber/policy.json' "$OCCORE" &&
-    check "openchamber-secure writes the pin (atomic) + records the opt-in" grep -qF 'mv -f "$_ocp_tmp" /etc/openchamber/policy.json' "$OCCORE" grep -qF 'OPENCHAMBER_POLICY=yes' "$OCCORE"
+# review a S1 (#468): this compound was doubly broken -- the leading
+# raw grep duplicated the first half and the trailing OPENCHAMBER grep
+# was dead operand bytes (`-q` exits before it), so "records the
+# opt-in" was never asserted. Both halves are ridden pins now.
+check_live "openchamber-secure writes the policy pin (atomic)" "$OCCORE" \
+    -qF 'mv -f "$_ocp_tmp" /etc/openchamber/policy.json'
+check_live "openchamber-secure records the policy opt-in" "$OCCORE" \
+    -qF 'OPENCHAMBER_POLICY=yes'
 # 0.0.47a F1: replacing divergent policy content is announced, never silent
 check_live "openchamber-secure announces replacing divergent content (F1)" "$OCCORE" \
     -qF 'diverges from the kit pin — replacing it'

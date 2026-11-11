@@ -712,7 +712,9 @@ fi
 # Inversion (conventions.md "Source-counting pins", the #459 a B3
 # class): the pinned literal IS a full-line comment (status-core.sh's
 # parity note) -- a rider would delete the pinned bytes. Bare grep is
-# the sanctioned shape. # rider-inversion (comment-literal pin)
+# the sanctioned shape. (No in-place marker here: this pin is an
+# if-form, not a rule-2 check shape -- the marker would be decorative;
+# review a Q7, #468.)
 if grep -qF 'BOUNDED pattern as the wrapper' "$STATUS_CORE"; then
     pass "the probe comment states the bounded parity truthfully"
 else
@@ -1142,7 +1144,7 @@ fi
 # checkout-first lookup).
 if live_src "$STATUS" | grep -qF 'UI_LIB="$ST_CALL_DIR/../sh/ui.sh"' &&
     live_src "$STATUS" | grep -qF 'GIT_CHECK_LIB="$ST_CALL_DIR/../sh/git-check.sh"' &&
-    grep -qF 'ST_CALL_DIR="$(dirname "$(readlink -f "$0" 2>/dev/null || printf '"'"'%s'"'"' "$0")")"' "$STATUS"; then
+    live_src "$STATUS" | grep -qF 'ST_CALL_DIR="$(dirname "$(readlink -f "$0" 2>/dev/null || printf '"'"'%s'"'"' "$0")")"'; then
     pass "status.sh resolves ui.sh/git-check.sh checkout-first"
 else
     fail "status.sh resolves ui.sh/git-check.sh deployed-first (pre-#158 skew)"
@@ -1443,7 +1445,7 @@ _sock_n="$(live_src "$STATUS_CORE" |
 if live_src "$STATUS_CORE" | grep -qF 'ui_kv "opencode version" "unknown — probe failed' &&
     [ "$_sock_n" = "2" ] &&
     live_src "$STATUS_CORE" | grep -qF 'ui_kv "mkcert CA" "unknown — needs root to check' &&
-    grep -qF 'ui_kv "mkcert CA" "missing (optional' "$STATUS_CORE" &&
+    live_src "$STATUS_CORE" | grep -qF 'ui_kv "mkcert CA" "missing (optional' &&
     ! grep -qE 'ui_kv_warn "[^"]*" "unknown — (needs root|probe failed)' "$STATUS" "$STATUS_CORE" &&
     ! grep -qF 'ui_kv_warn "mkcert CA" "missing (optional' "$STATUS" "$STATUS_CORE"; then
     pass "W3: unknown/optional rows are uncounted (plain ui_kv, both socket twins)"

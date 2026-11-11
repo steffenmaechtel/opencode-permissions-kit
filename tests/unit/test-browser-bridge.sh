@@ -352,7 +352,7 @@ else
 fi
 chmod 755 "$WORK/ro-dir"
 OPK="$REPO/files/opencode-permissions-kit-lib/bin/opk"
-if grep -q 'if browser_bridge_write_conf "$LIBDIR"; then' "$OPK" &&
+if live_src "$OPK" | grep -q 'if browser_bridge_write_conf "$LIBDIR"; then' &&
     live_src "$OPK" | grep -q 'could not write the carrier to /etc/wsl.conf'; then
     pass "opk wsl-add-opencode-1-fix reports failure instead of lying (C4)"
 else

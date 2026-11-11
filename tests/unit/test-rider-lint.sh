@@ -29,27 +29,33 @@
 # (values ending .jsonc/.json/.ts/.tsx) register but are EXEMPT: the
 # rider strips `#` lines only, so riding them is an identity no-op
 # until the deferred JSONC `//` decision (#460 rules of engagement)
-# lands in live_src. Exempt otherwise: negated bodies (`! grep` --
-# absence pins stay un-ridden by design) and non-source operands
-# (rendered fixtures, stub logs). Boundary (reviewer scope): a check
-# whose command carries multiple grep legs joined by && -- whether
-# direct or inside an sh -c child -- is a compound shape; the census
-# converted the inventory's compound sites to parent-if blocks with
-# live_src pipes; new compound shapes stay the reviewer's call.
+# lands in live_src. Exempt otherwise: non-source operands (rendered
+# fixtures, stub logs). Negation/absence: an absence leg (`! grep`,
+# if-found-then-fail) stays un-ridden by design, and since the review-a
+# fix (#468) the exemption is LEG-scoped: the detector splits each
+# joined statement quote-aware into legs (on ; | && -- a single & is
+# literal, `2>&1` never splits), a check carried on a &&-continuation
+# leg is gated like a statement-initial one, and a presence leg beside
+# an absence leg is gated like a lone presence pin. Boundary (reviewer
+# scope): compound multi-leg shapes inside if-forms (not check-form)
+# stay the reviewer's call; the census converted the inventory's
+# compound sites to parent-if blocks with live_src pipes.
 #
 # Rule 3 (measured 2026-11-11, deliberately NOT gating): the sh -c
 # indirection of the same strict shape (`check "desc" sh -c 'grep ...
 # \"$1\"' _ "$SRCVAR"`, single positional file, presence-only) -- 336
-# sites tree-wide before the census wave, 304 after it converted the
-# inventory suites' sites (bypass-guard, container-backend, kit-cli
-# fetch twins, mkcert-reuse, staged-write, tui-mode's uninstall pin,
-# update-flags' #164 twins). The residual sits in suites the round-a
-# census never named (ddev-as-opencode, ddev-hosts, ddev-migrate,
-# wsl-exposure, ui, and update-flags' openchamber/#163 blocks). Same
-# survivor trap, same conversion path (check_live for single legs,
-# parent-if + live_src pipes for multi-leg). Recorded as a ratchet:
-# the count must only go DOWN; the wave that drives it to zero flips
-# it to a gating zero-count (the same path rule 2 took).
+# sites tree-wide before the census wave. The wave converted 32
+# inventory-suite sites (bypass-guard 11, mkcert-reuse 7, staged-write
+# 13, update-flags' #164 twin); container-backend, kit-cli and
+# tui-mode converted rule-2 direct shapes only, not sh -c sites
+# (review a Q1). Residual 304 (review a Q2, per suite): ddev-as-
+# opencode 142, update-flags 48, ddev-migrate 40, wsl-exposure 40,
+# ddev-hosts 23, container-backend 3, staged-write 4, kit-cli 2,
+# tui-mode 1, ui 1. Same survivor trap, same conversion path
+# (check_live for single legs, parent-if + live_src pipes for
+# multi-leg). Recorded as a ratchet: the count must only go DOWN; the
+# wave that drives it to zero flips it to a gating zero-count (the
+# same path rule 2 took).
 #
 # Discrimination arms (scratch fixtures, run BEFORE the tree sweep):
 #   - a planted single-quoted file-operand rider -> flagged
@@ -124,7 +130,10 @@ _rider_hits() {
 # && / || / | continuations), collect assignments, derive the
 # registered source variables transitively, then flag.
 _rule2_detect() {
-    awk '
+    # sq carries the single-quote byte in from the shell layer: the awk
+    # program is a single-quoted shell string, so the byte `'` must not
+    # appear inside it (split_legs needs to RECOGNIZE that byte).
+    awk -v sq="'" '
         { lines[NR] = $0 }
         END {
             total = NR
@@ -184,23 +193,77 @@ _rule2_detect() {
             }
             for (k = 1; k <= n; k++) {
                 stmt = S[k]
-                neg = (stmt ~ /! *grep/)
-                # annotation exemption: an in-place `rider-inversion`
-                # marker names the sanctioned bare shape (conventions.md
-                # "Source-counting pins": a comment-literal presence pin)
+                # annotation exemption: statement-level -- an in-place
+                # `rider-inversion` marker names the sanctioned bare shape
+                # (conventions.md "Source-counting pins": a comment-literal
+                # presence pin)
                 inv = (stmt ~ /#[[:space:]]*rider-inversion/)
-                if (stmt ~ /^check "[^"]*"[[:space:]]+grep / && !neg && !inv) {
-                    if (has_reg_operand(stmt)) print "DIRECT\t" L[k] "\t" shorten(stmt)
-                }
-                if (stmt ~ /^check "[^"]*"[[:space:]]+sh -c / && !neg && stmt ~ /_ "\$[A-Za-z_0-9]+"/ &&
-                    stmt !~ /printf "%s" "\$[0-9]"/) {
-                    p1 = index(stmt, "\"$1\"") > 0 || index(stmt, "\\\"\\$1\\\"") > 0
-                    p2 = index(stmt, "\"$2\"") > 0 || index(stmt, "\\\"\\$2\\\"") > 0
-                    p3 = index(stmt, "\"$3\"") > 0 || index(stmt, "\\\"\\$3\\\"") > 0
-                    cnt = (p1 ? 1 : 0) + (p2 ? 1 : 0) + (p3 ? 1 : 0)
-                    if (cnt == 1 && has_reg_bind(stmt)) print "SHC1\t" L[k] "\t" shorten(stmt)
+                # Per-leg evaluation (review a S4/X2, #468): a check carried
+                # on a &&-continuation leg of a compound is gated like a
+                # statement-initial one; an absence leg (`! grep`) is its
+                # own leg and no longer exempts the check leg beside it.
+                # Rule 3 keeps a LEG-level `! grep` exemption: the ratchet
+                # counts presence-only shapes -- absence stays un-ridden
+                # (conventions.md), so a sh -c payload carrying an absence
+                # leg stays uncounted.
+                nl = split_legs(stmt, leg)
+                for (j = 1; j <= nl; j++) {
+                    l = leg[j]; sub(/^[[:space:]]+/, "", l)
+                    if (l ~ /^check "[^"]*"[[:space:]]+grep / && !inv) {
+                        if (has_reg_operand(l)) print "DIRECT\t" L[k] "\t" shorten(stmt)
+                    }
+                    shcneg = (l ~ /! *grep/)
+                    if (l ~ /^check "[^"]*"[[:space:]]+sh -c / && !shcneg && l ~ /_ "\$[A-Za-z_0-9]+"/ &&
+                        l !~ /printf "%s" "\$[0-9]"/) {
+                        p1 = index(l, "\"$1\"") > 0 || index(l, "\\\"\\$1\\\"") > 0
+                        p2 = index(l, "\"$2\"") > 0 || index(l, "\\\"\\$2\\\"") > 0
+                        p3 = index(l, "\"$3\"") > 0 || index(l, "\\\"\\$3\\\"") > 0
+                        cnt = (p1 ? 1 : 0) + (p2 ? 1 : 0) + (p3 ? 1 : 0)
+                        if (cnt == 1 && has_reg_bind(l)) print "SHC1\t" L[k] "\t" shorten(stmt)
+                    }
                 }
             }
+        }
+        # split_legs: quote-aware split of a joined statement into command
+        # legs on `;`, `|` runs and `&&`. A single `&` is literal (`2>&1`
+        # never splits); `||` splits like `|`. Escapes honored: inside
+        # double quotes `\"` is a literal byte, not a terminator; inside
+        # single quotes nothing is escapable -- so BRE `\|` inside a
+        # quoted grep pattern and the `&&` inside an sh -c payload never
+        # split the leg (review a S4, #468).
+        func split_legs(s, out,   n, i, c, q, cur) {
+            n = 0; q = ""; cur = ""
+            for (i = 1; i <= length(s); i++) {
+                c = substr(s, i, 1)
+                if (q != "") {
+                    cur = cur c
+                    if (q == "\"" && c == "\\") {
+                        i++
+                        cur = cur substr(s, i, 1)
+                        continue
+                    }
+                    if (c == q) q = ""
+                    continue
+                }
+                if (c == sq || c == "\"") { q = c; cur = cur c; continue }
+                if (c == ";" || c == "|") {
+                    while (substr(s, i + 1, 1) == "|") i++
+                    n++; out[n] = cur; cur = ""
+                    continue
+                }
+                if (c == "&") {
+                    if (substr(s, i + 1, 1) == "&") {
+                        while (substr(s, i + 1, 1) == "&") i++
+                        n++; out[n] = cur; cur = ""
+                        continue
+                    }
+                    cur = cur c
+                    continue
+                }
+                cur = cur c
+            }
+            n++; out[n] = cur
+            return n
         }
         # Static regex operands ONLY: a regex constant used as an
         # expression (a ternary branch) evaluates as $0 ~ /re/ -- 0 or 1
@@ -277,29 +340,35 @@ printf '%s\n' \
     'check "direct over registered" grep -qF pat "$SRC"' \
     'check "direct over fixture stays" grep -qF pat "$FIX"' \
     'check "direct inversion-annotated stays" grep -qF pat "$SRC" # rider-inversion (comment-literal pin)' \
-    'check "direct negated stays" grep -qF pat "$SRC" && ! grep -qF nope "$SRC"' \
+    'check "direct beside absence leg flags" grep -qF pat "$SRC" && ! grep -qF nope "$SRC"' \
     'check "direct over slash-family stays" grep -qF pat "$TS"' \
+    'grep -qF pre "$SRC" && check "joined direct flags" grep -qF pat "$SRC"' \
     'check "shc over registered" sh -c "grep -qF pat \"\$1\"" _ "$SRC"' \
+    'check "shc absence stays uncounted" sh -c "! grep -qF nope \"\$1\"" _ "$SRC"' \
     'check "direct chained var flags" grep -qF pat "$CHK"' \
     'check_live "ridden stays" "$SRC" -qF pat' \
     >"$_cell/rule2.sh"
 
 _n="$(_rule2_detect "$_cell/rule2.sh" | grep -c DIRECT)"
-check "planted direct strict shapes flag (2 hits: direct + chained)" test "$_n" = 2
+check "planted direct strict shapes flag (4: direct, absence-beside, joined, chained)" test "$_n" = 4
 _n="$(_rule2_detect "$_cell/rule2.sh" | grep DIRECT | grep -c 'direct over registered')"
 check "the direct-over-registered arm is one of them" test "$_n" = 1
 _n="$(_rule2_detect "$_cell/rule2.sh" | grep DIRECT | grep -c 'inversion-annotated')"
 check "inversion-annotated site stays unflagged (comment-literal pin)" test "$_n" = 0
 _n="$(_rule2_detect "$_cell/rule2.sh" | grep DIRECT | grep -c 'fixture')"
 check "direct over a fixture var stays unflagged" test "$_n" = 0
-_n="$(_rule2_detect "$_cell/rule2.sh" | grep DIRECT | grep -c 'negated')"
-check "negated direct body stays unflagged (absence legs)" test "$_n" = 0
+_n="$(_rule2_detect "$_cell/rule2.sh" | grep DIRECT | grep -c 'absence leg')"
+check "presence leg beside an absence leg flags (review a X2, #468)" test "$_n" = 1
+_n="$(_rule2_detect "$_cell/rule2.sh" | grep DIRECT | grep -c 'joined direct')"
+check "&&-joined check flags (review a S4, #468)" test "$_n" = 1
 _n="$(_rule2_detect "$_cell/rule2.sh" | grep DIRECT | grep -c 'slash-family')"
 check "direct over slash-family source stays unflagged (// deferred)" test "$_n" = 0
 _n="$(_rule2_detect "$_cell/rule2.sh" | grep -c 'chained')"
 check "chained registration flags (transitive derivation)" test "$_n" = 1
 _n="$(_rule2_detect "$_cell/rule2.sh" | grep -c SHC1)"
 check "planted sh -c indirection shape counts (rule 3)" test "$_n" = 1
+_n="$(_rule2_detect "$_cell/rule2.sh" | grep SHC1 | grep -c 'shc absence')"
+check "sh -c payload with an absence leg stays uncounted (presence-only rule 3)" test "$_n" = 0
 _n="$(_rule2_detect "$_cell/rule2.sh" | grep -c 'ridden')"
 check "a check_live call stays unflagged" test "$_n" = 0
 
@@ -335,6 +404,25 @@ if [ "$_total" -eq 0 ]; then
     pass "no strict direct check-greps over source vars in tests/unit (rule 2, #460)"
 fi
 
+# --- 3b. rider-inversion tripwire (review a X3, #468): the marker
+# exempts a strict shape from rule 2, so appending it must stay a
+# conscious, reviewable act -- the detector cannot verify the inversion
+# claim (that the pinned literal is a full-line comment), so the COUNT
+# is the control. One trailing-marker site is sanctioned outside this
+# suite today (the container-backend comment-literal pin); this suite's
+# own planted arm is machinery and rides the same self-allowlist as the
+# sweeps above. A new marker (or one stamped onto a live pin) fails
+# loud here until the site carries a conventions.md "Source-counting
+# pins" justification in the same diff.
+_inv_expected=1
+_inv_found=0
+for _f in "$SCRIPT_DIR"/test-*.sh; do
+    [ "$(basename "$_f")" = "test-rider-lint.sh" ] && continue
+    _inv_found=$((_inv_found + $(grep -cE '^[^#].*# rider-inversion' "$_f")))
+done
+check "rider-inversion markers stay a registered exception ($_inv_found/$_inv_expected)" \
+    test "$_inv_found" = "$_inv_expected"
+
 # --- 4. rule-3 ratchet (measured, NOT gating): sh -c single-file presence -------
 _r3=0
 for _f in "$SCRIPT_DIR"/test-*.sh; do
@@ -342,12 +430,13 @@ for _f in "$SCRIPT_DIR"/test-*.sh; do
     _n="$(_rule2_detect "$_f" | grep -c SHC1)"
     _r3=$((_r3 + _n))
 done
-# Ratchet baseline: the census wave (#460 PR 2) converted the
-# inventory suites' sh -c sites (336 -> 304); the residual sits in the
-# suites the round-a inventory never named (ddev-as-opencode,
-# ddev-hosts, ddev-migrate, wsl-exposure, ui). Only downward motion is
-# legal; the wave that reaches zero flips this ratchet into a gating
-# zero-count.
+# Ratchet baseline: the census wave (#460 PR 2) converted 32
+# inventory-suite sh -c sites (336 -> 304). Since the review-a fix
+# (#468) the detector splits statements into legs, so the count is
+# leg-scoped; absence-carrying payloads stay exempt (the census counts
+# presence-only shapes). The per-suite distribution is documented in
+# the rule-3 header above. Only downward motion is legal; the wave
+# that reaches zero flips this ratchet into a gating zero-count.
 check "sh -c single-file presence ratchet (rule 3, census residual: $_r3)" test "$_r3" -le 304
 
 suite_done "rider lint tests"

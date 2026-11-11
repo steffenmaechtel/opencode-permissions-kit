@@ -371,7 +371,8 @@ fi
 echo ""
 echo "--- Headless mode (third-party tools) ---"
 
-if live_src "$CORE_LIB" | grep -q 'HEADLESS=false' && grep -q 'serve | acp | models | agent | providers' "$CORE_LIB"; then
+if live_src "$CORE_LIB" | grep -q 'HEADLESS=false' &&
+    live_src "$CORE_LIB" | grep -q 'serve | acp | models | agent | providers'; then
     pass "wrapper classifies headless subcommands (serve/acp/queries)"
 else
     fail "wrapper lost headless subcommand classification"
@@ -454,7 +455,8 @@ else
     fail "run lost the interactive-tty distinction"
 fi
 
-if grep -q 'if \[ "${1:-}" = "serve" \]; then' "$CORE_LIB" && live_src "$CORE_LIB" | grep -q 'CONTAINER_AUTO=false'; then
+if live_src "$CORE_LIB" | grep -q 'if \[ "${1:-}" = "serve" \]; then' &&
+    live_src "$CORE_LIB" | grep -q 'CONTAINER_AUTO=false'; then
     pass "serve requests container tools without prompting"
 else
     fail "serve lost the silent container-tool request"
@@ -629,7 +631,7 @@ assert_eq "serve cwd: unavailable probe (empty output) changes nothing" \
     "fallback=none warn=0" "$result"
 
 # static: wrapper wiring + sudoers rule
-if grep -q 'cwd-check "\$1" 2>/dev/null || true' "$CORE_LIB" &&
+if live_src "$CORE_LIB" | grep -q 'cwd-check "\$1" 2>/dev/null || true' &&
     live_src "$CORE_LIB" | grep -q 'sudo -n -u opencode.*cwd-check'; then
     pass "wrapper probes the serve cwd via cwd-check (sudo -n, fault-tolerant)"
 else
@@ -1001,7 +1003,8 @@ assert_eq "merged: error-object probe falls back to the project scan" \
     "tools=[docker] requested=true auto=true banner=1" "$result"
 
 # 2.x: the probe's background service is stopped again (stale-config guard)
-if grep -q 'stop_merged_config_service()' "$CORE_LIB" && live_src "$CORE_LIB" | grep -q 'service stop'; then
+if live_src "$CORE_LIB" | grep -q 'stop_merged_config_service()' &&
+    live_src "$CORE_LIB" | grep -q 'service stop'; then
     pass "wrapper stops the 2.x probe service (stale-config guard)"
 else
     fail "wrapper lost the probe service stop"
@@ -1025,7 +1028,7 @@ fi
 # stamps and covers the pre-advisories cohort.
 if live_src "$CORE_LIB" | grep -qF '_MAJOR_SRC="${ADV_LINE:-}"' &&
     live_src "$CORE_LIB" | grep -qF 'case "$_MAJOR_SRC" in' &&
-    grep -q '_MAJOR_SRC=$(timeout 10' "$CORE_LIB"; then
+    live_src "$CORE_LIB" | grep -q '_MAJOR_SRC=$(timeout 10'; then
     pass "OPENCODE_MAJOR fallback probe reuses ADV_LINE, direct fallback bounded (0.0.43a F3, 0.0.44a V21)"
 else
     fail "OPENCODE_MAJOR fallback probe is unbounded or duplicated (0.0.43a F3, 0.0.44a V21)"
@@ -1090,7 +1093,8 @@ sm_case none 2 --standalone
 sm_case none 2 run --standalone "hi"
 
 # arg rewriting: the wrapper's case block inserts/appends correctly
-if grep -q 'case \$(standalone_mode "\$@")' "$WRAPPER_FILE" && live_src "$WRAPPER_FILE" | grep -q 'set -- "\$_sub" --standalone "\$@"'; then
+if live_src "$WRAPPER_FILE" | grep -q 'case \$(standalone_mode "\$@")' &&
+    live_src "$WRAPPER_FILE" | grep -q 'set -- "\$_sub" --standalone "\$@"'; then
     pass "wrapper rewrites args via standalone_mode"
 else
     fail "wrapper lost the standalone arg rewriting"

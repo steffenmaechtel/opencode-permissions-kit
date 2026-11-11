@@ -42,6 +42,14 @@ UNINSTALL_CORE="$REPO/files/opencode-permissions-kit-lib/sh/uninstall-core.sh"
 check() {
     desc="$1"
     shift
+    # review a S2 (#468): mirror the harness F6 guard -- an empty
+    # command must fail loud, not pass as a redirection-only rc 0 (the
+    # shadow stays because it suppresses the checked command's output,
+    # review #398 a F2).
+    if [ "$#" -eq 0 ]; then
+        fail "$desc (check: no command given)"
+        return
+    fi
     if "$@" >/dev/null 2>&1; then pass "$desc"; else fail "$desc"; fi
 }
 
@@ -175,10 +183,15 @@ check_live "install.sh fetch list includes the 2x plugin" "$INSTALL" \
     -q 'opencode-permissions-kit-lib/tui/kit-mode-2x.tsx'
 check "install.sh deploys the 2x plugin to LIBDIR/tui (lib_deploy manifest)" \
     sh -c 'grep -qF "opencode-permissions-kit-lib/tui/kit-mode-2x.tsx 644" "$2" && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL_CORE" "$DEPLOYLIB"
-check "install.sh registers the 2x plugin as a discovered plugin dir (major-gated, shared helper)"
-# split legs (#346 wave 3): kit_source bootstrap stays on the entry,
-# the 2x registration call lives in do_deploy_phase (the lib)
-sh -c 'grep -qF "kit_source \"\$SCRIPT_DIR/opencode-permissions-kit-lib/sh/tui-plugin.sh\"" "$2" && grep -qF "tui_plugin_sync_user \"\$OPENCODE_MAJOR\"" "$1"' _ "$INSTALL_CORE" "$INSTALL"
+# review a S2 (#468): the vacuous no-command check row plus the bare
+# rc-discarded sh -c below are one real pin now -- both legs ridden
+# (kit_source on the entry, the sync call in the deploy lib).
+if live_src "$INSTALL" | grep -qF 'kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/tui-plugin.sh"' &&
+    live_src "$INSTALL_CORE" | grep -qF 'tui_plugin_sync_user "$OPENCODE_MAJOR"'; then
+    pass "install.sh registers the 2x plugin as a discovered plugin dir (major-gated, shared helper)"
+else
+    fail "install.sh registers the 2x plugin as a discovered plugin dir (major-gated, shared helper)"
+fi
 check_live "install.sh unregisters inert cli.json path entries (2x cleanup, via sh/tui-plugin.sh)" "$TUIPLUGIN" \
     -qF 'tui-register.py" "$_tp_user_dir/cli.json" unregister'
 check_live "update.sh fetch list includes the 2x plugin" "$UPDATE" -q 'opencode-permissions-kit-lib/tui/kit-mode-2x.tsx'

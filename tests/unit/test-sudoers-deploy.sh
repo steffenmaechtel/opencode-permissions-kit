@@ -30,6 +30,13 @@ TEMPLATE_SRC="$REPO/files/opencode-permissions-kit-lib/templates/sudoers.templat
 check() {
     _d="$1"
     shift
+    # F6 parity with the harness form (review a S2 class sweep, #468):
+    # an empty command fails loud instead of vacuously passing through
+    # the redirection-only null command.
+    if [ "$#" -eq 0 ]; then
+        fail "$_d (check: no command given)"
+        return
+    fi
     if "$@" >/dev/null 2>&1; then pass "$_d"; else fail "$_d"; fi
 }
 
