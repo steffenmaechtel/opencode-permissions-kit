@@ -23,8 +23,10 @@ asks before removing the kit block; your own entries always stay.
 | `projects.conf` | Project roots, one per line |
 | `handover/` | Scan-skip stamps for the ddev handover |
 | `sudoers` | Deployed sudoers rules (root-owned; symlinked as `/etc/sudoers.d/opencode-permissions-kit`) |
-| `ddev-browser-cmds.conf` | User-created: ddev command names for the browser bridge (one per line, `#` comments) |
+| `ddev-browser-cmds.conf` | Extra ddev command names for the browser bridge (one per line, `#` comments) |
 
+- `ddev-browser-cmds.conf` is optional and user-created — the kit reads it
+  but never writes or ships it
 - `projects.conf` paths must not contain spaces — the writer splits on
   them and every consumer reads the file line-by-line. Entries are
   written by install and `opk config` only: every consumer that runs
