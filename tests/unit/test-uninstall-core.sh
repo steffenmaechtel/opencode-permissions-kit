@@ -605,10 +605,10 @@ UNR_OUT=$(PATH="$UNRS/bin:$PATH" CHOWN_LOG="$WORK/unr-chown.log" sh -c '
 ' _ "$LIB" "$UNR/root" 2>&1) || UNR_RC=$?
 assert_eq "worker: only the regular operand reaches chown (#267)" \
     "chown devuser:devgroup $UNR/root/regular.conf" "$(cat "$WORK/unr-chown.log")"
-check "worker: a swapped leaf link never reaches chown (#267)" \
-    sh -c "! grep -q leaf-link \"\$1\"" _ "$WORK/unr-chown.log"
-check "worker: an operand behind a symlinked parent never reaches chown (#267)" \
-    sh -c "! grep -q link-parent \"\$1\"" _ "$WORK/unr-chown.log"
+check_absent "worker: a swapped leaf link never reaches chown (#267)" \
+    "$WORK/unr-chown.log" -q leaf-link
+check_absent "worker: an operand behind a symlinked parent never reaches chown (#267)" \
+    "$WORK/unr-chown.log" -q link-parent
 check "worker: skipped swaps fail the pass — PARTIALLY via un_rc_q, never green (#267)" \
     sh -c "[ \"\$1\" -ne 0 ]" _ "$UNR_RC"
 
@@ -644,8 +644,8 @@ case "$UNRM_OUT" in
     *) fail "worker: mktemp failure must announce its cause (got: $UNRM_OUT) (#267, #420 a A3)" ;;
 esac
 assert_eq "worker: mktemp failure refuses loud (rc 1, #267)" "1" "$UNRM_RC"
-check "worker: mktemp failure runs no find at all (#267)" \
-    sh -c "! grep -q find \"\$1\"" _ "$WORK/unr-find.log"
+check_absent "worker: mktemp failure runs no find at all (#267)" \
+    "$WORK/unr-find.log" -q find
 # find's own death fails the pass (0.0.43b W4 shape — a wholesale find
 # death never counts as a green revert over a half-walked tree): rc 1
 # and xargs never runs. Logging pass-through sudo so the absence of the
@@ -670,8 +670,8 @@ UNRF_OUT=$(PATH="$UNRF/bin:$PATH" sh -c '
     _un_revert_chown "$3"
 ' _ "$LIB" "$WORK/unr-find2.log" "$UNR/root" 2>&1) || UNRF_RC=$?
 assert_eq "worker: a dead find fails the pass (rc 1, no green revert — 0.0.43b W4 shape)" "1" "$UNRF_RC"
-check "worker: a dead find never reaches xargs (#267)" \
-    sh -c "! grep -q xargs \"\$1\"" _ "$WORK/unr-find2.log"
+check_absent "worker: a dead find never reaches xargs (#267)" \
+    "$WORK/unr-find2.log" -q xargs
 rm -rf "${UNR:?}" "${UNRS:?}" "${UNRM:?}" "${UNRF:?}"
 
 # --- 4b3. find-chown worker: scan-root recheck (#421) -------------------------------
@@ -722,8 +722,8 @@ if [ -d "$UNR2/root-moved" ] && [ -L "$UNR2/root" ]; then
 else
     fail "worker: root-swap fixture fired (#421 seam — root not swapped)"
 fi
-check "worker: a swapped scan root never reaches chown (#421)" \
-    sh -c '! grep -q . "\$1"' _ "$WORK/unr2-chown.log"
+check_absent "worker: a swapped scan root never reaches chown (#421)" \
+    "$WORK/unr2-chown.log" -q .
 case "$UNR2_OUT" in
     *"scan root $UNR2/root was replaced by a symlink"*)
         pass "worker: the swapped root is refused with its own cause (#421)"

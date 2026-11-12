@@ -93,7 +93,7 @@ case "$_sd_out" in *rc=0*) pass "happy path: rc=0" ;; *) fail "happy path: rc (g
 check "happy path: CONFDIR/sudoers installed" test -f "$CONF/sudoers"
 check "happy path: mode 440" sh -c "[ \"\$(stat -c %a \"$CONF/sudoers\")\" = 440 ]"
 check "happy path: DEFAULT_USER substituted" grep -q alice "$CONF/sudoers"
-check "happy path: placeholder gone" sh -c "! grep -q DEFAULT_USER \"$CONF/sudoers\""
+check_absent "happy path: placeholder gone" "$CONF/sudoers" -q DEFAULT_USER
 check "happy path: sudoers.d symlink" test -L "$SDD/opencode-permissions-kit"
 check "happy path: symlink points at CONFDIR/sudoers" \
     sh -c "[ \"\$(readlink \"$SDD/opencode-permissions-kit\")\" = \"$CONF/sudoers\" ]"

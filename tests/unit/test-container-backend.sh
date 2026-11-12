@@ -38,8 +38,6 @@ TEST_YML="$REPO/.github/workflows/test-unit.yml"
 # trap of its own (a local trap would disarm the harness registry).
 . "$SCRIPT_DIR/lib/harness.sh"
 
-grep_absent() { ! grep "$@"; }
-
 # Mirror of the install.sh/update.sh sudoers render: substitute DEFAULT_USER.
 render_sudoers() {
     local template="$1" default_user="$2" out="$3"
@@ -92,18 +90,18 @@ echo ""
 echo "-- sudoers.template structure --"
 check_live "template keeps DOCKER_HOST + XDG_RUNTIME_DIR + OPENCODE_SERVER_PASSWORD + USERNAME env_keep" "$SUDOERS" \
     -Fq 'env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME"'
-check "template has NO DDEV_DEBUG env_keep (describe URL transport needs none)" \
-    grep_absent -Fq 'DDEV_DEBUG' "$SUDOERS"
-check "template has NO OPENCODE_LAUNCH_CWD env_keep" \
-    grep_absent -Fq 'OPENCODE_LAUNCH_CWD' "$SUDOERS"
-check "template has NO docker-group block sentinels" \
-    grep_absent -Fq '#@docker-group' "$SUDOERS"
-check "template has NO ddev delegation rule" \
-    grep_absent -Fq 'DDEV_BIN' "$SUDOERS"
-check "template has NO root-side helper grants (protect-projects/ddev-transaction)" \
-    grep_absent -Fq 'protect-projects' "$SUDOERS"
-check "template has NO ddev-transaction grant" \
-    grep_absent -Fq 'ddev-transaction' "$SUDOERS"
+check_absent "template has NO DDEV_DEBUG env_keep (describe URL transport needs none)" \
+    "$SUDOERS" -Fq 'DDEV_DEBUG'
+check_absent "template has NO OPENCODE_LAUNCH_CWD env_keep" \
+    "$SUDOERS" -Fq 'OPENCODE_LAUNCH_CWD'
+check_absent "template has NO docker-group block sentinels" \
+    "$SUDOERS" -Fq '#@docker-group'
+check_absent "template has NO ddev delegation rule" \
+    "$SUDOERS" -Fq 'DDEV_BIN'
+check_absent "template has NO root-side helper grants (protect-projects/ddev-transaction)" \
+    "$SUDOERS" -Fq 'protect-projects'
+check_absent "template has NO ddev-transaction grant" \
+    "$SUDOERS" -Fq 'ddev-transaction'
 check_live "base (opencode) RunAs for the binary is present" "$SUDOERS" \
     -Eq 'ALL=\(opencode\) NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/opencode \*'
 check_live "template has the rootless socket-check NOPASSWD rule" "$SUDOERS" \
@@ -114,7 +112,7 @@ echo "-- sudoers render --"
 OUT="$TMPDIR/sudoers"
 render_sudoers "$SUDOERS" dev "$OUT"
 check "render: substitutes DEFAULT_USER" grep -Fq 'dev ALL=(opencode) NOPASSWD' "$OUT"
-check "render: no placeholder remains" grep_absent -Fq 'DEFAULT_USER' "$OUT"
+check_absent "render: no placeholder remains" "$OUT" -Fq 'DEFAULT_USER'
 check "render: keeps socket-check rule" grep -Fq "socket-check *" "$OUT"
 
 echo ""
@@ -241,10 +239,10 @@ check "update.sh comment documents the re-base" grep -Fq 'OPENCODE_GROUP re-base
 
 echo ""
 echo "-- OPENCODE_GROUP (legacy WWW_GROUP removed) --"
-check "config.sh has no WWW_GROUP fallback" \
-    grep_absent -Fq 'OPENCODE_GROUP:-${WWW_GROUP:-opencode}' "$CONFIG"
-check "status.sh has no WWW_GROUP fallback" \
-    grep_absent -Fq 'OPENCODE_GROUP:-${WWW_GROUP:-opencode}' "$STATUS"
+check_absent "config.sh has no WWW_GROUP fallback" \
+    "$CONFIG" -Fq 'OPENCODE_GROUP:-${WWW_GROUP:-opencode}'
+check_absent "status.sh has no WWW_GROUP fallback" \
+    "$STATUS" -Fq 'OPENCODE_GROUP:-${WWW_GROUP:-opencode}'
 check "uninstall.sh has no WWW_GROUP fallback" \
     sh -c '! grep -Fq "\$WWW_GROUP" "$1" && ! grep -Fq "\$WWW_GROUP" "$2"' _ \
     "$UNINSTALL" "$UNINSTALL_CORE"
@@ -257,10 +255,10 @@ check_live "config.sh recognizes container-backend action" "$CONFIG" -Fq 'contai
 check_live "config.sh has container_backend_status" "$CONFIG" -Fq 'container_backend_status()'
 check_live "config.sh has container_backend_apply" "$CONFIG" -Fq 'container_backend_apply()'
 check_live "config.sh accepts only rootless backends" "$CONFIG" -Fq 'docker-rootless | podman-rootless'
-check "config.sh has NO ddev-mode action" \
-    grep_absent -Fq 'ddev-mode)' "$CONFIG"
-check "config.sh has NO ddev_mode_apply" \
-    grep_absent -Fq 'ddev_mode_apply' "$CONFIG"
+check_absent "config.sh has NO ddev-mode action" \
+    "$CONFIG" -Fq 'ddev-mode)'
+check_absent "config.sh has NO ddev_mode_apply" \
+    "$CONFIG" -Fq 'ddev_mode_apply'
 check_live "config.sh menu has a container backend entry" "$CONFIG" -Fq 'Switch container backend'
 
 echo ""
@@ -300,8 +298,8 @@ check "setup-container-backend is executed by path (git 100755)" \
     [ "$(git_mode files/opencode-permissions-kit-lib/bin/setup-container-backend)" = "100755" ]
 check "socket-check is executed by path (git 100755)" \
     [ "$(git_mode files/opencode-permissions-kit-lib/bin/socket-check)" = "100755" ]
-check "test-unit.yml has no test-migration.sh (removed)" \
-    grep_absent -Fq './tests/unit/test-migration.sh' "$TEST_YML"
+check_absent "test-unit.yml has no test-migration.sh (removed)" \
+    "$TEST_YML" -Fq './tests/unit/test-migration.sh'
 
 echo ""
 echo "-- setup-container-backend structure --"
