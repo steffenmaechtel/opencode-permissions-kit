@@ -281,16 +281,19 @@ adoption) invert grep's error rc to 0 and PASS VACUOUSLY on a
 missing operand file, counting it as absent; `check_absent` fails
 loud there (a missing file or bad pattern never passes as absent —
 the mirror of check_live's missing-file loudness). Adoption wave
-#469: 28 sites converted (13 grep_absent rows + the single-target
-`sh -c '! grep …'` negations); the rider lint gates the strict shape
-by NAME (rule 4, born gated: the registration-bound
+#469: 27 sites converted (12 grep_absent call rows -- the removed
+definition was the suite's 13th grep_absent line, not a site -- plus
+15 single-target `sh -c '! grep …'` negations); the rider lint gates
+the strict shape by NAME (rule 4, born gated: the registration-bound
 single-positional single-leg sh -c absence form must be
 `check_absent` — the payload is split quote-aware and compound
-payloads stay out; multi-file conjunctions, compound legs,
-in-payload pipes, literal-path/log/fixture binds and if-form
-spellings stay the documented raw shapes and convert on sight like
-the counted shape did). A `-r` directory target rides the same shape
-(the file operand is the grep target, one operand). A presence pin whose pinned
+payloads stay out; spliced-quote payloads escape entirely (the
+first segment cannot see the legs behind a splice, and a false flag
+there demanded an impossible conversion); multi-file conjunctions,
+compound legs, in-payload pipes, literal-path/log/fixture binds and
+if-form spellings stay the documented raw shapes and convert on
+sight like the counted shape did). A `-r` directory target rides
+the same shape (the file operand is the grep target, one operand). A presence pin whose pinned
 literal is itself a full-line comment is the recorded INVERSION of
 this rule: the strip would delete the pinned bytes and make the pin
 unmatchable — such a site (the documented-disposition marker pin

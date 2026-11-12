@@ -61,8 +61,8 @@
 #                        stripped content into the child as an
 #                        argument -- sh -c children never source the
 #                        harness, live_src must not appear inside
-#                        sh -c code (boundary: one canonical
-#                        single-file sugar, no separator parsing).
+#                        sh -c code (boundary: the single-file
+#                        PRESENCE sugar, no separator parsing).
 #   check_absent <desc> <file> <grep-args...>
 #                        pass/fail around a RAW fail-on-found grep
 #                        over the file (#469, the absence twin of
@@ -238,9 +238,10 @@ check_live() {
 #
 # The absence twin of check_live -- PR #468's "future suggestion",
 # adopted: the class already had a suite-local name (test-container-
-# backend's grep_absent, 13 call sites) and hundreds of raw `! grep`
-# legs tree-wide; one named primitive makes it greppable and the
-# rider lint gates the strict shape by NAME (rule 4, test-rider-lint).
+# backend's grep_absent, 12 call rows at adoption) and hundreds of
+# raw `! grep` legs tree-wide; one named primitive makes it greppable
+# and the rider lint gates the strict shape by NAME (rule 4,
+# test-rider-lint).
 # Two contracts differ from check_live, both deliberate:
 #   RAW, never ridden -- a commented-out forbidden line still counts
 #   (the documented absence semantics: the survivor trap INVERTS for

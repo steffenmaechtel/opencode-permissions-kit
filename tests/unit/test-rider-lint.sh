@@ -84,19 +84,29 @@
 # the strict single-target ABSENCE shape (`check "desc" sh -c
 # '! grep ... "$1"' _ "$SRCVAR"`, single positional file, one absence
 # leg) must be check_absent -- the harness's named raw fail-on-found
-# sugar (tests/unit/lib/harness.sh, #469). The census at adoption: 28
-# sites converted (13 grep_absent rows in test-container-backend --
-# the suite-local name that proved the class wanted one -- plus the
-# single-target sh -c negations). The detector mirrors rule 3's
-# grammar exactly, only the leg polarity differs: registration-bound
-# (`_ "$VAR"`), single positional, ABSENCE-bearing. Escapes and their
-# dispositions, same as rule 3's siblings: multi-file payloads
-# (`! grep "$1" && ! grep "$2"`), compound legs (absence beside
-# presence or a numeric gate), in-payload pipes, literal-path and
-# log/fixture binds the registration cannot see, if-form spellings --
-# all stay the documented raw shapes (conventions.md "Source-counting
-# pins", absence paragraph) and convert on sight like the counted
-# shape did. check_absent itself is never flagged (it IS the name).
+# sugar (tests/unit/lib/harness.sh, #469). The census at adoption: 27
+# sites converted (12 grep_absent call rows in test-container-backend
+# -- the suite-local name that proved the class wanted one; its 13th
+# grep_absent line was the removed definition -- plus 15 single-
+# target sh -c negations). The grammar mirrors rule 3's binds
+# (registration-bound `_ "$VAR"`, single positional, printf-exempt)
+# and adds ONE conjunct rule 3 has no counterpart for: the payload
+# itself is split quote-aware and must be a SINGLE leg starting
+# `! grep` -- rule 3 deliberately flags compound presence payloads,
+# rule 4's absence analogue must stay out. Escapes and their
+# dispositions: multi-file payloads (`! grep "$1" && ! grep "$2"`),
+# compound legs (absence beside presence or a numeric gate),
+# in-payload pipes, literal-path and log/fixture binds the
+# registration cannot see, if-form spellings -- all stay the
+# documented raw shapes (conventions.md "Source-counting pins",
+# absence paragraph) and convert on sight like the counted shape
+# did; spliced-quote payloads (the sq-dq-sq idiom) escape ENTIRELY
+# (first-segment parsing cannot see the compound legs behind a
+# splice -- a false flag there demanded an impossible conversion,
+# so the whole spliced shape rides convert-on-sight, round a X2);
+# the payload anchor is the arm anchor (`check "desc" <spaces>
+# sh -c `), immune to a desc carrying those bytes (round a X1).
+# check_absent itself is never flagged (it IS the name).
 #
 # Discrimination arms (scratch fixtures, run BEFORE the tree sweep):
 #   - a planted single-quoted file-operand rider -> flagged
@@ -110,6 +120,12 @@
 #   - a chained-var registration flags (rule 2 transitivity)
 #   - a planted sh -c indirection shape counts (rule 3) -- and the
 #     tree sweep at zero means a NEW one fails loud (gating since #470)
+#   - a planted strict sh -c absence shape flags (rule 4), including
+#     one whose DESCRIPTION carries the bytes "sh -c " (the payload
+#     anchor is the arm anchor, round a X1) -- a single-file compound
+#     absence payload and a spliced-quote compound stay out (payload
+#     single-leg conjunct / splice escape, round a X2/X5)
+#   - a check_absent call stays unflagged
 # Sabotage (committed tree, then restore + re-run green): delete the
 # hit arm from a detector -> the planted-rider arms go red while
 # the sweep passes vacuously only if the arms are gone too.
@@ -326,24 +342,37 @@ _rule2_detect() {
             return n
         }
         # payload_legs: the rule-4 strictness guard (#469) -- extract
-        # the sh -c payload of a check leg (single- or double-quoted,
-        # escape-aware for the double form) and return its leg count
+        # the sh -c payload of a check leg and return its leg count
         # via split_legs; a caller also reads ple[1] for the negated
-        # grep anchor. Payloads with concatenated quote segments (the
-        # sq-dq-sq splicing idiom) examine only the FIRST segment --
-        # byte-form-exact like rule 1/3, escape-valence documented in
-        # the header.
-        func payload_legs(s,   pi, q, rest, ei, j, cj, inner) {
-            pi = index(s, "sh -c ") + 6
-            if (pi <= 6) return 0
-            q = substr(s, pi, 1)
+        # grep anchor. The payload anchor is the ARM anchor itself
+        # (`check "desc" <spaces> sh -c ` -- round a X1, #487): the
+        # first-`sh -c `-index spelling let a description carrying
+        # those bytes (or a double space after them) redirect the
+        # extraction and silently unflag a strict row. Spliced-quote
+        # payloads (the sq-dq-sq idiom) escape rule 4 ENTIRELY (round
+        # a X2): the first segment alone made a compound payload count
+        # as strict and red the sweep on a shape whose conversion is
+        # impossible -- refusing the whole spliced shape trades that
+        # false flag for a documented silent miss (a strict spliced
+        # absence rides convert-on-sight, like the sibling spellings
+        # of rule 3). Escape valences of the double-quoted form:
+        # backslash-quote/-backslash/-dollar reduce to their single
+        # bytes (suite-level escapes), other pairs pass verbatim; a
+        # payload not starting with a quote char returns 0 legs (no
+        # flag).
+        func payload_legs(s,   m, q, rest, ei, j, cj, nk, inner) {
+            if (!match(s, /^check "[^"]*"[[:space:]]+sh -c[[:space:]]+/)) return 0
+            m = RSTART + RLENGTH
+            q = substr(s, m, 1)
             inner = ""
             if (q == sq) {
-                rest = substr(s, pi + 1)
+                rest = substr(s, m + 1)
                 ei = index(rest, sq)
-                if (ei > 0) inner = substr(rest, 1, ei - 1)
+                if (ei == 0) return 0
+                if (substr(rest, ei + 1, 1) == "\"") return 0
+                inner = substr(rest, 1, ei - 1)
             } else if (q == "\"") {
-                rest = substr(s, pi + 1)
+                rest = substr(s, m + 1)
                 j = 1
                 while (j <= length(rest)) {
                     cj = substr(rest, j, 1)
@@ -448,12 +477,26 @@ printf '%s\n' \
     'check "direct over markdown stays" grep -qF pat "$MD"' \
     'grep -qF pre "$SRC" && check "joined direct flags" grep -qF pat "$SRC"' \
     'check "shc over registered" sh -c "grep -qF pat \"\$1\"" _ "$SRC"' \
-    'check "shc absence stays uncounted" sh -c "! grep -qF nope \"\$1\"" _ "$SRC"' \
+    'check "shc absence strict (rule 4 flags it)" sh -c "! grep -qF nope \"\$1\"" _ "$SRC"' \
     'check "multi-file absence stays" sh -c "! grep -qF nope \"\$1\" && ! grep -qF nope \"\$2\"" _ "$SRC" "$SRC"' \
+    'check "single-file compound absence stays" sh -c "! grep -qF nope \"\$1\" && grep -qF pat \"\$1\"" _ "$SRC"' \
+    'check "strict absence with sh -c in the desc flags" sh -c "! grep -qF nope \"\$1\"" _ "$SRC"' \
     'check "direct chained var flags" grep -qF pat "$CHK"' \
     'check_live "ridden stays" "$SRC" -qF pat' \
     'check_absent "named absence" "$SRC" -qF nope' \
     >"$_cell/rule2.sh"
+# The spliced-quote compound row (round a X2): a SINGLE-quoted payload
+# whose first grep pattern carries an apostrophe rides the sq-dq-sq
+# splice idiom -- assembled byte-precisely here (the plain printf
+# block above cannot carry a literal single quote inside its
+# single-quoted arguments). The double-space row (round a X1) is
+# written the same way: shfmt would collapse it in suite source, the
+# fixture keeps the bytes the detector must see.
+_sq="'"
+printf '%s\n' "check \"spliced compound absence stays out\" sh -c ${_sq}! grep -qF don${_sq}\"${_sq}\"${_sq}t \"\$1\" && grep -qF y \"\$1\"${_sq} _ \"\$SRC\"" \
+    >>"$_cell/rule2.sh"
+printf '%s\n' 'check "double space payload flags" sh -c  "! grep -qF nope \"\$1\"" _ "$SRC"' \
+    >>"$_cell/rule2.sh"
 
 _n="$(_rule2_detect "$_cell/rule2.sh" | grep -c DIRECT)"
 check "planted direct strict shapes flag (4: direct, absence-beside, joined, chained)" test "$_n" = 4
@@ -482,11 +525,19 @@ check "a check_live call stays unflagged" test "$_n" = 0
 
 # --- 1c. rule-4 discrimination arms (#469: strict sh -c absence -> check_absent)
 _n="$(_rule2_detect "$_cell/rule2.sh" | grep -c SHCA)"
-check "planted strict sh -c absence shape flags (rule 4, #469)" test "$_n" = 1
+check "planted strict sh -c absence shapes flag (3: plain, desc carrying sh -c, double space)" test "$_n" = 3
 _n="$(_rule2_detect "$_cell/rule2.sh" | grep SHCA | grep -c 'shc absence')"
 check "the rule-3 absence arm is exactly rule 4's flag (SHCA names it)" test "$_n" = 1
+_n="$(_rule2_detect "$_cell/rule2.sh" | grep SHCA | grep -c 'desc flags')"
+check "a desc carrying the sh -c bytes still flags (payload anchor = arm anchor, a X1)" test "$_n" = 1
+_n="$(_rule2_detect "$_cell/rule2.sh" | grep SHCA | grep -c 'double space')"
+check "a double-space payload still flags ([[:space:]]+ anchor, a X1)" test "$_n" = 1
 _n="$(_rule2_detect "$_cell/rule2.sh" | grep SHCA | grep -c 'multi-file absence')"
 check "multi-file absence conjunction stays out (positional-count guard)" test "$_n" = 0
+_n="$(_rule2_detect "$_cell/rule2.sh" | grep SHCA | grep -c 'single-file compound')"
+check "single-file compound absence stays out (payload single-leg conjunct, a X5)" test "$_n" = 0
+_n="$(_rule2_detect "$_cell/rule2.sh" | grep SHCA | grep -c 'spliced compound')"
+check "spliced-quote compound absence stays out (splice escape, a X2)" test "$_n" = 0
 _n="$(_rule2_detect "$_cell/rule2.sh" | grep -c 'named absence')"
 check "a check_absent call stays unflagged (it is the name)" test "$_n" = 0
 
@@ -563,10 +614,11 @@ fi
 
 # --- 5. rule-4 sweep (gating since #469, born gated): the strict sh -c
 # absence shape must be check_absent -- the named raw fail-on-found
-# sugar. Grammar mirrors rule 3 with the leg polarity flipped; the
-# escapes (multi-file conjunctions, compound legs, in-payload pipes,
-# literal-path / log / fixture binds, if-forms) stay the documented
-# raw shapes and convert on sight (header, conventions.md).
+# sugar. Grammar: rule 3's binds plus the payload-single-leg conjunct
+# (header); the escapes (multi-file conjunctions, compound legs,
+# in-payload pipes, spliced quotes, literal-path / log / fixture
+# binds, if-forms) stay the documented raw shapes and convert on
+# sight (header, conventions.md).
 _total=0
 for _f in "$SCRIPT_DIR"/test-*.sh; do
     [ "$(basename "$_f")" = "test-rider-lint.sh" ] && continue
