@@ -314,9 +314,8 @@ follow-up pin was VACUOUSLY green with and without the guard it
 pinned. The scope is NEW rows only: the #460/#487 fixture block in
 `test-rider-lint.sh` (double-quoted printf rows with per-row
 `\\\$`/`\$` escape discipline, every row armed with a 1-hit check)
-is a REGISTERED EXCEPTION — do not copy its idiom into new rows and
-do not refactor the block into the canonical shape. Every
-`test … = 0` expectation pin gets its red path EXECUTED once (delete
+is a REGISTERED EXCEPTION — do not copy its idiom into new rows.
+Every `test … = 0` expectation pin gets its red path EXECUTED once (delete
 the guard or the planted row in a sabotage run and observe the red)
 — count pins alone stayed green through three rounds' sabotage
 candidates.
