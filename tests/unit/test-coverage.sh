@@ -97,7 +97,8 @@ fi
 # extracts each -c body — single- or double-quoted, quote glued to -c,
 # quote on the next line after a backslash continuation, env-prefixed
 # openers — up to its FIRST closing quote. Contract, exact on today's
-# baseline (6 blocks / 6 shields / 3 suites): every -c body that sets
+# baseline (7 blocks / 7 shields / 4 suites — #479 b B5 added the
+# stdin-anchor 1d block): every -c body that sets
 # -u carries the house shield PS4="+ " as its FIRST body line (a
 # shield after set -u is too late — kcov's PS4 ${BASH_SOURCE}
 # expansion aborts the first traced command under set -u), and every
@@ -247,7 +248,7 @@ END { printf "TOTAL %d %d\n", blocks, ok }
     _n=$(_strip "$_s" | grep -cF 'PS4="+ "' || true)
     _sh_lines=$((_sh_lines + $_n))
 done
-if [ "$_sh_b" -eq 6 ] && [ "$_sh_ok" -eq 6 ] && [ "$_sh_lines" -eq 6 ] &&
+if [ "$_sh_b" -eq 7 ] && [ "$_sh_ok" -eq 7 ] && [ "$_sh_lines" -eq 7 ] &&
     [ -z "$_sh_unsh" ]; then
     pass "every set -u -c block in every suite carries the first-line PS4 shield (blocks=$_sh_b shielded=$_sh_ok lines=$_sh_lines)"
 else

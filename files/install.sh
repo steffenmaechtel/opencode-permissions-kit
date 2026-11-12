@@ -232,7 +232,10 @@ STREAMED=false
 # discriminator at all six #405 anchors); without /proc the #405 file
 # probe remains the fallback.
 _opk_stdin=false
-_opk_argv0="$(tr '\0' '\n' 2>/dev/null </proc/$$/cmdline | head -n 1)"
+# The || fallback keeps the no-/proc arm of the discriminator reachable:
+# under bash+pipefail an unreadable /proc/$$/cmdline fails the tr member
+# and errexit would kill the entry before the elif below (#479 a F1).
+_opk_argv0="$(tr '\0' '\n' 2>/dev/null </proc/$$/cmdline | head -n 1)" || _opk_argv0=""
 if [ -n "$_opk_argv0" ]; then
     if [ "$0" = "$_opk_argv0" ]; then
         _opk_stdin=true

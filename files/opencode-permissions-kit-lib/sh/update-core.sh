@@ -1131,8 +1131,14 @@ update_binary_upgrade() {
             [ -n "$BACKUP_DIR" ] && rm -rf "$BACKUP_DIR"
         fi
         # Candidate dir cleanup AFTER the install attempt — never before
-        # verification (issue #24).
-        [ -n "$TMP" ] && rm -rf "$TMP"
+        # verification (issue #24). The if-form — not a `[ … ] &&` tail —
+        # keeps the function's return rc at 0: a boolean tail returns 1
+        # whenever TMP is unset (--binary-path mode never sets it) and the
+        # bare set -e caller dies silently after the binary phase, success
+        # runs included (#479 a F2).
+        if [ -n "$TMP" ]; then
+            rm -rf "$TMP"
+        fi
     fi
 }
 
