@@ -53,7 +53,7 @@ The full walkthrough (including verification) lives in
 
 - WSL2 (or any Linux with ACL support and, for docker-rootless, systemd)
 - Ubuntu 22.04 LTS / Debian 12 or newer — the support floor; only
-  Ubuntu 24.04 is automated-tested and field-tested today (see the
+  Ubuntu 24.04 passes automated tests and is field-tested today (see the
   [support matrix](docs/getting-started.md#supported-distros)). Older
   Ubuntu LTS releases are ESM-only; no fixes are made for them
 - `sudo` access

@@ -232,18 +232,25 @@ case "$_fbn" in
 esac
 
 # --- 1d. the set -eu entries reach the fallback instead of dying (#479 a F1) ---------
-# status/doctor/uninstall run `set -u` only — their /proc-less degrade
-# is pinned above. install/update/config ALSO run `set -eu` + pipefail:
-# there, an unreadable /proc/$$/cmdline fails the tr member of the argv0
-# pipeline, the assignment inherits the pipeline rc, and errexit killed
-# the whole entry BEFORE the elif — the documented no-/proc fallback was
-# dead code at exactly these three anchors until the || fallback landed
-# (#479 a F1). Drive the REAL block from install.sh under bash with the
-# entry's own option discipline and the proc path swapped for a missing
-# file: the run must reach a verdict, not exit silently mid-assignment.
+# status.sh and doctor.sh run `set -u`, uninstall.sh sets no options at
+# all (only a `set -x` debug toggle) — none of the three carries
+# errexit, so their bare argv0 probe degrades to the elif as designed
+# (pinned in 1c above). install/update/config ALSO run `set -eu` +
+# pipefail: there, an unreadable /proc/$$/cmdline fails the tr member
+# of the argv0 pipeline, the assignment inherits the pipeline rc, and
+# errexit killed the whole entry BEFORE the elif — the documented
+# no-/proc fallback was dead code at exactly these three anchors until
+# the || fallback landed (#479 a F1). Drive the REAL block from
+# install.sh under bash with the entry's own option discipline and the
+# proc path swapped for a missing file: the run must reach a verdict,
+# not exit silently mid-assignment. The body's first line is the kcov
+# PS4 shield (kcov-coverage.md #4, #369): the bash -c body sets -u, and
+# kcov's PS4 ${BASH_SOURCE} expansion would abort the child before the
+# first traced command without it.
 command -v bash >/dev/null 2>&1 ||
     fail "1d needs bash on PATH (the set -eu entries' documented runner)"
 _BASH_BIN="$(command -v bash)"
+ln -s "$_BASH_BIN" "$_FBBIN/bash"
 _f1k="$(sed -n '/^_opk_stdin=false$/,/^fi$/p' "$INSTALL" |
     sed 's#/proc/$$/cmdline#/proc/$$/cmdline-absent#g')"
 case "$(printf '%s\n' "$_f1k" | head -1)" in
@@ -251,12 +258,19 @@ case "$(printf '%s\n' "$_f1k" | head -1)" in
     *) fail "install.sh discriminator block extraction broke (got: $(printf '%s' "$_f1k" | head -c 40))" ;;
 esac
 _f1rc=0
-_f1out="$(cd "$WORK/clean" && PATH="$_FBBIN" "$_BASH_BIN" -c '
+# Scanner-readable multiline body (the coverage shield contract in
+# test-coverage.sh): the opener rides PATH so the line ends in plain
+# `bash -c`, the opening quote opens the NEXT line, and the shield is
+# the first body line — kcov's PS4 ${BASH_SOURCE} expansion would abort
+# the set -eu child without it (kcov-coverage.md #4, #369).
+_f1out=$(cd "$WORK/clean" && PATH="$_FBBIN" bash -c \
+    '
+    PS4="+ " # kcov shield: PS4 ${BASH_SOURCE} vs set -u (internal/records/kcov-coverage.md)
     set -eu
     (set -o pipefail) 2>/dev/null && set -o pipefail || true
     eval "$1"
     if [ "$_opk_stdin" = true ]; then echo SET; else echo UNSET; fi
-' f1 "$_f1k" 2>/dev/null)" || _f1rc=$?
+' f1 "$_f1k" 2>/dev/null) || _f1rc=$?
 assert_eq "install.sh /proc-less probe: no silent pipefail abort under set -eu (#479 a F1)" \
     "0" "$_f1rc"
 case "$_f1out" in

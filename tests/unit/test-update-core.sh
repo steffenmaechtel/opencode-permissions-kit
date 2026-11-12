@@ -657,8 +657,11 @@ _f2_run() { # <install-rc> — run the REAL update_binary_upgrade in
         ui_warn() { echo "warn: $*"; }
         log() { echo "log: $*"; }
         . "$1"
-        # Post-source stubs (the #439 b B2 lesson): update-core defines
-        # these itself — pre-source stubs would be re-defined away.
+        # The pre-source ui_*/log stubs above are LIVE (update-core
+        # expects the entry helper set and defines none of them); the
+        # three below override functions update-core DOES define —
+        # post-source placement per the #439 b B2 lesson (pre-source
+        # stubs would be re-defined away).
         update_ensure_backup_dir() {
             UPD_BACKUP_DIR="$UPD_BACKUP_ROOT"
         }
