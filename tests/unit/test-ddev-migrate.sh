@@ -426,10 +426,10 @@ case "$OUTG" in
         ;;
     *) fail "planted dump operand must be refused loudly (got: $OUTG) (#264)" ;;
 esac
-check "refused operand: the project is never started" \
-    sh -c "! grep -q 'ddev:start alpha' \"\$1\"" _ "$WORK/ddev.log"
-check "refused operand: export-db never opens the link" \
-    sh -c "! grep -q 'ddev:export-db alpha' \"\$1\"" _ "$WORK/ddev.log"
+check_absent "refused operand: the project is never started" \
+    "$WORK/ddev.log" -q 'ddev:start alpha'
+check_absent "refused operand: export-db never opens the link" \
+    "$WORK/ddev.log" -q 'ddev:export-db alpha'
 check "refused operand: the victim behind the link keeps its content" \
     sh -c "test \"\$(cat \"\$1\")\" = VICTIM-GATE-CONTENT" _ "$WORK/victim-gate.conf"
 check "refused operand: FAIL entry lands in the manifest" \
@@ -662,10 +662,10 @@ sed -n '/^    rm -rf "\$DM_STAGE" 2>\/dev\/null || true$/,/^    \[ "\${DD_MIG_OK
 if [ -s "$WORK/finblock" ]; then
     check "finalize block scoping: compact, no EOF over-run (4i)" \
         sh -c "[ \"\$(wc -l < \"\$1\")\" -le 45 ]" _ "$WORK/finblock"
-    check "finalize never chown -R's the dump dir — per-entry hand-over only (S2)" \
-        sh -c "! grep -q 'chown -R' \"\$1\"" _ "$WORK/finblock"
-    check "finalize: the bare manifest operand chown (the S2 dereference shape) is gone" \
-        sh -c "! grep -qF 'chown \"root:\$dm_ocg\" \"\$DD_MIG_DUMP_DIR/manifest.conf\"' \"\$1\"" _ "$WORK/finblock"
+    check_absent "finalize never chown -R's the dump dir — per-entry hand-over only (S2)" \
+        "$WORK/finblock" -q 'chown -R'
+    check_absent "finalize: the bare manifest operand chown (the S2 dereference shape) is gone" \
+        "$WORK/finblock" -qF 'chown "root:$dm_ocg" "$DD_MIG_DUMP_DIR/manifest.conf"'
     check "finalize: the manifest re-take rides the find gate (S2)" \
         sh -c "grep -qF -- '-exec chown \"root:\$dm_ocg\" {} +' \"\$1\"" _ "$WORK/finblock"
     # round a B1: || true keeps the one-red-row failure path under
@@ -726,8 +726,7 @@ if live_src "$MIG" | grep -q 'OPENCODE_DOCKER_HOST' &&
 else
     fail "import builds DOCKER_HOST from the configured backend"
 fi
-check "import never deletes dumps on failure" \
-    sh -c "! grep -q 'rm -rf.*DDEV_MIG_BACKUP_ROOT' \"\$1\"" _ "$MIG"
+check_absent "import never deletes dumps on failure" "$MIG" -q 'rm -rf.*DDEV_MIG_BACKUP_ROOT'
 check_live "standalone list mode exists (bin dispatcher)" "$BIN_MIG" -q 'list)'
 
 # --- 6. install.sh wiring ----------------------------------------------------------

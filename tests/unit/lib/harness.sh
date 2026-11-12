@@ -63,6 +63,27 @@
 #                        harness, live_src must not appear inside
 #                        sh -c code (boundary: one canonical
 #                        single-file sugar, no separator parsing).
+#   check_absent <desc> <file> <grep-args...>
+#                        pass/fail around a RAW fail-on-found grep
+#                        over the file (#469, the absence twin of
+#                        check_live): rc 0 (found) fails, rc 1 (not
+#                        found) passes, rc >= 2 (grep error: missing
+#                        file, bad pattern) fails LOUD with its own
+#                        row -- the raw `! grep` and grep_absent
+#                        shapes PASS VACUOUSLY at rc 2 (`! 2` is 0),
+#                        counting a missing operand file as absent.
+#                        RAW is deliberate, the documented absence
+#                        semantics (conventions.md "Source-counting
+#                        pins"): a commented-out forbidden line still
+#                        counts -- no live_src here, ever. The grep
+#                        flags and pattern pass through verbatim; the
+#                        file operand is the grep TARGET (a -r
+#                        directory target rides the same shape).
+#                        Multi-file absence (`! grep A && ! grep B`)
+#                        and compound legs stay the raw sh -c /
+#                        if-found-then-fail shapes (the #468 compound
+#                        boundary); the strict single-target shape is
+#                        gated by the rider lint (rule 4, #469).
 #   test_chain <makefile>
 #                        the wrapped make-test chain reader (#464): one
 #                        prerequisite per output line, `test:` head
@@ -211,6 +232,53 @@ check_live() {
     else
         fail "$_cl_desc"
     fi
+}
+
+# --- check_absent (#469) ---------------------------------------------------------
+#
+# The absence twin of check_live -- PR #468's "future suggestion",
+# adopted: the class already had a suite-local name (test-container-
+# backend's grep_absent, 13 call sites) and hundreds of raw `! grep`
+# legs tree-wide; one named primitive makes it greppable and the
+# rider lint gates the strict shape by NAME (rule 4, test-rider-lint).
+# Two contracts differ from check_live, both deliberate:
+#   RAW, never ridden -- a commented-out forbidden line still counts
+#   (the documented absence semantics: the survivor trap INVERTS for
+#   absence pins, stripping would make a still-present forbidden
+#   comment pass as absent -- conventions.md "Source-counting pins").
+#   rc >= 2 fails loud -- grep error (missing file, bad pattern) must
+#   never count as absent; the raw `! grep` / `! grep "$@"` shapes
+#   invert rc 2 to 0 and pass vacuously. grep's own stderr surfaces
+#   ahead of the fail row (the check_live missing-file precedent).
+check_absent() {
+    # Arg-count guards mirror check_live's A5 arms: a conversion slip
+    # dropping an argument must land in a counted FAIL row (dash
+    # aborts the suite on `shift 2` overflow, an unbound $2 kills
+    # under set -u).
+    if [ "$#" -eq 0 ]; then
+        fail "check_absent: no arguments given (desc and file required)"
+        return
+    fi
+    if [ "$#" -lt 2 ]; then
+        fail "$1 (check_absent: file argument missing)"
+        return
+    fi
+    local _ca_desc="$1" _ca_file="$2" _ca_rc
+    shift 2
+    # Mirror of check's F6 guard: no grep arguments, no vacuous pass.
+    if [ "$#" -eq 0 ]; then
+        fail "$_ca_desc (check_absent: no grep arguments given)"
+        return
+    fi
+    _ca_rc=0
+    grep "$@" "$_ca_file" >/dev/null || _ca_rc=$?
+    case "$_ca_rc" in
+        0) fail "$_ca_desc" ;;
+        1) pass "$_ca_desc" ;;
+        *)
+            fail "$_ca_desc (check_absent: grep rc $_ca_rc -- a missing file or bad pattern fails loud, never passes as absent)"
+            ;;
+    esac
 }
 
 test_chain() {

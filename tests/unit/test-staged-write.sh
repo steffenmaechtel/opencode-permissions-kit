@@ -554,8 +554,8 @@ else
     fail "0.0.39h F10: opk handover refuses symlinked operands + rechecks between the ops"
 fi
 check_live "0.0.39i F4: opk handover --dry-run previews the symlink refuse" "$HOCORE_SW" -qF "would refuse"
-check "0.0.39h F12: no 1;33 color definition remains repo-wide (files/)" \
-    sh -c '! grep -rq "1;33" "$1"' _ "$REPO/files"
+check_absent "0.0.39h F12: no 1;33 color definition remains repo-wide (files/)" \
+    "$REPO/files" -rq "1;33"
 
 # --- 6. agent_home_sane (0.0.39h F1/F2) ---------------------------------------------
 # The walker asserts every component of a path below the agent home

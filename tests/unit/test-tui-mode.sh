@@ -261,8 +261,8 @@ check_no "register: refuses a symlinked cli.json (C2)" \
     python3 "$REGISTER" "$T2X/symhome/cli.json" register /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx
 check "symlink refusal: the link itself survives" \
     test -L "$T2X/symhome/cli.json"
-check "symlink refusal: the link target keeps its content" \
-    sh -c '! grep -q kit-mode-2x "$1"' _ "$T2X/dotfiles/cli.json"
+check_absent "symlink refusal: the link target keeps its content" \
+    "$T2X/dotfiles/cli.json" -q kit-mode-2x
 # no-op unregister (nothing to change) stays rc 0 — the refusal only
 # applies when a write would be needed
 check "unregister on a symlinked cli.json without changes is a no-op" \

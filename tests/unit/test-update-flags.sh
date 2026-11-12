@@ -669,8 +669,8 @@ if [ -s "$_f1_dir/stampblock" ]; then
     # decay the arm greps back to file-wide/token-blind (the 0.0.42d
     # class). Both decay modes fail LOUD instead: preflight tokens inside
     # the block, or a block grown past every legitimate edit's size.
-    check "stamp block scoping: no preflight tokens inside (G1)" \
-        sh -c "! grep -q '_pf_oc' \"\$1\"" _ "$_f1_dir/stampblock"
+    check_absent "stamp block scoping: no preflight tokens inside (G1)" \
+        "$_f1_dir/stampblock" -q '_pf_oc'
     check "stamp block scoping: block stays compact, no EOF over-run (G1)" \
         sh -c "[ \"\$(wc -l < \"\$1\")\" -le 40 ]" _ "$_f1_dir/stampblock"
     check "install-time stamp anchors the sed major arm (F1)" \
@@ -707,8 +707,8 @@ if live_src "$UPDATE" | grep -qF 'UI_NO_STDIN_FALLBACK=1' &&
 else
     fail "streamed update never reads the confirm answer from the script stream (S8)"
 fi
-check "update.sh --help no longer claims prompt-free defaults (D2)" \
-    sh -c "! grep -qF 'No prompts by default' \"\$1\"" _ "$UPDATE"
+check_absent "update.sh --help no longer claims prompt-free defaults (D2)" \
+    "$UPDATE" -qF 'No prompts by default'
 
 # --- OpenChamber policy pin re-apply (issue #154, Tier 2) -------------------------
 # Opt-in only: the pin is re-applied when install.conf says

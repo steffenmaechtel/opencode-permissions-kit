@@ -74,7 +74,7 @@ _meta_cleanup() {
     rm -rf "${_lc_iso:-}" "${_lc_cell:-}" "${_sgi_iso:-}" \
         "${_sgi_scratch:-}" "${_afc_out:-}" "${_afc_cell:-}" \
         "${_a1h_out:-}" "${_a1h_cell:-}" "${_a1h_a:-}" "${_a1h_b:-}" \
-        "${_ef_fix:-}" "${_ls_fix:-}" "${_tc_fix:-}"
+        "${_ef_fix:-}" "${_ls_fix:-}" "${_ca_fix:-}" "${_tc_fix:-}"
     rm -f "${_sgi_out:-}"
 }
 trap _meta_cleanup EXIT INT TERM
@@ -660,6 +660,90 @@ has "no arguments given" "10.14 ... the guard fires before any unset access (A5)
 # numbers. A deletion dialect (`/d`) must go red here.
 arm "_ls=\$(live_src \"$_ls_fix/subject.sh\" | wc -l | tr -d ' '); _raw=\$(wc -l < \"$_ls_fix/subject.sh\" | tr -d ' '); printf 'LINES=%s/%s' \"\$_ls\" \"\$_raw\""
 has "LINES=7/7" "10.15 line-preserving dialect: comment lines become empty lines (A6)"
+
+# --- 10b. check_absent (#469): the raw fail-on-found single-target sugar ---------
+# The absence twin of check_live, pinned through the same child-shell
+# observation (rows + rc). Two discriminations carry the section:
+#   - RAW (10b.3): a forbidden literal present ONLY as a full-line
+#     comment must still FAIL -- the exact inverse of 10.9's survivor
+#     trap, and the reason check_absent never rides live_src.
+#   - LOUD rc >= 2 (10b.4/10b.5): a missing file and a bad pattern
+#     must FAIL, never pass as absent -- the raw `! grep` /
+#     grep_absent shapes invert rc 2 to 0 and pass vacuously (the
+#     vacuity this helper exists to kill).
+# Sabotage arms (committed tree, then restore + re-run green):
+#   - delete check_absent from harness.sh -> the section reds
+#   - fold the rc >= 2 case arm into `1) pass` -> 10b.4 and 10b.5 go
+#     red (the loud-vs-vacuous discrimination); the found/not-found
+#     arms stay green -- the rc-2 pins carry it alone
+#   - swap the 0/1 arms (found passes) -> 10b.1 and 10b.2 go red
+_ca_fix="$(mktemp -d)"
+printf '%s\n' \
+    'plain_live="ordinary"' \
+    '# forbidden_shadow_construct' \
+    'forbidden_live="present"' \
+    'dashflag="--only-binary present"' \
+    >"$_ca_fix/subject.sh"
+printf '%s\n' 'nested_forbidden="in second file"' >"$_ca_fix/second.sh"
+
+arm "check_absent \"ca found\" \"$_ca_fix/subject.sh\" -qF forbidden_live; suite_done demo"
+rc_is 1 "10b.1 check_absent: forbidden literal found -> red suite"
+has "Failed: 1" "10b.1 ... counts as a failure"
+has "ca found" "10b.1 ... the row carries the description"
+
+arm "check_absent \"ca clean\" \"$_ca_fix/subject.sh\" -qF absent_pattern_xyz; suite_done demo"
+rc_is 0 "10b.2 check_absent: clean file -> green suite"
+has "Passed: 1" "10b.2 ... counts as a pass"
+has "ca clean" "10b.2 ... the row carries the description"
+
+arm "check_absent \"ca shadow\" \"$_ca_fix/subject.sh\" -qF forbidden_shadow_construct; suite_done demo"
+rc_is 1 "10b.3 RAW semantics: comment-only forbidden line still fails (the 10.9 inverse)"
+has "Failed: 1" "10b.3 ... a commented-out forbidden line never passes as absent"
+
+arm "check_absent \"ca missing\" \"$_ca_fix/no-such-file\" -qF x; suite_done demo"
+rc_is 1 "10b.4 missing file: rc 2 fails loud, never a vacuous pass"
+has "no-such-file" "10b.4 ... grep's own error names the file"
+has "grep rc 2" "10b.4 ... the fail row names the loud contract"
+
+arm "check_absent \"ca badre\" \"$_ca_fix/subject.sh\" -q '['; suite_done demo"
+rc_is 1 "10b.5 bad pattern: rc 2 fails loud (never passes as absent)"
+has "grep rc 2" "10b.5 ... same loud row, distinct trigger"
+
+arm "check_absent \"ca ere\" \"$_ca_fix/subject.sh\" -Eq 'absent_(xyz|qqq)'; suite_done demo"
+rc_is 0 "10b.6 grep flags pass through verbatim (-Eq ERE arm, not found -> green)"
+arm "check_absent \"ca dash\" \"$_ca_fix/subject.sh\" -qF -- '--only-binary'; suite_done demo"
+rc_is 1 "10b.6 ... a dash-leading pattern rides -- verbatim (found -> red)"
+arm "check_absent \"ca dir\" \"$_ca_fix\" -rq nested_forbidden; suite_done demo"
+rc_is 1 "10b.6 ... a -r directory target rides the same shape (found -> red)"
+
+# 10b.7: the arg guards -- counted FAIL rows, suite rc 1, never a dash
+# abort (the A5 mirror).
+arm 'check_absent; suite_done demo'
+rc_is 1 "10b.7 zero-arg check_absent -> fail row, suite rc 1 (A5 mirror)"
+has "no arguments given" "10b.7 ... the guard fires before any unset access"
+arm 'check_absent "one arg"; suite_done demo'
+rc_is 1 "10b.7 ... only a desc -> fail row, suite rc 1 (A5 mirror)"
+has "file argument missing" "10b.7 ... names the missing operand"
+arm 'check_absent "no grep args" "/dev/null"; suite_done demo'
+rc_is 1 "10b.7 ... without grep arguments -> fail row (F6 mirror)"
+has "no grep arguments given" "10b.7 ... names the contract"
+
+# 10b.8: the mixed tally -- one clean pass plus one found failure in
+# one suite: both counters move (the #393 sabotage class, absence arm).
+arm 'check_absent "m1" "'"$_ca_fix"'/subject.sh" -qF absent_pattern_xyz; check_absent "m2" "'"$_ca_fix"'/subject.sh" -qF forbidden_live; suite_done demo'
+rc_is 1 "10b.8 mixed tally: one clean + one found -> rc 1"
+has "Passed: 1" "10b.8 ... the pass counted"
+has "Failed: 1" "10b.8 ... the failure counted"
+
+# 10b.9 (the founding claim, pinned): the RAW shape passes vacuously
+# at rc 2 -- `! grep` inverts grep's error rc to 0, counting a missing
+# operand file as absent. This is the vacuity check_absent exists to
+# kill; the arm observes the raw shape itself, run the way a
+# pre-conversion site ran it (sh -c payload, positional file).
+arm 'sh -c "! grep -q x \"\$1\"" _ "'"$_ca_fix"'/no-such-file"; echo "RAWRC=$?"'
+has "RAWRC=0" "10b.9 raw shape: a missing file PASSES vacuously -- the exact vacuity the helper kills"
+arm 'sh -c "! grep -q x \"\$1\"" _ "'"$_ca_fix"'/subject.sh"; echo "RAWRC2=$?"'
+has "RAWRC2=0" "10b.9 ... control: the raw shape is not broken on a present, clean file (the gap is rc 2 only)"
 
 # --- 11. test_chain (#464): the wrapped make-test chain reader -----------------
 # The one-prerequisite-per-line chain layout is RULE-enforced in the

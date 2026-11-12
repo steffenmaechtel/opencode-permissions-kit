@@ -80,6 +80,24 @@
 # (lifting the positional count to 2), if-form (non check-form) shapes
 # -- and convert on sight like the counted shape did.
 #
+# Rule 4 (gating since #469, born gated): the sh -c indirection of
+# the strict single-target ABSENCE shape (`check "desc" sh -c
+# '! grep ... "$1"' _ "$SRCVAR"`, single positional file, one absence
+# leg) must be check_absent -- the harness's named raw fail-on-found
+# sugar (tests/unit/lib/harness.sh, #469). The census at adoption: 28
+# sites converted (13 grep_absent rows in test-container-backend --
+# the suite-local name that proved the class wanted one -- plus the
+# single-target sh -c negations). The detector mirrors rule 3's
+# grammar exactly, only the leg polarity differs: registration-bound
+# (`_ "$VAR"`), single positional, ABSENCE-bearing. Escapes and their
+# dispositions, same as rule 3's siblings: multi-file payloads
+# (`! grep "$1" && ! grep "$2"`), compound legs (absence beside
+# presence or a numeric gate), in-payload pipes, literal-path and
+# log/fixture binds the registration cannot see, if-form spellings --
+# all stay the documented raw shapes (conventions.md "Source-counting
+# pins", absence paragraph) and convert on sight like the counted
+# shape did. check_absent itself is never flagged (it IS the name).
+#
 # Discrimination arms (scratch fixtures, run BEFORE the tree sweep):
 #   - a planted single-quoted file-operand rider -> flagged
 #   - a planted double-quoted rider (both $ variants) -> flagged
@@ -246,6 +264,23 @@ _rule2_detect() {
                         cnt = (p1 ? 1 : 0) + (p2 ? 1 : 0) + (p3 ? 1 : 0)
                         if (cnt == 1 && has_reg_bind(l)) print "SHC1\t" L[k] "\t" shorten(stmt)
                     }
+                    # Rule 4 (#469): the same grammar with an absence
+                    # leg -- single positional, registration-bound,
+                    # AND single-leg: the payload itself is split
+                    # quote-aware and must consist of EXACTLY one leg
+                    # starting `! grep`. A compound payload (presence
+                    # beside absence, an in-payload pipe, a numeric
+                    # gate) or a two-file conjunction stays out -- the
+                    # documented raw shapes, converted on sight.
+                    if (l ~ /^check "[^"]*"[[:space:]]+sh -c / && shcneg && l ~ /_ "\$[A-Za-z_0-9]+"/ &&
+                        l !~ /printf "%s" "\$[0-9]"/) {
+                        pl = payload_legs(l)
+                        p1 = index(l, "\"$1\"") > 0 || index(l, "\\\"\\$1\\\"") > 0
+                        p2 = index(l, "\"$2\"") > 0 || index(l, "\\\"\\$2\\\"") > 0
+                        p3 = index(l, "\"$3\"") > 0 || index(l, "\\\"\\$3\\\"") > 0
+                        cnt = (p1 ? 1 : 0) + (p2 ? 1 : 0) + (p3 ? 1 : 0)
+                        if (pl == 1 && ple[1] ~ /^ *! *grep/ && cnt == 1 && has_reg_bind(l)) print "SHCA\t" L[k] "\t" shorten(stmt)
+                    }
                 }
             }
         }
@@ -289,6 +324,48 @@ _rule2_detect() {
             }
             n++; out[n] = cur
             return n
+        }
+        # payload_legs: the rule-4 strictness guard (#469) -- extract
+        # the sh -c payload of a check leg (single- or double-quoted,
+        # escape-aware for the double form) and return its leg count
+        # via split_legs; a caller also reads ple[1] for the negated
+        # grep anchor. Payloads with concatenated quote segments (the
+        # sq-dq-sq splicing idiom) examine only the FIRST segment --
+        # byte-form-exact like rule 1/3, escape-valence documented in
+        # the header.
+        func payload_legs(s,   pi, q, rest, ei, j, cj, inner) {
+            pi = index(s, "sh -c ") + 6
+            if (pi <= 6) return 0
+            q = substr(s, pi, 1)
+            inner = ""
+            if (q == sq) {
+                rest = substr(s, pi + 1)
+                ei = index(rest, sq)
+                if (ei > 0) inner = substr(rest, 1, ei - 1)
+            } else if (q == "\"") {
+                rest = substr(s, pi + 1)
+                j = 1
+                while (j <= length(rest)) {
+                    cj = substr(rest, j, 1)
+                    if (cj == "\\") {
+                        # The outer suite-level escapes reduce to their
+                        # payload bytes (backslash-quote -> quote,
+                        # backslash-backslash -> backslash, backslash-
+                        # dollar -> dollar): split_legs then runs on the
+                        # payload AS SHELL SEES IT, where a backslash-
+                        # quote must not wedge its quote state open.
+                        nk = substr(rest, j + 1, 1)
+                        if (nk == "\"" || nk == "\\" || nk == "$") inner = inner nk
+                        else inner = inner cj nk
+                        j += 2
+                        continue
+                    }
+                    if (cj == "\"") break
+                    inner = inner cj
+                    j++
+                }
+            } else return 0
+            return split_legs(inner, ple)
         }
         # Static regex operands ONLY: a regex constant used as an
         # expression (a ternary branch) evaluates as $0 ~ /re/ -- 0 or 1
@@ -372,8 +449,10 @@ printf '%s\n' \
     'grep -qF pre "$SRC" && check "joined direct flags" grep -qF pat "$SRC"' \
     'check "shc over registered" sh -c "grep -qF pat \"\$1\"" _ "$SRC"' \
     'check "shc absence stays uncounted" sh -c "! grep -qF nope \"\$1\"" _ "$SRC"' \
+    'check "multi-file absence stays" sh -c "! grep -qF nope \"\$1\" && ! grep -qF nope \"\$2\"" _ "$SRC" "$SRC"' \
     'check "direct chained var flags" grep -qF pat "$CHK"' \
     'check_live "ridden stays" "$SRC" -qF pat' \
+    'check_absent "named absence" "$SRC" -qF nope' \
     >"$_cell/rule2.sh"
 
 _n="$(_rule2_detect "$_cell/rule2.sh" | grep -c DIRECT)"
@@ -400,6 +479,16 @@ _n="$(_rule2_detect "$_cell/rule2.sh" | grep SHC1 | grep -c 'shc absence')"
 check "sh -c payload with an absence leg stays uncounted (presence-only rule 3)" test "$_n" = 0
 _n="$(_rule2_detect "$_cell/rule2.sh" | grep -c 'ridden')"
 check "a check_live call stays unflagged" test "$_n" = 0
+
+# --- 1c. rule-4 discrimination arms (#469: strict sh -c absence -> check_absent)
+_n="$(_rule2_detect "$_cell/rule2.sh" | grep -c SHCA)"
+check "planted strict sh -c absence shape flags (rule 4, #469)" test "$_n" = 1
+_n="$(_rule2_detect "$_cell/rule2.sh" | grep SHCA | grep -c 'shc absence')"
+check "the rule-3 absence arm is exactly rule 4's flag (SHCA names it)" test "$_n" = 1
+_n="$(_rule2_detect "$_cell/rule2.sh" | grep SHCA | grep -c 'multi-file absence')"
+check "multi-file absence conjunction stays out (positional-count guard)" test "$_n" = 0
+_n="$(_rule2_detect "$_cell/rule2.sh" | grep -c 'named absence')"
+check "a check_absent call stays unflagged (it is the name)" test "$_n" = 0
 
 # --- 2. tree sweep --------------------------------------------------------------
 # Every suite except this one (self-allowlist, header). lib/ is not
@@ -470,6 +559,26 @@ for _f in "$SCRIPT_DIR"/test-*.sh; do
 done
 if [ "$_total" -eq 0 ]; then
     pass "no sh -c single-file presence shapes in tests/unit (rule 3, #470)"
+fi
+
+# --- 5. rule-4 sweep (gating since #469, born gated): the strict sh -c
+# absence shape must be check_absent -- the named raw fail-on-found
+# sugar. Grammar mirrors rule 3 with the leg polarity flipped; the
+# escapes (multi-file conjunctions, compound legs, in-payload pipes,
+# literal-path / log / fixture binds, if-forms) stay the documented
+# raw shapes and convert on sight (header, conventions.md).
+_total=0
+for _f in "$SCRIPT_DIR"/test-*.sh; do
+    [ "$(basename "$_f")" = "test-rider-lint.sh" ] && continue
+    _hits="$(_rule2_detect "$_f" | grep SHCA)"
+    if [ -n "$_hits" ]; then
+        fail "strict sh -c absence shape in $(basename "$_f") -- use check_absent (rule 4, #469)"
+        echo "$_hits" | sed 's/^/        /'
+        _total=$((_total + 1))
+    fi
+done
+if [ "$_total" -eq 0 ]; then
+    pass "no strict sh -c absence shapes in tests/unit (rule 4, #469)"
 fi
 
 suite_done "rider lint tests"
