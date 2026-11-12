@@ -100,10 +100,12 @@
 # registration cannot see, if-form spellings -- all stay the
 # documented raw shapes (conventions.md "Source-counting pins",
 # absence paragraph) and convert on sight like the counted shape
-# did; spliced-quote payloads (the sq-dq-sq idiom) escape ENTIRELY
-# (first-segment parsing cannot see the compound legs behind a
-# splice -- a false flag there demanded an impossible conversion,
-# so the whole spliced shape rides convert-on-sight, round a X2);
+# did. Spliced-quote payloads escape ENTIRELY: any byte other than
+# whitespace directly after the closing quote marks a quote
+# CONCATENATION (the sq-dq-sq idiom, the sq-sq idiom, the backslash
+# spelling -- rounds a X2 + b B1) whose later segments the
+# first-segment parser cannot see, and a false flag there demanded
+# an impossible conversion; such shapes ride convert-on-sight;
 # the payload anchor is the arm anchor (`check "desc" <spaces>
 # sh -c `), immune to a desc carrying those bytes (round a X1).
 # check_absent itself is never flagged (it IS the name).
@@ -369,7 +371,17 @@ _rule2_detect() {
                 rest = substr(s, m + 1)
                 ei = index(rest, sq)
                 if (ei == 0) return 0
-                if (substr(rest, ei + 1, 1) == "\"") return 0
+                # Quote-CONCATENATED payloads escape entirely (rounds
+                # a X2 + b B1): a legitimate single-quoted payload is
+                # always followed by whitespace (the ` _ ` binder); any
+                # OTHER byte directly after the closing quote is a
+                # concat splice -- sq-sq and sq-dq-sq idioms, the
+                # backslash spelling -- whose later segments this
+                # first-segment parser cannot see. Refusing the whole
+                # shape trades the false flag (an impossible
+                # conversion demand on a hidden compound) for a
+                # documented convert-on-sight miss.
+                if (substr(rest, ei + 1, 1) !~ /[ \t]/) return 0
                 inner = substr(rest, 1, ei - 1)
             } else if (q == "\"") {
                 rest = substr(s, m + 1)
@@ -485,15 +497,19 @@ printf '%s\n' \
     'check_live "ridden stays" "$SRC" -qF pat' \
     'check_absent "named absence" "$SRC" -qF nope' \
     >"$_cell/rule2.sh"
-# The spliced-quote compound row (round a X2): a SINGLE-quoted payload
-# whose first grep pattern carries an apostrophe rides the sq-dq-sq
-# splice idiom -- assembled byte-precisely here (the plain printf
-# block above cannot carry a literal single quote inside its
-# single-quoted arguments). The double-space row (round a X1) is
-# written the same way: shfmt would collapse it in suite source, the
-# fixture keeps the bytes the detector must see.
+# The spliced-quote rows (round a X2 + b B1): SINGLE-quoted payloads
+# whose first grep pattern carries an apostrophe ride a quote-CONCAT
+# splice -- the sq-dq-sq idiom and the sq-sq idiom -- assembled
+# byte-precisely here (a literal single quote cannot occur inside a
+# single-quoted printf argument). The double-space row (round a X1)
+# sits here for uniformity: shfmt leaves quoted string interiors
+# untouched, so the bytes would survive the format gate -- but this
+# block owns every byte-fragile fixture row (b B2: the earlier
+# "shfmt would collapse it" rationale was wrong).
 _sq="'"
 printf '%s\n' "check \"spliced compound absence stays out\" sh -c ${_sq}! grep -qF don${_sq}\"${_sq}\"${_sq}t \"\$1\" && grep -qF y \"\$1\"${_sq} _ \"\$SRC\"" \
+    >>"$_cell/rule2.sh"
+printf '%s\n' "check \"sqsq compound absence stays out\" sh -c ${_sq}! grep -qF don${_sq}${_sq}t \"\$1\" && grep -qF y \"\$1\"${_sq} _ \"\$SRC\"" \
     >>"$_cell/rule2.sh"
 printf '%s\n' 'check "double space payload flags" sh -c  "! grep -qF nope \"\$1\"" _ "$SRC"' \
     >>"$_cell/rule2.sh"
@@ -538,6 +554,8 @@ _n="$(_rule2_detect "$_cell/rule2.sh" | grep SHCA | grep -c 'single-file compoun
 check "single-file compound absence stays out (payload single-leg conjunct, a X5)" test "$_n" = 0
 _n="$(_rule2_detect "$_cell/rule2.sh" | grep SHCA | grep -c 'spliced compound')"
 check "spliced-quote compound absence stays out (splice escape, a X2)" test "$_n" = 0
+_n="$(_rule2_detect "$_cell/rule2.sh" | grep SHCA | grep -c 'sqsq compound')"
+check "sq-sq compound absence stays out (concat escape, b B1)" test "$_n" = 0
 _n="$(_rule2_detect "$_cell/rule2.sh" | grep -c 'named absence')"
 check "a check_absent call stays unflagged (it is the name)" test "$_n" = 0
 

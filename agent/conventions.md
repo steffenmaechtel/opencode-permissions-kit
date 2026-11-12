@@ -287,9 +287,11 @@ definition was the suite's 13th grep_absent line, not a site -- plus
 the strict shape by NAME (rule 4, born gated: the registration-bound
 single-positional single-leg sh -c absence form must be
 `check_absent` — the payload is split quote-aware and compound
-payloads stay out; spliced-quote payloads escape entirely (the
-first segment cannot see the legs behind a splice, and a false flag
-there demanded an impossible conversion); multi-file conjunctions,
+payloads stay out; quote-CONCATENATED payloads (sq-dq-sq, sq-sq or
+backslash splicing — any byte other than whitespace directly after
+the closing quote) escape entirely: the first-segment parser cannot
+see the legs behind a concat, and a false flag there demanded an
+impossible conversion); multi-file conjunctions,
 compound legs, in-payload pipes, literal-path/log/fixture binds and
 if-form spellings stay the documented raw shapes and convert on
 sight like the counted shape did). A `-r` directory target rides
