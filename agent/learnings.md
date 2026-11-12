@@ -158,30 +158,6 @@ empty-match greps (`grep … || true` where empty output is rc 1), `IFS= read
 -r` for TSV/line reads, no bare `cd` under `set -e`, full quoting pass.
 (Candidate for a skeleton block in [conventions.md](conventions.md).)
 
-### L8 — Shell-quoting machinery: never hand-roll what a parser library knows
-*Class: `quoting-parser` — first measured in the #487 loop (PR #487,
-rounds a–d): 5 of 17 findings were hand-written-awk quote-tracking
-defects plus one vacuous fixture pin whose printf layer silently ate
-an escape byte.*
-
-Test machinery that must UNDERSTAND shell quoting (lint detectors
-over suite source, fixtures with byte-exact shell payloads) does not
-hand-roll quote tracking — first-index anchors, escape folding and
-splice-segment walks were each their own finding (a X1 first-index
-anchor, a X2 sq-dq-sq first-segment, b B1 the sq-sq sibling, c C2 the
-dq-opening spelling). The next parser need evaluates the library
-option first (Python `shlex`; `python3` is a required suite
-dependency — pilot order: #488); if awk stays, every quote-handling
-conjunct gets a discrimination arm BEFORE the tree sweep runs.
-Fixture rows with escaped payload bytes are written
-single-quoted-with-splices — a double-quoted printf folds `\$` to `$`
-and the row flags nowhere (the c C2 follow-up: the escape pin was
-VACUOUSLY green with and without the guard it pins). Every `= 0`
-expectation pin gets its red path EXECUTED once (guard deleted or
-row removed must redden it — count pins alone stayed green through
-the sabotage candidates of three rounds; L4's discipline applied to
-zero-expectations).
-
 ## Keep doing — with era-marked evidence
 
 - **Same-PR docs** (`docs-policy` 25 → 0 in 0.0.46; **6 returned** in

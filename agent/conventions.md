@@ -295,6 +295,27 @@ examples from counting; for a NEW pin whose literal spans a wrap, join
 continuations before stripping — otherwise do not copy the idiom, and
 do not refactor the site into the canonical shape.
 
+## Quoting-aware test machinery (detectors and byte-exact fixtures)
+
+Test machinery that must UNDERSTAND shell quoting — a lint detector
+over suite source, a fixture row carrying byte-exact shell payload
+bytes — does not hand-roll quote tracking: first-index anchors,
+escape folding and splice-segment walks were each their own finding
+in the #487 loop (a X1, a X2, b B1, c C2; evidence and the library
+pilot order live in #488). A new parser need evaluates the library
+option first (python3 `shlex` — python3 is a required suite
+dependency); if awk stays, every quote-handling conjunct gets a
+discrimination arm BEFORE the tree sweep runs — the sweep alone
+passes vacuously at zero. Fixture rows with escaped payload bytes
+(`\"\$1\"`) are written single-quoted-with-splices: a double-quoted
+printf folds `\$` to `$`, the detector then sees neither positional
+spelling and the row flags nowhere — the c C2 follow-up pin was
+VACUOUSLY green with and without the guard it pinned. Every
+`test … = 0` expectation pin gets its red path EXECUTED once (delete
+the guard or the planted row in a sabotage run and observe the red)
+— count pins alone stayed green through three rounds' sabotage
+candidates.
+
 ## Unit-suite path variables (entry scripts and their phase libs)
 
 Suites that reference a management entry script together with its
