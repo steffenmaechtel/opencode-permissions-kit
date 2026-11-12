@@ -231,6 +231,39 @@ case "$_fbn" in
         ;;
 esac
 
+# --- 1d. the set -eu entries reach the fallback instead of dying (#479 a F1) ---------
+# status/doctor/uninstall run `set -u` only — their /proc-less degrade
+# is pinned above. install/update/config ALSO run `set -eu` + pipefail:
+# there, an unreadable /proc/$$/cmdline fails the tr member of the argv0
+# pipeline, the assignment inherits the pipeline rc, and errexit killed
+# the whole entry BEFORE the elif — the documented no-/proc fallback was
+# dead code at exactly these three anchors until the || fallback landed
+# (#479 a F1). Drive the REAL block from install.sh under bash with the
+# entry's own option discipline and the proc path swapped for a missing
+# file: the run must reach a verdict, not exit silently mid-assignment.
+command -v bash >/dev/null 2>&1 ||
+    fail "1d needs bash on PATH (the set -eu entries' documented runner)"
+_BASH_BIN="$(command -v bash)"
+_f1k="$(sed -n '/^_opk_stdin=false$/,/^fi$/p' "$INSTALL" |
+    sed 's#/proc/$$/cmdline#/proc/$$/cmdline-absent#g')"
+case "$(printf '%s\n' "$_f1k" | head -1)" in
+    _opk_stdin=false) ;;
+    *) fail "install.sh discriminator block extraction broke (got: $(printf '%s' "$_f1k" | head -c 40))" ;;
+esac
+_f1rc=0
+_f1out="$(cd "$WORK/clean" && PATH="$_FBBIN" "$_BASH_BIN" -c '
+    set -eu
+    (set -o pipefail) 2>/dev/null && set -o pipefail || true
+    eval "$1"
+    if [ "$_opk_stdin" = true ]; then echo SET; else echo UNSET; fi
+' f1 "$_f1k" 2>/dev/null)" || _f1rc=$?
+assert_eq "install.sh /proc-less probe: no silent pipefail abort under set -eu (#479 a F1)" \
+    "0" "$_f1rc"
+case "$_f1out" in
+    SET | UNSET) pass "install.sh /proc-less discriminator reached a verdict: $_f1out (#479 a F1)" ;;
+    *) fail "install.sh /proc-less discriminator died before any verdict (out=[$_f1out]) (#479 a F1)" ;;
+esac
+
 # --- 2. wiring: update.sh ----------------------------------------------------------
 # The stdin flag, the forced fetch (a cwd-adjacent checkout can no
 # longer pass the VERSION test spuriously), the binonly anchor and its

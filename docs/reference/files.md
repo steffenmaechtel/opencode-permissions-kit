@@ -22,6 +22,8 @@ asks before removing the kit block; your own entries always stay.
 | `install.conf` | Install settings (keys below) |
 | `projects.conf` | Project roots, one per line |
 | `handover/` | Scan-skip stamps for the ddev handover |
+| `sudoers` | Deployed sudoers rules (root-owned; symlinked as `/etc/sudoers.d/opencode-permissions-kit`) |
+| `ddev-browser-cmds.conf` | Optional, user-created: extra ddev commands for the browser bridge (one per line) |
 
 - `projects.conf` paths must not contain spaces — the writer splits on
   them and every consumer reads the file line-by-line. Entries are

@@ -503,7 +503,8 @@ siblings from — any branch or version tag works (`stable` release mirror,
 [update channels](../how-to/update.md#channels)). The value is stamped as
 `KIT_CHANNEL` in `install.conf`, which later `opk update` runs follow. Refs
 are limited to `A-Z a-z 0-9 . _ / -` — anything else is refused before
-anything runs.
+anything runs, and `..` inside the ref is refused too (git refnames
+cannot carry it).
 
 ## config.sh
 
@@ -559,6 +560,7 @@ sudo opk update --channel stable   # or master, a feature branch, or a tag
 | `--channel <ref>` | Switch the tracking ref for this and every future update (re-stamps `KIT_CHANNEL`) |
 | `--major 1\|2` | Switch the opencode major (TUI registration flips with it) |
 | `--version <ver>` | Upgrade to exactly this opencode version |
+| `-h`, `--help` | Print the usage block |
 
 Upgrades never cross majors silently: without `--major` / `--version` the
 latest release **of the installed major** is used (1.x resolves through

@@ -635,6 +635,51 @@ else
     fail "upgrade-flow mktemp guard broken (out=$_b4g_out) (#376 B4 sweep)"
 fi
 
+# --- 19b. the --binary-path tail returns 0 on every arm (#479 a F2) -----------------
+# update_binary_upgrade ends with the candidate-dir cleanup; as a
+# boolean `[ -n "$TMP" ] && rm` tail it returned 1 whenever TMP was
+# unset — always in --binary-path mode — and the bare set -e caller in
+# update.sh died silently after the binary phase (finalize phases and
+# the summary skipped), SUCCESS runs included. The if-form keeps the
+# tail rc 0. Driven with a real executable candidate and an available
+# backup base, both install outcomes must return 0.
+_f2cand="$WORK/f2-candidate"
+printf '#!/bin/sh\nexit 0\n' >"$_f2cand"
+chmod +x "$_f2cand"
+_f2_run() { # <install-rc> — run the REAL update_binary_upgrade in
+    # --binary-path mode; the subshell rc IS the function rc
+    _ibrc="$1"
+    BINARY_PATH="$_f2cand" SYSTEM_BIN="" BINARY_GROUP="$(id -gn)" \
+    UPD_BACKUP_ROOT="$WORK/f2-backup" sh -c '
+        ui_section() { :; }
+        ui_detail() { :; }
+        ui_success() { :; }
+        ui_warn() { echo "warn: $*"; }
+        log() { echo "log: $*"; }
+        . "$1"
+        # Post-source stubs (the #439 b B2 lesson): update-core defines
+        # these itself — pre-source stubs would be re-defined away.
+        update_ensure_backup_dir() {
+            UPD_BACKUP_DIR="$UPD_BACKUP_ROOT"
+        }
+        current_opencode_major() { echo 1; }
+        _ibrc="$2"
+        install_binary() { return "$_ibrc"; }
+        update_binary_upgrade
+    ' _ "$LIB" "$_ibrc" 2>/dev/null
+}
+_f2_bad=""
+for _f2arm in 0 1; do
+    _f2rc=0
+    _f2_run "$_f2arm" || _f2rc=$?
+    [ "$_f2rc" -eq 0 ] || _f2_bad="$_f2_bad install-rc=$_f2arm fn-rc=$_f2rc"
+done
+if [ -z "$_f2_bad" ]; then
+    pass "binary upgrade returns 0 in --binary-path mode, install success and failure both (#479 a F2)"
+else
+    fail "binary upgrade --binary-path tail kills the update ($_f2_bad) (#479 a F2)"
+fi
+
 # --- 20. shell-hook rc backups (#425): copy before edit, degrade loud --------------
 # The install-side rc invariant (PR #424) holds update-side: every rc
 # file touched by the hook loop gets a recovery copy in the update
