@@ -350,18 +350,18 @@ _rule2_detect() {
         # (`check "desc" <spaces> sh -c ` -- round a X1, #487): the
         # first-`sh -c `-index spelling let a description carrying
         # those bytes (or a double space after them) redirect the
-        # extraction and silently unflag a strict row. Spliced-quote
-        # payloads (the sq-dq-sq idiom) escape rule 4 ENTIRELY (round
-        # a X2): the first segment alone made a compound payload count
-        # as strict and red the sweep on a shape whose conversion is
-        # impossible -- refusing the whole spliced shape trades that
-        # false flag for a documented silent miss (a strict spliced
-        # absence rides convert-on-sight, like the sibling spellings
-        # of rule 3). Escape valences of the double-quoted form:
-        # backslash-quote/-backslash/-dollar reduce to their single
-        # bytes (suite-level escapes), other pairs pass verbatim; a
-        # payload not starting with a quote char returns 0 legs (no
-        # flag).
+        # extraction and silently unflag a strict row. Quote-
+        # CONCATENATED payloads (any spelling: sq-dq-sq, sq-sq,
+        # backslash, a dq-opening splice -- rounds a X2 + b B1 + c C2)
+        # escape rule 4 ENTIRELY, both quote branches: the first
+        # segment alone cannot see the legs behind a concat, and a
+        # false flag there demanded an impossible conversion -- the
+        # whole concatenated shape rides convert-on-sight, like the
+        # sibling spellings of rule 3. Escape valences of the
+        # double-quoted form: backslash-quote/-backslash/-dollar
+        # reduce to their single bytes (suite-level escapes), other
+        # pairs pass verbatim; a payload not starting with a quote
+        # char returns 0 legs (no flag).
         func payload_legs(s,   m, q, rest, ei, j, cj, nk, inner) {
             if (!match(s, /^check "[^"]*"[[:space:]]+sh -c[[:space:]]+/)) return 0
             m = RSTART + RLENGTH
@@ -405,6 +405,13 @@ _rule2_detect() {
                     inner = inner cj
                     j++
                 }
+                # Unterminated dq payload: no flag (fail-still).
+                if (j > length(rest)) return 0
+                # The SAME concat guard as the sq branch (round c C2):
+                # a byte other than whitespace directly after the
+                # closing quote is a concat splice whose later
+                # segments this parser cannot see -- escape.
+                if (substr(rest, j + 1, 1) !~ /[ \t]/) return 0
             } else return 0
             return split_legs(inner, ple)
         }
@@ -511,6 +518,13 @@ printf '%s\n' "check \"spliced compound absence stays out\" sh -c ${_sq}! grep -
     >>"$_cell/rule2.sh"
 printf '%s\n' "check \"sqsq compound absence stays out\" sh -c ${_sq}! grep -qF don${_sq}${_sq}t \"\$1\" && grep -qF y \"\$1\"${_sq} _ \"\$SRC\"" \
     >>"$_cell/rule2.sh"
+printf '%s\n' "check \"dq concat compound stays out\" sh -c \"! grep -qF nope \\\"\$1\\\"\"${_sq} && grep -qF y \\\"\$1\\\"${_sq} _ \"\$SRC\"" \
+    >>"$_cell/rule2.sh"
+# The strict SINGLE-quoted row (round c C1): the only fixture row
+# exercising the sq branch's FLAG path (every other strict row is
+# double-quoted; the sq rows above are concat-escape rows).
+printf '%s\n' "check \"strict sq absence flags\" sh -c ${_sq}! grep -qF nope \"\$1\"${_sq} _ \"\$SRC\"" \
+    >>"$_cell/rule2.sh"
 printf '%s\n' 'check "double space payload flags" sh -c  "! grep -qF nope \"\$1\"" _ "$SRC"' \
     >>"$_cell/rule2.sh"
 
@@ -541,9 +555,11 @@ check "a check_live call stays unflagged" test "$_n" = 0
 
 # --- 1c. rule-4 discrimination arms (#469: strict sh -c absence -> check_absent)
 _n="$(_rule2_detect "$_cell/rule2.sh" | grep -c SHCA)"
-check "planted strict sh -c absence shapes flag (3: plain, desc carrying sh -c, double space)" test "$_n" = 3
+check "planted strict sh -c absence shapes flag (4: plain, desc carrying sh -c, double space, strict sq)" test "$_n" = 4
 _n="$(_rule2_detect "$_cell/rule2.sh" | grep SHCA | grep -c 'shc absence')"
 check "the rule-3 absence arm is exactly rule 4's flag (SHCA names it)" test "$_n" = 1
+_n="$(_rule2_detect "$_cell/rule2.sh" | grep SHCA | grep -c 'strict sq')"
+check "a strict single-quoted payload flags (the sq branch flag path, c C1)" test "$_n" = 1
 _n="$(_rule2_detect "$_cell/rule2.sh" | grep SHCA | grep -c 'desc flags')"
 check "a desc carrying the sh -c bytes still flags (payload anchor = arm anchor, a X1)" test "$_n" = 1
 _n="$(_rule2_detect "$_cell/rule2.sh" | grep SHCA | grep -c 'double space')"
@@ -556,6 +572,8 @@ _n="$(_rule2_detect "$_cell/rule2.sh" | grep SHCA | grep -c 'spliced compound')"
 check "spliced-quote compound absence stays out (splice escape, a X2)" test "$_n" = 0
 _n="$(_rule2_detect "$_cell/rule2.sh" | grep SHCA | grep -c 'sqsq compound')"
 check "sq-sq compound absence stays out (concat escape, b B1)" test "$_n" = 0
+_n="$(_rule2_detect "$_cell/rule2.sh" | grep SHCA | grep -c 'dq concat compound')"
+check "dq-opening concat compound stays out (dq-branch guard, c C2)" test "$_n" = 0
 _n="$(_rule2_detect "$_cell/rule2.sh" | grep -c 'named absence')"
 check "a check_absent call stays unflagged (it is the name)" test "$_n" = 0
 
