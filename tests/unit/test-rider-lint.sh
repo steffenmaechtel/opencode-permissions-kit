@@ -518,8 +518,15 @@ printf '%s\n' "check \"spliced compound absence stays out\" sh -c ${_sq}! grep -
     >>"$_cell/rule2.sh"
 printf '%s\n' "check \"sqsq compound absence stays out\" sh -c ${_sq}! grep -qF don${_sq}${_sq}t \"\$1\" && grep -qF y \"\$1\"${_sq} _ \"\$SRC\"" \
     >>"$_cell/rule2.sh"
-printf '%s\n' "check \"dq concat compound stays out\" sh -c \"! grep -qF nope \\\"\$1\\\"\"${_sq} && grep -qF y \\\"\$1\\\"${_sq} _ \"\$SRC\"" \
+printf '%s\n' 'check "dq concat compound stays out" sh -c "! grep -qF nope \"\$1\"'"'"' && grep -qF y \"\$1\"'"'"' _ "$SRC"' \
     >>"$_cell/rule2.sh"
+# NOTE (round c sabotage catch): the dq-concat row above must carry
+# the SUITE-LEVEL escape bytes backslash-dollar in BOTH segments --
+# a printf double-quoted "\$1" emits `$1` without the backslash, the
+# positional-count conjunct then sees neither spelling and the row
+# flags nowhere: the escape pin goes VACUOUSLY green (caught by the
+# per-cycle sabotage run, L4). The single-quoted-with-splices shape
+# above is the byte-faithful form.
 # The strict SINGLE-quoted row (round c C1): the only fixture row
 # exercising the sq branch's FLAG path (every other strict row is
 # double-quoted; the sq rows above are concat-escape rows).
