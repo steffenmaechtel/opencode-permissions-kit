@@ -58,11 +58,12 @@ manifest itself is shape-gated line by line (an HTML error body never
 becomes a "manifest"), and `opk update` additionally re-verifies the
 whole staged tree before any deploy phase runs. That tree pass also
 covers trees an older deployed updater fetched without verification —
-for updaters that export their staging tree (vintage 0.0.39 and later).
-Older vintages (0.0.28–0.0.38) re-exec the new updater without the
-export marker and are indistinguishable from a manifest-less checkout,
-so their **first** update into the verified era deploys unverified; the
-update after that verifies.
+for updaters that export their staging tree (vintage 0.0.40 and later).
+Vintages 0.0.29–0.0.39 re-exec the new updater without the export
+marker and are indistinguishable from a manifest-less checkout, so
+their **first** update into the verified era deploys unverified; the
+update after that verifies. (Vintages ≤ 0.0.28 never reach the re-exec:
+they predate the current file layout and abort with a re-install hint.)
 
 What this buys:
 

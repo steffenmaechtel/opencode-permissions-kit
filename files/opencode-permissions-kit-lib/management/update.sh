@@ -510,13 +510,16 @@ FILES_ROOT="$(cd "$SCRIPT_DIR/../.." 2>/dev/null && pwd -P)"
 #       manifest and re-exec'd THIS copy -- the resolve step fetches
 #       the manifest the old fetcher never pulled, and the tree verify
 #       below checks the whole staged tree before anything deploys (the
-#       issue #478 acceptance criterion). Scope (0.0.28-0.0.38
-#       vintages): this works only when the old copy EXPORTED
-#       _FETCH_TREE (introduced 0.0.39); vintages that re-exec without
-#       the export are indistinguishable from a manifest-less checkout
-#       (tarball vintages share the shape), so their FIRST hop into
-#       the verified era deploys unverified -- the update after it
-#       verifies. Documented in docs/concepts/security-model.md.
+#       issue #478 acceptance criterion). Scope (#493 b A1, measured
+#       against TAGS): this works only when the old copy EXPORTED
+#       _FETCH_TREE (first shipped in tag 0.0.40). Vintages 0.0.29
+#       through 0.0.39 re-exec WITHOUT the export and are
+#       indistinguishable from a manifest-less checkout (tarball
+#       vintages share the shape), so their FIRST hop into the
+#       verified era deploys unverified -- the update after it
+#       verifies. (Vintages <= 0.0.28 cannot re-exec at all: they
+#       predate the new layout and 404-abort before reaching it.)
+#       Documented in docs/concepts/security-model.md.
 # Checkout behavior (both directions, deliberate):
 #   - a checkout WITH the committed repo-root SHA256SUMS resolves it
 #     into _fk_sums: a heal re-fetch is then verified against the
