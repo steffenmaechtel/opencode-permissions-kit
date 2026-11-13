@@ -100,12 +100,12 @@
 # registration cannot see, if-form spellings -- all stay the
 # documented raw shapes (conventions.md "Source-counting pins",
 # absence paragraph) and convert on sight like the counted shape
-# did. Spliced-quote payloads escape ENTIRELY: any byte other than
-# whitespace directly after the closing quote marks a quote
-# CONCATENATION (the sq-dq-sq idiom, the sq-sq idiom, the backslash
-# spelling -- rounds a X2 + b B1) whose later segments the
-# first-segment parser cannot see, and a false flag there demanded
-# an impossible conversion; such shapes ride convert-on-sight;
+# did. Spliced-quote payloads are PARSED THROUGH since the #488
+# shlex port: the payload token is assembled by shlex itself, so a
+# concat spelling (sq-dq-sq, sq-sq, dq-opening -- rounds a X2 + b B1
+# / c C2) no longer hides the payload's real legs; a spliced STRICT
+# absence flags (the escape class closed), a spliced compound still
+# stays out (its payload is genuinely multi-leg);
 # the payload anchor is the arm anchor (`check "desc" <spaces>
 # sh -c `), immune to a desc carrying those bytes (round a X1).
 # check_absent itself is never flagged (it IS the name).
@@ -190,255 +190,15 @@ _rider_hits() {
 # in-memory pass: slurp, join statements (backslash, trailing
 # && / || / | continuations), collect assignments, derive the
 # registered source variables transitively, then flag.
-_rule2_detect() {
-    # sq carries the single-quote byte in from the shell layer: the awk
-    # program is a single-quoted shell string, so the byte `'` must not
-    # appear inside it (split_legs needs to RECOGNIZE that byte).
-    awk -v sq="'" '
-        { lines[NR] = $0 }
-        END {
-            total = NR
-            n = 0; i = 1
-            while (i <= total) {
-                ln = lines[i]
-                if (ln ~ /^[[:space:]]*#/) { i++; continue }
-                stmt = ln; start = i
-                while (stmt ~ /\\$/ || stmt ~ /&&[[:space:]]*$/ || stmt ~ /\|\|[[:space:]]*$/ || stmt ~ /\|[[:space:]]*$/) {
-                    if (stmt ~ /\\$/) sub(/\\$/, "", stmt)
-                    else if (stmt ~ /&&[[:space:]]*$/) sub(/[[:space:]]*$/, "", stmt)
-                    else if (stmt ~ /\|\|[[:space:]]*$/) sub(/[[:space:]]*$/, "", stmt)
-                    # a trailing single pipe STAYS -- the next line joins
-                    # after it (a | b must not reconstruct as "a b")
-                    i++
-                    if (i > total) break
-                    nxt = lines[i]
-                    sub(/^[[:space:]]+/, "", nxt)
-                    if (nxt ~ /^[[:space:]]*#/) break
-                    stmt = stmt nxt
-                }
-                i++
-                n++; S[n] = stmt; L[n] = start
-            }
-            nv = 0
-            for (k = 1; k <= n; k++) {
-                if (S[k] ~ /^[A-Za-z_][A-Za-z_0-9]*=/) {
-                    v = S[k]; sub(/=.*/, "", v)
-                    r = S[k]; sub(/^[^=]*=/, "", r)
-                    nv++; vname[nv] = v; vval[v] = r
-                }
-            }
-            for (round = 1; round <= 4; round++) {
-                changed = 0
-                for (k = 1; k <= nv; k++) {
-                    v = vname[k]
-                    if (marked[v]) continue
-                    r = vval[v]
-                    own_ex = (r ~ /\.(jsonc|json|tsx|ts|md)("|[[:space:]]|$)/) ? 1 : 0
-                    if (r ~ /\$REPO\/|\$FILES\/|\.github\/|\.\.\/e2e\/|\$SCRIPT_DIR\/\.\.\/\.\.|\$SCRIPT_DIR\/\.\.\/sh\//) {
-                        marked[v] = 1; exempt[v] = own_ex; changed++
-                    } else if (match(r, /\$[A-Za-z_][A-Za-z_0-9]*/)) {
-                        ref = substr(r, RSTART + 1, RLENGTH - 1)
-                        if (marked[ref]) {
-                            marked[v] = 1
-                            # own extension WINS over inheritance ("$TS/../sh/y.sh"
-                            # is a shell source even though $TS is a .tsx);
-                            # extension-less values inherit the parent class
-                            if (own_ex) exempt[v] = 1
-                            else if (r ~ /\.[a-z0-9]+("|[[:space:]]|$)/) exempt[v] = 0
-                            else exempt[v] = exempt[ref]
-                            changed++
-                        }
-                    }
-                }
-                if (!changed) break
-            }
-            for (k = 1; k <= n; k++) {
-                stmt = S[k]
-                # annotation exemption: statement-level -- an in-place
-                # `rider-inversion` marker names the sanctioned bare shape
-                # (conventions.md "Source-counting pins": a comment-literal
-                # presence pin)
-                inv = (stmt ~ /#[[:space:]]*rider-inversion/)
-                # Per-leg evaluation (review a S4/X2, #468): a check carried
-                # on a &&-continuation leg of a compound is gated like a
-                # statement-initial one; an absence leg (`! grep`) is its
-                # own leg and no longer exempts the check leg beside it.
-                # Rule 3 keeps a LEG-level `! grep` exemption: the sweep
-                # counts presence-only shapes -- absence stays un-ridden
-                # (conventions.md), so a sh -c payload carrying an absence
-                # leg stays uncounted.
-                nl = split_legs(stmt, leg)
-                for (j = 1; j <= nl; j++) {
-                    l = leg[j]; sub(/^[[:space:]]+/, "", l)
-                    if (l ~ /^check "[^"]*"[[:space:]]+grep / && !inv) {
-                        if (has_reg_operand(l)) print "DIRECT\t" L[k] "\t" shorten(stmt)
-                    }
-                    shcneg = (l ~ /! *grep/)
-                    if (l ~ /^check "[^"]*"[[:space:]]+sh -c / && !shcneg && l ~ /_ "\$[A-Za-z_0-9]+"/ &&
-                        l !~ /printf "%s" "\$[0-9]"/) {
-                        p1 = index(l, "\"$1\"") > 0 || index(l, "\\\"\\$1\\\"") > 0
-                        p2 = index(l, "\"$2\"") > 0 || index(l, "\\\"\\$2\\\"") > 0
-                        p3 = index(l, "\"$3\"") > 0 || index(l, "\\\"\\$3\\\"") > 0
-                        cnt = (p1 ? 1 : 0) + (p2 ? 1 : 0) + (p3 ? 1 : 0)
-                        if (cnt == 1 && has_reg_bind(l)) print "SHC1\t" L[k] "\t" shorten(stmt)
-                    }
-                    # Rule 4 (#469): the same grammar with an absence
-                    # leg -- single positional, registration-bound,
-                    # AND single-leg: the payload itself is split
-                    # quote-aware and must consist of EXACTLY one leg
-                    # starting `! grep`. A compound payload (presence
-                    # beside absence, an in-payload pipe, a numeric
-                    # gate) or a two-file conjunction stays out -- the
-                    # documented raw shapes, converted on sight.
-                    if (l ~ /^check "[^"]*"[[:space:]]+sh -c / && shcneg && l ~ /_ "\$[A-Za-z_0-9]+"/ &&
-                        l !~ /printf "%s" "\$[0-9]"/) {
-                        pl = payload_legs(l)
-                        p1 = index(l, "\"$1\"") > 0 || index(l, "\\\"\\$1\\\"") > 0
-                        p2 = index(l, "\"$2\"") > 0 || index(l, "\\\"\\$2\\\"") > 0
-                        p3 = index(l, "\"$3\"") > 0 || index(l, "\\\"\\$3\\\"") > 0
-                        cnt = (p1 ? 1 : 0) + (p2 ? 1 : 0) + (p3 ? 1 : 0)
-                        if (pl == 1 && ple[1] ~ /^ *! *grep/ && cnt == 1 && has_reg_bind(l)) print "SHCA\t" L[k] "\t" shorten(stmt)
-                    }
-                }
-            }
-        }
-        # split_legs: quote-aware split of a joined statement into command
-        # legs on `;`, `|` runs and `&&`. A single `&` is literal (`2>&1`
-        # never splits); `||` splits like `|`. Escapes honored: inside
-        # double quotes `\"` is a literal byte, not a terminator; inside
-        # single quotes nothing is escapable -- so BRE `\|` inside a
-        # quoted grep pattern and the `&&` inside an sh -c payload never
-        # split the leg (review a S4, #468).
-        func split_legs(s, out,   n, i, c, q, cur) {
-            n = 0; q = ""; cur = ""
-            for (i = 1; i <= length(s); i++) {
-                c = substr(s, i, 1)
-                if (q != "") {
-                    cur = cur c
-                    if (q == "\"" && c == "\\") {
-                        i++
-                        cur = cur substr(s, i, 1)
-                        continue
-                    }
-                    if (c == q) q = ""
-                    continue
-                }
-                if (c == sq || c == "\"") { q = c; cur = cur c; continue }
-                if (c == ";" || c == "|") {
-                    while (substr(s, i + 1, 1) == "|") i++
-                    n++; out[n] = cur; cur = ""
-                    continue
-                }
-                if (c == "&") {
-                    if (substr(s, i + 1, 1) == "&") {
-                        while (substr(s, i + 1, 1) == "&") i++
-                        n++; out[n] = cur; cur = ""
-                        continue
-                    }
-                    cur = cur c
-                    continue
-                }
-                cur = cur c
-            }
-            n++; out[n] = cur
-            return n
-        }
-        # payload_legs: the rule-4 strictness guard (#469) -- extract
-        # the sh -c payload of a check leg and return its leg count
-        # via split_legs; a caller also reads ple[1] for the negated
-        # grep anchor. The payload anchor is the ARM anchor itself
-        # (`check "desc" <spaces> sh -c ` -- round a X1, #487): the
-        # first-`sh -c `-index spelling let a description carrying
-        # those bytes (or a double space after them) redirect the
-        # extraction and silently unflag a strict row. Quote-
-        # CONCATENATED payloads (any spelling: sq-dq-sq, sq-sq,
-        # backslash, a dq-opening splice -- rounds a X2 + b B1 + c C2)
-        # escape rule 4 ENTIRELY, both quote branches: the first
-        # segment alone cannot see the legs behind a concat, and a
-        # false flag there demanded an impossible conversion -- the
-        # whole concatenated shape rides convert-on-sight, like the
-        # sibling spellings of rule 3. Escape valences of the
-        # double-quoted form: backslash-quote/-backslash/-dollar
-        # reduce to their single bytes (suite-level escapes), other
-        # pairs pass verbatim; a payload not starting with a quote
-        # char returns 0 legs (no flag).
-        func payload_legs(s,   m, q, rest, ei, j, cj, nk, inner) {
-            if (!match(s, /^check "[^"]*"[[:space:]]+sh -c[[:space:]]+/)) return 0
-            m = RSTART + RLENGTH
-            q = substr(s, m, 1)
-            inner = ""
-            if (q == sq) {
-                rest = substr(s, m + 1)
-                ei = index(rest, sq)
-                if (ei == 0) return 0
-                # Quote-CONCATENATED payloads escape entirely (rounds
-                # a X2 + b B1): a legitimate single-quoted payload is
-                # always followed by whitespace (the ` _ ` binder); any
-                # OTHER byte directly after the closing quote is a
-                # concat splice -- sq-sq and sq-dq-sq idioms, the
-                # backslash spelling -- whose later segments this
-                # first-segment parser cannot see. Refusing the whole
-                # shape trades the false flag (an impossible
-                # conversion demand on a hidden compound) for a
-                # documented convert-on-sight miss.
-                if (substr(rest, ei + 1, 1) !~ /[ \t]/) return 0
-                inner = substr(rest, 1, ei - 1)
-            } else if (q == "\"") {
-                rest = substr(s, m + 1)
-                j = 1
-                while (j <= length(rest)) {
-                    cj = substr(rest, j, 1)
-                    if (cj == "\\") {
-                        # The outer suite-level escapes reduce to their
-                        # payload bytes (backslash-quote -> quote,
-                        # backslash-backslash -> backslash, backslash-
-                        # dollar -> dollar): split_legs then runs on the
-                        # payload AS SHELL SEES IT, where a backslash-
-                        # quote must not wedge its quote state open.
-                        nk = substr(rest, j + 1, 1)
-                        if (nk == "\"" || nk == "\\" || nk == "$") inner = inner nk
-                        else inner = inner cj nk
-                        j += 2
-                        continue
-                    }
-                    if (cj == "\"") break
-                    inner = inner cj
-                    j++
-                }
-                # Unterminated dq payload: no flag (fail-still).
-                if (j > length(rest)) return 0
-                # The SAME concat guard as the sq branch (round c C2):
-                # a byte other than whitespace directly after the
-                # closing quote is a concat splice whose later
-                # segments this parser cannot see -- escape.
-                if (substr(rest, j + 1, 1) !~ /[ \t]/) return 0
-            } else return 0
-            return split_legs(inner, ple)
-        }
-        # Static regex operands ONLY: a regex constant used as an
-        # expression (a ternary branch) evaluates as $0 ~ /re/ -- 0 or 1
-        # -- and match() then hunts the digit "1" forever while the
-        # cursor keeps the matched byte (the spin this detector shipped
-        # with once; killed at 100% CPU four minutes in).
-        func has_reg_operand(s) {
-            while (match(s, /"\$[A-Za-z_][A-Za-z_0-9]*(\/[^"]*)?"/)) {
-                name = substr(s, RSTART + 2, RLENGTH - 3)
-                sub(/\/.*/, "", name)
-                if (marked[name] && !exempt[name]) return 1
-                s = substr(s, RSTART + RLENGTH)
-            }
-            return 0
-        }
-        func has_reg_bind(s) {
-            while (match(s, /"\$[A-Za-z_][A-Za-z_0-9]*"/)) {
-                name = substr(s, RSTART + 2, RLENGTH - 3)
-                if (marked[name] && !exempt[name]) return 1
-                s = substr(s, RSTART + RLENGTH)
-            }
-            return 0
-        }
-        func shorten(s) { sub(/^[[:space:]]+/, "", s); return substr(s, 1, 160) }
-    ' "$1"
+_rule2_detect() { # $1 = suite file -> DIRECT/SHC1/SHCA hits on stdout
+    # shlex port (#488 pilot): the quote-tracking phases (split_legs /
+    # payload_legs) live in python now (tests/unit/lib/rider_detect.py)
+    # -- POSIX shlex parses shell quoting correctly by construction, so
+    # the splice/concat escape classes (#487 rounds a X2 / b B1 / c C2)
+    # close structurally. Joining and registration are faithful ports;
+    # the differential over all suites and the fixture arms pinned the
+    # equivalence before the swap.
+    python3 "$SCRIPT_DIR/lib/rider_detect.py" "$1"
 }
 
 echo ""
@@ -532,56 +292,66 @@ printf '%s\n' 'check "dq concat compound stays out" sh -c "! grep -qF nope \"\$1
 # double-quoted; the sq rows above are concat-escape rows).
 printf '%s\n' "check \"strict sq absence flags\" sh -c ${_sq}! grep -qF nope \"\$1\"${_sq} _ \"\$SRC\"" \
     >>"$_cell/rule2.sh"
+# The #488 shlex row: an sq-sq spliced payload whose VALUE is a clean
+# strict absence -- parsed through (the payload's real legs decide),
+# flagged since the port; the awk detector escaped this spelling.
+printf '%s\n' "check \"spliced strict absence flags (shlex parses through, #488)\" sh -c ${_sq}! grep -qF no${_sq}${_sq}pe \"\$1\"${_sq} _ \"\$SRC\"" \
+    >>"$_cell/rule2.sh"
 printf '%s\n' 'check "double space payload flags" sh -c  "! grep -qF nope \"\$1\"" _ "$SRC"' \
     >>"$_cell/rule2.sh"
 
-_n="$(_rule2_detect "$_cell/rule2.sh" | grep -c DIRECT)"
+# one interpreter start for every rule2.sh arm below (#488 pilot):
+# the fixture verdicts grep the captured output, not 20 fresh calls
+_rule2_out="$(_rule2_detect "$_cell/rule2.sh")"
+_n="$(printf '%s\n' "$_rule2_out" | grep -c DIRECT)"
 check "planted direct strict shapes flag (4: direct, absence-beside, joined, chained)" test "$_n" = 4
-_n="$(_rule2_detect "$_cell/rule2.sh" | grep DIRECT | grep -c 'direct over registered')"
+_n="$(printf '%s\n' "$_rule2_out" | grep DIRECT | grep -c 'direct over registered')"
 check "the direct-over-registered arm is one of them" test "$_n" = 1
-_n="$(_rule2_detect "$_cell/rule2.sh" | grep DIRECT | grep -c 'inversion-annotated')"
+_n="$(printf '%s\n' "$_rule2_out" | grep DIRECT | grep -c 'inversion-annotated')"
 check "inversion-annotated site stays unflagged (comment-literal pin)" test "$_n" = 0
-_n="$(_rule2_detect "$_cell/rule2.sh" | grep DIRECT | grep -c 'fixture')"
+_n="$(printf '%s\n' "$_rule2_out" | grep DIRECT | grep -c 'fixture')"
 check "direct over a fixture var stays unflagged" test "$_n" = 0
-_n="$(_rule2_detect "$_cell/rule2.sh" | grep DIRECT | grep -c 'absence leg')"
+_n="$(printf '%s\n' "$_rule2_out" | grep DIRECT | grep -c 'absence leg')"
 check "presence leg beside an absence leg flags (review a X2, #468)" test "$_n" = 1
-_n="$(_rule2_detect "$_cell/rule2.sh" | grep DIRECT | grep -c 'joined direct')"
+_n="$(printf '%s\n' "$_rule2_out" | grep DIRECT | grep -c 'joined direct')"
 check "&&-joined check flags (review a S4, #468)" test "$_n" = 1
-_n="$(_rule2_detect "$_cell/rule2.sh" | grep DIRECT | grep -c 'slash-family')"
+_n="$(printf '%s\n' "$_rule2_out" | grep DIRECT | grep -c 'slash-family')"
 check "direct over slash-family source stays unflagged (// deferred)" test "$_n" = 0
-_n="$(_rule2_detect "$_cell/rule2.sh" | grep DIRECT | grep -c 'markdown')"
+_n="$(printf '%s\n' "$_rule2_out" | grep DIRECT | grep -c 'markdown')"
 check "direct over markdown source stays unflagged (headings are not comments, #472)" test "$_n" = 0
-_n="$(_rule2_detect "$_cell/rule2.sh" | grep -c 'chained')"
+_n="$(printf '%s\n' "$_rule2_out" | grep -c 'chained')"
 check "chained registration flags (transitive derivation)" test "$_n" = 1
-_n="$(_rule2_detect "$_cell/rule2.sh" | grep -c SHC1)"
+_n="$(printf '%s\n' "$_rule2_out" | grep -c SHC1)"
 check "planted sh -c indirection shape counts (rule 3)" test "$_n" = 1
-_n="$(_rule2_detect "$_cell/rule2.sh" | grep SHC1 | grep -c 'shc absence')"
+_n="$(printf '%s\n' "$_rule2_out" | grep SHC1 | grep -c 'shc absence')"
 check "sh -c payload with an absence leg stays uncounted (presence-only rule 3)" test "$_n" = 0
-_n="$(_rule2_detect "$_cell/rule2.sh" | grep -c 'ridden')"
+_n="$(printf '%s\n' "$_rule2_out" | grep -c 'ridden')"
 check "a check_live call stays unflagged" test "$_n" = 0
 
 # --- 1c. rule-4 discrimination arms (#469: strict sh -c absence -> check_absent)
-_n="$(_rule2_detect "$_cell/rule2.sh" | grep -c SHCA)"
-check "planted strict sh -c absence shapes flag (4: plain, desc carrying sh -c, double space, strict sq)" test "$_n" = 4
-_n="$(_rule2_detect "$_cell/rule2.sh" | grep SHCA | grep -c 'shc absence')"
+_n="$(printf '%s\n' "$_rule2_out" | grep -c SHCA)"
+check "planted strict sh -c absence shapes flag (5: plain, desc carrying sh -c, double space, strict sq, spliced strict)" test "$_n" = 5
+_n="$(printf '%s\n' "$_rule2_out" | grep SHCA | grep -c 'spliced strict')"
+check "a spliced STRICT absence flags (the concat escape class closes, #488)" test "$_n" = 1
+_n="$(printf '%s\n' "$_rule2_out" | grep SHCA | grep -c 'shc absence')"
 check "the rule-3 absence arm is exactly rule 4's flag (SHCA names it)" test "$_n" = 1
-_n="$(_rule2_detect "$_cell/rule2.sh" | grep SHCA | grep -c 'strict sq')"
+_n="$(printf '%s\n' "$_rule2_out" | grep SHCA | grep -c 'strict sq')"
 check "a strict single-quoted payload flags (the sq branch flag path, c C1)" test "$_n" = 1
-_n="$(_rule2_detect "$_cell/rule2.sh" | grep SHCA | grep -c 'desc flags')"
+_n="$(printf '%s\n' "$_rule2_out" | grep SHCA | grep -c 'desc flags')"
 check "a desc carrying the sh -c bytes still flags (payload anchor = arm anchor, a X1)" test "$_n" = 1
-_n="$(_rule2_detect "$_cell/rule2.sh" | grep SHCA | grep -c 'double space')"
+_n="$(printf '%s\n' "$_rule2_out" | grep SHCA | grep -c 'double space')"
 check "a double-space payload still flags ([[:space:]]+ anchor, a X1)" test "$_n" = 1
-_n="$(_rule2_detect "$_cell/rule2.sh" | grep SHCA | grep -c 'multi-file absence')"
+_n="$(printf '%s\n' "$_rule2_out" | grep SHCA | grep -c 'multi-file absence')"
 check "multi-file absence conjunction stays out (positional-count guard)" test "$_n" = 0
-_n="$(_rule2_detect "$_cell/rule2.sh" | grep SHCA | grep -c 'single-file compound')"
+_n="$(printf '%s\n' "$_rule2_out" | grep SHCA | grep -c 'single-file compound')"
 check "single-file compound absence stays out (payload single-leg conjunct, a X5)" test "$_n" = 0
-_n="$(_rule2_detect "$_cell/rule2.sh" | grep SHCA | grep -c 'spliced compound')"
-check "spliced-quote compound absence stays out (splice escape, a X2)" test "$_n" = 0
-_n="$(_rule2_detect "$_cell/rule2.sh" | grep SHCA | grep -c 'sqsq compound')"
-check "sq-sq compound absence stays out (concat escape, b B1)" test "$_n" = 0
-_n="$(_rule2_detect "$_cell/rule2.sh" | grep SHCA | grep -c 'dq concat compound')"
-check "dq-opening concat compound stays out (dq-branch guard, c C2)" test "$_n" = 0
-_n="$(_rule2_detect "$_cell/rule2.sh" | grep -c 'named absence')"
+_n="$(printf '%s\n' "$_rule2_out" | grep SHCA | grep -c 'spliced compound')"
+check "spliced compound absence stays out (real multi-leg payload, a X2 row)" test "$_n" = 0
+_n="$(printf '%s\n' "$_rule2_out" | grep SHCA | grep -c 'sqsq compound')"
+check "sq-sq compound absence stays out (real multi-leg payload, b B1 row)" test "$_n" = 0
+_n="$(printf '%s\n' "$_rule2_out" | grep SHCA | grep -c 'dq concat compound')"
+check "dq-opening concat compound stays out (real multi-leg payload, c C2 row)" test "$_n" = 0
+_n="$(printf '%s\n' "$_rule2_out" | grep -c 'named absence')"
 check "a check_absent call stays unflagged (it is the name)" test "$_n" = 0
 
 # --- 2. tree sweep --------------------------------------------------------------
@@ -602,10 +372,25 @@ if [ "$_total" -eq 0 ]; then
 fi
 
 # --- 3. rule-2 tree sweep (gating): strict direct shape -------------------------
+# One interpreter start for ALL three rule sweeps (#488 pilot): the
+# detector's --batch mode prefixes every hit with its file; the loops
+# below grep the capture (per-file fail rows, self-allowlist and hit
+# format unchanged -- the prefix is cut away again).
+_TAB="$(printf '\t')"
+_BATCH_OUT="$(work_new_file)" || {
+    echo "rider lint tests: scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
+set --
+for _f in "$SCRIPT_DIR"/test-*.sh; do
+    [ "$(basename "$_f")" = "test-rider-lint.sh" ] && continue
+    set -- "$@" "$_f"
+done
+python3 "$SCRIPT_DIR/lib/rider_detect.py" --batch "$@" >"$_BATCH_OUT"
 _total=0
 for _f in "$SCRIPT_DIR"/test-*.sh; do
     [ "$(basename "$_f")" = "test-rider-lint.sh" ] && continue
-    _hits="$(_rule2_detect "$_f" | grep DIRECT)"
+    _hits="$(grep -F "${_f}${_TAB}DIRECT${_TAB}" "$_BATCH_OUT" | cut -d "$_TAB" -f2-)"
     if [ -n "$_hits" ]; then
         fail "strict direct check-grep over a registered source var in $(basename "$_f") -- use check_live (rule 2, #460)"
         echo "$_hits" | sed 's/^/        /'
@@ -644,7 +429,7 @@ check "rider-inversion markers stay a registered exception ($_inv_found/$_inv_ex
 _total=0
 for _f in "$SCRIPT_DIR"/test-*.sh; do
     [ "$(basename "$_f")" = "test-rider-lint.sh" ] && continue
-    _hits="$(_rule2_detect "$_f" | grep SHC1)"
+    _hits="$(grep -F "${_f}${_TAB}SHC1${_TAB}" "$_BATCH_OUT" | cut -d "$_TAB" -f2-)"
     if [ -n "$_hits" ]; then
         fail "sh -c single-file presence shape in $(basename "$_f") -- use check_live / parent-if + live_src pipes (rule 3, #470)"
         echo "$_hits" | sed 's/^/        /'
@@ -665,7 +450,7 @@ fi
 _total=0
 for _f in "$SCRIPT_DIR"/test-*.sh; do
     [ "$(basename "$_f")" = "test-rider-lint.sh" ] && continue
-    _hits="$(_rule2_detect "$_f" | grep SHCA)"
+    _hits="$(grep -F "${_f}${_TAB}SHCA${_TAB}" "$_BATCH_OUT" | cut -d "$_TAB" -f2-)"
     if [ -n "$_hits" ]; then
         fail "strict sh -c absence shape in $(basename "$_f") -- use check_absent (rule 4, #469)"
         echo "$_hits" | sed 's/^/        /'
