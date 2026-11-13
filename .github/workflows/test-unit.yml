@@ -9,9 +9,12 @@ name: test-unit
 # open PR fires only `pull_request`, avoiding the classic double-run.
 # A daily schedule (05:07 UTC; issue #78 ran it weekly until
 # 2026-10-23) re-runs the suite on
-# master even when nothing was pushed — runner image updates
-# (ubuntu-latest) and environment drift can break a "green" master
-# between releases. Scheduled runs always target the default branch.
+# master even when nothing was pushed — runner image updates (the
+# pinned ubuntu-24.04 image, issue #480 F47: every workflow pins the
+# exact runner, so ubuntu-latest drift cannot fire — but the pinned
+# image itself still rolls) and environment drift can break a "green"
+# master between releases. Scheduled runs always target the default
+# branch.
 on:
   pull_request:
     branches:

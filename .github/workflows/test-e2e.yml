@@ -13,7 +13,10 @@ name: test-e2e
 # opencode release at runtime, so a new opencode version can break a
 # "green" master between pushes — the cron catches that drift before a
 # release is cut. Scheduled runs use the defaults (E2E_STRICT=0, like
-# push runs; the strict input only applies to manual dispatch).
+# push runs; the strict input only applies to manual dispatch). The
+# strict lever reaches EVERY lane here (issue #480 F3): all five jobs
+# export E2E_STRICT from the dispatch input, and the ddev twin
+# (test-e2e-ddev.yml) wires the same input for its two lanes.
 #
 # Lane naming is major-explicit (lane-naming wave 2026-10-23): every
 # e2e job name carries its opencode major, so no name ever silently
@@ -204,8 +207,12 @@ jobs:
           sudo systemctl restart docker
           sleep 3
       - name: Run E2E test
+        # E2E_STRICT (issue #480 F3): the strict dispatch input reaches
+        # EVERY lane — run.sh has its own skip sites (12i provisioning /
+        # nested userns / alpine pull + the version-conditional 3b probe),
+        # and a degraded runner must not green through all of them.
         run: |
-          ./tests/e2e/run.sh
+          E2E_STRICT="${{ inputs.strict == true && '1' || '0' }}" ./tests/e2e/run.sh
         env:
           # Git channel explicit in both halves of the pair (convention:
           # no suffix = git-distro) — travels via env into lib.sh's
@@ -295,8 +302,9 @@ jobs:
           sudo systemctl restart docker
           sleep 3
       - name: Run E2E test
+        # E2E_STRICT on every lane (issue #480 F3 — see the distro twin).
         run: |
-          ./tests/e2e/run.sh
+          E2E_STRICT="${{ inputs.strict == true && '1' || '0' }}" ./tests/e2e/run.sh
         env:
           # PPA leg of the git pair (issue #118) — travels via env into
           # lib.sh's --build-arg GIT_CHANNEL; run.sh asserts the PPA git
@@ -466,8 +474,12 @@ jobs:
           sudo systemctl restart docker
           sleep 3
       - name: Run E2E test (opencode 1.x pin)
+        # E2E_STRICT on every lane (issue #480 F3 — see the 2x-git-distro
+        # twin). NB: the 3b permission probe skips on this lane BY VERSION
+        # (1.x < 2.2.6, counted through skip()) — a strict dispatch here
+        # reports exactly that skip as a failure, honestly.
         run: |
-          ./tests/e2e/run.sh
+          E2E_STRICT="${{ inputs.strict == true && '1' || '0' }}" ./tests/e2e/run.sh
         env:
           # Resolved 1.x version travels via env, never interpolated into
           # the run: shell (S6: defense-in-depth on top of the anchored check).

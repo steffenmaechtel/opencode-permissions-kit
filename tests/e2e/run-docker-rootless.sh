@@ -199,7 +199,7 @@ if ! E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/c
         E 'printf "subuid: "; cat /etc/subuid; printf "subgid: "; cat /etc/subgid; printf "daemon.json: "; cat /home/opencode/.config/docker/daemon.json 2>/dev/null' || true
     fi
     _rootless_ok=false
-    skipped=$((skipped + 1))
+    skip "RL2: docker-rootless provisioning failed"
 fi
 
 # Give the systemd --user docker.service a moment to create the socket.
@@ -219,7 +219,7 @@ if [ "$_rootless_ok" = true ]; then
         echo "  --- docker.service status (as opencode) ---"
         E 'sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/'"$OC_UID"' systemctl --user status docker.service --no-pager 2>&1 | head -15"' | sed 's/\x1b\[[0-9;]*m//g' || true
         _rootless_ok=false
-        skipped=$((skipped + 1))
+        skip "RL2: docker-rootless daemon socket never appeared"
     fi
 fi
 
@@ -349,7 +349,7 @@ if [ "$_rootless_ok" = true ]; then
             _rl_cat_check hunter2 settings.php
     else
         echo "  ${YELLOW}SKIP${NC}  RL4 §9.1: could not pull alpine (no network?) — $(E 'tail -1 /tmp/docker-pull.out' 2>/dev/null || echo unknown)"
-        skipped=$((skipped + 3))
+        skip "RL4: alpine pull failed — container userns/read checks not run"
     fi
 fi
 
