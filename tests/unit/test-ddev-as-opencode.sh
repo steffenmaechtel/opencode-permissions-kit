@@ -127,9 +127,10 @@ else
     # Skip disclosed, not absorbed (#481 F32): the old arm printed a
     # PASS row and bumped the pass tally for a test that never ran --
     # on kit dev hosts (current user IS opencode) the guard never
-    # executes but counted as passed. The sibling idiom (test-update-
-    # core.sh, test-status.sh, test-update-flags.sh): a SKIP row, no
-    # counter.
+    # executes but counted as passed. Sibling suites disclose skips
+    # without absorbing them: SKIP rows (test-update-core.sh,
+    # test-update-flags.sh), an info row (test-status.sh) -- no
+    # counter either way (#495 a A1).
     echo "  SKIP  helper refuses a non-opencode caller (current user IS opencode/undeterminable)"
 fi
 
