@@ -417,9 +417,10 @@ fi
 # E2E_STRICT=1 (the manual-dispatch strict input) turns counted skips
 # into failures (lib.sh skip()); the lever must reach EVERY lane. A lane
 # without the export greens through wholesale skips on a degraded
-# runner — and the e2e verdict gates releases (scripts/release.sh
-# checks exactly these runs). 5 lanes here (3 run.sh + 2 rootless),
-# 2 in the ddev twin.
+# runner — and the e2e verdict feeds the release gate (scripts/release.sh
+# requires EVERY master-sha CI run completed green, name-agnostic over
+# all workflows of the commit — #494 a F5). 5 lanes here (3 run.sh + 2
+# rootless), 2 in the ddev twin.
 _STRICT_EXPORT="E2E_STRICT=\"\${{ inputs.strict == true && '1' || '0' }}\""
 _SE_E2E=$(live_src "$WF_E2E" | grep -cF -- "$_STRICT_EXPORT" || true)
 _SE_DDEV=$(live_src "$WF_DDEV_E2E" | grep -cF -- "$_STRICT_EXPORT" || true)
