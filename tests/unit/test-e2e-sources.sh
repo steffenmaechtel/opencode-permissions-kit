@@ -19,26 +19,30 @@ LIB="$(cd "$(dirname "$0")/../e2e" && pwd)/lib.sh"
 # (and check/assert_eq where present) live in lib/harness.sh now.
 . "$(cd "$(dirname "$0")" && pwd)/lib/harness.sh"
 
-grep_q() { grep -q "$@" "$LIB"; }
+# Presence pins over lib.sh / the runners ride check_live / live_src
+# (#481 F31): the former grep_q wrapper spelled the raw grep — blind to
+# comments and, as an indirect $(cd …) binding, outside the rider
+# lint's registration — while sibling pins in this file already rode
+# live_src.
 
 # --- syntax -------------------------------------------------------------------
 check "lib.sh passes POSIX sh syntax check" sh -n "$LIB"
 
 # --- 2.x: npm registry, both scopes -------------------------------------------
-check "2.x downloads from the npm registry (@opencode scope)" \
-    grep_q 'registry\.npmjs\.org/@opencode/cli-\$target'
-check "2.x falls back to the legacy @opencode-ai scope" \
-    grep_q 'registry\.npmjs\.org/@opencode-ai/cli-\$target'
-check "npm tarball layout: package/bin/opencode is moved into the cache" \
-    grep_q 'package/bin/opencode'
-check "major gate: only 2.* versions take the npm path" \
-    grep_q '2\.\*)'
+check_live "2.x downloads from the npm registry (@opencode scope)" "$LIB" \
+    -q 'registry\.npmjs\.org/@opencode/cli-\$target'
+check_live "2.x falls back to the legacy @opencode-ai scope" "$LIB" \
+    -q 'registry\.npmjs\.org/@opencode-ai/cli-\$target'
+check_live "npm tarball layout: package/bin/opencode is moved into the cache" "$LIB" \
+    -q 'package/bin/opencode'
+check_live "major gate: only 2.* versions take the npm path" "$LIB" \
+    -q '2\.\*)'
 
 # --- 1.x: GitHub release assets (unchanged channel) ---------------------------
-check "1.x downloads stay on GitHub release assets" \
-    grep_q 'github\.com/anomalyco/opencode/releases/download'
-check "1.x asset name keeps the target suffix" \
-    grep_q 'opencode-\$target\.tar\.gz'
+check_live "1.x downloads stay on GitHub release assets" "$LIB" \
+    -q 'github\.com/anomalyco/opencode/releases/download'
+check_live "1.x asset name keeps the target suffix" "$LIB" \
+    -q 'opencode-\$target\.tar\.gz'
 
 # --- default lane = 2.x (issue #197): with E2E_OC_VERSION empty, lib.sh
 # resolves the npm dist-tag 'latest' (GitHub releases/latest stays 1.x
@@ -46,23 +50,23 @@ check "1.x asset name keeps the target suffix" \
 # anchored-validated against 2.x before use — registry output is
 # untrusted — and an unreachable registry falls back to the newest
 # cached binary (the offline chain must stay). ---
-check "npm_dist_latest helper exists in lib.sh" \
-    grep -q '^npm_dist_latest() {' "$LIB"
-check "default resolution goes through npm_dist_latest" \
-    grep_q 'OC_VERSION=\$(npm_dist_latest "\$target")'
-check "npm_dist_latest reads the per-target packument" \
-    grep_q 'registry\.npmjs\.org/@opencode/cli-\$tgt'
+check_live "npm_dist_latest helper exists in lib.sh" "$LIB" \
+    -q '^npm_dist_latest() {'
+check_live "default resolution goes through npm_dist_latest" "$LIB" \
+    -q 'OC_VERSION=\$(npm_dist_latest "\$target")'
+check_live "npm_dist_latest reads the per-target packument" "$LIB" \
+    -q 'registry\.npmjs\.org/@opencode/cli-\$tgt'
 check_live "default resolution is gated on an anchored 2.x semver" "$LIB" -q '\^2\\\.\[0'
-check "2.x gate message names the E2E_OC_VERSION escape hatch" \
-    grep_q 'pin E2E_OC_VERSION=<ver> to test another major'
-check "offline fallback to the newest cached binary stays" \
-    grep_q 'WARNING: version endpoint unreachable'
-check "offline fallback prefers the newest cached 2.x (lane major, #224 a W1)" \
-    grep_q 'OC_CACHE_DIR./opencode-2\.\* 2'
-check "off-major offline degradation is named, never silent (#224 a W1)" \
-    grep_q 'no cached 2x, using cached opencode'
-check "off-major warning names the E2E_OC_VERSION escape hatch (#224 a W1)" \
-    grep_q "off the default lane's 2.x major"
+check_live "2.x gate message names the E2E_OC_VERSION escape hatch" "$LIB" \
+    -q 'pin E2E_OC_VERSION=<ver> to test another major'
+check_live "offline fallback to the newest cached binary stays" "$LIB" \
+    -q 'WARNING: version endpoint unreachable'
+check_live "offline fallback prefers the newest cached 2.x (lane major, #224 a W1)" "$LIB" \
+    -q 'OC_CACHE_DIR./opencode-2\.\* 2'
+check_live "off-major offline degradation is named, never silent (#224 a W1)" "$LIB" \
+    -q 'no cached 2x, using cached opencode'
+check_live "off-major warning names the E2E_OC_VERSION escape hatch (#224 a W1)" "$LIB" \
+    -q "off the default lane's 2.x major"
 # Empty-cache hard fail (#224 b W1 follow-up): both halves must exist AND sit
 # together — the FAIL message alone without the exit would print red and
 # keep going (OC_VERSION empty -> messy failure far downstream), the exit
@@ -130,10 +134,10 @@ _npmout=$(_npmres down)
 rm -rf "$NPMWORK"
 
 # --- both fetch paths route through the shared helper -------------------------
-check "e2e_resolve_cache uses e2e_fetch_opencode" \
-    grep_q 'e2e_fetch_opencode "\$OC_VERSION"'
-check "e2e_fetch_old uses e2e_fetch_opencode" \
-    grep_q 'e2e_fetch_opencode "\$OLD_VERSION"'
+check_live "e2e_resolve_cache uses e2e_fetch_opencode" "$LIB" \
+    -q 'e2e_fetch_opencode "\$OC_VERSION"'
+check_live "e2e_fetch_old uses e2e_fetch_opencode" "$LIB" \
+    -q 'e2e_fetch_opencode "\$OLD_VERSION"'
 
 # --- rate-limit resilience (CI crash 2026-09-25: api.github.com 60 req/h
 # per IP on shared runners killed the ddev-2x job at version resolution) ---
@@ -141,8 +145,8 @@ RUN_DDEV="$(cd "$(dirname "$0")/../e2e" && pwd)/run-ddev.sh"
 WF_E2E="$(cd "$(dirname "$0")/../../.github/workflows" && pwd)/test-e2e.yml"
 WF_DDEV="$(cd "$(dirname "$0")/../../.github/workflows" && pwd)/test-e2e-ddev.yml"
 
-check "gh_latest_tag helper exists in lib.sh" \
-    grep -q '^gh_latest_tag() {' "$LIB"
+check_live "gh_latest_tag helper exists in lib.sh" "$LIB" \
+    -q '^gh_latest_tag() {'
 if live_src "$LIB" | grep -q 'OPK_GH_TOKEN' &&
     live_src "$LIB" | grep -q 'Authorization: Bearer'; then
     pass "version resolution authorizes the API when a token is present"
@@ -155,8 +159,13 @@ if live_src "$LIB" | grep -q 'url_effective' &&
 else
     fail "version resolution falls back to the releases/latest redirect"
 fi
-check "run-ddev.sh resolves ddev through gh_latest_tag (no bare API call)" \
-    sh -c "grep -q 'gh_latest_tag ddev/ddev' \"\$1\" && ! grep -q 'https://api.github.com/repos/ddev' \"\$1\"" _ "$RUN_DDEV"
+# Split from one compound sh -c row (#481 F31 sweep): the presence leg
+# rides live_src, the no-bare-API-call absence leg stays raw grep
+# (check_absent — the absence carve-out).
+check_live "run-ddev.sh resolves ddev through gh_latest_tag" "$RUN_DDEV" \
+    -q 'gh_latest_tag ddev/ddev'
+check_absent "run-ddev.sh makes no bare api.github.com ddev call" "$RUN_DDEV" \
+    -qF 'https://api.github.com/repos/ddev'
 # Token backstop (#224 a W3: since the #197 flip only the GitHub-calling
 # steps need it — the -1x lane resolves and both ddev jobs' gh_latest_tag;
 # the per-job auth contract lives in test-workflows.sh's lane pins, this
@@ -177,8 +186,8 @@ DOCKERFILE="$(cd "$(dirname "$0")/../e2e" && pwd)/Dockerfile"
 DOCKERFILE_ROOTLESS="$(cd "$(dirname "$0")/../e2e" && pwd)/Dockerfile.rootless"
 RUN_SH="$(cd "$(dirname "$0")/../e2e" && pwd)/run.sh"
 
-check "lib.sh reads the E2E_GIT_CHANNEL knob (default distro)" \
-    grep_q 'E2E_GIT_CHANNEL="\${E2E_GIT_CHANNEL:-distro}"'
+check_live "lib.sh reads the E2E_GIT_CHANNEL knob (default distro)" "$LIB" \
+    -q 'E2E_GIT_CHANNEL="\${E2E_GIT_CHANNEL:-distro}"'
 # Guarded counts (#260, the #244 f W1 class): grep -c exits 1 on zero
 # matches. This suite runs set -u only — no -e — so the bare shape
 # records its FAIL rather than aborting today; the guard keeps the
@@ -192,8 +201,8 @@ if [ "$_git_build_args" -ge 2 ]; then
 else
     fail "git channel forwarded on $_git_build_args of 2 builder paths"
 fi
-check "non-distro git channels get an image-tag suffix (cache separation)" \
-    grep_q 'E2E_IMAGE="\$E2E_IMAGE-git-\$E2E_GIT_CHANNEL"'
+check_live "non-distro git channels get an image-tag suffix (cache separation)" "$LIB" \
+    -q 'E2E_IMAGE="\$E2E_IMAGE-git-\$E2E_GIT_CHANNEL"'
 if live_src "$DOCKERFILE" | grep -q '^ARG GIT_CHANNEL=' &&
     live_src "$DOCKERFILE_ROOTLESS" | grep -q '^ARG GIT_CHANNEL='; then
     pass "Dockerfile declares the GIT_CHANNEL build arg"
@@ -210,22 +219,28 @@ fi
 # 2026-10-23, was a matrix): stable per-leg check names for branch
 # protection, and a job-level skip can no longer collapse the legs.
 # The per-leg channel assignment is pinned by test-workflows.sh
-# (per-job blocks); this is the presence + no-matrix pin.
-# (#285: the absence leg in the check below stays raw on purpose -- a
-# commented forbidden construct SHOULD keep tripping; the absence
-# carve-out in conventions.md "Source-counting pins".)
-check "CI covers the git pair as explicit jobs (distro + latest legs, issue #118)" \
-    sh -c "grep -q 'e2e-2x-git-distro:' \"\$1\" && grep -q 'e2e-2x-git-latest:' \"\$1\" && ! grep -qE 'matrix\.git|git: \[distro' \"\$1\"" _ "$WF_E2E"
-check "run.sh asserts the latest leg really runs PPA git" \
-    grep -q 'E2E_GIT_CHANNEL:-distro}" = "latest"' "$RUN_SH"
+# (per-job blocks); this is the presence + no-matrix pin, split from
+# one compound sh -c row (#481 F31 sweep): presence legs comment-
+# stripped, the no-matrix absence leg raw.
+# (#285: the absence leg stays raw on purpose -- a commented forbidden
+# construct SHOULD keep tripping; the absence carve-out in
+# conventions.md "Source-counting pins".)
+check_live "test-e2e.yml: git pair leg 'e2e-2x-git-distro' is an explicit job (issue #118)" "$WF_E2E" \
+    -q 'e2e-2x-git-distro:'
+check_live "test-e2e.yml: git pair leg 'e2e-2x-git-latest' is an explicit job (issue #118)" "$WF_E2E" \
+    -q 'e2e-2x-git-latest:'
+check_absent "test-e2e.yml: the git pair is no matrix (issue #118)" "$WF_E2E" \
+    -qE 'matrix\.git|git: \[distro'
+check_live "run.sh asserts the latest leg really runs PPA git" "$RUN_SH" \
+    -q 'E2E_GIT_CHANNEL:-distro}" = "latest"'
 
 # --- base image knob (auth.docker.io 504 outage 2026-10): CI pulls ubuntu
 # through the Google Docker Hub mirror; local runs stay on docker.io. Same
 # contract class as E2E_GIT_CHANNEL: knob in lib.sh, forwarded on BOTH
 # builder paths, ARG-before-FROM in BOTH Dockerfiles, exported by BOTH
 # workflow files. ---
-check "lib.sh reads the E2E_BASE_IMAGE knob (default ubuntu:24.04)" \
-    grep_q 'E2E_BASE_IMAGE="\${E2E_BASE_IMAGE:-ubuntu:24.04}"'
+check_live "lib.sh reads the E2E_BASE_IMAGE knob (default ubuntu:24.04)" "$LIB" \
+    -q 'E2E_BASE_IMAGE="\${E2E_BASE_IMAGE:-ubuntu:24.04}"'
 _base_build_args=$(live_src "$LIB" | grep -c -- '--build-arg BASE_IMAGE' || true)
 if [ "$_base_build_args" -ge 2 ]; then
     pass "base image forwarded on both builder paths (BuildKit + classic)"
@@ -267,8 +282,8 @@ if live_src "$LIB" |
 else
     fail "lib.sh lost the worktree-suffix assignment on E2E_CONTAINER"
 fi
-check "e2e_worktree_suffix helper exists in lib.sh" \
-    grep -q '^e2e_worktree_suffix() {' "$LIB"
+check_live "e2e_worktree_suffix helper exists in lib.sh" "$LIB" \
+    -q '^e2e_worktree_suffix() {'
 if live_src "$RUN_SH" | grep -q 'E2E_CONTAINER:-opencode-e2e-test}"' &&
     live_src "$RUN_ROOTLESS" | grep -q 'E2E_CONTAINER:-opencode-e2e-rootless-test}"' &&
     live_src "$RUN_DDEV" | grep -q 'E2E_CONTAINER:-opencode-e2e-ddev-test}"'; then

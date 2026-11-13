@@ -253,12 +253,18 @@ if [ ! -f "$GATE_SCRIPT" ]; then
     fail "tests/tsx-syntax-gate.sh missing (issue #114 gate)"
 else
     _gmissing=""
-    grep -qF 'sh tests/tsx-syntax-gate.sh' "$WF_TEST" || _gmissing="$_gmissing no-run-step"
-    grep -qF 'tui/*.tsx' "$GATE_SCRIPT" || _gmissing="$_gmissing no-tsx-glob"
+    # Comment-stripped legs (#481 F5 sweep — same class as the lane
+    # pins): a commented-out run step or gate line must not satisfy
+    # the wiring pin.
+    live_src "$WF_TEST" | grep -qF 'sh tests/tsx-syntax-gate.sh' ||
+        _gmissing="$_gmissing no-run-step"
+    live_src "$GATE_SCRIPT" | grep -qF 'tui/*.tsx' ||
+        _gmissing="$_gmissing no-tsx-glob"
     # Invocation signature (not prose): ci-ness AND the install-scripts
-    # hardening in one literal — header comments quoting "npm ci" must
-    # not satisfy this check.
-    grep -qF 'npm ci --ignore-scripts' "$GATE_SCRIPT" ||
+    # hardening in one literal — and comment-stripped, so a header
+    # comment quoting "npm ci" (or a commented-out call) satisfies
+    # neither.
+    live_src "$GATE_SCRIPT" | grep -qF 'npm ci --ignore-scripts' ||
         _gmissing="$_gmissing no-npm-ci"
     # Lockfile (lockfileVersion 3): the typescript block is the only
     # place a "version" key follows the "node_modules/typescript" key
@@ -303,11 +309,16 @@ fi
 # resolution — the checks run against the per-job block instead.
 
 job_block() { # $1 = workflow file, $2 = job id -> the job's lines on stdout
+    # Comment-stripped at capture (#481 F5): the awk span passes comment
+    # lines through verbatim, so a `#`-disabled step env or cache key
+    # must not satisfy a lane pin. The strip substitutes empty lines --
+    # line bookkeeping stays true (conventions.md "Source-counting
+    # pins", the block-strip sanction).
     awk -v hdr="  $2:" '
         index($0, hdr) == 1 { p = 1; next }
         p && /^  [A-Za-z0-9_-]+:/ { exit }
         p { print }
-    ' "$1"
+    ' "$1" | sed 's/^[[:space:]]*#.*$//'
 }
 
 check_job_lane() { # wf label job ere-pattern...
@@ -405,8 +416,14 @@ if [ "$_RB_RST_E2E" = 5 ] && [ "$_RB_RST_DDEV" = 2 ]; then
 else
     fail "battery docker restarts: test-e2e=$_RB_RST_E2E (want 5), ddev=$_RB_RST_DDEV (want 2)"
 fi
-_RB_UP_E2E=$(grep -B1 'UPSTREAM="\$(resolvectl' "$WF_E2E" | grep -c 'nameserver 1.1.1.1' || true)
-_RB_UP_DDEV=$(grep -B1 'UPSTREAM="\$(resolvectl' "$WF_DDEV_E2E" | grep -c 'nameserver 1.1.1.1' || true)
+# Order pin ridden like its siblings (#481 F4): the raw grep -B1
+# adjacency counted a `#`-commented resolver printf too -- the strip
+# substitutes an empty line, so a disabled battery line stops counting
+# while the line bookkeeping stays true.
+_RB_UP_E2E=$(live_src "$WF_E2E" | grep -B1 'UPSTREAM="\$(resolvectl' |
+    grep -c 'nameserver 1.1.1.1' || true)
+_RB_UP_DDEV=$(live_src "$WF_DDEV_E2E" | grep -B1 'UPSTREAM="\$(resolvectl' |
+    grep -c 'nameserver 1.1.1.1' || true)
 if [ "$_RB_UP_E2E" = 5 ] && [ "$_RB_UP_DDEV" = 2 ]; then
     pass "battery order: public resolvers print directly BEFORE the Azure append (5 + 2)"
 else
@@ -531,14 +548,21 @@ filter_block() { # print the dorny/paths-filter entry list of a workflow
 check_e2e_filter() {
     _wf="$1"
     _name="${_wf##*/}"
-    _blk="$(filter_block "$_wf")"
+    # Presence legs over the comment-stripped block (#481 F5): in
+    # nested YAML a `#`-commented filter entry is exactly how one
+    # disables it, so only live entries may satisfy the pin. The
+    # broadening legs below stay RAW by the absence carve-out
+    # (conventions.md "Source-counting pins"): a commented-out
+    # forbidden entry keeps tripping.
+    _blk_raw="$(filter_block "$_wf")"
+    _blk="$(printf '%s\n' "$_blk_raw" | sed 's/^[[:space:]]*#.*$//')"
     _missing=""
     for _pat in "- 'files/**'" "- 'tests/e2e/**'" "- '.github/**'" "- 'Makefile'" "- 'VERSION'"; do
         printf '%s\n' "$_blk" | grep -qF -- "$_pat" || _missing="$_missing [$_pat]"
     done
     _broad=""
-    printf '%s\n' "$_blk" | grep -qF -- "- 'tests/**'" && _broad="$_broad [tests/**]"
-    printf '%s\n' "$_blk" | grep -qF -- "- 'scripts/**'" && _broad="$_broad [scripts/**]"
+    printf '%s\n' "$_blk_raw" | grep -qF -- "- 'tests/**'" && _broad="$_broad [tests/**]"
+    printf '%s\n' "$_blk_raw" | grep -qF -- "- 'scripts/**'" && _broad="$_broad [scripts/**]"
     if [ -z "$_missing" ] && [ -z "$_broad" ]; then
         pass "$_name: code filter = e2e inputs (files/, tests/e2e/, .github/, Makefile, VERSION)"
     else
@@ -551,15 +575,15 @@ check_e2e_filter "$WF_DDEV_E2E"
 # Manual dispatches run in their own concurrency group (0.0.44a V13): a
 # workflow_dispatch resolves github.ref to refs/heads/master — the push
 # run's group — and cancel-in-progress killed the push run, reddening
-# scripts/release.sh's CI gate on exactly the release sha.
+# scripts/release.sh's CI gate on exactly the release sha. Comment-
+# stripped legs (#481 F5): a commented-out group expression must not
+# satisfy the pin.
 for _wf in test-unit test-e2e test-e2e-ddev; do
-    if grep -qF "(github.event_name == 'push' || github.event_name == 'pull_request') && github.ref" \
-        "$REPO/.github/workflows/$_wf.yml" &&
-        grep -qF "|| 'manual' }}" "$REPO/.github/workflows/$_wf.yml"; then
-        pass "$_wf.yml: dispatch gets its own concurrency group (V13)"
-    else
-        fail "$_wf.yml: dispatch gets its own concurrency group (V13)"
-    fi
+    _wfpath="$REPO/.github/workflows/$_wf.yml"
+    check_live "$_wf.yml: push/pr runs key their group by ref (V13)" "$_wfpath" \
+        -qF "(github.event_name == 'push' || github.event_name == 'pull_request') && github.ref"
+    check_live "$_wf.yml: dispatch gets its own concurrency group (V13)" "$_wfpath" \
+        -qF "|| 'manual' }}"
 done
 
 # --- 8. pages re-run hygiene (issue #388) ---------------------------------------

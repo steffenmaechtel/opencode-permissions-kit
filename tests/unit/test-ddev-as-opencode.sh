@@ -124,8 +124,13 @@ if [ "$(id -u)" != "$(id -u opencode 2>/dev/null || echo 0)" ]; then
     check "helper prints 'must run as' hint" \
         sh -c "printf '%s' \"\$1\" | grep -q 'must run as'" _ "$OUT"
 else
-    echo "  ${GREEN}PASS${NC}  (guard test skipped: current user IS opencode/undeterminable)"
-    passed=$((passed + 1))
+    # Skip disclosed, not absorbed (#481 F32): the old arm printed a
+    # PASS row and bumped the pass tally for a test that never ran --
+    # on kit dev hosts (current user IS opencode) the guard never
+    # executes but counted as passed. The sibling idiom (test-update-
+    # core.sh, test-status.sh, test-update-flags.sh): a SKIP row, no
+    # counter.
+    echo "  SKIP  helper refuses a non-opencode caller (current user IS opencode/undeterminable)"
 fi
 
 # --- 2. helper ddev-resolution / env / exec logic (static) ---------------------
