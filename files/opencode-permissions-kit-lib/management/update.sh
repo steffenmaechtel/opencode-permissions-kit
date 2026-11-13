@@ -110,6 +110,92 @@ case "$KIT_BRANCH" in
 esac
 KIT_BASE_URL="${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/$KIT_BRANCH}"
 
+# --- fetch integrity (issue #478) ---------------------------------------------
+# Every file fetch_kit and ensure_local_file stage is verified against
+# the repo's SHA256SUMS manifest (same ref) before it enters the fetch
+# tree. Trust model: the manifest rides the same origin and ref as the
+# files, so this detects corruption and non-file bodies -- a captive
+# portal's HTML passes curl -f and the non-empty guard (PR #479 round a
+# F20) -- but NOT a compromise of the origin itself: attacker-replaced
+# files come with attacker-replaced sums. Origin-compromise protection
+# needs signed manifests (internal/process/release-handling.md, Phase 2)
+# and stays out of scope. KIT_SHA_VERIFY=0 disables the mechanism
+# (break-glass for pre-manifest tag pins and odd mirrors; only the
+# operator sets their own environment -- an attacker on the wire
+# cannot).
+
+# Loud probe: a missing sha256sum aborts the fetch -- a silently
+# skipped verification would be worse than none.
+_kit_sha_probe() {
+    command -v sha256sum >/dev/null 2>&1 && return 0
+    echo "error: sha256sum is required to verify fetched kit files (coreutils) — aborting" >&2
+    echo "       (KIT_SHA_VERIFY=0 disables verification for pre-manifest pins)" >&2
+    return 1
+}
+
+# Fetch the manifest into <base> and shape-gate every line to exactly
+# `<64 lowercase hex><two spaces><ref-charset path>`: the verifier's
+# input must never be garbage (an HTML error body, a truncated
+# transfer, a CRLF-mangled mirror). Same temp discipline as the file
+# fetches: registers, moves in only when sound.
+_kit_sums_fetch() {
+    _ksf_base="$1"
+    _ksf_url="$KIT_BASE_URL/SHA256SUMS"
+    echo "  fetching SHA256SUMS ..." >&2
+    # Same named-cause guard as the per-file fetch below (#364 class).
+    _ksf_tmp=$(mktemp) || {
+        echo "error: mktemp failed (is \$TMPDIR writable?) — cannot fetch the integrity manifest" >&2
+        return 1
+    }
+    _tmp_track "$_ksf_tmp"
+    if ! curl -fsSL "$_ksf_url" -o "$_ksf_tmp" || [ ! -s "$_ksf_tmp" ]; then
+        rm -f "$_ksf_tmp"
+        echo "error: could not fetch the integrity manifest from $_ksf_url (failed or empty) — aborting" >&2
+        echo "       the ref may predate integrity manifests or the origin is broken;" >&2
+        echo "       KIT_SHA_VERIFY=0 disables verification (pre-manifest pins)" >&2
+        return 1
+    fi
+    # -v inverts: a rc 0 line selection means a NON-matching line exists.
+    if grep -vEq '^[0-9a-f]{64}  [A-Za-z0-9._/-]+$' "$_ksf_tmp"; then
+        rm -f "$_ksf_tmp"
+        echo "error: integrity manifest from $_ksf_url is malformed (expected sha256sum lines) — aborting" >&2
+        return 1
+    fi
+    chmod 644 "$_ksf_tmp"
+    mv "$_ksf_tmp" "$_ksf_base/SHA256SUMS"
+}
+
+# The pinned digest for <name> from <manifest>: stdout, rc 1 when the
+# name has no entry or is ambiguous (duplicates) -- both are manifest
+# drift and fail closed.
+_kit_sums_expected() {
+    awk -v p="$2" '$2 == p { n++; h = $1 } END { if (n == 1) print h; else exit 1 }' "$1"
+}
+
+# Verify one fetched file against the manifest: names the file and both
+# digests on mismatch (issue #478's reporting requirement). The manifest
+# key is the repo-root-relative path (`files/<name>` / `VERSION`) — the
+# generator's format; the caller passes the KIT_FILES name.
+_kit_sums_check() {
+    _ksc_file="$1" _ksc_name="$2" _ksc_man="$3"
+    case "$_ksc_name" in
+        VERSION) _ksc_key="VERSION" ;;
+        *) _ksc_key="files/$_ksc_name" ;;
+    esac
+    if ! _ksc_want=$(_kit_sums_expected "$_ksc_man" "$_ksc_key"); then
+        echo "error: no unique SHA256SUMS entry for '$_ksc_name' (manifest and fetch list drifted) — aborting" >&2
+        return 1
+    fi
+    _ksc_got=$(sha256sum "$_ksc_file" | awk '{print $1}')
+    if [ "$_ksc_want" != "$_ksc_got" ]; then
+        echo "error: SHA256 mismatch for $_ksc_name — aborting (the fetched file is NOT the released one)" >&2
+        echo "       expected: $_ksc_want" >&2
+        echo "       actual:   $_ksc_got" >&2
+        return 1
+    fi
+}
+# --- end fetch integrity ------------------------------------------------------
+
 # Canonical kit file list. Single source of truth shared by fetch_kit() and
 # the pre-deploy verification (ensure_local_file), so the two can never drift
 # and a stale installed update.sh fetching an incomplete temp dir is healed
@@ -209,6 +295,15 @@ fetch_kit() {
         "$dir/opencode-permissions-kit-lib/py" "$dir/opencode-permissions-kit-lib/tui" \
         "$dir/opencode-permissions-kit-lib/management" "$dir/opencode-permissions-kit-lib/templates" \
         "$dir/etc"
+    # Integrity manifest first (issue #478): every file below is verified
+    # against it before it enters this tree. Gate order is deliberate:
+    # tool probe, manifest fetch + shape gate, then the per-file loop.
+    _fk_sums=""
+    if [ "${KIT_SHA_VERIFY:-1}" != 0 ]; then
+        _kit_sha_probe || return 1
+        _kit_sums_fetch "$base" || return 1
+        _fk_sums="$base/SHA256SUMS"
+    fi
     for f in $KIT_FILES; do
         echo "  fetching $f ..." >&2
         # Fetch to a temp file and refuse anything unsound (0.0.39e C1):
@@ -232,6 +327,12 @@ fetch_kit() {
         if ! curl -fsSL "$_fk_url" -o "$_fk_tmp" || [ ! -s "$_fk_tmp" ]; then
             rm -f "$_fk_tmp"
             echo "error: could not fetch $f from $_fk_url (failed or empty) — aborting" >&2
+            return 1
+        fi
+        # Integrity gate (issue #478): the staged temp must match the
+        # manifest before it is moved into the fetch tree.
+        if [ -n "${_fk_sums:-}" ] && ! _kit_sums_check "$_fk_tmp" "$f" "$_fk_sums"; then
+            rm -f "$_fk_tmp"
             return 1
         fi
         chmod 644 "$_fk_tmp"
@@ -268,6 +369,13 @@ ensure_local_file() {
     if ! curl -fsSL "$KIT_BASE_URL/files/$f" -o "$_elf_tmp" 2>/dev/null || [ ! -s "$_elf_tmp" ]; then
         rm -f "$_elf_tmp"
         echo "error: could not fetch $f from $KIT_BASE_URL — aborting (partial files are never deployed)" >&2
+        return 1
+    fi
+    # Same integrity gate as fetch_kit (issue #478): a re-fetched file
+    # enters the deploy tree only when it matches the manifest.
+    if [ -n "${_fk_sums:-}" ] && ! _kit_sums_check "$_elf_tmp" "$f" "$_fk_sums"; then
+        rm -f "$_elf_tmp"
+        echo "error: re-fetched $f failed the SHA256SUMS check — aborting (partial files are never deployed)" >&2
         return 1
     fi
     chmod 644 "$_elf_tmp"
@@ -386,6 +494,58 @@ fi
 # is files/opencode-permissions-kit-lib/management (two levels down).
 FILES_ROOT="$(cd "$SCRIPT_DIR/../.." 2>/dev/null && pwd -P)"
 
+# --- fetch integrity context (issue #478) ---------------------------------------
+# fetch_kit above verifies per file when THIS copy fetched the tree. Two
+# residual paths need the manifest resolved HERE, after the re-exec:
+#   (a) the streamed/deployed flow: _fk_sums dies with the pre-exec
+#       shell while the fetched manifest survives at the tree root;
+#   (b) an older deployed update.sh (a pre-manifest fetcher) fetched the
+#       tree without any manifest and re-exec'd THIS copy -- the resolve
+#       step fetches the manifest the old fetcher never pulled, and the
+#       tree verify below checks the whole staged tree before anything
+#       deploys (the issue #478 acceptance criterion).
+# Checkout runs without a manifest (a pre-manifest vintage) resolve
+# nothing and verify nothing tree-wide: local files are developer
+# trust, and a dirty checkout must not read as a corrupted fetch.
+_fk_sums_resolve() {
+    if [ "${KIT_SHA_VERIFY:-1}" = 0 ]; then
+        return 0
+    fi
+    if [ -f "$FILES_ROOT/../SHA256SUMS" ]; then
+        _fk_sums="$FILES_ROOT/../SHA256SUMS"
+    elif [ -n "${_FETCH_TREE:-}" ]; then
+        _kit_sha_probe || return 1
+        _kit_sums_fetch "$_FETCH_TREE" || return 1
+        _fk_sums="$_FETCH_TREE/SHA256SUMS"
+    fi
+    return 0
+}
+_fk_sums_resolve || {
+    echo "error: cannot establish the SHA256SUMS verification context — aborting" >&2
+    exit 1
+}
+
+# Whole-tree verification before any deploy phase runs (issue #478):
+# covers trees an OLDER deployed fetcher staged unverified (the
+# pre-manifest fetcher + re-exec window, case (b) above) and a channel
+# that moved between an old fetch and this manifest. Fetch trees only
+# -- the resolve block's checkout carve-out applies here too. The
+# manifest paths are repo-root-relative and the fetch tree mirrors the
+# repo root (files/ + VERSION), so `sha256sum -c` reads it in place;
+# --quiet prints the failing lines only.
+verify_fetched_tree() {
+    [ -n "${_FETCH_TREE:-}" ] || return 0
+    [ -n "${_fk_sums:-}" ] || return 0
+    echo "Verifying fetched kit tree against SHA256SUMS ..." >&2
+    if ! (cd "$_FETCH_TREE" && sha256sum -c --quiet SHA256SUMS); then
+        echo "error: fetched kit tree failed the SHA256SUMS verification — aborting" >&2
+        echo "       re-run the update (a channel that moved mid-fetch shows exactly this);" >&2
+        echo "       KIT_SHA_VERIFY=0 skips verification (pre-manifest pins)" >&2
+        return 1
+    fi
+    return 0
+}
+
 # Heal an incomplete fetched temp dir (see ensure_local_file above) before we
 # touch any of the files. No-op for a real local checkout; skipped entirely
 # for binary-only runs from the installed library.
@@ -394,6 +554,9 @@ if [ "$_opk_binonly" != true ]; then
         [ "$f" = "VERSION" ] && continue
         ensure_local_file "$f"
     done
+    # Plain statement on purpose (the phase-call idiom): under set -e a
+    # failed verification aborts the update with the named errors above.
+    verify_fetched_tree
 fi
 # Library runs have no ../VERSION — fall back to the installed stamp so the
 # banner/summary show the real version (binary-only runs never re-stamp it).

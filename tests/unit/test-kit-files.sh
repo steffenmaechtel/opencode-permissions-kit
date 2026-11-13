@@ -274,21 +274,55 @@ esac
 
 # 5b. functional: run update.sh's fetch_kit with a fake curl that writes the
 #     -o target directly (NO directory creation, like real curl — a missing
-#     parent dir must fail, reproducing curl error 23).
+#     parent dir must fail, reproducing curl error 23). Since issue #478 the
+#     fake curl also answers SHA256SUMS URLs with a VALID manifest for the
+#     stub bodies ($FAKE_SUMS) so fetch_kit's integrity gate passes — these
+#     arms test the fetch MECHANICS; the gate's own arms live in
+#     tests/unit/test-fetch-integrity.sh.
 mkdir -p "$WORK/fakebin"
 cat >"$WORK/fakebin/curl" <<'FAKE'
 #!/bin/sh
 _out=""
+_url=""
 while [ $# -gt 0 ]; do
-    [ "$1" = "-o" ] && _out="$2" && break
+    if [ "$1" = "-o" ]; then
+        _out="$2"
+        shift 2
+        continue
+    fi
+    _url="$1"
     shift
 done
-printf 'stub\n' > "$_out"
+case "$_url" in
+    */SHA256SUMS) printf '%s' "$FAKE_SUMS" >"$_out" ;;
+    *) printf 'stub\n' >"$_out" ;;
+esac
 FAKE
 chmod +x "$WORK/fakebin/curl"
 
+# The manifest matching every stub body (one digest, every listed name,
+# repo-root-relative form like scripts/gen-sums.sh emits it).
+_stub_hash="$(printf 'stub\n' | sha256sum | awk '{print $1}')"
+FAKE_SUMS=""
+for f in $update_list; do
+    case "$f" in
+        VERSION) FAKE_SUMS="$FAKE_SUMS$_stub_hash  VERSION
+" ;;
+        *) FAKE_SUMS="$FAKE_SUMS$_stub_hash  files/$f
+" ;;
+    esac
+done
+export FAKE_SUMS
+
 sed -n '/^KIT_FILES="/,/"$/p' "$UPDATE" >"$WORK/kitfiles.env"
 extract_func "$UPDATE" fetch_kit >"$WORK/fetchkit.fn"
+# fetch_kit's integrity helpers (issue #478) ride along — without them
+# the extracted function dies rc 127 at _kit_sha_probe. The marker range
+# is executed (dot), not pinned, so it stays un-ridden (conventions.md
+# "Source-counting pins": behavioral probes keep raw source).
+sed -n '/^# --- fetch integrity (issue #478) ---/,/^# --- end fetch integrity ---/p' "$UPDATE" |
+    sed '1d;$d' >"$WORK/sumsfn.sh"
+[ -s "$WORK/sumsfn.sh" ] || fail "fetch integrity helper block extracted from update.sh (empty — marker drift?)"
 # fetch_kit reports the tree via the _FK_DIR global (no stdout — a
 # command-substitution call would void the trap registrations); the
 # inner shell echoes it deliberately for this test. The dump contract is
@@ -300,13 +334,15 @@ extract_func "$UPDATE" fetch_kit >"$WORK/fetchkit.fn"
 # line-start trap statement as the suite's own and reds the
 # work-registry mix (check 4b).
 _fk_out="$(PATH="$WORK/fakebin:$PATH" sh -c '
+    _tmp_track() { :; }
     . "$1"
+    . "$3"
     eval "$(cat "$2")"
     fetch_kit
     _fk_rc=$?
     printf "%s\n" "${_FETCH_TREE:-}"
     [ "$_fk_rc" -eq 0 ] && printf "%s\n" "$_FK_DIR"
-' _ "$WORK/kitfiles.env" "$WORK/fetchkit.fn" 2>/dev/null || true)"
+' _ "$WORK/kitfiles.env" "$WORK/fetchkit.fn" "$WORK/sumsfn.sh" 2>/dev/null || true)"
 # The staging BASE is the receiver (#443): inside the inner shell
 # fetch_kit's `mktemp -d` base has no cleanup of its own (the inner shell
 # loads only KIT_FILES plus the extracted function -- update.sh's
@@ -354,13 +390,15 @@ cat >"$WORK/fakebin/curl" <<'FAKE'
 exit 1
 FAKE
 _fk2_out="$(PATH="$WORK/fakebin:$PATH" sh -c '
+    _tmp_track() { :; }
     . "$1"
+    . "$3"
     eval "$(cat "$2")"
     fetch_kit
     _fk_rc=$?
     printf "%s\n" "${_FETCH_TREE:-}"
     [ "$_fk_rc" -eq 0 ] && printf "%s\n" "$_FK_DIR"
-' _ "$WORK/kitfiles.env" "$WORK/fetchkit.fn" 2>/dev/null || true)"
+' _ "$WORK/kitfiles.env" "$WORK/fetchkit.fn" "$WORK/sumsfn.sh" 2>/dev/null || true)"
 _fk2_base="$(printf '%s\n' "$_fk2_out" | sed -n 1p)"
 _fk2_dir="$(printf '%s\n' "$_fk2_out" | sed -n 2p)"
 if [ -n "$_fk2_base" ]; then

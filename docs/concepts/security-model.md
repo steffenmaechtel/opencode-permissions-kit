@@ -46,6 +46,48 @@ One exception: **browser-opening commands** (`launch`, `mailpit`,
 the developer — it needs the Windows interop the agent must not have. See
 [ddev integration](ddev-integration.md#browser-opening-commands).
 
+## Download integrity (SHA256SUMS)
+
+The streamed installer and updater fetch every kit file from
+`raw.githubusercontent.com`. Since issue #478 each fetched file is
+verified against the repo's **`SHA256SUMS`** manifest (fetched from the
+same ref) before it enters the staging tree: the digest must match
+exactly, or the install/update aborts — nothing is deployed, temps are
+cleaned, and the error names the file plus expected/actual digests. The
+manifest itself is shape-gated line by line (an HTML error body never
+becomes a "manifest"), and `opk update` additionally re-verifies the
+whole staged tree before any deploy phase runs, which also covers trees
+an older deployed updater fetched before this mechanism existed.
+
+What this buys:
+
+- **Corruption detection** — truncated transfers, a broken mirror, or a
+  captive portal's HTML page masquerading as a 200 file body can no
+  longer reach `/usr/local/lib` as root.
+
+What it deliberately does **not** buy:
+
+- **Origin-compromise protection.** The manifest rides the same origin
+  and ref as the files: an attacker able to replace the files can
+  replace the manifest too, with matching digests. Protecting against
+  that requires signed manifests (a public key shipped independently of
+  the streamed scripts) — a deliberate Phase 2 non-goal for now.
+
+Operational notes:
+
+- `KIT_SHA_VERIFY=0` disables the mechanism (break-glass for tag pins
+  that predate the manifest and for odd mirrors; only the operator sets
+  their own environment — an attacker on the wire cannot).
+- A missing `sha256sum` binary aborts the fetch loudly — verification is
+  never silently skipped.
+- Refs without a manifest (tags older than the mechanism) fail closed
+  under new code with a named error. Streaming an *old* tag's own
+  `install.sh` keeps working as before: that script predates the
+  mechanism entirely.
+- Maintainer side: the manifest is regenerated with `make sums` and
+  committed; the unit suite's freshness pin reddens on a stale manifest
+  and `make release` refuses to cut a release from one.
+
 ## Known residual gaps
 
 - **Bash-spawned reads** (`cat .env`) are only caught by the template's
@@ -73,9 +115,11 @@ the developer — it needs the Windows interop the agent must not have. See
   capability). The keyless alternative is ddev's `.ddev/custom_certs/`
   flow, at the cost of per-project manual provisioning.
 - **Supply chain (trust assumption):** install and update stream kit files
-  and the opencode binary over HTTPS without checksums or signatures (the
-  `--binary` "verification" is a liveness check — `opencode --version`
-  runs — not an integrity check), and rootless backend provisioning runs
+  and the opencode binary over HTTPS. Kit files carry SHA256SUMS
+  integrity verification ([above](#download-integrity-sha256sums)) —
+  corruption detection, not origin-compromise protection. The opencode
+  binary is still verified only by a liveness check (`opencode --version`
+  runs, not an integrity check), and rootless backend provisioning runs
   get.docker.com as root. Installing means trusting GitHub, the opencode
   releases, the npm registry and `opencode.ai/v2/install` (2.x binary
   resolution and the optional root-run installer fallback), and

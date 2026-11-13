@@ -411,6 +411,10 @@ fi
 # Fake curl: every file gets content EXCEPT etc/umask.sh, which answers
 # HTTP-200-style success with an EMPTY body (captive portal / broken
 # mirror). fetch_kit must abort instead of deploying the empty file.
+# Since issue #478 the SHA256SUMS URL answers a VALID manifest for the
+# content bodies ($FAKE_SUMS) so the integrity gate passes and the arm
+# still asserts the empty-BODY guard (the gate's own arms live in
+# tests/unit/test-fetch-integrity.sh).
 FKWORK=$(mktemp -d)
 # Trap every mktemp receiver of this suite on abort and signals (#283):
 # the suite had no live trap (its only "trap" lines are grep pins over
@@ -428,18 +432,43 @@ _trap_cleanup() {
 }
 trap _trap_cleanup EXIT INT TERM
 mkdir -p "$FKWORK/bin"
+# The manifest matching every `content` body (one digest, every listed
+# name) — install.sh's inline fetch list, same extraction idiom as
+# tests/unit/test-kit-files.sh.
+_fkia_list="$(extract_func "$INSTALL" fetch_kit |
+    sed -n '/for f in /,/; do/p' |
+    sed -e 's/^[[:space:]]*for f in //' -e 's/; do$//' |
+    sed -e 's/\\$//' | tr '\n' ' ' | sed -e 's/  */ /g' -e 's/^ //' -e 's/ $//')"
+_fkia_hash="$(printf 'content\n' | sha256sum | awk '{print $1}')"
+FAKE_SUMS=""
+for f in $_fkia_list; do
+    case "$f" in
+        VERSION) FAKE_SUMS="$FAKE_SUMS$_fkia_hash  VERSION
+" ;;
+        *) FAKE_SUMS="$FAKE_SUMS$_fkia_hash  files/$f
+" ;;
+    esac
+done
+export FAKE_SUMS
 cat >"$FKWORK/bin/curl" <<'FAKE'
 #!/bin/sh
 # args: -fsSL <url> -o <tmpfile>
 last=
 for a in "$@"; do last="$a"; done
 case "$2" in
+    */SHA256SUMS) printf '%s' "$FAKE_SUMS" > "$last"; exit 0 ;;
     */files/etc/umask.sh) : > "$last"; exit 0 ;;   # empty-but-200
     *) printf 'content\n' > "$last"; exit 0 ;;
 esac
 FAKE
 chmod +x "$FKWORK/bin/curl"
 eval "$(extract_func "$INSTALL" fetch_kit)"
+# fetch_kit's integrity helpers (issue #478) ride along — without them
+# the extracted function dies rc 127 at _kit_sha_probe. Marker range,
+# executed (not pinned), so it stays un-ridden (conventions.md
+# "Source-counting pins": behavioral probes keep raw source).
+eval "$(sed -n '/^# --- fetch integrity (issue #478) ---/,/^# --- end fetch integrity ---/p' "$INSTALL" |
+    sed '1d;$d')"
 # fetch_kit registers its fetch temps via _tmp_track (the host script's
 # trap empties the registry; the isolated function only needs it defined).
 _tmp_track() { :; }
@@ -476,6 +505,10 @@ for _fkg_host in "$INSTALL" "$UPDATE"; do
     mkdir -p "$_fkg_w/a-bin" "$_fkg_w/b-bin"
     _fkg_name="$(basename "$_fkg_host")"
     eval "$(extract_func "$_fkg_host" fetch_kit)"
+    # integrity helpers ride along (issue #478) — arm (b) reaches
+    # _kit_sums_fetch's mktemp before any per-file fetch.
+    eval "$(sed -n '/^# --- fetch integrity (issue #478) ---/,/^# --- end fetch integrity ---/p' "$_fkg_host" |
+        sed '1d;$d')"
     _tmp_track() { :; }
 
     # shared: fake curl (never reached in green; sabotage must not hit

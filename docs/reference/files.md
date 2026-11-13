@@ -224,3 +224,15 @@ deployment like `.ddev/`.
 
 Which project directories the kit hands over to the `opencode` user is
 explained in [ddev integration](../concepts/ddev-integration.md).
+
+## Repository root: SHA256SUMS
+
+Not deployed — the integrity manifest for the streamed downloads
+([issue #478](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/478)).
+One coreutils `sha256sum` line per streamed kit file
+(`<digest>  files/<path>` plus `VERSION`), fetched by `install.sh` and
+`update.sh` from the same ref as the files and enforced before anything
+is staged — details and trust model:
+[security model](../concepts/security-model.md#download-integrity-sha256sums).
+Regenerate with `make sums` after any change under `files/` and commit
+it with your PR; the suite reddens on a stale manifest.
