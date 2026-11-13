@@ -1163,9 +1163,15 @@ update_finalize_default_config() {
         DEFAULT_OC_CONF="$DEFAULT_HOME/.config/opencode/opencode.jsonc"
         if [ ! -f "$DEFAULT_OC_CONF" ]; then
             sudo mkdir -p "$(dirname "$DEFAULT_OC_CONF")"
-            sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc" "$DEFAULT_OC_CONF"
-            sudo chown "$DEFAULT_USER:$NEW_OPENCODE_GROUP" "$DEFAULT_OC_CONF"
-            sudo chmod 664 "$DEFAULT_OC_CONF"
+            # Atomic deploy (#482 F19, install twin): a plain cp killed
+            # mid-write leaves a TRUNCATED deny-all that this gate then
+            # reads as existing — the protection layer is silently gone
+            # (this arm deploys only-if-absent, the else arm leaves
+            # existing files untouched, so nothing ever heals it).
+            # staged_write flips content, owner and mode in via one mv.
+            staged_write 664 "$DEFAULT_USER:$NEW_OPENCODE_GROUP" \
+                "$FILES_ROOT/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc" \
+                "$DEFAULT_OC_CONF"
             ui_success "deny-all config installed for default user: $DEFAULT_OC_CONF"
             log "deny-all config installed for default user: $DEFAULT_OC_CONF"
         else

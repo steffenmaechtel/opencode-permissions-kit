@@ -1384,6 +1384,18 @@ check "12k: install twin leaves admin-extended policy untouched (0.0.47b W3)" \
 check "12k: install twin announces the skip" \
     E 'grep -q "left untouched" /tmp/oc-install-twin.log'
 E 'rm -f /tmp/oc-install-twin.log'
+# #482 F17: the install-side WRITE arm (absent file + opt-in) — the
+# pin must land atomically with the kit content and root:root 644, no
+# staged temp residue (the arms above only exercised the skip paths).
+E 'sudo rm -f /etc/openchamber/policy.json'
+E 'sudo bash /home/dev/repo/files/install.sh --yes --container-backend podman-rootless --projects /var/www/vhosts --ddev-settings ddev --openchamber-policy yes > /tmp/oc-install-write.log 2>&1'
+check "12k: install writes the policy pin when absent + opt-in (#482 F17)" \
+    E 'test "$(cat /etc/openchamber/policy.json)" = "{\"opencodeBinary\": \"/usr/local/bin/opencode\" }"'
+check "12k: install-written pin is root:root 644 (#482 F17)" \
+    E 'sudo stat -c "%U:%G %a" /etc/openchamber/policy.json | grep -q "^root:root 644$"'
+check "12k: install-written pin leaves no staged temp behind (#482 F17)" \
+    E '! ls /etc/openchamber/policy.json.opk-new.* 2>/dev/null'
+E 'rm -f /tmp/oc-install-write.log'
 # 0.0.47b W4: the getent failure path — an unresolvable DEFAULT_USER skips
 # the leftover scan loudly (rc 0, pin write unaffected); riding: the
 # explicit command's announced replacement of the divergent file, asserted

@@ -654,6 +654,101 @@ check_live "gates: uninstall.sh plugin-removal chain gate" \
 check_live "0.0.39h F3: staged-write.sh refuses a directory destination" "$STAGEDWRITE" \
     -qF 'destination '"'"'$_sw_dst'"'"' is a directory'
 
+# --- 5c. deny-all deploys ride staged_write (#482 F19, install + update twin) ------
+# Real drives of both write sites' [ ! -f ] blocks (the gate + the write
+# the finding is about): each must deploy the REAL template with content
+# + mode 664 through the section-1 staged_write (stage+mv — a mid-write
+# kill can no longer strand a truncated deny-all that the only-if-absent
+# gate then reads as existing), and the install gate must leave an
+# existing file untouched (the never-heals contract the finding rides
+# on). Owner legs ride a self-chown (unprivileged chown-to-self is the
+# verified no-op success; a foreign owner would EPERM the drive).
+_F19W="$WORK/f19"
+mkdir -p "$_F19W/stage" "$_F19W/i-home/.config/opencode" "$_F19W/u-home/.config/opencode"
+_f19_tmpl="$REPO/files/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc"
+_f19_iblock="$(sed -n '/if \[ ! -f "$DEFAULT_OC_CONF" \]; then/,/^    fi$/p' "$INSTALL_CORE")"
+_f19_ublock="$(sed -n '/if \[ ! -f "$DEFAULT_OC_CONF" \]; then/,/^        fi$/p' "$UPDATE_CORE")"
+if [ -n "$_f19_iblock" ] && [ -n "$_f19_ublock" ]; then
+    pass "deny-all blocks extractable, install + update twin (#482 F19)"
+    _f19_i_rc=0
+    _f19_i_out=$(
+        sh -c '
+            DEFAULT_OC_CONF="$1/i-home/.config/opencode/opencode.jsonc"
+            DEFAULT_USER="$2"
+            OPENCODE_GROUP="$3"
+            SCRIPT_DIR="$4"
+            SW_SUDO=""
+            SW_STAGE_DIR="$1/stage"
+            ui_success() { echo "success: $*"; }
+            log() { echo "log: $*"; }
+            . "$5"
+            eval "$6"
+        ' _ "$_F19W" "$(id -un)" "$(id -gn)" "$REPO/files" "$STAGEDWRITE" "$_f19_iblock"
+    ) || _f19_i_rc=$?
+    if [ "$_f19_i_rc" -eq 0 ] &&
+        [ "$(cat "$_F19W/i-home/.config/opencode/opencode.jsonc" 2>/dev/null)" = "$(cat "$_f19_tmpl")" ] &&
+        [ "$(stat -c %a "$_F19W/i-home/.config/opencode/opencode.jsonc" 2>/dev/null)" = 664 ] &&
+        [ -z "$(ls -A "$_F19W/stage" 2>/dev/null)" ]; then
+        pass "install deny-all: real template via staged_write, mode 664, no staging leftovers (#482 F19)"
+    else
+        fail "install deny-all staged_write deploy (rc=$_f19_i_rc) (#482 F19)"
+    fi
+    printf 'USER-OWNED-SENTINEL\n' >"$_F19W/i-home/.config/opencode/opencode.jsonc"
+    sh -c '
+        DEFAULT_OC_CONF="$1/i-home/.config/opencode/opencode.jsonc"
+        DEFAULT_USER="$2"
+        OPENCODE_GROUP="$3"
+        SCRIPT_DIR="$4"
+        SW_SUDO=""
+        SW_STAGE_DIR="$1/stage"
+        ui_success() { :; }
+        log() { :; }
+        . "$5"
+        eval "$6"
+    ' _ "$_F19W" "$(id -un)" "$(id -gn)" "$REPO/files" "$STAGEDWRITE" "$_f19_iblock"
+    if [ "$(cat "$_F19W/i-home/.config/opencode/opencode.jsonc" 2>/dev/null)" = "USER-OWNED-SENTINEL" ]; then
+        pass "install deny-all gate: existing config left untouched (#482 F19)"
+    else
+        fail "install deny-all gate must not overwrite an existing config (#482 F19)"
+    fi
+    _f19_u_rc=0
+    _f19_u_out=$(
+        sh -c '
+            sudo() { "$@"; }
+            DEFAULT_OC_CONF="$1/u-home/.config/opencode/opencode.jsonc"
+            DEFAULT_USER="$2"
+            NEW_OPENCODE_GROUP="$3"
+            FILES_ROOT="$4"
+            SW_SUDO=""
+            SW_STAGE_DIR="$1/stage"
+            ui_success() { echo "success: $*"; }
+            ui_detail() { echo "detail: $*"; }
+            log() { echo "log: $*"; }
+            . "$5"
+            eval "$6"
+        ' _ "$_F19W" "$(id -un)" "$(id -gn)" "$REPO/files" "$STAGEDWRITE" "$_f19_ublock"
+    ) || _f19_u_rc=$?
+    if [ "$_f19_u_rc" -eq 0 ] &&
+        [ "$(cat "$_F19W/u-home/.config/opencode/opencode.jsonc" 2>/dev/null)" = "$(cat "$_f19_tmpl")" ] &&
+        [ "$(stat -c %a "$_F19W/u-home/.config/opencode/opencode.jsonc" 2>/dev/null)" = 664 ]; then
+        pass "update twin: real template via staged_write, mode 664 (#482 F19)"
+    else
+        fail "update deny-all staged_write deploy (rc=$_f19_u_rc out=$_f19_u_out) (#482 F19)"
+    fi
+else
+    fail "deny-all blocks extractable, install + update twin (#482 F19)"
+fi
+# #482 F19 sweep: the projects.conf CREATE at install rides the same
+# temp+mv shape as config.sh's atomic rewrite of the same file (the
+# install.conf stamp C5 pin above is the neighboring idiom).
+if live_src "$INSTALL_CORE" | grep -qF '_PRJ_CONF_TMP=' &&
+    live_src "$INSTALL_CORE" | grep -qF 'mv -f "$_PRJ_CONF_TMP"' &&
+    ! grep -qF 'sudo tee /etc/opencode-permissions-kit/projects.conf' "$INSTALL_CORE"; then
+    pass "#482 F19 sweep: projects.conf create is temp + mv (config.sh twin shape)"
+else
+    fail "#482 F19 sweep: projects.conf create must be atomic (temp + mv)"
+fi
+
 # --- summary -----------------------------------------------------------------------
 
 suite_done "staged-write / handover gate tests"
