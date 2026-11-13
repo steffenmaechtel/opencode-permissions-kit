@@ -1196,9 +1196,11 @@ if [ "$_rootless_ok" = true ]; then
         check "12i: rootless container CAN read index.php via bind mount" \
             container_cat_check "normal source code" index.php
     else
-        # The label names the count (#494 a F1): the tally counts skip
-        # EVENTS (1), not the 2 container-read checks behind this site.
-        skip "12i: alpine pull failed — 2 container read checks not run ($(sudo tail -1 /tmp/podman-pull.out 2>/dev/null || echo unknown))"
+        # The label names the count (#494 a F1, corrected b B1): the
+        # tally counts skip EVENTS (1), not the 3 container-read checks
+        # behind this site (.env, settings.php, index.php) — the old
+        # "+ 2" hand tally had miscounted them all along.
+        skip "12i: alpine pull failed — 3 container read checks not run ($(sudo tail -1 /tmp/podman-pull.out 2>/dev/null || echo unknown))"
     fi
 fi
 
