@@ -425,6 +425,13 @@ if [ -z "$_dc_sites" ]; then
 else
     fail "failure tallies double-counted (two increments < 4 lines apart):$_dc_sites"
 fi
+# Vacuous-pass control (#494 a F3): the window pin consumes the awk in a
+# $( ) — empty output (pattern regression, quoting slip) would pass at
+# zero forever. This arm proves the SAME pattern still sees run-ddev.sh's
+# live increments, so a zero-match window result means "clean", not
+# "blind".
+check "double-count pattern still matches live increments (vacuous-pass control, #494 a F3)" \
+    awk '/failures=\$\(\(failures \+ 1\)\)/ { n++ } END { exit !(n >= 1) }' "$RUN_DDEV"
 
 echo ""
 if [ "$failures" -gt 0 ]; then

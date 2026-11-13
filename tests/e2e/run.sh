@@ -1141,9 +1141,10 @@ fi
 # 12i.1 re-apply podman-rootless via config.sh (idempotent re-provision of the
 # install-time backend; exercises the config.sh switch path).
 if ! E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh --yes container-backend podman-rootless >/tmp/config-backend.log 2>&1'; then
-    echo "  ${YELLOW}SKIP${NC}  12i: backend provisioning failed ($(E 'tail -1 /tmp/config-backend.log' 2>/dev/null || echo unknown))"
     _rootless_ok=false
-    skip "12i: backend provisioning failed"
+    # One row per event (#494 a F2): the log-tail detail rides the skip
+    # label — skip() already prints the SKIP row a second echo duplicated.
+    skip "12i: backend provisioning failed ($(E 'tail -1 /tmp/config-backend.log' 2>/dev/null || echo unknown))"
 fi
 
 # 12i.2 verify install.conf + sudoers state.
@@ -1173,9 +1174,8 @@ if [ "$_rootless_ok" = true ]; then
         check "12i: rootless podman works as the opencode user (nested userns)" \
             E 'cd /tmp && sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/$(id -u opencode) podman info >/dev/null 2>&1"'
     else
-        echo "  ${YELLOW}SKIP${NC}  12i: nested user namespaces not available ($(E 'tail -1 /tmp/podman-info.out' 2>/dev/null || echo unknown))"
         _rootless_ok=false
-        skip "12i: nested user namespaces not available"
+        skip "12i: nested user namespaces not available ($(E 'tail -1 /tmp/podman-info.out' 2>/dev/null || echo unknown))"
     fi
 fi
 
@@ -1196,8 +1196,9 @@ if [ "$_rootless_ok" = true ]; then
         check "12i: rootless container CAN read index.php via bind mount" \
             container_cat_check "normal source code" index.php
     else
-        echo "  ${YELLOW}SKIP${NC}  12i: could not pull alpine (no network?) — $(sudo tail -1 /tmp/podman-pull.out 2>/dev/null || echo unknown)"
-        skip "12i: alpine pull failed — container read checks not run"
+        # The label names the count (#494 a F1): the tally counts skip
+        # EVENTS (1), not the 2 container-read checks behind this site.
+        skip "12i: alpine pull failed — 2 container read checks not run ($(sudo tail -1 /tmp/podman-pull.out 2>/dev/null || echo unknown))"
     fi
 fi
 

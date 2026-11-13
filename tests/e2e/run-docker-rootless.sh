@@ -189,7 +189,8 @@ echo "--- RL2. Switch to docker-rootless via config.sh (real provisioning) ---"
 # enable+start docker.service, linger. Run the REPO checkout so we test the
 # local code, not a potentially stale installed copy.
 if ! E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh --yes container-backend docker-rootless >/tmp/config-drl.log 2>&1'; then
-    echo "  ${YELLOW}SKIP${NC}  RL2: docker-rootless provisioning failed"
+    # No announcing SKIP echo (#494 a F2): skip() at the arm's end prints
+    # the same verdict — the dump block between is diagnostic context.
     echo "  --- /tmp/config-drl.log (full) ---"
     E 'sed "s/\x1b\[[0-9;]*m//g" /tmp/config-drl.log 2>/dev/null' || true
     if [ "$E2E_DEBUG" = "1" ]; then
@@ -213,7 +214,7 @@ if [ "$_rootless_ok" = true ]; then
         sleep 1
     done
     if [ "$_sock_ok" = false ]; then
-        echo "  ${YELLOW}SKIP${NC}  RL2: docker-rootless daemon socket never appeared"
+        # No announcing SKIP echo (#494 a F2) — skip() closes the arm.
         echo "  --- /tmp/config-drl.log (last 40 lines) ---"
         E 'sed "s/\x1b\[[0-9;]*m//g" /tmp/config-drl.log 2>/dev/null | tail -40' || true
         echo "  --- docker.service status (as opencode) ---"
@@ -348,8 +349,9 @@ if [ "$_rootless_ok" = true ]; then
         check "RL4 §9.1 (soft-only): container CAN read settings.php via bind mount (ddev boots)" \
             _rl_cat_check hunter2 settings.php
     else
-        echo "  ${YELLOW}SKIP${NC}  RL4 §9.1: could not pull alpine (no network?) — $(E 'tail -1 /tmp/docker-pull.out' 2>/dev/null || echo unknown)"
-        skip "RL4: alpine pull failed — container userns/read checks not run"
+        # The label names the count (#494 a F1): the tally counts skip
+        # EVENTS (1), not the 3 userns/read checks behind this site.
+        skip "RL4: alpine pull failed — 3 container userns/read checks not run ($(E 'tail -1 /tmp/docker-pull.out' 2>/dev/null || echo unknown))"
     fi
 fi
 
