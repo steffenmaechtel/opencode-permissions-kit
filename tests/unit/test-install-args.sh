@@ -449,6 +449,10 @@ for f in $_fkia_list; do
 " ;;
     esac
 done
+if [ -z "$FAKE_SUMS" ]; then
+    echo "test-install-args: FAKE_SUMS came up empty — install.sh fetch-list extraction drifted (the empty-body arm would pass vacuously through the manifest-empty message)" >&2
+    exit 1
+fi
 export FAKE_SUMS
 cat >"$FKWORK/bin/curl" <<'FAKE'
 #!/bin/sh
@@ -475,7 +479,11 @@ _tmp_track() { :; }
 FKOUT=""
 FKRC=0
 FKOUT=$(PATH="$FKWORK/bin:$PATH" KIT_BASE_URL="https://example.test" fetch_kit 2>&1) || FKRC=$?
-if [ "$FKRC" -ne 0 ] && printf '%s' "$FKOUT" | grep -q "empty"; then
+# Both conjuncts on purpose (#493 a C3): the empty-body file must be
+# NAMED — "empty" alone also matches the manifest-stage error and the
+# arm would pass vacuously on extraction drift.
+if [ "$FKRC" -ne 0 ] && printf '%s' "$FKOUT" | grep -q "empty" &&
+    printf '%s' "$FKOUT" | grep -qF 'etc/umask.sh'; then
     pass "fetch_kit aborts on an empty (200) body instead of deploying it"
 else
     fail "fetch_kit aborts on an empty (200) body (rc=$FKRC out=$FKOUT)"

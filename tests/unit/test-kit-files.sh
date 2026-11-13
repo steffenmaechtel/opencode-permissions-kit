@@ -384,7 +384,11 @@ fi
 # (b) the partial staging base captured on the dump's first line for the
 # registration above -- the #443 leak's failure branch. Reuses the
 # suite's fakebin by swapping the stub for a failing one; the canary's
-# own staging tree registers like the main arm's.
+# own staging tree registers like the main arm's. Since issue #478 the
+# abort fires at the MANIFEST fetch (the first curl the gate does);
+# the per-file failure branch keeps its behavioral arm in
+# test-install-args.sh's empty-body test (#493 a C2) — this canary
+# asserts the red fetch + base capture, not which curl died first.
 cat >"$WORK/fakebin/curl" <<'FAKE'
 #!/bin/sh
 exit 1

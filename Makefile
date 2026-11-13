@@ -357,14 +357,23 @@ fmt:
 # freshness pin reddens `make test` on a stale manifest, and
 # scripts/release.sh refuses to cut a release from one. Generation is
 # deterministic (LC_ALL=C path sort), so an unchanged tree reproduces
-# the committed file byte-for-byte.
+# the committed file byte-for-byte. Temp+mv on purpose (#493 a C6): a
+# red run must never delete or truncate the committed manifest in the
+# working tree.
 sums:
-	@if ! sh ./scripts/gen-sums.sh > SHA256SUMS; then \
-		echo "error:  SHA256SUMS generation failed (a listed file missing?)"; \
-		rm -f SHA256SUMS; \
-		exit 1; \
-	fi
-	@echo "SHA256SUMS regenerated ($$(wc -l < SHA256SUMS | tr -d ' ') entries) — commit it with your PR"
+	@_sums_tmp="SHA256SUMS.$$$$.tmp"; \
+		if ! sh ./scripts/gen-sums.sh >"SHA256SUMS.$$$$.tmp"; then \
+			echo "error:  SHA256SUMS generation failed (a listed file missing?)"; \
+			rm -f "$$_sums_tmp"; \
+			exit 1; \
+		fi; \
+		if ! cmp -s SHA256SUMS "$$_sums_tmp"; then \
+			mv "$$_sums_tmp" SHA256SUMS; \
+			echo "SHA256SUMS regenerated ($$(wc -l < SHA256SUMS | tr -d ' ') entries) — commit it with your PR"; \
+		else \
+			rm -f "$$_sums_tmp"; \
+			echo "SHA256SUMS already fresh ($$(wc -l < SHA256SUMS | tr -d ' ') entries)"; \
+		fi
 
 # kcov coverage report over the unit suites (issue #255 stage 0b). Report
 # only — never part of `make test` and never a percentage gate. Needs

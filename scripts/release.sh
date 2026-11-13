@@ -135,6 +135,12 @@ _sums_tmp="$(mktemp)" || {
     err "mktemp failed — cannot verify SHA256SUMS freshness."
     exit 1
 }
+# First temp file in this script (#493 a B4): a Ctrl-C between mktemp
+# and the rm sites must not leak it -- the trap arms every exit path
+# after creation and is idempotent with the inline rms.
+trap 'rm -f "${_sums_tmp:-}"' EXIT
+trap 'rm -f "${_sums_tmp:-}"; exit 130' INT
+trap 'rm -f "${_sums_tmp:-}"; exit 143' TERM
 if ! "$REPO/scripts/gen-sums.sh" >"$_sums_tmp"; then
     err "SHA256SUMS generation failed — files/ and the fetch lists drifted structurally."
     rm -f "$_sums_tmp"

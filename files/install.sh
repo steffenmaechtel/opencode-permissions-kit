@@ -108,20 +108,27 @@ KIT_BASE_URL="${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/
 # for pre-manifest tag pins and odd mirrors; only the operator sets
 # their own environment -- an attacker on the wire cannot).
 
-# Loud probe: a missing sha256sum aborts the fetch -- a silently
-# skipped verification would be worse than none.
+# Loud probe: a missing or unusable sha256sum aborts the fetch -- a
+# silently skipped verification would be worse than none. The probe
+# EXECUTES the tool instead of a bare command -v: bash's command -v
+# accepts non-executable PATH files while dash refuses (measured,
+# #493 a C9; evidence in issue #486), and a found-but-broken tool
+# would otherwise surface one step later as a digest mismatch with an
+# empty actual.
 _kit_sha_probe() {
-    command -v sha256sum >/dev/null 2>&1 && return 0
+    sha256sum --version >/dev/null 2>&1 && return 0
     echo "error: sha256sum is required to verify fetched kit files (coreutils) — aborting" >&2
     echo "       (KIT_SHA_VERIFY=0 disables verification for pre-manifest pins)" >&2
     return 1
 }
 
 # Fetch the manifest into <base> and shape-gate every line to exactly
-# `<64 lowercase hex><two spaces><ref-charset path>`: the verifier's
-# input must never be garbage (an HTML error body, a truncated
-# transfer, a CRLF-mangled mirror). Same temp discipline as the file
-# fetches: registers, moves in only when sound.
+# `<64 lowercase hex><two spaces><files/-prefixed name or VERSION>`:
+# the verifier's input must never be garbage (an HTML error body, a
+# truncated transfer, a CRLF-mangled mirror), and keys outside the two
+# generator spellings (absolute paths, aliases) never enter lookup or
+# the whole-tree `sha256sum -c` (#493 a A3). Same temp discipline as
+# the file fetches: registers, moves in only when sound.
 _kit_sums_fetch() {
     _ksf_base="$1"
     _ksf_url="$KIT_BASE_URL/SHA256SUMS"
@@ -140,7 +147,7 @@ _kit_sums_fetch() {
         return 1
     fi
     # -v inverts: a rc 0 line selection means a NON-matching line exists.
-    if grep -vEq '^[0-9a-f]{64}  [A-Za-z0-9._/-]+$' "$_ksf_tmp"; then
+    if grep -vEq '^[0-9a-f]{64}  (files/[A-Za-z0-9._/-]+|VERSION)$' "$_ksf_tmp"; then
         rm -f "$_ksf_tmp"
         echo "error: integrity manifest from $_ksf_url is malformed (expected sha256sum lines) — aborting" >&2
         return 1

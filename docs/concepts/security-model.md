@@ -56,8 +56,13 @@ exactly, or the install/update aborts — nothing is deployed, temps are
 cleaned, and the error names the file plus expected/actual digests. The
 manifest itself is shape-gated line by line (an HTML error body never
 becomes a "manifest"), and `opk update` additionally re-verifies the
-whole staged tree before any deploy phase runs, which also covers trees
-an older deployed updater fetched before this mechanism existed.
+whole staged tree before any deploy phase runs. That tree pass also
+covers trees an older deployed updater fetched without verification —
+for updaters that export their staging tree (vintage 0.0.39 and later).
+Older vintages (0.0.28–0.0.38) re-exec the new updater without the
+export marker and are indistinguishable from a manifest-less checkout,
+so their **first** update into the verified era deploys unverified; the
+update after that verifies.
 
 What this buys:
 
@@ -78,8 +83,12 @@ Operational notes:
 - `KIT_SHA_VERIFY=0` disables the mechanism (break-glass for tag pins
   that predate the manifest and for odd mirrors; only the operator sets
   their own environment — an attacker on the wire cannot).
-- A missing `sha256sum` binary aborts the fetch loudly — verification is
-  never silently skipped.
+- A missing or unusable `sha256sum` binary aborts the fetch loudly —
+  verification is never silently skipped on the fetch paths. The one
+  documented carve-out: a checkout of a pre-manifest vintage (no
+  `SHA256SUMS` in the tree) heals a missing file without verification
+  and without a message — local trust, see the code comments in
+  `management/update.sh`.
 - Refs without a manifest (tags older than the mechanism) fail closed
   under new code with a named error. Streaming an *old* tag's own
   `install.sh` keeps working as before: that script predates the

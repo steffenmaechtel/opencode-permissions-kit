@@ -221,13 +221,14 @@ _p="${_url#"$KIT_BASE_URL"/}"
 cat "$KIT_BASE_ROOT/$_p" >"$_out" || exit 1
 FAKECURL
 chmod 755 "$SRVBIN/curl"
-# NOSHBIN: same as SRVBIN but sha256sum is a dead, non-executable file —
-# command -v must not resolve it (the tool probe arm).
+# NOSHBIN: same as SRVBIN but WITHOUT any sha256sum at all — the tool
+# probe must abort on absence (#493 a C9: the previous dead-644-file
+# variant relied on dash's command -v refusing non-executable files;
+# bash accepts them, which reddened the arm under kcov's sh→bash shim
+# — evidence in issue #486. Absence trips the probe under every shell).
 NOSHBIN="$WORK/noshbin"
 cp -R "$SRVBIN" "$NOSHBIN"
 rm -f "${NOSHBIN:?}/sha256sum"
-: >"$NOSHBIN/sha256sum"
-chmod 644 "$NOSHBIN/sha256sum"
 # env(1) must still resolve the interpreter itself with this PATH.
 _fi_w="$(command -v sh 2>/dev/null || true)"
 [ -n "$_fi_w" ] && ln -s "$_fi_w" "$NOSHBIN/sh"
@@ -457,7 +458,7 @@ else
 fi
 
 # 3h. missing sha256sum: loud abort, never a silently unverified fetch
-# (command -v does not resolve the dead, non-executable file).
+# (absence from the stub PATH — shell-agnostic, see NOSHBIN above).
 FIX="$WORK/fix-nosh"
 build_fixture "$FIX"
 _fi_tmpnosh="$(work_new "$WORK/tmp-nosh.XXXXXX")"
@@ -606,6 +607,9 @@ else
 fi
 
 # 5b. tampered staged tree: the whole-tree gate refuses before deploy.
+# A1 pin (#493 a): the refusal must NOT offer the KIT_SHA_VERIFY=0
+# bypass -- verification ran and failed; the hint would invite
+# deploying exactly the refused content.
 printf 'staged-corruption\n' >>"$TREE_A/files/etc/umask.sh"
 _fi_out="$(TMPDIR="$_fi_tmptree" env _FETCH_TREE="$TREE_A" \
     FILES_ROOT="$TREE_A/files" KIT_BASE_URL="file://$FIX" KIT_BASE_ROOT="$FIX" \
@@ -614,16 +618,18 @@ _fi_out="$(TMPDIR="$_fi_tmptree" env _FETCH_TREE="$TREE_A" \
 _fi_rc=$?
 if [ "$_fi_rc" -ne 0 ] &&
     printf '%s' "$_fi_out" | grep -q 'failed the SHA256SUMS verification' &&
-    printf '%s' "$_fi_out" | grep -qF 'etc/umask.sh'; then
-    pass "tampered staged tree fails verify_fetched_tree before deploy"
+    printf '%s' "$_fi_out" | grep -qF 'etc/umask.sh' &&
+    ! printf '%s' "$_fi_out" | grep -q 'KIT_SHA_VERIFY=0'; then
+    pass "tampered staged tree fails verify_fetched_tree before deploy (no bypass hint)"
 else
-    fail "tampered staged tree fails verify_fetched_tree before deploy (rc=$_fi_rc out=$(printf '%s' "$_fi_out" | tail -3))"
+    fail "tampered staged tree fails verify_fetched_tree before deploy, without the bypass hint (rc=$_fi_rc out=$(printf '%s' "$_fi_out" | tail -3))"
 fi
 
 # 5c. checkout carve-out: no _FETCH_TREE and no manifest anywhere --
-# resolve must not reach for the network (PATH carries NO curl at all;
-# a fetch attempt dies "not found" and reddens the arm) and verify is
-# an rc 0 no-op: a dirty checkout must not read as a corrupted fetch.
+# resolve must not reach for the network (PATH carries neither curl nor
+# mktemp; a wrong fetch dies loudly at _kit_sums_fetch's first external,
+# whichever it is -- #493 a C5) and verify is an rc 0 no-op: a dirty
+# checkout must not read as a corrupted fetch.
 _fi_tmp5c="$(work_new "$WORK/tmp-5c.XXXXXX")"
 mkdir -p "$_fi_tmp5c/files"
 _fi_out="$(TMPDIR="$_fi_tmp5c" env _FETCH_TREE="" FILES_ROOT="$_fi_tmp5c/files" \
@@ -639,16 +645,33 @@ fi
 
 # --- 6. wiring pins (source-level) ------------------------------------------------
 
+# B6 pin (#493 a): the marker range must capture ONLY the helper block.
+# An over-capture (the second block header once shared the start
+# pattern's prefix) would drag update.sh's flow code into every inner
+# eval; _fk_sums_resolve lives after the end marker by construction.
+extract_sums_helpers "$UPDATE" >"$WORK/helpers-pin.sh"
+if grep -q '_fk_sums_resolve' "$WORK/helpers-pin.sh" ||
+    grep -q 'exec bash' "$WORK/helpers-pin.sh"; then
+    fail "helper extraction stops at the end marker (over-capture, B6)"
+else
+    pass "helper extraction stops at the end marker (B6)"
+fi
+if grep -q '^_kit_sums_check() {' "$WORK/helpers-pin.sh"; then
+    pass "helper extraction carries the four helpers (B6 sane leg)"
+else
+    fail "helper extraction carries the four helpers (B6 sane leg)"
+fi
+
 check_live "update.sh gates the fetch loop on KIT_SHA_VERIFY" "$UPDATE" -qF 'KIT_SHA_VERIFY:-1'
 check_live "install.sh gates the fetch loop on KIT_SHA_VERIFY (twin)" "$INSTALL" -qF 'KIT_SHA_VERIFY:-1'
 check_live "update.sh verifies each staged temp before the mv" "$UPDATE" -qF '_kit_sums_check "$_fk_tmp" "$f" "$_fk_sums"'
 check_live "install.sh verifies each staged temp before the mv (twin)" "$INSTALL" -qF '_kit_sums_check "$_fk_tmp" "$f" "$_fk_sums"'
-# The call-site pin is anchored to the indented statement: the bare
-# name also matches the function DEFINITION (`verify_fetched_tree() {`,
-# col 0) and its comment mentions, and the functional 5b arm extracts
-# the function directly — only this pin sees a deleted CALL (sabotage
-# cycle 4 of the wave).
-check_live "update.sh runs the whole-tree verify after the heal loop" "$UPDATE" -Eq '^[[:space:]]+verify_fetched_tree$'
+# Presence-of-CALL only, anchored to the indented statement (the bare
+# name also matches the function DEFINITION, col 0, and its comment
+# mentions; the functional 5b arm extracts the function directly). The
+# description deliberately claims presence, not order — #493 a C4: a
+# pin must not claim what it does not check.
+check_live "update.sh calls the whole-tree verify (call site anchored)" "$UPDATE" -Eq '^[[:space:]]+verify_fetched_tree$'
 check_live "update.sh heals through the verified path (ensure_local_file gate)" "$UPDATE" -qF 're-fetched $f failed the SHA256SUMS check'
 check_live "update.sh names the break-glass in the abort messages" "$UPDATE" -qF 'KIT_SHA_VERIFY=0 disables verification'
 check_live "install.sh names the break-glass too (twin)" "$INSTALL" -qF 'KIT_SHA_VERIFY=0 disables verification'

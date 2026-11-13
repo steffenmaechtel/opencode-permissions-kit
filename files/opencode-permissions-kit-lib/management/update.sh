@@ -124,20 +124,27 @@ KIT_BASE_URL="${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/
 # operator sets their own environment -- an attacker on the wire
 # cannot).
 
-# Loud probe: a missing sha256sum aborts the fetch -- a silently
-# skipped verification would be worse than none.
+# Loud probe: a missing or unusable sha256sum aborts the fetch -- a
+# silently skipped verification would be worse than none. The probe
+# EXECUTES the tool instead of a bare command -v: bash's command -v
+# accepts non-executable PATH files while dash refuses (measured,
+# #493 a C9; evidence in issue #486), and a found-but-broken tool
+# would otherwise surface one step later as a digest mismatch with an
+# empty actual.
 _kit_sha_probe() {
-    command -v sha256sum >/dev/null 2>&1 && return 0
+    sha256sum --version >/dev/null 2>&1 && return 0
     echo "error: sha256sum is required to verify fetched kit files (coreutils) — aborting" >&2
     echo "       (KIT_SHA_VERIFY=0 disables verification for pre-manifest pins)" >&2
     return 1
 }
 
 # Fetch the manifest into <base> and shape-gate every line to exactly
-# `<64 lowercase hex><two spaces><ref-charset path>`: the verifier's
-# input must never be garbage (an HTML error body, a truncated
-# transfer, a CRLF-mangled mirror). Same temp discipline as the file
-# fetches: registers, moves in only when sound.
+# `<64 lowercase hex><two spaces><files/-prefixed name or VERSION>`:
+# the verifier's input must never be garbage (an HTML error body, a
+# truncated transfer, a CRLF-mangled mirror), and keys outside the two
+# generator spellings (absolute paths, aliases) never enter lookup or
+# the whole-tree `sha256sum -c` (#493 a A3). Same temp discipline as
+# the file fetches: registers, moves in only when sound.
 _kit_sums_fetch() {
     _ksf_base="$1"
     _ksf_url="$KIT_BASE_URL/SHA256SUMS"
@@ -156,7 +163,7 @@ _kit_sums_fetch() {
         return 1
     fi
     # -v inverts: a rc 0 line selection means a NON-matching line exists.
-    if grep -vEq '^[0-9a-f]{64}  [A-Za-z0-9._/-]+$' "$_ksf_tmp"; then
+    if grep -vEq '^[0-9a-f]{64}  (files/[A-Za-z0-9._/-]+|VERSION)$' "$_ksf_tmp"; then
         rm -f "$_ksf_tmp"
         echo "error: integrity manifest from $_ksf_url is malformed (expected sha256sum lines) — aborting" >&2
         return 1
@@ -494,19 +501,33 @@ fi
 # is files/opencode-permissions-kit-lib/management (two levels down).
 FILES_ROOT="$(cd "$SCRIPT_DIR/../.." 2>/dev/null && pwd -P)"
 
-# --- fetch integrity context (issue #478) ---------------------------------------
+# --- post-re-exec manifest context (issue #478) ---------------------------------
 # fetch_kit above verifies per file when THIS copy fetched the tree. Two
 # residual paths need the manifest resolved HERE, after the re-exec:
 #   (a) the streamed/deployed flow: _fk_sums dies with the pre-exec
 #       shell while the fetched manifest survives at the tree root;
-#   (b) an older deployed update.sh (a pre-manifest fetcher) fetched the
-#       tree without any manifest and re-exec'd THIS copy -- the resolve
-#       step fetches the manifest the old fetcher never pulled, and the
-#       tree verify below checks the whole staged tree before anything
-#       deploys (the issue #478 acceptance criterion).
-# Checkout runs without a manifest (a pre-manifest vintage) resolve
-# nothing and verify nothing tree-wide: local files are developer
-# trust, and a dirty checkout must not read as a corrupted fetch.
+#   (b) an older deployed update.sh fetched the tree without any
+#       manifest and re-exec'd THIS copy -- the resolve step fetches
+#       the manifest the old fetcher never pulled, and the tree verify
+#       below checks the whole staged tree before anything deploys (the
+#       issue #478 acceptance criterion). Scope (0.0.28-0.0.38
+#       vintages): this works only when the old copy EXPORTED
+#       _FETCH_TREE (introduced 0.0.39); vintages that re-exec without
+#       the export are indistinguishable from a manifest-less checkout
+#       (tarball vintages share the shape), so their FIRST hop into
+#       the verified era deploys unverified -- the update after it
+#       verifies. Documented in docs/concepts/security-model.md.
+# Checkout behavior (both directions, deliberate):
+#   - a checkout WITH the committed repo-root SHA256SUMS resolves it
+#     into _fk_sums: a heal re-fetch is then verified against the
+#     LOCAL manifest (stale after local edits without `make sums` --
+#     the heal aborts loudly on the mismatch; no tree verify runs).
+#   - a checkout WITHOUT a manifest (a pre-manifest vintage, e.g. a
+#     tarball) resolves nothing: a heal re-fetch stays unverified
+#     (local trust), silently -- the one documented carve-out from
+#     "verification is never silently skipped" (security-model.md).
+# Either way no tree-wide verify runs for checkouts: a dirty checkout
+# must not read as a corrupted fetch.
 _fk_sums_resolve() {
     if [ "${KIT_SHA_VERIFY:-1}" = 0 ]; then
         return 0
@@ -540,7 +561,7 @@ verify_fetched_tree() {
     if ! (cd "$_FETCH_TREE" && sha256sum -c --quiet SHA256SUMS); then
         echo "error: fetched kit tree failed the SHA256SUMS verification — aborting" >&2
         echo "       re-run the update (a channel that moved mid-fetch shows exactly this);" >&2
-        echo "       KIT_SHA_VERIFY=0 skips verification (pre-manifest pins)" >&2
+        echo "       do NOT disable verification here — the staged tree is not the released one" >&2
         return 1
     fi
     return 0
