@@ -643,7 +643,12 @@ check_live "update.sh gates the fetch loop on KIT_SHA_VERIFY" "$UPDATE" -qF 'KIT
 check_live "install.sh gates the fetch loop on KIT_SHA_VERIFY (twin)" "$INSTALL" -qF 'KIT_SHA_VERIFY:-1'
 check_live "update.sh verifies each staged temp before the mv" "$UPDATE" -qF '_kit_sums_check "$_fk_tmp" "$f" "$_fk_sums"'
 check_live "install.sh verifies each staged temp before the mv (twin)" "$INSTALL" -qF '_kit_sums_check "$_fk_tmp" "$f" "$_fk_sums"'
-check_live "update.sh runs the whole-tree verify after the heal loop" "$UPDATE" -qF 'verify_fetched_tree'
+# The call-site pin is anchored to the indented statement: the bare
+# name also matches the function DEFINITION (`verify_fetched_tree() {`,
+# col 0) and its comment mentions, and the functional 5b arm extracts
+# the function directly — only this pin sees a deleted CALL (sabotage
+# cycle 4 of the wave).
+check_live "update.sh runs the whole-tree verify after the heal loop" "$UPDATE" -Eq '^[[:space:]]+verify_fetched_tree$'
 check_live "update.sh heals through the verified path (ensure_local_file gate)" "$UPDATE" -qF 're-fetched $f failed the SHA256SUMS check'
 check_live "update.sh names the break-glass in the abort messages" "$UPDATE" -qF 'KIT_SHA_VERIFY=0 disables verification'
 check_live "install.sh names the break-glass too (twin)" "$INSTALL" -qF 'KIT_SHA_VERIFY=0 disables verification'
