@@ -404,9 +404,11 @@ mirror, which must stay **byte-identical** to `master` (§3, Option B).
 Copy the block, search & replace `0.0.36` with the new version, run the
 lines one by one. The VERSION bump lands on `master` **via PR** (never
 commit on master directly); `make release` then verifies a clean tree,
-sync with origin, the VERSION stamp, a free tag and `stable`
-fast-forwardability, runs the suite, and tags, mirrors and pushes
-(never force-pushes):
+sync with origin, the VERSION stamp, a **fresh `SHA256SUMS`** (issue
+#478: the integrity manifest streamed installs verify against —
+regenerate with `make sums` in the PR that changes `files/`), a free
+tag and `stable` fast-forwardability, runs the suite, and tags, mirrors
+and pushes (never force-pushes):
 
 ```bash
 git checkout -b release/0.0.36

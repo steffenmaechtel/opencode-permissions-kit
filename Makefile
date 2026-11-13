@@ -3,6 +3,7 @@
     lint \
     fmt \
     fmt-scope \
+    sums \
     install-shfmt \
     check-host \
     check-py \
@@ -48,6 +49,7 @@
     test-update-core \
     test-install-core \
     test-release \
+    test-fetch-integrity \
     test-e2e-sources \
     test-browser-bridge \
     test-security-advisories \
@@ -149,6 +151,7 @@ help:
 	@echo "  make test-string-continuations  Run the string-continuation guard"
 	@echo "  make fmt           One-shot shfmt -w over the whole gate scope"
 	@echo "  make fmt-scope     Print the gate's file scope (single source, used by the format-gate suite)"
+	@echo "  make sums          Regenerate SHA256SUMS (issue #478; commit it when files/ changed)"
 	@echo "  make install-shfmt Download the pinned shfmt to ~/.local/bin (no root)"
 	@echo "  make coverage      kcov line-coverage report over the unit suites (report only, docker once; SUITE=name filters)"
 	@echo "  make test-coverage  Run coverage-runner pins (issue #255 stage 0b)"
@@ -268,6 +271,7 @@ test: lint \
       test-install-args \
       test-install-core \
       test-release \
+      test-fetch-integrity \
       test-fs-baseline \
       test-staged-write \
       test-uninstall \
@@ -346,6 +350,30 @@ fmt:
 	fi
 	@shfmt -w $(SHFMT_FLAGS) $(SHELLCHECK_FILES) $(SHFMT_TEST_FILES)
 	@echo "formatted (gate scope): $$(echo $(SHELLCHECK_FILES) $(SHFMT_TEST_FILES) | wc -w) files"
+
+# Regenerate the SHA256SUMS integrity manifest (issue #478) from
+# update.sh's KIT_FILES list. Run after ANY change under files/ and
+# commit the manifest with your PR: the fetch-integrity suite's
+# freshness pin reddens `make test` on a stale manifest, and
+# scripts/release.sh refuses to cut a release from one. Generation is
+# deterministic (LC_ALL=C path sort), so an unchanged tree reproduces
+# the committed file byte-for-byte. Temp+mv on purpose (#493 a C6): a
+# red run must never delete or truncate the committed manifest in the
+# working tree.
+sums:
+	@_sums_tmp="SHA256SUMS.$$$$.tmp"; \
+		if ! sh ./scripts/gen-sums.sh >"SHA256SUMS.$$$$.tmp"; then \
+			echo "error:  SHA256SUMS generation failed (a listed file missing?)"; \
+			rm -f "$$_sums_tmp"; \
+			exit 1; \
+		fi; \
+		if ! cmp -s SHA256SUMS "$$_sums_tmp"; then \
+			mv "$$_sums_tmp" SHA256SUMS; \
+			echo "SHA256SUMS regenerated ($$(wc -l < SHA256SUMS | tr -d ' ') entries) — commit it with your PR"; \
+		else \
+			rm -f "$$_sums_tmp"; \
+			echo "SHA256SUMS already fresh ($$(wc -l < SHA256SUMS | tr -d ' ') entries)"; \
+		fi
 
 # kcov coverage report over the unit suites (issue #255 stage 0b). Report
 # only — never part of `make test` and never a percentage gate. Needs
@@ -599,6 +627,10 @@ test-install-core:
 test-release:
 	@echo "=== Release Helper Tests ==="
 	@./tests/unit/test-release.sh
+
+test-fetch-integrity:
+	@echo "=== Fetch Integrity Tests (issue #478) ==="
+	@./tests/unit/test-fetch-integrity.sh
 
 test-fs-baseline:
 	@echo "=== Group-Baseline Progress Tests ==="

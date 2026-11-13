@@ -146,6 +146,8 @@ jobs:
         run: ./tests/unit/test-install-core.sh
       - name: Run release script tests
         run: ./tests/unit/test-release.sh
+      - name: Run fetch integrity tests (issue #478)
+        run: ./tests/unit/test-fetch-integrity.sh
       - name: Run fs-baseline progress tests
         run: ./tests/unit/test-fs-baseline.sh
       - name: Run staged-write / handover gate tests

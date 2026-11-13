@@ -14,6 +14,8 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RELEASE="$SCRIPT_DIR/../../scripts/release.sh"
+GENSUMS="$SCRIPT_DIR/../../scripts/gen-sums.sh"
+FILES_DIR="$SCRIPT_DIR/../../files"
 # Shared harness (issue #394): pass/fail, colors, counters
 # (and check/assert_eq where present) live in lib/harness.sh now.
 . "$SCRIPT_DIR/lib/harness.sh"
@@ -21,7 +23,10 @@ RELEASE="$SCRIPT_DIR/../../scripts/release.sh"
 WORK="$(work_new)"
 
 # mkrepo: fresh sandbox at $WORK/r with origin=$WORK/origin.git, master
-# holding one commit (VERSION=1.2.3 + the release script), all pushed.
+# holding one commit (VERSION=1.2.3 + the release script + gen-sums +
+# a files/ tree + a FRESH SHA256SUMS, issue #478), all pushed. The
+# sandbox copy of each script resolves REPO from its own location, so
+# copying the real scripts into the sandbox tests the real logic.
 mkrepo() {
     rm -rf "${WORK:?}/r" "${WORK:?}/origin.git"
     git init -q -b master "$WORK/origin.git" --bare
@@ -30,8 +35,12 @@ mkrepo() {
     git -C "$WORK/r" config user.name test
     mkdir -p "$WORK/r/scripts"
     cp "$RELEASE" "$WORK/r/scripts/release.sh"
+    cp "$GENSUMS" "$WORK/r/scripts/gen-sums.sh"
+    chmod 755 "$WORK/r/scripts/gen-sums.sh"
+    cp -R "$FILES_DIR" "$WORK/r/files"
     echo "1.2.3" >"$WORK/r/VERSION"
     echo "kit" >"$WORK/r/README.md"
+    sh "$WORK/r/scripts/gen-sums.sh" >"$WORK/r/SHA256SUMS"
     git -C "$WORK/r" add -A
     git -C "$WORK/r" commit -qm "init 1.2.3"
     git -C "$WORK/r" remote add origin "$WORK/origin.git"
@@ -231,6 +240,33 @@ unset FAKE_GH_CONCLUSION
 grep -q 'actions/runs?branch=master' "$RELEASE" &&
     pass "CI gate has the curl+python3 fallback (no gh needed on the host)" ||
     fail "CI gate has the curl+python3 fallback (no gh needed on the host)"
+
+# --- 6c. SHA256SUMS freshness pre-flight (issue #478) -----------------------------
+# A release must not be cut from a stale integrity manifest: streamed
+# installs verify every fetched file against it. A committed files/
+# change without `make sums` blocks the release; a fresh manifest passes.
+mkrepo
+expect_rc 0 "fresh SHA256SUMS passes the pre-flight" \
+    sh "$WORK/r/scripts/release.sh" 1.2.3 --skip-tests --dry-run
+printf 'drift\n' >>"$WORK/r/files/install.sh"
+git -C "$WORK/r" add files/install.sh
+git -C "$WORK/r" commit -qm "tamper files/ without regenerating the manifest"
+git -C "$WORK/r" push -q origin master
+expect_rc 1 "stale SHA256SUMS blocks the release" \
+    sh "$WORK/r/scripts/release.sh" 1.2.3 --skip-tests --dry-run
+if printf '%s' "$LAST_OUT" | grep -q 'stale'; then
+    pass "stale-manifest refusal points at make sums"
+else
+    fail "stale-manifest refusal points at make sums (out=$LAST_OUT)"
+fi
+# Regenerating heals the sandbox (and proves the refusal was the drift,
+# not the fixture): make sums' exact pipeline + a re-run.
+sh "$WORK/r/scripts/gen-sums.sh" >"$WORK/r/SHA256SUMS"
+git -C "$WORK/r" add SHA256SUMS
+git -C "$WORK/r" commit -qm "regenerate SHA256SUMS"
+git -C "$WORK/r" push -q origin master
+expect_rc 0 "regenerated SHA256SUMS releases again" \
+    sh "$WORK/r/scripts/release.sh" 1.2.3 --skip-tests --dry-run
 
 # --- 7. static: test gate + suite wiring -------------------------------------------
 grep -q 'make -C "$REPO" test check-version' "$RELEASE" &&

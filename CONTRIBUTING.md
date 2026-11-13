@@ -13,6 +13,11 @@ how to work on the code. For what the kit does, see the
    install one-liner streams `files/install.sh` from the `stable`
    release mirror, which is fast-forwarded to `master` only on release
    (`KIT_CHANNEL` in `install.conf` records what an install tracks).
+5. **Changed anything under `files/`? Regenerate the integrity
+   manifest** (`make sums`) and commit `SHA256SUMS` with your PR. The
+   streamed install/update verify every fetched file against it
+   (issue #478); the suite's freshness pin reddens `make test` on a
+   stale manifest, and `make release` refuses to cut one.
 
 ### Re-wrapping prose blocks
 

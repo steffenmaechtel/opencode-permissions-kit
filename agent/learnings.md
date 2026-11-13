@@ -177,7 +177,10 @@ empty-match greps (`grep … || true` where empty output is rc 1), `IFS= read
   resolution rows checked ≤ 120 BEFORE the commit, with the
   `<SHA>`-fill's +2 bytes per row budgeted (issue #237; the rule
   itself lives in the review README — AGENTS.md Testing owns the
-  chain mechanics)
+  chain mechanics); and a diff touching `files/` owes `make sums`
+  inside the chain — the regenerated `SHA256SUMS` is committed with
+  the wave, `make test`'s freshness pin reddens on a stale manifest
+  (issue #478)
 - **Comment-strip riders on source-counting pins** (#261, PR #284) —
   a `grep -c` count pin over shipped source without the rider is
   pass-green on commented-out code. Census: 39 strip sites across 14

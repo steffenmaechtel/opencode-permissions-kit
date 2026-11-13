@@ -193,7 +193,12 @@ gate (`make test`), never only the touched suites: tree-wide invariant
 suites (rules-meta, sandbox-policy, workflows, format-gate) redden on
 changes their own files never touched — #412's round-b B3 (bare
 rule-ID citations in new comment text) was locally invisible and red
-in CI exactly through that gap.
+in CI exactly through that gap. A wave whose diff touches `files/`
+also owes `make sums` IN the chain, before the commit: the freshness
+pin inside `make test` reddens on a stale `SHA256SUMS` (issue #478),
+so the regeneration and its commit are part of the gate, not an
+afterthought — `make sums` itself is idempotent (no-op output when
+the manifest is already fresh).
 
 Both e2e suites are part of the definition of done for changes to
 `install.sh`, `update.sh`, the wrapper, or backend provisioning — and for

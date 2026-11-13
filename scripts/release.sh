@@ -119,6 +119,42 @@ if [ "$STAMP" != "$VERSION" ]; then
     exit 1
 fi
 
+# SHA256SUMS freshness (issue #478): streamed installs verify every
+# fetched file against the committed manifest -- a tag cut from a stale
+# manifest would make every verification of that release fail, or worse,
+# ship a manifest that does not describe what the ref serves. Regenerate
+# to a temp and diff; generation failure (a listed file missing) aborts
+# the release the same way.
+step "2.5/5 pre-flight: SHA256SUMS freshness"
+
+if [ ! -f "$REPO/SHA256SUMS" ]; then
+    err "SHA256SUMS is missing — generate and commit via PR:  make sums"
+    exit 1
+fi
+_sums_tmp="$(mktemp)" || {
+    err "mktemp failed — cannot verify SHA256SUMS freshness."
+    exit 1
+}
+# First temp file in this script (#493 a B4): a Ctrl-C between mktemp
+# and the rm sites must not leak it -- the trap arms every exit path
+# after creation and is idempotent with the inline rms.
+trap 'rm -f "${_sums_tmp:-}"' EXIT
+trap 'rm -f "${_sums_tmp:-}"; exit 130' INT
+trap 'rm -f "${_sums_tmp:-}"; exit 143' TERM
+if ! "$REPO/scripts/gen-sums.sh" >"$_sums_tmp"; then
+    err "SHA256SUMS generation failed — files/ and the fetch lists drifted structurally."
+    rm -f "$_sums_tmp"
+    exit 1
+fi
+if ! diff -q "$_sums_tmp" "$REPO/SHA256SUMS" >/dev/null; then
+    err "SHA256SUMS is stale — regenerate and commit via PR:  make sums"
+    diff "$REPO/SHA256SUMS" "$_sums_tmp" | sed 's/^/        /' | head -10
+    rm -f "$_sums_tmp"
+    exit 1
+fi
+rm -f "$_sums_tmp"
+say "SHA256SUMS is fresh (matches files/ on disk)"
+
 step "3/5 pre-flight: tag + mirror fast-forward check"
 
 HEAD_REV="$(git -C "$REPO" rev-parse master)"
