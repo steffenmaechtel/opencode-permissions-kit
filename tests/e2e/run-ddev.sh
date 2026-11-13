@@ -643,7 +643,8 @@ if [ "$_daemon_ok" = true ]; then
         check "DD9: export-db returns the imported mark" \
             OC_DD2 'ddev export-db -f=/tmp/dd9-out.sql.gz >/dev/null 2>&1 && zcat /tmp/dd9-out.sql.gz | grep -q dd9_mark'
     else
-        echo "  ${YELLOW}SKIP${NC}  DD9: import-db failed"
+        # Single row per event (#494 b B2 — the F2 class sweep's missed
+        # sibling: the echo duplicated the skip label, no dump between).
         skip "dd9 import failed"
     fi
 
