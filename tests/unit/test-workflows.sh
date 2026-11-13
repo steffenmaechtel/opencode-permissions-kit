@@ -14,6 +14,7 @@
 #   6. YAML structure guards (one env block per step; run: block literals)
 #   7. e2e path-filter = e2e inputs
 #   8. pages re-run hygiene (issue #388)
+#   9. e2e strict lever wiring (issue #480 F3)
 # Run: sh tests/unit/test-workflows.sh
 set -u
 
@@ -410,6 +411,31 @@ if [ "$_RB_UP_E2E" = 5 ] && [ "$_RB_UP_DDEV" = 2 ]; then
     pass "battery order: public resolvers print directly BEFORE the Azure append (5 + 2)"
 else
     fail "battery public-first order: e2e=$_RB_UP_E2E (want 5), ddev=$_RB_UP_DDEV (want 2)"
+fi
+
+# --- e2e strict lever wiring (issue #480 F3) ------------------------------------
+# E2E_STRICT=1 (the manual-dispatch strict input) turns counted skips
+# into failures (lib.sh skip()); the lever must reach EVERY lane. A lane
+# without the export greens through wholesale skips on a degraded
+# runner — and the e2e verdict feeds the release gate (scripts/release.sh
+# requires EVERY master-sha CI run completed green, name-agnostic over
+# all workflows of the commit — #494 a F5). 5 lanes here (3 run.sh + 2
+# rootless), 2 in the ddev twin.
+_STRICT_EXPORT="E2E_STRICT=\"\${{ inputs.strict == true && '1' || '0' }}\""
+_SE_E2E=$(live_src "$WF_E2E" | grep -cF -- "$_STRICT_EXPORT" || true)
+_SE_DDEV=$(live_src "$WF_DDEV_E2E" | grep -cF -- "$_STRICT_EXPORT" || true)
+if [ "$_SE_E2E" = 5 ] && [ "$_SE_DDEV" = 2 ]; then
+    pass "every e2e lane exports E2E_STRICT from the dispatch input (5 + 2)"
+else
+    fail "E2E_STRICT wiring: test-e2e=$_SE_E2E (want 5), ddev=$_SE_DDEV (want 2)"
+fi
+# The ddev twin had NO strict dispatch input at all (issue #480 F3): a
+# lever that cannot be pulled on the lanes with the most skip sites.
+if live_src "$WF_E2E" | grep -qF 'skips count as failures' &&
+    live_src "$WF_DDEV_E2E" | grep -qF 'skips count as failures'; then
+    pass "both e2e workflows carry the strict dispatch input"
+else
+    fail "strict dispatch input missing from test-e2e.yml / test-e2e-ddev.yml"
 fi
 
 # Explicit 1x lanes (renamed from the -2x twins, issue #197): GitHub

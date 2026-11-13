@@ -194,8 +194,12 @@ set -e
 chmod 700 "$WF/locked"
 check "fallback: unreadable cwd prints the explanatory note (issue #51)" \
     sh -c "printf '%s\n' \"\$1\" | grep -q 'not accessible to the opencode user'" _ "$WF_OUT2"
+# The rc assertion rides INSIDE the check command (issue #480 F48): a
+# trailing `check ... && [ "$WF_RC" = 0 ]` aborts the whole suite via
+# set -e when the helper regresses — loud, but every later pin is lost
+# from that run's tally. Inside, a regression is one counted FAIL.
 check "fallback: unreadable cwd still execs ddev (exit code passes through)" \
-    sh -c "printf '%s\n' \"\$1\" | grep -qF 'FAKE_DDEV_ARGS:stop myproject'" _ "$WF_OUT2" && [ "$WF_RC" = 0 ]
+    sh -c "printf '%s\n' \"\$1\" | grep -qF 'FAKE_DDEV_ARGS:stop myproject' && [ \"\$2\" = 0 ]" _ "$WF_OUT2" "$WF_RC"
 rm -rf "$WF"
 
 # --- 2b. --opk-ensure-shared heal (issue #94) -----------------------------------

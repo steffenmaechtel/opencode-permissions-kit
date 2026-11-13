@@ -3,7 +3,10 @@
 # the download channel must be picked by major — 1.x from GitHub release
 # assets, 2.x from the npm registry (2.x ships no GitHub assets) with the
 # legacy @opencode-ai scope as fallback. Plus the per-worktree
-# container-name derivation (issue #366). Mostly structural greps (like
+# container-name derivation (issue #366) and the skip-accounting /
+# strict-lever class pins across the three runners (issue #480: every
+# skip routes through skip(), no double-counted failure tallies, no rc
+# leg measured behind a tee pipe). Mostly structural greps (like
 # test-bypass-guard.sh — lib.sh's runner-facing plumbing is e2e
 # scaffolding), plus behavioral probes of the self-contained helpers
 # (npm_dist_latest via a fake curl, the test-update-flags.sh pattern).
@@ -384,6 +387,51 @@ for _df in "$E2E_DIR/Dockerfile" "$E2E_DIR/Dockerfile.rootless"; do
         fail "$(basename "$_df") archive-mirror machinery: ARG=$_am_arg sed=$_am_sed"
     fi
 done
+
+# --- skip accounting + strict lever (issue #480: F3/F33/F34/F35) ---------------
+# The E2E_STRICT lever (every e2e lane's dispatch input, pinned in
+# test-workflows.sh) turns counted skips into failures — it only works
+# when every skip site routes through lib.sh's skip(). A hand-incremented
+# tally next to a custom SKIP echo is invisible to the lever AND drifts
+# from the detail lines printed. Raw absence pins (a commented-out
+# forbidden line still trips, the documented semantics) plus positive
+# controls on lib.sh so nothing passes vacuously.
+for _r in "$RUN_SH" "$RUN_ROOTLESS" "$RUN_DDEV"; do
+    check_absent "$(basename "$_r"): no hand-incremented skip tally (all skips via skip(), #480 F3)" \
+        "$_r" -F -- 'skipped=$((skipped'
+    check_absent "$(basename "$_r"): no uncounted 'skipped:' echo line (#480 F35)" \
+        "$_r" -F -- 'echo "  skipped:'
+    check_absent "$(basename "$_r"): no rc leg measured behind a tee pipe (dash rc is tee's, #480 F34)" \
+        "$_r" -nE '\| *tee [^|]*; *test *\$\?'
+done
+check_live "lib.sh skip() owns the skip tally (the lever's anchor, #480 F3)" "$LIB" \
+    -qF 'skipped=$((skipped + 1))'
+check_live "lib.sh skip() escalates to a failure under E2E_STRICT=1" "$LIB" \
+    -qF '[ "${E2E_STRICT:-0}" = "1" ]'
+
+# Double-count window (issue #480 F33): one failed event = one failure.
+# The pre-fix shape incremented the tally before AND after the log dump
+# (2-3 lines apart); genuinely separate failures always sit farther
+# apart (an exit/fi and the next guard between them). Positive control:
+# the pattern matches run-ddev.sh's 19 live increments (verified in the
+# wave), so the pin cannot pass vacuously at zero.
+_dc_sites=""
+for _r in "$RUN_SH" "$RUN_ROOTLESS" "$RUN_DDEV"; do
+    _hits="$(awk '/failures=\$\(\(failures \+ 1\)\)/ { if (_p && NR - _p < 4) print _p ":" NR; _p = NR }' "$_r")"
+    [ -n "$_hits" ] && _dc_sites="$_dc_sites $(basename "$_r"):$_hits"
+done
+if [ -z "$_dc_sites" ]; then
+    pass "runners: no failure tally incremented twice within one event window (#480 F33)"
+else
+    fail "failure tallies double-counted (two increments < 4 lines apart):$_dc_sites"
+fi
+# Vacuous-pass control (#494 a F3): the window pin consumes the awk in a
+# $( ) — empty output (pattern regression, quoting slip) would pass at
+# zero forever. This arm proves the SAME pattern still sees run-ddev.sh's
+# live increments, so a zero-match window result means "clean", not
+# "blind".
+check "double-count pattern still matches live increments (vacuous-pass control, #494 a F3)" \
+    awk '/failures=\$\(\(failures \+ 1\)\)/ { n++ } END { exit !(n >= 1) }' "$RUN_DDEV"
 
 echo ""
 if [ "$failures" -gt 0 ]; then

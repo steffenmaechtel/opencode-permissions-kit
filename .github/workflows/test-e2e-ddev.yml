@@ -15,7 +15,10 @@ name: test-e2e-ddev
 # (camino site tier on, latest ddev) — master is the pre-release gate
 # and the real-site tier is exactly the burn-in class this suite exists
 # for (proven CI-green 2026-08-23); manual dispatch can deselect the
-# site tier for a lean skeleton run.
+# site tier for a lean skeleton run. Manual dispatch also carries the
+# strict input (issue #480 F3): E2E_STRICT=1 turns the suite's counted
+# skips into failures — the lever that proves the burn-in sections
+# really ran on a given runner. Push and scheduled runs stay at 0.
 # CI rebuilds the golden image warm every run (the cache is a
 # local-workspace concept, design doc §6 R6).
 #
@@ -53,6 +56,11 @@ on:
       - master
   workflow_dispatch:
     inputs:
+      strict:
+        description: 'Strict mode: skips count as failures (verifies the ddev sections really run on this runner)'
+        required: false
+        default: false
+        type: boolean
       site_tier:
         description: 'Run the real-site tier (camino fixture, DD10-DD12) — always on for push/schedule'
         required: false
@@ -186,8 +194,15 @@ jobs:
           # gh_latest_tag resolves the ddev version) — the ephemeral
           # workflow token, no secret needed.
           OPK_GH_TOKEN: ${{ github.token }}
+        # E2E_STRICT (issue #480 F3): the strict dispatch input reaches
+        # both ddev lanes — run-ddev.sh carries the most skip sites of
+        # the three suites (12: systemd boot ×2, inner daemon, dd2
+        # start, dd9 import, camino start + master ×2, dd12 start,
+        # dd13 second start, bare origin, DD14 env — #494 a F4/b B3),
+        # and a degraded runner must not green through the burn-in
+        # subjects. Push/schedule run with 0.
         run: |
-          ./tests/e2e/run-ddev.sh
+          E2E_STRICT="${{ inputs.strict == true && '1' || '0' }}" ./tests/e2e/run-ddev.sh
 
       - name: Summary
         if: always()
@@ -294,8 +309,9 @@ jobs:
           # gh_latest_tag resolves the ddev version) — the ephemeral
           # workflow token, no secret needed.
           OPK_GH_TOKEN: ${{ github.token }}
+        # E2E_STRICT on both lanes (issue #480 F3 — see the 2x job).
         run: |
-          ./tests/e2e/run-ddev.sh
+          E2E_STRICT="${{ inputs.strict == true && '1' || '0' }}" ./tests/e2e/run-ddev.sh
       - name: Summary
         if: always()
         env:

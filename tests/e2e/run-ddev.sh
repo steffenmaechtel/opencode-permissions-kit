@@ -594,10 +594,11 @@ if [ "$_daemon_ok" = true ]; then
         check "DD4: dev-owned restart succeeds" \
             E 'grep -qE "Successfully started|Restarted" /tmp/dd2-restart.log'
     else
+        # One failed restart = one failure (issue #480 F33): the log dump
+        # between the two increments counted the same event twice.
         echo "  ${RED}FAIL${NC}  DD4: dev-owned restart failed:"
         failures=$((failures + 1))
         E 'sed "s/\x1b\[[0-9;]*m//g" /tmp/dd2-restart.log 2>/dev/null | tail -10' || true
-        failures=$((failures + 1))
     fi
     check "DD4: root still dev-owned after dev-owned restart" \
         E 'test "$(stat -c %U /var/www/vhosts/dd2)" = dev'
@@ -642,7 +643,8 @@ if [ "$_daemon_ok" = true ]; then
         check "DD9: export-db returns the imported mark" \
             OC_DD2 'ddev export-db -f=/tmp/dd9-out.sql.gz >/dev/null 2>&1 && zcat /tmp/dd9-out.sql.gz | grep -q dd9_mark'
     else
-        echo "  ${YELLOW}SKIP${NC}  DD9: import-db failed"
+        # Single row per event (#494 b B2 — the F2 class sweep's missed
+        # sibling: the echo duplicated the skip label, no dump between).
         skip "dd9 import failed"
     fi
 
@@ -806,10 +808,10 @@ if [ "$SITE_TIER" = "camino" ] && E 'test -d /opt/e2e/fixtures/camino' 2>/dev/nu
                 check "DD11: developer-side restart through ddev() works while running" \
                     E 'grep -qE "Successfully started|Restarted" /tmp/dd11-restart.log'
             else
+                # One failure per event (issue #480 F33 — see DD4).
                 echo "  ${RED}FAIL${NC}  DD11: developer-side restart failed:"
                 failures=$((failures + 1))
                 E 'sed "s/\x1b\[[0-9;]*m//g" /tmp/dd11-restart.log 2>/dev/null | tail -10' || true
-                failures=$((failures + 1))
             fi
             E 'curl --resolve camino-e2e.local:8080:127.0.0.1 -fsS http://camino-e2e.local:8080/camino/ -o /tmp/dd11-front.html'
             check "DD11: site still answers 200 after the dev restart" \
@@ -888,10 +890,10 @@ if [ "$SITE_TIER" = "camino" ]; then
                 check "DD12: ddev survives git's .ddev file replacement (restart)" \
                     E 'grep -qE "Successfully started|Restarted" /tmp/dd12-restart.log'
             else
+                # One failure per event (issue #480 F33 — see DD4).
                 echo "  ${RED}FAIL${NC}  DD12: restart after .ddev checkout failed:"
                 failures=$((failures + 1))
                 E 'sed "s/\x1b\[[0-9;]*m//g" /tmp/dd12-restart.log 2>/dev/null | tail -10' || true
-                failures=$((failures + 1))
             fi
             OC_DD12 'ddev delete -Oy >/dev/null 2>&1' || true
         else

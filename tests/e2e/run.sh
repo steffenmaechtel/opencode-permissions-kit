@@ -304,7 +304,9 @@ if [ "$(printf '%s\n2.2.6\n' "$OC_VERSION" | sort -V | tail -n 1)" = "$OC_VERSIO
     # the image ships no procps, so no in-container pkill exists).
     kill "$E2E_SERVE_JOB" 2>/dev/null || true
 else
-    echo "  skipped: opencode $OC_VERSION < 2.2.6 (permission route unverified there)"
+    # Counted through skip() (issue #480 F35): visible in the tally and
+    # to the E2E_STRICT lever — an uncounted echo was invisible to both.
+    skip "3b permission-route probes: opencode $OC_VERSION < 2.2.6 (route unverified there)"
 fi
 
 check "Wrapper is first in PATH" \
@@ -993,8 +995,13 @@ check "wrapper: kit-update note names the update command" \
     E 'grep -q "sudo opk update" /tmp/wrapper-update.txt'
 # restore the quiet verdict so later starts stay deterministic
 E 'printf "DATE=%s\nSTATE=current\nVER=\n" "$(date +%F)" > /home/dev/.cache/opencode-permissions-kit/update-check'
-# Invalid CWD: wrapper should refuse
-E 'cd /tmp && /usr/local/bin/opencode 2>&1 | tee /tmp/wrapper-invalid.txt; test $? -ne 0' &&
+# Invalid CWD: wrapper should refuse (exit 1, as-opencode-core.sh
+# wrapper_refusal). File redirect, never a tee pipe: under dash (no
+# pipefail) a pipeline's rc is the LAST member's — `... | tee f;
+# test $? -ne 0` measured tee (always 0), so the rc leg was vacuous
+# and the OK line could never print (issue #480 F34). The counted
+# refusal coverage stays the ERROR-banner grep below.
+E 'cd /tmp && /usr/local/bin/opencode >/tmp/wrapper-invalid.txt 2>&1; test $? -ne 0' &&
     echo "  ${GREEN}OK${NC}  wrapper refused from invalid CWD"
 check "wrapper: ERROR banner from invalid CWD" \
     E 'grep -q "ERROR: opencode cannot be started here" /tmp/wrapper-invalid.txt'
@@ -1134,9 +1141,10 @@ fi
 # 12i.1 re-apply podman-rootless via config.sh (idempotent re-provision of the
 # install-time backend; exercises the config.sh switch path).
 if ! E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh --yes container-backend podman-rootless >/tmp/config-backend.log 2>&1'; then
-    echo "  ${YELLOW}SKIP${NC}  12i: backend provisioning failed ($(E 'tail -1 /tmp/config-backend.log' 2>/dev/null || echo unknown))"
     _rootless_ok=false
-    skipped=$((skipped + 1))
+    # One row per event (#494 a F2): the log-tail detail rides the skip
+    # label — skip() already prints the SKIP row a second echo duplicated.
+    skip "12i: backend provisioning failed ($(E 'tail -1 /tmp/config-backend.log' 2>/dev/null || echo unknown))"
 fi
 
 # 12i.2 verify install.conf + sudoers state.
@@ -1166,9 +1174,8 @@ if [ "$_rootless_ok" = true ]; then
         check "12i: rootless podman works as the opencode user (nested userns)" \
             E 'cd /tmp && sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/$(id -u opencode) podman info >/dev/null 2>&1"'
     else
-        echo "  ${YELLOW}SKIP${NC}  12i: nested user namespaces not available ($(E 'tail -1 /tmp/podman-info.out' 2>/dev/null || echo unknown))"
         _rootless_ok=false
-        skipped=$((skipped + 1))
+        skip "12i: nested user namespaces not available ($(E 'tail -1 /tmp/podman-info.out' 2>/dev/null || echo unknown))"
     fi
 fi
 
@@ -1189,8 +1196,11 @@ if [ "$_rootless_ok" = true ]; then
         check "12i: rootless container CAN read index.php via bind mount" \
             container_cat_check "normal source code" index.php
     else
-        echo "  ${YELLOW}SKIP${NC}  12i: could not pull alpine (no network?) — $(sudo tail -1 /tmp/podman-pull.out 2>/dev/null || echo unknown)"
-        skipped=$((skipped + 2))
+        # The label names the count (#494 a F1, corrected b B1): the
+        # tally counts skip EVENTS (1), not the 3 container-read checks
+        # behind this site (.env, settings.php, index.php) — the old
+        # "+ 2" hand tally had miscounted them all along.
+        skip "12i: alpine pull failed — 3 container read checks not run ($(sudo tail -1 /tmp/podman-pull.out 2>/dev/null || echo unknown))"
     fi
 fi
 

@@ -188,8 +188,12 @@ skip() {
     echo "  ${YELLOW}SKIP${NC}  $1"
     skipped=$((skipped + 1))
     # E2E_STRICT=1 turns skips into failures: a wholesale-skip run is
-    # green otherwise, and nobody notices the core sections never ran
-    # (wire this via the workflow's strict dispatch input).
+    # green otherwise, and nobody notices the core sections never ran.
+    # Wired from every e2e lane's strict dispatch input (issue #480 F3):
+    # test-e2e.yml (all 5 jobs) and test-e2e-ddev.yml (both jobs) export
+    # E2E_STRICT from the input; ALL skip sites must route through this
+    # helper — a hand-incremented skipped=$((skipped + 1)) is invisible
+    # to the lever (pinned by tests/unit/test-e2e-sources.sh).
     if [ "${E2E_STRICT:-0}" = "1" ]; then
         echo "  ${RED}FAIL${NC}  (strict mode) $1"
         failures=$((failures + 1))
