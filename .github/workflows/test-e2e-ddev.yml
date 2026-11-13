@@ -196,10 +196,11 @@ jobs:
           OPK_GH_TOKEN: ${{ github.token }}
         # E2E_STRICT (issue #480 F3): the strict dispatch input reaches
         # both ddev lanes — run-ddev.sh carries the most skip sites of
-        # the three suites (12: systemd boot ×2, inner daemon, dd2/dd9/
-        # dd12 starts, camino start/master ×2, dd13 second start, bare
-        # origin, DD14 env — #494 a F4), and a degraded runner must not
-        # green through the burn-in subjects. Push/schedule run with 0.
+        # the three suites (12: systemd boot ×2, inner daemon, dd2
+        # start, dd9 import, camino start + master ×2, dd12 start,
+        # dd13 second start, bare origin, DD14 env — #494 a F4/b B3),
+        # and a degraded runner must not green through the burn-in
+        # subjects. Push/schedule run with 0.
         run: |
           E2E_STRICT="${{ inputs.strict == true && '1' || '0' }}" ./tests/e2e/run-ddev.sh
 
