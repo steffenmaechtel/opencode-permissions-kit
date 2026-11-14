@@ -135,10 +135,21 @@ run_resolver() {
     env PATH="$1:$PATH" SYSTEM_BIN="$2" CONFDIR="$WORK/conf" \
         sh -c ". '$FUNCS' && $3" 2>/dev/null
 }
-_re=$(run_resolver "$WORK/bin" "$WORK/stub-v2" 'current_opencode_major')
-[ "$_re" = "2" ] && pass "resolve: 2.x --version line maps to major 2" || fail "resolve: 2.x --version line maps to major 2 (got: '$_re')"
-_re=$(run_resolver "$WORK/bin" "$WORK/stub-v1" 'current_opencode_major')
-[ "$_re" = "1" ] && pass "resolve: bare 1.x --version line maps to major 1" || fail "resolve: bare 1.x --version line maps to major 1 (got: '$_re')"
+# rc-capture on every run_resolver caller (#503 a M2): FUNCS is a
+# concatenation of extract_func outputs with no syntax guard -- a
+# broken-non-empty extraction makes the child's `.` fatal (rc 2,
+# silenced by the run_resolver 2>/dev/null), and the bare assignment
+# aborted the whole suite mid-run under set -e: no tally, downstream
+# pins unseen. The capture routes the child death into the assert's
+# own row; the rc conjunct rides the existing folded condition.
+_re_rc=0
+_re=$(run_resolver "$WORK/bin" "$WORK/stub-v2" 'current_opencode_major') || _re_rc=$?
+[ "$_re_rc" -eq 0 ] && [ "$_re" = "2" ] && pass "resolve: 2.x --version line maps to major 2" ||
+    fail "resolve: 2.x --version line maps to major 2 (rc=$_re_rc got: '$_re')"
+_re_rc=0
+_re=$(run_resolver "$WORK/bin" "$WORK/stub-v1" 'current_opencode_major') || _re_rc=$?
+[ "$_re_rc" -eq 0 ] && [ "$_re" = "1" ] && pass "resolve: bare 1.x --version line maps to major 1" ||
+    fail "resolve: bare 1.x --version line maps to major 1 (rc=$_re_rc got: '$_re')"
 
 # The probes are BOUNDED (0.0.43b W3): a wedged 2.x service can make even
 # --version hang (issue #80) — opk update, the remediation path, must
@@ -168,10 +179,14 @@ else
 fi
 
 # 2b. latest resolution per major (npm dist-tag vs GitHub releases/latest)
-_re=$(run_resolver "$WORK/bin" "$WORK/stub-v2" 'resolve_latest_opencode_version 2')
-[ "$_re" = "2.1.99" ] && pass "resolve: major 2 resolves through the npm dist-tag" || fail "resolve: major 2 resolves through the npm dist-tag (got: '$_re')"
-_re=$(run_resolver "$WORK/bin" "$WORK/stub-v1" 'resolve_latest_opencode_version 1')
-[ "$_re" = "1.18.99" ] && pass "resolve: major 1 resolves through GitHub releases/latest" || fail "resolve: major 1 resolves through GitHub releases/latest (got: '$_re')"
+_re_rc=0
+_re=$(run_resolver "$WORK/bin" "$WORK/stub-v2" 'resolve_latest_opencode_version 2') || _re_rc=$?
+[ "$_re_rc" -eq 0 ] && [ "$_re" = "2.1.99" ] && pass "resolve: major 2 resolves through the npm dist-tag" ||
+    fail "resolve: major 2 resolves through the npm dist-tag (rc=$_re_rc got: '$_re')"
+_re_rc=0
+_re=$(run_resolver "$WORK/bin" "$WORK/stub-v1" 'resolve_latest_opencode_version 1') || _re_rc=$?
+[ "$_re_rc" -eq 0 ] && [ "$_re" = "1.18.99" ] && pass "resolve: major 1 resolves through GitHub releases/latest" ||
+    fail "resolve: major 1 resolves through GitHub releases/latest (rc=$_re_rc got: '$_re')"
 
 # 2c. a dist-tag outside the wanted major fails loudly (no silent crossing)
 mkdir -p "$WORK/bin3"
@@ -387,18 +402,30 @@ chan_case() {
         printf '%s' "$KIT_BRANCH"
     )
 }
-out=$(chan_case "stable" "")
-[ "$out" = "stable" ] && pass "channel: stamp wins when no env is set" ||
-    fail "channel: stamp wins when no env is set (out=$out)"
-out=$(chan_case "stable" "master")
-[ "$out" = "master" ] && pass "channel: explicit env overrides the stamp" ||
-    fail "channel: explicit env overrides the stamp (out=$out)"
-out=$(chan_case "" "")
-[ "$out" = "master" ] && pass "channel: master fallback when nothing is stamped" ||
-    fail "channel: master fallback when nothing is stamped (out=$out)"
-out=$(chan_case "" "feature/x")
-[ "$out" = "feature/x" ] && pass "channel: any branch env passes through" ||
-    fail "channel: any branch env passes through (out=$out)"
+# rc-capture on every chan_case caller (#503 a M1): CHAN_BLOCK is
+# grep-extracted raw source (needle + -A1 neighbor + the KIT_BRANCH
+# line) and the extractability probe above checks substring presence
+# only -- a broken-non-empty block (update.sh refactor moving the
+# stamped-channel assignment into multi-line/heredoc context) makes
+# the eval inside chan_case fatal, and the bare assignment aborted
+# the whole suite mid-run under set -e: no tally, downstream pins
+# unseen. The capture routes the child death into the row's own rc.
+_rc=0
+out=$(chan_case "stable" "") || _rc=$?
+[ "$_rc" -eq 0 ] && [ "$out" = "stable" ] && pass "channel: stamp wins when no env is set" ||
+    fail "channel: stamp wins when no env is set (rc=$_rc out=$out)"
+_rc=0
+out=$(chan_case "stable" "master") || _rc=$?
+[ "$_rc" -eq 0 ] && [ "$out" = "master" ] && pass "channel: explicit env overrides the stamp" ||
+    fail "channel: explicit env overrides the stamp (rc=$_rc out=$out)"
+_rc=0
+out=$(chan_case "" "") || _rc=$?
+[ "$_rc" -eq 0 ] && [ "$out" = "master" ] && pass "channel: master fallback when nothing is stamped" ||
+    fail "channel: master fallback when nothing is stamped (rc=$_rc out=$out)"
+_rc=0
+out=$(chan_case "" "feature/x") || _rc=$?
+[ "$_rc" -eq 0 ] && [ "$out" = "feature/x" ] && pass "channel: any branch env passes through" ||
+    fail "channel: any branch env passes through (rc=$_rc out=$out)"
 check_live "channel: KIT_BASE_URL builds from the resolved ref" \
     "$UPDATE" \
     -F 'KIT_BASE_URL="${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/$KIT_BRANCH}"'
