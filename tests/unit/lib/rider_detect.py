@@ -39,13 +39,15 @@ says otherwise):
     inside a merged token ('"$(dirname "$SRC")/f"', '"$SRC"bak') flags
     again like the awk's raw scan, and references whose name run ends
     before a dot or suffix ('"$SRC.bak"', unquoted $SRC.bak) flag too
-    -- the fail-loud direction (round a A2, #496). The quoted
-    outside-dot spelling ('"$SRC".bak') is an awk AGREEMENT, not a
-    delta: the awk's quote-delimited scan closed on '"$SRC"' before
-    the dot and flagged it (round b D1, #496).
+    -- the fail-loud direction (round a A2, #496; the two dot
+    spellings unpinned: no arm plants them -- round c E1, #496). The
+    quoted outside-dot spelling ('"$SRC".bak') is an awk AGREEMENT,
+    not a delta: the awk's quote-delimited scan closed on '"$SRC"'
+    before the dot and flagged it (round b D1, #496).
   - the positional conjunct counts backslash-escaped and word-suffix
     spellings ('\\$1', 'f\\$1') the awk's byte forms never saw -- the
-    escaped positional IS the rule-3/4 shape (round a A3, #496).
+    escaped positional IS the rule-3/4 shape (round a A3, #496; the
+    word-suffix spelling unpinned -- round c E2, #496).
   - an UNQUOTED desc token satisfies the token anchor where the awk
     regex demanded quotes (unpinned: no live rows shape that way, so
     no arm plants the shape -- round b D2, #496).
