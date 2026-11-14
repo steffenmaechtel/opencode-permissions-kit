@@ -167,9 +167,20 @@ jobs:
           fi
       - name: Read pinned OLD version (for cache key)
         id: old
+        # Fail-loud extraction (#485 F25): the sed is shape-pinned to
+        # lib.sh's E2E_OLD_VERSION default line; shape drift there used
+        # to yield an EMPTY value — silently cold OLD-binary caches,
+        # nothing red. Anchored validation, same shape as the version
+        # resolution steps above.
         run: |
-          echo "OLD_VERSION=$(sed -n 's/^E2E_OLD_VERSION="${E2E_OLD_VERSION:-\([0-9.]*\)}".*/\1/p' \
-              tests/e2e/lib.sh | head -1)" >> "$GITHUB_OUTPUT"
+          OLD="$(sed -n 's/^E2E_OLD_VERSION="${E2E_OLD_VERSION:-\([0-9.]*\)}".*/\1/p' \
+              tests/e2e/lib.sh | head -1)"
+          if printf '%s' "$OLD" | grep -qE '^[0-9]+(\.[0-9]+)*$'; then
+            echo "OLD_VERSION=$OLD" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::E2E_OLD_VERSION extraction from tests/e2e/lib.sh got '${OLD:-empty}' \
+                (cache-key sed and lib.sh shape drifted, #485 F25)" && exit 1
+          fi
       - name: Cache opencode binaries + installer (per 2.x version)
         uses: actions/cache@v6
         with:
@@ -262,9 +273,20 @@ jobs:
           fi
       - name: Read pinned OLD version (for cache key)
         id: old
+        # Fail-loud extraction (#485 F25): the sed is shape-pinned to
+        # lib.sh's E2E_OLD_VERSION default line; shape drift there used
+        # to yield an EMPTY value — silently cold OLD-binary caches,
+        # nothing red. Anchored validation, same shape as the version
+        # resolution steps above.
         run: |
-          echo "OLD_VERSION=$(sed -n 's/^E2E_OLD_VERSION="${E2E_OLD_VERSION:-\([0-9.]*\)}".*/\1/p' \
-              tests/e2e/lib.sh | head -1)" >> "$GITHUB_OUTPUT"
+          OLD="$(sed -n 's/^E2E_OLD_VERSION="${E2E_OLD_VERSION:-\([0-9.]*\)}".*/\1/p' \
+              tests/e2e/lib.sh | head -1)"
+          if printf '%s' "$OLD" | grep -qE '^[0-9]+(\.[0-9]+)*$'; then
+            echo "OLD_VERSION=$OLD" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::E2E_OLD_VERSION extraction from tests/e2e/lib.sh got '${OLD:-empty}' \
+                (cache-key sed and lib.sh shape drifted, #485 F25)" && exit 1
+          fi
       - name: Cache opencode binaries + installer (per 2.x version)
         uses: actions/cache@v6
         with:
@@ -348,9 +370,20 @@ jobs:
           fi
       - name: Read pinned OLD version (for cache key)
         id: old
+        # Fail-loud extraction (#485 F25): the sed is shape-pinned to
+        # lib.sh's E2E_OLD_VERSION default line; shape drift there used
+        # to yield an EMPTY value — silently cold OLD-binary caches,
+        # nothing red. Anchored validation, same shape as the version
+        # resolution steps above.
         run: |
-          echo "OLD_VERSION=$(sed -n 's/^E2E_OLD_VERSION="${E2E_OLD_VERSION:-\([0-9.]*\)}".*/\1/p' \
-              tests/e2e/lib.sh | head -1)" >> "$GITHUB_OUTPUT"
+          OLD="$(sed -n 's/^E2E_OLD_VERSION="${E2E_OLD_VERSION:-\([0-9.]*\)}".*/\1/p' \
+              tests/e2e/lib.sh | head -1)"
+          if printf '%s' "$OLD" | grep -qE '^[0-9]+(\.[0-9]+)*$'; then
+            echo "OLD_VERSION=$OLD" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::E2E_OLD_VERSION extraction from tests/e2e/lib.sh got '${OLD:-empty}' \
+                (cache-key sed and lib.sh shape drifted, #485 F25)" && exit 1
+          fi
       - name: Cache opencode binaries + installer (per 2.x version, shared with e2e job)
         uses: actions/cache@v6
         with:
@@ -438,9 +471,20 @@ jobs:
           fi
       - name: Read pinned OLD version (for cache key)
         id: old
+        # Fail-loud extraction (#485 F25): the sed is shape-pinned to
+        # lib.sh's E2E_OLD_VERSION default line; shape drift there used
+        # to yield an EMPTY value — silently cold OLD-binary caches,
+        # nothing red. Anchored validation, same shape as the version
+        # resolution steps above.
         run: |
-          echo "OLD_VERSION=$(sed -n 's/^E2E_OLD_VERSION="${E2E_OLD_VERSION:-\([0-9.]*\)}".*/\1/p' \
-              tests/e2e/lib.sh | head -1)" >> "$GITHUB_OUTPUT"
+          OLD="$(sed -n 's/^E2E_OLD_VERSION="${E2E_OLD_VERSION:-\([0-9.]*\)}".*/\1/p' \
+              tests/e2e/lib.sh | head -1)"
+          if printf '%s' "$OLD" | grep -qE '^[0-9]+(\.[0-9]+)*$'; then
+            echo "OLD_VERSION=$OLD" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::E2E_OLD_VERSION extraction from tests/e2e/lib.sh got '${OLD:-empty}' \
+                (cache-key sed and lib.sh shape drifted, #485 F25)" && exit 1
+          fi
       - name: Cache opencode binaries + installer (per 1.x version)
         uses: actions/cache@v6
         with:
@@ -524,9 +568,20 @@ jobs:
           fi
       - name: Read pinned OLD version (for cache key)
         id: old
+        # Fail-loud extraction (#485 F25): the sed is shape-pinned to
+        # lib.sh's E2E_OLD_VERSION default line; shape drift there used
+        # to yield an EMPTY value — silently cold OLD-binary caches,
+        # nothing red. Anchored validation, same shape as the version
+        # resolution steps above.
         run: |
-          echo "OLD_VERSION=$(sed -n 's/^E2E_OLD_VERSION="${E2E_OLD_VERSION:-\([0-9.]*\)}".*/\1/p' \
-              tests/e2e/lib.sh | head -1)" >> "$GITHUB_OUTPUT"
+          OLD="$(sed -n 's/^E2E_OLD_VERSION="${E2E_OLD_VERSION:-\([0-9.]*\)}".*/\1/p' \
+              tests/e2e/lib.sh | head -1)"
+          if printf '%s' "$OLD" | grep -qE '^[0-9]+(\.[0-9]+)*$'; then
+            echo "OLD_VERSION=$OLD" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::E2E_OLD_VERSION extraction from tests/e2e/lib.sh got '${OLD:-empty}' \
+                (cache-key sed and lib.sh shape drifted, #485 F25)" && exit 1
+          fi
       - name: Cache opencode binaries + installer (per 1.x version, shared with e2e-1x)
         uses: actions/cache@v6
         with:

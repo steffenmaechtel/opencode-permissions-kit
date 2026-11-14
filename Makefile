@@ -119,6 +119,18 @@ export PATH := $(PATH):$(HOME)/.local/bin
 # tests/unit/test-format-gate.sh.
 SHFMT_VERSION = 3.14.1
 SHFMT_FLAGS = -ln dash -i 4 -ci
+# Per-artifact digests of the pinned release (#485 F28): the recipe used
+# to assert only --version, which a compromised or corrupted release can
+# satisfy -- the binary would be downloaded AND executed on the CI unit
+# job and contributor hosts. Verified against the v3.14.1 GitHub release
+# assets (independent re-verification by the maintainer welcome). These
+# are plain make variables, so a stub-driven unit test can override the
+# host platform's pin on the command line (make install-shfmt
+# SHFMT_SHA256_linux_amd64=<stub digest>).
+SHFMT_SHA256_linux_amd64 = 76e77641faa025814b77f153b29796b8e6fa2fca03e0c76a691608b86c7ea7bf
+SHFMT_SHA256_linux_arm64 = 5f2db09dae91fca848f7adbdd014632e921a383863a2ad7e0450ad3aba0c6489
+SHFMT_SHA256_darwin_amd64 = d33eee0da0f92835b3562e9767a05cee7e4eaeef47daa03bfd09da17b4b590a6
+SHFMT_SHA256_darwin_arm64 = b7c872db63553ccffc7253aba3ed7d4885a27d83f1ba567b1138c6315a5847e5
 # Tests' own scripts: every TRACKED .sh under tests/. Tracked-only on
 # purpose: warm checkouts carry untracked foreign shell (e2e camino
 # share-providers, cache dumps -- bash, not ours to format). Asymmetry,
@@ -128,6 +140,16 @@ SHFMT_FLAGS = -ln dash -i 4 -ci
 # today (verified review a B5), and a stray scratch file failing loud
 # under files/ is the safer direction.
 SHFMT_TEST_FILES = $(shell git ls-files -- 'tests/*.sh' | sort)
+
+# Scripts checked by `make check-py` -- DERIVED FROM DISK (#485 F29, the
+# SHELLCHECK_FILES class): every .py under the shipped py/ dir. The old
+# hand-maintained list (2 entries) was pinned by nothing -- exactly the
+# rot class the shell gate's disk derivation killed ("had silently
+# dropped seven shipped scripts"): a new shipped py script cannot be
+# forgotten, and an untracked scratch file reddens the gate (find, not
+# git ls-files, on purpose -- same asymmetry rationale as
+# SHELLCHECK_FILES).
+CHECK_PY_FILES = $(shell find files/opencode-permissions-kit-lib/py -type f -name '*.py' | sort)
 
 # Single-source derivation link (review a B3, #301):
 # tests/unit/test-format-gate.sh reads the gate scope from HERE, never
@@ -139,6 +161,7 @@ fmt-scope:
 help:
 	@echo "opencode permissions kit — dev makefile"
 	@echo ""
+	@echo "  make help         Print this help (every .PHONY target, issues #476/#477)"
 	@echo "  make test          Run all self-contained tests (shell) + lint"
 	@echo "  make check-host    Verify the host has all tools needed to contribute"
 	@echo "  make check-py      Run python3 -m py_compile over the shipped py/ scripts"
@@ -185,6 +208,7 @@ help:
 	@echo "  make test-update-core   Run update phase-lib tests"
 	@echo "  make test-install-core  Run install phase-lib tests"
 	@echo "  make test-release       Run release helper tests"
+	@echo "  make test-fetch-integrity  Run SHA256SUMS fetch-integrity tests (issue #478)"
 	@echo "  make test-e2e-sources   Run e2e source-consistency tests"
 	@echo "  make test-browser-bridge  Run WSL browser bridge tests"
 	@echo "  make test-security-advisories  Run advisory database/watch tests"
@@ -375,7 +399,10 @@ sums:
 # version pin. Fail-loud + atomic (review a B1/B2, #301): every failure
 # edge exits 1 explicitly (the trailing PATH-note case must never zero a
 # failed run), and the download lands on a temp name -- a broken
-# transfer never truncates an existing install in place. SHFMT_BIN_DIR
+# transfer never truncates an existing install in place. The artifact
+# digest is verified against the SHFMT_SHA256_* pins BEFORE the binary
+# is ever executed (#485 F28): --version alone is a probe a compromised
+# release can satisfy. SHFMT_BIN_DIR
 # (env) redirects the destination so the unit suite can pin this target
 # inside its scratch sandbox; set-but-EMPTY fails loud (the `-` form
 # keeps the empty value, mkdir errors -- review b D6) and a stale-temp
@@ -384,10 +411,10 @@ sums:
 # concurrent run's in-flight temp (seconds old) is never swept.
 install-shfmt:
 	@case "$$(uname -s)/$$(uname -m)" in \
-		Linux/x86_64) plat=linux_amd64 ;; \
-		Linux/aarch64) plat=linux_arm64 ;; \
-		Darwin/x86_64) plat=darwin_amd64 ;; \
-		Darwin/arm64) plat=darwin_arm64 ;; \
+		Linux/x86_64) plat=linux_amd64; want='$(SHFMT_SHA256_linux_amd64)' ;; \
+		Linux/aarch64) plat=linux_arm64; want='$(SHFMT_SHA256_linux_arm64)' ;; \
+		Darwin/x86_64) plat=darwin_amd64; want='$(SHFMT_SHA256_darwin_amd64)' ;; \
+		Darwin/arm64) plat=darwin_arm64; want='$(SHFMT_SHA256_darwin_arm64)' ;; \
 		*) echo "error: unsupported platform for the shfmt download -- install v$(SHFMT_VERSION) manually"; exit 1 ;; \
 	esac; \
 	bin="$${SHFMT_BIN_DIR-$${HOME}/.local/bin}"; \
@@ -398,6 +425,25 @@ install-shfmt:
 	curl -fsSL -o "$$tmp" \
 		"https://github.com/mvdan/sh/releases/download/v$(SHFMT_VERSION)/shfmt_v$(SHFMT_VERSION)_$$plat" \
 		|| { rm -f "$$tmp"; exit 1; }; \
+	if command -v sha256sum >/dev/null 2>&1; then \
+		got="$$(sha256sum "$$tmp" | awk '{print $$1}')"; \
+	else \
+		got="$$(shasum -a 256 "$$tmp" | awk '{print $$1}')"; \
+	fi; \
+	if [ -z "$$got" ]; then \
+		rm -f "$$tmp"; \
+		echo "error:  no sha256 tool found (sha256sum or shasum) -- cannot verify the download, NOT installing"; \
+		exit 1; \
+	fi; \
+	if [ "$$got" != "$$want" ]; then \
+		rm -f "$$tmp"; \
+		echo "error:  shfmt checksum mismatch for $$plat"; \
+		echo "        want $$want"; \
+		echo "        got  $$got"; \
+		echo "        download corrupted or compromised -- NOT installed; verify the release assets and"; \
+		echo "        update the SHFMT_SHA256_* pins if the release legitimately changed."; \
+		exit 1; \
+	fi; \
 	chmod +x "$$tmp" || { rm -f "$$tmp"; exit 1; }; \
 	"$$tmp" --version >/dev/null || { rm -f "$$tmp"; echo "error: downloaded shfmt failed its --version probe"; exit 1; }; \
 	mv -f "$$tmp" "$$bin/shfmt" || { rm -f "$$tmp"; exit 1; }; \
@@ -415,16 +461,19 @@ check-host:
 
 # Python syntax gate (review 0.0.39a C5): a syntax error in the shipped
 # py/ scripts otherwise ships green until an e2e run (or a user) hits it.
-# PYTHONPYCACHEPREFIX keeps the bytecode cache out of the repo tree (the
-# workflow-consistency test derives requirements from files/ on disk).
-# The tui/*.tsx assets are gated CI-only by tests/tsx-syntax-gate.sh
-# (issue #114): a parse check needs node + pinned typescript — kept out
-# of the unit-suite host requirements on purpose.
+# Scope = CHECK_PY_FILES (disk-derived, #485 F29 -- see its definition
+# above). The empty-list guard fails loud: `python3 -m py_compile` with
+# zero operands exits 0, so a broken derivation must not green the gate
+# vacuously. PYTHONPYCACHEPREFIX keeps the bytecode cache out of the
+# repo tree (the workflow-consistency test derives requirements from
+# files/ on disk). The tui/*.tsx assets are gated CI-only by
+# tests/tsx-syntax-gate.sh (issue #114): a parse check needs node +
+# pinned typescript — kept out of the unit-suite host requirements on
+# purpose.
 check-py:
 	@echo "=== Python syntax check (shipped scripts) ==="
-	@PYTHONPYCACHEPREFIX="$$(mktemp -d)" python3 -m py_compile \
-		files/opencode-permissions-kit-lib/py/jsonc-parser.py \
-		files/opencode-permissions-kit-lib/py/tui-register.py
+	@test -n "$(CHECK_PY_FILES)" || { echo "error:  no py scripts found under files/opencode-permissions-kit-lib/py"; exit 1; }
+	@PYTHONPYCACHEPREFIX="$$(mktemp -d)" python3 -m py_compile $(CHECK_PY_FILES)
 	@echo "Python syntax OK."
 
 test-opencode-as-opencode:

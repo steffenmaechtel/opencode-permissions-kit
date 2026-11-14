@@ -279,6 +279,26 @@ check "first-run cli.json has mode 0644" \
 check "first-run cli.json parses and carries the plugin entry" \
     sh -c 'python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert any(e.get(\"package\",\"\").endswith(\"kit-mode-2x.tsx\") for e in d[\"plugins\"])" "$1"' _ "$T2X/fresh/cli.json"
 
+# #485 F23: locale-hardened read — a 7-bit-locale host (LC_ALL=C with
+# PYTHONUTF8=0 AND PYTHONCOERCECLOCALE=0, the finding's measured
+# trigger) used to fail register/unregister with rc 1 whenever cli.json
+# carried non-ASCII; open() now pins encoding="utf-8" like
+# jsonc-parser's read_config. The write side needs no pin (json.dump's
+# default ensure_ascii=True keeps the temp file ASCII — which is also
+# why the parse probe below is locale-independent). Octal fixture
+# escapes: dash printf does not interpret \xHH.
+printf '{"plugins": ["pkg-\303\274"], "label": "gr\303\274n"}\n' >"$T2X/utf8-cli.json"
+check "register: non-ASCII cli.json under a 7-bit locale (F23)" \
+    env LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 \
+    python3 "$REGISTER" "$T2X/utf8-cli.json" register /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx
+check "register: the non-ASCII user entry survives the round-trip (F23)" \
+    python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert 'pkg-'+chr(0xfc) in d['plugins']; assert any(isinstance(e,dict) and e['package'].endswith('kit-mode-2x.tsx') for e in d['plugins'])" "$T2X/utf8-cli.json"
+check "unregister: non-ASCII cli.json under a 7-bit locale (F23)" \
+    env LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 \
+    python3 "$REGISTER" "$T2X/utf8-cli.json" unregister /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx
+check "unregister: the non-ASCII user entry still intact (F23)" \
+    python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert 'pkg-'+chr(0xfc) in d['plugins']; assert not any(isinstance(e,dict) and e.get('package','').endswith('kit-mode-2x.tsx') for e in d['plugins'])" "$T2X/utf8-cli.json"
+
 # --- shared per-user sync (sh/tui-plugin.sh, 0.0.41e wave) ----------------------
 # tui_plugin_sync_user replaces the twin inline bodies in install.sh
 # Step 8c and update.sh's sync_tui_registration. Runs here as the
