@@ -549,14 +549,24 @@ projects_remove() {
         # captured OUTSIDE the write pipeline — dash has no pipefail, an
         # `|| rc=$?` on the pipeline would only ever see tee's 0. The
         # .tmp is registered in the scratch registry.
-        # Per-process suffix (0.0.42e C5 / 0.0.44a V11): the fixed name
-        # let two concurrent `opk config projects remove` runs clobber
-        # each other's staging file — the three sibling rewrites got
-        # `.opk-new.$$` in 0.0.42e; this fourth site now matches them.
+        # Per-process suffix (0.0.42e C5 / 0.0.44a V11 / #502): the
+        # fixed name let two concurrent `opk config projects remove`
+        # runs clobber each other's staging file — the three sibling
+        # rewrites got `.opk-new.$$` in 0.0.42e. V11 gave this fourth
+        # site its `.$$` but kept a `.tmp` stem while its comment
+        # claimed the sibling match — #502 aligned the stem for real
+        # (same convention as the siblings and the install-side twin
+        # in install-core.sh).
+        # Mode contract (#501): no explicit chmod — projects.conf's
+        # final mode is umask-dependent (0644 root:root under root's
+        # usual 022) and deliberately fail-closed: a stricter root
+        # umask only tightens the file, never loosens it — an explicit
+        # chmod 0644 would re-loosen a 0600 written under umask 077.
+        # The install-side twin (install-core.sh) writes the same way.
         _pr_rc=0
         _pr_out=$(sudo grep -vxF "$p" "$PROJECTS_CONF" 2>/dev/null) || _pr_rc=$?
         [ "$_pr_rc" -le 1 ] || die "cannot rewrite $PROJECTS_CONF (grep rc $_pr_rc) — '$p' NOT removed"
-        _pr_tmp="$PROJECTS_CONF.tmp.$$"
+        _pr_tmp="$PROJECTS_CONF.opk-new.$$"
         _tmp_track "$_pr_tmp"
         if [ -n "$_pr_out" ]; then
             printf '%s\n' "$_pr_out" | sudo tee "$_pr_tmp" >/dev/null
