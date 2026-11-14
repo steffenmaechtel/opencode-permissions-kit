@@ -19,7 +19,7 @@ c7264f5557baa68a9c30fc646974099c2ecec68862ae7ec9b522b4abce544632  files/opencode
 0eaf0a37ea2439ec17b0e6b3fed0d7ddc017b7d7072aeb4658b3a89a5f6d4239  files/opencode-permissions-kit-lib/py/tui-register.py
 dcb8b17188cab386608f95f5e4b2fe3ae0a0cf87e624c4661be08074f32fa1e8  files/opencode-permissions-kit-lib/sh/advisories.sh
 9cb195dde3c284914c8bea7f39fcddc405d4e57141c3e3b953d858fce42b3e99  files/opencode-permissions-kit-lib/sh/as-opencode-core.sh
-918a777776dd428f59327c3a3693914672393894711cc545ec1e37ae8951865f  files/opencode-permissions-kit-lib/sh/ddev-handover.sh
+8ed597c60598c9b2281ee97a0e20c1ceb88bf35ee7f7c12f1b2f8e8c11feba1c  files/opencode-permissions-kit-lib/sh/ddev-handover.sh
 2b6e687d11d2b3b623799eef7a67c4a6356e4ac692649b5782cb18da947ba3c9  files/opencode-permissions-kit-lib/sh/ddev-hosts.sh
 160c43e122c168539ef60279b5f734f9827cc5d1301dcb48f3406f704d3c8b9f  files/opencode-permissions-kit-lib/sh/ddev-migrate.sh
 b031ef936e57aae9868ce5201bd000b009639b8914b8e1234062fd179eb5a9b4  files/opencode-permissions-kit-lib/sh/ddev-terminal.sh
@@ -45,7 +45,7 @@ b84c5ae854e30e7286c258f7108e1bced15d9cba829e872e35e3197a9c869f2f  files/opencode
 02fc0af53d902c09cdd96c758e860e1cd1a4828444a9ce802b31a9640701b9d4  files/opencode-permissions-kit-lib/sh/update-core.sh
 49cf2952831b66edadf452762cad54d762477348cb0725ee1e11f9a199c8f8c5  files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh
 3023ff29a8be14b26025762b6f2885e6e10cc2b291b77aff536a53ad62327623  files/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc
-4fe0365d86cc2a93786ea8ba2f166ef740cb7a14a7a8b2207b5e3fb002bab8e0  files/opencode-permissions-kit-lib/templates/opencode.jsonc
+10ff06c6570c70a6dc251eab0cdcdf52f522d3de997b220070110d92c29c6d01  files/opencode-permissions-kit-lib/templates/opencode.jsonc
 a6e73bab547bb4eac6575ce148820ac8894ab79a9c93a8fb31ef2d2749ac9666  files/opencode-permissions-kit-lib/templates/sudoers.template
 fe653f918890fef6e62f8ace36af1970672ad847716fb8f6b683ed331d48c4c3  files/opencode-permissions-kit-lib/tui/kit-mode-2x.tsx
 086f1578f65c044004af017b0fa400241f14b3619ca77ad998a8cbeda37f07a4  files/opencode-permissions-kit-lib/tui/kit-mode.tsx

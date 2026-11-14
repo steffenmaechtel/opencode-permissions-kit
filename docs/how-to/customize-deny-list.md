@@ -24,7 +24,9 @@ The bundled template additionally:
 - hard-denies system-destructive and container commands,
 - mirrors the read/edit deny patterns as **ask tripwires** with trailing `*`
   in bash — so `cat settings.php | grep DB` still prompts. The tripwire is
-  lexical: variables (`F=.env; cat $F`), globs, and indirection evade it.
+  lexical: variables (`F=.env; cat $F`), globs, and indirection evade it —
+  and a planted git diff driver makes the allowlisted `git log -p` render
+  denied files (see the [security model](../concepts/security-model.md)).
 
 opencode applies the **last** matching rule — a narrow `allow` placed after
 a broad `deny` exempts a file from an overmatching rule. The template uses

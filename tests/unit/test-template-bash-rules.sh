@@ -262,4 +262,17 @@ for dead in \
     fi
 done
 
+# --- #483 (PR #479 round a F13): the tripwire comment names the git diff ---
+# --- driver evasion -- a zero-ask vector the RULES cannot see (the allowed
+# --- git diff/git log render denied content; the command text names no
+# --- protected file). RAW template operand: the pinned bytes are a comment,
+# --- which the stripped view deletes by design (jsonc sources stay raw per
+# --- the rider exemption).
+check "diff-driver evasion named in the tripwire comment (#483)" \
+    grep -qF 'So do git DIFF DRIVERS' "$TEMPLATE"
+check "diff-driver evasion names the config-planting arm (#483)" \
+    grep -qF '[diff "secret"] command = cat driver in .git/config' "$TEMPLATE"
+check "diff-driver evasion names the global-gitconfig arm (#506 a B2)" \
+    grep -qF 'global gitconfig for ONE ask' "$TEMPLATE"
+
 suite_done "template bash rule pins"

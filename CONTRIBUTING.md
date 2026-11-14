@@ -19,6 +19,23 @@ how to work on the code. For what the kit does, see the
    (issue #478); the suite's freshness pin reddens `make test` on a
    stale manifest, and `make release` refuses to cut one.
 
+### Checkout scripts run as root
+
+`opk` and the management scripts resolve their library relative to
+their own path, so anything invoked from a checkout executes that
+checkout's code — with your uid or root's depending on the command:
+the elevating subcommands self-elevate (`opk config`, `opk update` run
+`exec sudo sh` on the checkout's scripts when you are not root),
+direct script calls take a leading `sudo`, while `opk status`,
+`opk doctor` and an unsudoed direct call stay your uid — still
+checkout code, from a tree an AI session may have written into
+(`files/` is agent-group-writable on kit-managed machines; see
+AGENTS.md, "Checkout ownership"). That is deliberate ("checkout-first
+by construction"), and your own sudo password is the gate where root
+is involved. Review `git status` or the diff against `master` before
+running checkout scripts, or run them from a tree no agent can write
+to.
+
 ### Re-wrapping prose blocks
 
 Markdown prose wraps at roughly 78 columns; edits across several waves

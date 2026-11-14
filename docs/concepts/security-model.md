@@ -21,8 +21,10 @@ Concretely:
 - the agent-resources migration moves `~/.agents` whole but only
   `~/.claude/skills` — credentials such as `~/.claude/.credentials.json`
   never cross into the agent's home,
-- containers run under the `opencode` host UID via a rootless backend — the
-  agent can never reach a root-equivalent docker socket,
+- containers run under the `opencode` host UID via a rootless backend —
+  through the kit's backend the agent never reaches a root-equivalent
+  docker socket (one env_keep exception lives in
+  [Known residual gaps](#known-residual-gaps)),
 - no code path executes as the developer (no RunAs-developer sudoers rule).
 
 ## The soft permission layer (deliberate trade-off)
@@ -102,6 +104,19 @@ Operational notes:
 
 - **Bash-spawned reads** (`cat .env`) are only caught by the template's
   lexical ask-tripwires, never by the OS.
+- **Git diff drivers render denied files:** `git diff *` and `git log *`
+  are allowlisted, and the agent can write `.gitattributes` itself
+  (`*.env diff=secret`). A planted `[diff "secret"] command = cat` driver
+  then makes `git log -p` render denied file content, and the command
+  text names no protected file, so no bash tripwire fires. The planting
+  sites differ: `.git/config` is prompt-free only while its read/edit
+  denies are off — a default install renders them active (the
+  installer's recommended choice; `opk config git-config off` disables
+  them) — while the agent's global gitconfig (kit-created for
+  `safe.directory`, matched by no template rule) takes the same driver
+  for one ask (`git config --global diff.secret.command cat` hits no
+  allow and no tripwire) and then persists across sessions for every
+  repo; the git-config toggle does not close that arm.
 - **Bind-mounted containers** read the mounted tree freely (they run as the
   opencode host UID).
 - **Renamed copies** of secrets are invisible to the name-based
@@ -110,10 +125,26 @@ Operational notes:
   settings-dir pairs re-test every path component immediately before
   acting, but the gates are not atomic — a swap in the short window
   between a gate and its recursive pair stays undetected.
-- **Dev-owned flag write (accepted race):** the root-run dev-owned flag
-  write into `.ddev/config.yaml` screens for symlinks but is not atomic —
-  dev-owned mode's flag-write TOCTOU stays accepted (opencode-privilege-
-  capped; see [ddev integration](ddev-integration.md)).
+- **Dev-owned flag write (accepted race):** the dev-owned flag write into
+  `.ddev/config.yaml` screens for symlinks but is not atomic — dev-owned
+  mode's flag-write TOCTOU stays accepted. Its ceiling depends on the
+  caller: the opencode-uid path (`ddev-as-opencode`) caps the effect at
+  opencode privilege, while the root-run scan (install/update/
+  `opk config` handovers) performs the same write as root, where that
+  cap does not apply (see [ddev integration](ddev-integration.md)).
+- **TMPDIR-rooted scratch re-open windows:** the root-run passes stage
+  their work in `${TMPDIR:-/tmp}` and re-open staged files by name —
+  the fs-baseline worker and uninstall's chown revert re-read their
+  operand streams, the sudoers deploy installs a staged copy of the
+  file visudo validated a moment earlier, and a streamed install later
+  sources its whole verified fetch tree as the script directory. Under
+  the defaults (sticky `/tmp`, `0600` temps, sudo `env_reset` — the
+  sudoers template keeps no `TMPDIR`) those windows are benign; arming
+  them takes an operator who points `TMPDIR` into an agent-writable,
+  non-sticky directory before running the kit (`sudo -E`, `sudo env
+  TMPDIR=…`). Uninstall's revert is the sharp edge: it runs as the
+  developer with an inner `sudo`, so a dev-shell `TMPDIR` inside a
+  group-writable project tree arms that site without `sudo -E`.
 - The kit protects **locations, not information flows** — once content
   leaves the project roots, no scan recaptures it.
 - **mkcert CA key in the agent's home (deliberate):** ddev signs its
@@ -136,10 +167,42 @@ Operational notes:
   get.docker.com at install time. The `KIT_BASE_URL` env
   override replaces the fetch target entirely — treat the install
   environment as trusted.
+- **Developer-shell `DOCKER_HOST` rides env_keep:** the sudoers template
+  keeps `DOCKER_HOST`/`XDG_RUNTIME_DIR` into the agent session, but the
+  wrapper pins its own values only in the socket-resolving arms —
+  docker-rootless, and podman-rootless with `OPENCODE_PODMAN_SOCKET`
+  configured — while the podman-CLI, unreachable-socket and no-backend
+  arms export nothing, so a `DOCKER_HOST` set in the developer's shell
+  survives `env_reset` and overrides the socket pinning recorded in
+  `install.conf`; one naming a root-equivalent socket quietly breaks
+  "Containers ≠ root" for that session. Only the developer's own
+  environment arms it — unset `DOCKER_HOST` before starting `opencode`
+  if your shell carries one.
 - **OpenChamber serve password in the agent env:** when the serve feature is
   configured, `OPENCODE_SERVER_PASSWORD` (and username) survive sudo's
   `env_reset` into the agent's environment. Not a privilege escalation — but
   pick a strong password.
+- **Agent-authored container opt-in:** the per-project container-tools
+  opt-in is designed as project-owner consent, but the wrapper's probe
+  cannot tell an owner-written `./opencode.jsonc` from one the agent
+  wrote itself (the template's edit rules allow `*`): a
+  `"docker *": "allow"` entry the agent writes flips the probe to
+  "enabled by this project" without any prompt — only a note prints.
+  Bounded by the rootless, agent-UID backend: the opt-in changes which
+  tools run, not whose privileges they run with.
+- **Checkout-first `opk` runs checkout code as root:** `opk` resolves its
+  library relative to its own path, so an `opk` (or management script)
+  invoked from a checkout executes that checkout's code — with root
+  privileges via internal sudo for the elevating subcommands (`opk
+  config`, `opk update` run `exec sudo sh` when the caller is not
+  root) or a leading `sudo` for direct script calls, while `opk
+  status`, `opk doctor` and unsudoed direct calls stay the invoking
+  uid (still checkout code). On kit-managed machines the checkout is
+  agent-group-writable, so an agent session could have planted
+  content in `files/`. Deliberate design ("checkout-first by
+  construction" — the developer's own sudo password is the gate where
+  root is involved); see the repository's CONTRIBUTING.md for the
+  contributor-side warning.
 
 ## WSL2: the /mnt/c exposure
 
