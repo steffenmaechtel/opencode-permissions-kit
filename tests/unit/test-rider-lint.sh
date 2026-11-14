@@ -429,8 +429,11 @@ _rule2_batch() { # $@ = suite files -> $_BATCH_OUT; loud on death
         return 1
     }
 }
-_n="$( (_rule2_batch "$_cell/no-such-sweep-file.sh") 2>&1 >/dev/null | grep -c 'rules 2-4 sweep output unreliable')"
+_b1_rc=0
+_b1_err="$( (_rule2_batch "$_cell/no-such-sweep-file.sh") 2>&1 >/dev/null)" || _b1_rc=$?
+_n="$(printf '%s\n' "$_b1_err" | grep -c 'rules 2-4 sweep output unreliable')"
 check "a rider-detect --batch death fails loud with the guard message (round a B1, #496)" test "$_n" = 1
+check "a rider-detect --batch death returns nonzero (guard rc wiring, #496 b D3)" test "$_b1_rc" -ne 0
 _rule2_batch "$@" || exit 1
 _total=0
 for _f in "$SCRIPT_DIR"/test-*.sh; do

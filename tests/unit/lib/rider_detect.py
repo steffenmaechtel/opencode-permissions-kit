@@ -21,7 +21,8 @@ argument, stdout lines
 "<file>\\t" (one interpreter start for a whole sweep).
 
 Documented deltas vs the awk detector (behavior changes the shlex parse
-buys; each pinned by a discrimination arm in the suite):
+buys; each pinned by a discrimination arm in the suite unless the entry
+says otherwise):
   - quote-concatenated sh -c payloads are parsed THROUGH: a spliced
     STRICT absence shape now flags (the awk escape class closes); the
     spliced COMPOUND rows still stay out -- the payload's real legs
@@ -36,14 +37,18 @@ buys; each pinned by a discrimination arm in the suite):
   - the rule-2 operand conjunct walks each token's $NAME references
     longest-prefix-first instead of anchoring the whole token: a $NAME
     inside a merged token ('"$(dirname "$SRC")/f"', '"$SRC"bak') flags
-    again like the awk's raw scan, and dot-suffixed references
-    ('"$SRC".bak', awk-silent) now flag too -- the fail-loud direction
-    (round a A2, #496).
+    again like the awk's raw scan, and references whose name run ends
+    before a dot or suffix ('"$SRC.bak"', unquoted $SRC.bak) flag too
+    -- the fail-loud direction (round a A2, #496). The quoted
+    outside-dot spelling ('"$SRC".bak') is an awk AGREEMENT, not a
+    delta: the awk's quote-delimited scan closed on '"$SRC"' before
+    the dot and flagged it (round b D1, #496).
   - the positional conjunct counts backslash-escaped and word-suffix
     spellings ('\\$1', 'f\\$1') the awk's byte forms never saw -- the
     escaped positional IS the rule-3/4 shape (round a A3, #496).
   - an UNQUOTED desc token satisfies the token anchor where the awk
-    regex demanded quotes (no live rows shape that way).
+    regex demanded quotes (unpinned: no live rows shape that way, so
+    no arm plants the shape -- round b D2, #496).
 """
 
 import re
@@ -207,8 +212,11 @@ def has_reg_operand(leg, marked, exempt):
     never matched) and '"$SRC"bak' into '$SRCbak' (the greedy name run
     swallows the suffix); the prefix walk resolves both toward flagging
     -- the fail-loud direction (a false flag converts on sight; a
-    missed flag rides silently). Dot-suffixed references flag too (the
-    awk's quote-delimited byte scan stayed silent on '"$SRC".bak')."""
+    missed flag rides silently). References whose name run ends before
+    a dot or suffix flag too ('"$SRC.bak"', unquoted $SRC.bak -- the
+    awk's quote-delimited scan stayed silent on both); the outside-dot
+    spelling '"$SRC".bak' the awk DID flag (closed pair before the
+    dot, round b D1, #496)."""
     for t in leg:
         for m in RE_REF.finditer(t):
             name = m.group(1)
