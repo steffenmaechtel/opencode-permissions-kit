@@ -507,6 +507,10 @@ projects_add() {
             ui_detail "exists: $p"
             continue
         fi
+        # Mode contract (#501, #508 a A3): same umask-dependent shape
+        # as the other projects.conf writes — a missing file is
+        # CREATED by tee -a at 0666&~umask (0644 under root's usual
+        # 022), fail-closed; no explicit chmod by design.
         echo "$p" | sudo tee -a "$PROJECTS_CONF" >/dev/null
         # Apply the group baseline so the developer/agent share files
         # immediately — shared helper with live per-pass progress
@@ -543,20 +547,22 @@ projects_remove() {
         fi
         # grep -v rc 1 (empty result — removing the LAST registered
         # project, 0.0.39g C3) is benign; rc 2 is a REAL read error and
-        # must die BEFORE the .tmp is mv'd over projects.conf: the old
-        # `{ grep -v || true; } | tee` guard masked it into an empty
-        # rewrite that clobbered the file (review 0.0.39h F4). The rc is
-        # captured OUTSIDE the write pipeline — dash has no pipefail, an
-        # `|| rc=$?` on the pipeline would only ever see tee's 0. The
-        # .tmp is registered in the scratch registry.
+        # must die BEFORE the staging temp is mv'd over projects.conf:
+        # the old `{ grep -v || true; } | tee` guard masked it into an
+        # empty rewrite that clobbered the file (review 0.0.39h F4).
+        # The rc is captured OUTSIDE the write pipeline — dash has no
+        # pipefail, an `|| rc=$?` on the pipeline would only ever see
+        # tee's 0. The staging temp is registered in the scratch
+        # registry.
         # Per-process suffix (0.0.42e C5 / 0.0.44a V11 / #502): the
         # fixed name let two concurrent `opk config projects remove`
-        # runs clobber each other's staging file — the three sibling
-        # rewrites got `.opk-new.$$` in 0.0.42e. V11 gave this fourth
-        # site its `.$$` but kept a `.tmp` stem while its comment
-        # claimed the sibling match — #502 aligned the stem for real
-        # (same convention as the siblings and the install-side twin
-        # in install-core.sh).
+        # runs clobber each other's staging file — the two sibling
+        # rewrites in this file got `.opk-new.$$` in 0.0.42e C5, the
+        # install/update-side twins in 0.0.42f C1 (the "three siblings
+        # in 0.0.42e" figure this block long carried was wrong —
+        # #508 a A2). V11 gave this site its `.$$` but kept a `.tmp`
+        # stem while its comment claimed the sibling match — #502
+        # aligned the stem for real.
         # Mode contract (#501): no explicit chmod — projects.conf's
         # final mode is umask-dependent (0644 root:root under root's
         # usual 022) and deliberately fail-closed: a stricter root

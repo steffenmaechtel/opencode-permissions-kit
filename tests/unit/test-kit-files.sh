@@ -113,13 +113,14 @@ norm_files_path() {
 # blind guard — exactly its job).
 # copy_binary_atomic is deliberately outside the alternation (#500):
 # its operands are variables ("$loc" -> "$SYSTEM_BIN" in
-# install-core.sh, "$src" in update-core.sh), never a literal
-# "$(SCRIPT_DIR|FILES_ROOT)/..." path — the opencode binary comes from
-# upstream releases, not the kit's fetch lists, so there is no literal
-# for the extraction to key on and no list membership to assert. Not a
-# coverage gap: the exclusion is by design. If the binary ever deploys
-# from a fetch-list file, copy_binary_atomic joins the alternation in
-# the same wave.
+# install-core.sh, "$src" in update-core.sh) or non-fetch literal
+# paths (install-core.sh's "/root/.opencode/bin/opencode"), never a
+# literal "$(SCRIPT_DIR|FILES_ROOT)/..." path — the opencode binary
+# comes from upstream releases, not the kit's fetch lists, so there is
+# no literal for the extraction to key on and no list membership to
+# assert. Not a coverage gap: the exclusion is by design. If the
+# binary ever deploys from a fetch-list file, copy_binary_atomic joins
+# the alternation in the same wave.
 extract_deploy_sources() {
     sed -e ':a' -e '/\\$/{N; s/\\\n[[:space:]]*//; ba' -e '}' "$1" |
         grep -oE '(cp|copy_file_atomic|sudoers_deploy|agent_config_render|staged_write).*"\$(SCRIPT_DIR|FILES_ROOT)/[^"]+"' |

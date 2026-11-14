@@ -10,7 +10,7 @@ fe34f6f79b89b92aab1326a706f702a66fc812391ada0a8aa5654389b3349a4d  files/opencode
 0b64b752c0068c2c721fcb7353b113d57dcfc382f3b178f7d8589889af0e9a39  files/opencode-permissions-kit-lib/bin/setup-container-backend
 72e2b48893c03886b5ba0680cf6b419d7185e84cf2cbe6b12df536652d25db1f  files/opencode-permissions-kit-lib/bin/socket-check
 9f21f5a57ff8c03d0aa913753530a53eb8bdbfd956371d941e6431a2a7dc2913  files/opencode-permissions-kit-lib/bin/xdg-open
-c0553cfa06b815820211f6d237ed2b42503a301911bfa3d5cdf3710318c59b3a  files/opencode-permissions-kit-lib/management/config.sh
+b70e8b8f49271280a8e18795076eaad7a93d7b5ec3bdbe185829385ecfd8b7f7  files/opencode-permissions-kit-lib/management/config.sh
 7bb80e3e1220c5df12a284c8fe5ed38d14c2cc641d5003537401809d9b0129fd  files/opencode-permissions-kit-lib/management/doctor.sh
 15b14d82f6da5159f0882b021a4a6992f061f6b585e249ceba9ef8fa21ba78e0  files/opencode-permissions-kit-lib/management/status.sh
 546d3819cb32b608b6d712466c67e9da2aec5d934b2dc3e5b09712fedb62be44  files/opencode-permissions-kit-lib/management/uninstall.sh
@@ -28,7 +28,7 @@ ba4981b1468258c3b94c43c9beafaf476f604ba24ff2dc728986ae9a36de6ecf  files/opencode
 544b164dc7eb31c4972375cce7a8eeee0212275fd97f9227161e9c4b1a3fd2c5  files/opencode-permissions-kit-lib/sh/fs-baseline.sh
 80579d6005c882c689086a3af913ccdf686059905451f43b496aa74005fd0b41  files/opencode-permissions-kit-lib/sh/git-check.sh
 4140f251c24184514e656a6c6b0dc493c7aeae0180a47a6989e9fabe4cd1c0bb  files/opencode-permissions-kit-lib/sh/handover-core.sh
-cd1b5a08530fd8732b27d2f3e5eb57f6ac49cb61c1d3d08c60d6f888cce61a16  files/opencode-permissions-kit-lib/sh/install-core.sh
+445ae1bb3dfcc4293806c356c52d40b0a124f518f1c9fde591545ed674dd1b9f  files/opencode-permissions-kit-lib/sh/install-core.sh
 575266d6e05f87e5b5444464538ab3c222931bf5d5753d44695308aac067c3bf  files/opencode-permissions-kit-lib/sh/log.sh
 0304e35136d9c52c5d95778a68c86eb8ae3a261a6dfc48c5541458f5aee0ef4b  files/opencode-permissions-kit-lib/sh/openchamber-core.sh
 f584ab754df8a491dab02cd3ec60e1ffece05a07f8aaf9498213f308fab665e4  files/opencode-permissions-kit-lib/sh/path-sane.sh
