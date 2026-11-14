@@ -106,8 +106,10 @@
 # / c C2) no longer hides the payload's real legs; a spliced STRICT
 # absence flags (the escape class closed), a spliced compound still
 # stays out (its payload is genuinely multi-leg);
-# the payload anchor is the arm anchor (`check "desc" <spaces>
-# sh -c `), immune to a desc carrying those bytes (round a X1).
+# the payload anchor is the arm anchor -- TOKEN INDEXES (check, desc,
+# sh, -c at leg positions 0/1/2/3 in lib/rider_detect.py), immune to
+# a desc carrying those bytes (round a X1); an unquoted desc token
+# satisfies it too (documented port delta).
 # check_absent itself is never flagged (it IS the name).
 #
 # Discrimination arms (scratch fixtures, run BEFORE the tree sweep):
@@ -125,8 +127,9 @@
 #   - a planted strict sh -c absence shape flags (rule 4), including
 #     one whose DESCRIPTION carries the bytes "sh -c " (the payload
 #     anchor is the arm anchor, round a X1) -- a single-file compound
-#     absence payload and a spliced-quote compound stay out (payload
-#     single-leg conjunct / splice escape, round a X2/X5)
+#     absence payload and a spliced-quote compound stay out (the
+#     payload's REAL legs decide, spliced or not -- single-leg
+#     conjunct, round a X2/X5)
 #   - a check_absent call stays unflagged
 # Sabotage (committed tree, then restore + re-run green): delete the
 # hit arm from a detector -> the planted-rider arms go red while
@@ -299,12 +302,28 @@ printf '%s\n' "check \"spliced strict absence flags (shlex parses through, #488)
     >>"$_cell/rule2.sh"
 printf '%s\n' 'check "double space payload flags" sh -c  "! grep -qF nope \"\$1\"" _ "$SRC"' \
     >>"$_cell/rule2.sh"
+# Round a (#496) rows -- the port-fidelity shapes the review round's
+# EXECUTED differential pinned (fix wave a): the bare-EOL && continuation
+# (a A1: the joiner dropped the separator bytes, the continuation check
+# was invisible), merged-token operands (a A2: the whole-token anchor
+# was blind inside $(...) and quote-concat spellings), the
+# trailing-comment apostrophe (a C1: the quote raise skipped the whole
+# statement where the awk flagged), the escaped positional (a A3: the
+# awk byte forms never counted the dq-payload \$1 spelling).
+printf '%s\n' \
+    'foo bar &&' \
+    'check "joined bare-EOL cont flags" grep -qF pat "$SRC"' \
+    'check "cmdsub operand flags" grep -qF pat "$(dirname "$SRC")/f"' \
+    'check "concat operand flags" grep -qF pat "$SRC"bak' \
+    'check "comment apostrophe still flags" grep -qF pat "$SRC" # doesn'\''t ride the comment' \
+    'check "esc positional dq payload" sh -c "grep -qF pat \$1" _ "$SRC"' \
+    >>"$_cell/rule2.sh"
 
 # one interpreter start for every rule2.sh arm below (#488 pilot):
 # the fixture verdicts grep the captured output, not 20 fresh calls
 _rule2_out="$(_rule2_detect "$_cell/rule2.sh")"
 _n="$(printf '%s\n' "$_rule2_out" | grep -c DIRECT)"
-check "planted direct strict shapes flag (4: direct, absence-beside, joined, chained)" test "$_n" = 4
+check "planted direct strict shapes flag (8: direct, absence-beside, joined, chained, bare-EOL cont, cmdsub, concat, comment-apostrophe)" test "$_n" = 8
 _n="$(printf '%s\n' "$_rule2_out" | grep DIRECT | grep -c 'direct over registered')"
 check "the direct-over-registered arm is one of them" test "$_n" = 1
 _n="$(printf '%s\n' "$_rule2_out" | grep DIRECT | grep -c 'inversion-annotated')"
@@ -315,6 +334,14 @@ _n="$(printf '%s\n' "$_rule2_out" | grep DIRECT | grep -c 'absence leg')"
 check "presence leg beside an absence leg flags (review a X2, #468)" test "$_n" = 1
 _n="$(printf '%s\n' "$_rule2_out" | grep DIRECT | grep -c 'joined direct')"
 check "&&-joined check flags (review a S4, #468)" test "$_n" = 1
+_n="$(printf '%s\n' "$_rule2_out" | grep DIRECT | grep -c 'bare-EOL cont')"
+check "a check on a bare-EOL && continuation flags (joiner keeps the separator bytes, #496 a A1)" test "$_n" = 1
+_n="$(printf '%s\n' "$_rule2_out" | grep DIRECT | grep -c 'cmdsub operand')"
+check "a source var inside a merged \$(...) token flags (operand prefix walk, #496 a A2)" test "$_n" = 1
+_n="$(printf '%s\n' "$_rule2_out" | grep DIRECT | grep -c 'concat operand')"
+check "a quote-concat operand (\"\$SRC\"bak) flags (operand prefix walk, #496 a A2)" test "$_n" = 1
+_n="$(printf '%s\n' "$_rule2_out" | grep DIRECT | grep -c 'comment apostrophe')"
+check "an apostrophe in a trailing comment does not skip the statement (comment re-parse pass, #496 a C1)" test "$_n" = 1
 _n="$(printf '%s\n' "$_rule2_out" | grep DIRECT | grep -c 'slash-family')"
 check "direct over slash-family source stays unflagged (// deferred)" test "$_n" = 0
 _n="$(printf '%s\n' "$_rule2_out" | grep DIRECT | grep -c 'markdown')"
@@ -322,7 +349,9 @@ check "direct over markdown source stays unflagged (headings are not comments, #
 _n="$(printf '%s\n' "$_rule2_out" | grep -c 'chained')"
 check "chained registration flags (transitive derivation)" test "$_n" = 1
 _n="$(printf '%s\n' "$_rule2_out" | grep -c SHC1)"
-check "planted sh -c indirection shape counts (rule 3)" test "$_n" = 1
+check "planted sh -c indirection shape counts (rule 3, 2 rows: dq presence, esc positional)" test "$_n" = 2
+_n="$(printf '%s\n' "$_rule2_out" | grep SHC1 | grep -c 'esc positional')"
+check "an escaped positional (\$1) in a dq payload counts (documented port delta, #496 a A3)" test "$_n" = 1
 _n="$(printf '%s\n' "$_rule2_out" | grep SHC1 | grep -c 'shc absence')"
 check "sh -c payload with an absence leg stays uncounted (presence-only rule 3)" test "$_n" = 0
 _n="$(printf '%s\n' "$_rule2_out" | grep -c 'ridden')"
@@ -386,7 +415,23 @@ for _f in "$SCRIPT_DIR"/test-*.sh; do
     [ "$(basename "$_f")" = "test-rider-lint.sh" ] && continue
     set -- "$@" "$_f"
 done
-python3 "$SCRIPT_DIR/lib/rider_detect.py" --batch "$@" >"$_BATCH_OUT"
+# Fail-loud (round a B1, #496): the detector buffers ALL batch output
+# and writes it once at the END -- any batch-mode death (unreadable
+# file, a future parse bug) leaves the capture at ZERO bytes, and the
+# three sweeps below would grep an empty file and pass VACUOUSLY
+# green. The rc guard turns a detector death into a hard suite
+# failure; the arm below executes the failure path through the guard
+# message, observed on stderr the way a real run observes it.
+_rule2_batch() { # $@ = suite files -> $_BATCH_OUT; loud on death
+    python3 "$SCRIPT_DIR/lib/rider_detect.py" --batch "$@" \
+        >"$_BATCH_OUT" || {
+        echo "rider lint tests: rider-detect --batch failed (rc=$?) -- rules 2-4 sweep output unreliable" >&2
+        return 1
+    }
+}
+_n="$( (_rule2_batch "$_cell/no-such-sweep-file.sh") 2>&1 >/dev/null | grep -c 'rules 2-4 sweep output unreliable')"
+check "a rider-detect --batch death fails loud with the guard message (round a B1, #496)" test "$_n" = 1
+_rule2_batch "$@" || exit 1
 _total=0
 for _f in "$SCRIPT_DIR"/test-*.sh; do
     [ "$(basename "$_f")" = "test-rider-lint.sh" ] && continue

@@ -21,14 +21,29 @@ argument, stdout lines
 "<file>\\t" (one interpreter start for a whole sweep).
 
 Documented deltas vs the awk detector (behavior changes the shlex parse
-buys; each pinned by a discrimination arm or guarded by the tree
-differential):
+buys; each pinned by a discrimination arm in the suite):
   - quote-concatenated sh -c payloads are parsed THROUGH: a spliced
     STRICT absence shape now flags (the awk escape class closes); the
     spliced COMPOUND rows still stay out -- the payload's real legs
     decide, not the spelling.
-  - an unbalanced quote anywhere in a statement skips that statement
-    (shlex raises; the awk kept scanning with its quote state wedged).
+  - an unbalanced quote no longer skips the statement wholesale: pass 1
+    parses with commenters disabled; on its quote raise pass 2 re-parses
+    with '#' as a commenter, truncating a trailing unquoted comment whose
+    English (apostrophes) would otherwise wedge the quote state (round a
+    C1, #496 -- the awk flagged such rows; the naive port went blind).
+    Only when BOTH passes raise is the statement skipped (fail-still,
+    the awk payload extractor's unterminated branch).
+  - the rule-2 operand conjunct walks each token's $NAME references
+    longest-prefix-first instead of anchoring the whole token: a $NAME
+    inside a merged token ('"$(dirname "$SRC")/f"', '"$SRC"bak') flags
+    again like the awk's raw scan, and dot-suffixed references
+    ('"$SRC".bak', awk-silent) now flag too -- the fail-loud direction
+    (round a A2, #496).
+  - the positional conjunct counts backslash-escaped and word-suffix
+    spellings ('\\$1', 'f\\$1') the awk's byte forms never saw -- the
+    escaped positional IS the rule-3/4 shape (round a A3, #496).
+  - an UNQUOTED desc token satisfies the token anchor where the awk
+    regex demanded quotes (no live rows shape that way).
 """
 
 import re
@@ -42,6 +57,10 @@ RE_END_BACKSLASH = re.compile(r'\\$')
 RE_END_AND = re.compile(r'&&\s*$')
 RE_END_OROR = re.compile(r'\|\|\s*$')
 RE_END_PIPE = re.compile(r'\|\s*$')
+# round a A1 (#496): a bare trailing && / || keeps its SEPARATOR BYTES
+# in the joined statement (the awk stripped whitespace only) -- the legs
+# still split there, so a check on the continuation line stays visible.
+RE_TRAIL_WS = re.compile(r'\s+$')
 RE_ASSIGN = re.compile(r'^([A-Za-z_][A-Za-z_0-9]*)=(.*)$', re.S)
 RE_REGISTERED = re.compile(
     r'\$REPO/|\$FILES/|\.github/|\.\./e2e/'
@@ -55,7 +74,6 @@ RE_INVERSION = re.compile(r'#\s*rider-inversion')
 # leg[0] == 'check', leg[1] = the desc token, leg[2] the command word.
 # Documented delta: an UNQUOTED desc token satisfies the token anchor
 # where the awk regex demanded quotes (no live rows shape that way).
-RE_OPERAND = re.compile(r'^\$([A-Za-z_][A-Za-z_0-9]*)(/.+)?$')
 RE_BIND = re.compile(r'^\$([A-Za-z_][A-Za-z_0-9]*)$')
 RE_POSITIONAL = re.compile(r'"?\\?\$([0-9])"?\b')
 RE_PRINTF_EXEMPT = re.compile(r'printf "?%s"? "?\\?\$[0-9]')
@@ -78,9 +96,9 @@ def join_statements(text):
             if RE_END_BACKSLASH.search(stmt):
                 stmt = RE_END_BACKSLASH.sub('', stmt)
             elif RE_END_AND.search(stmt):
-                stmt = RE_END_AND.sub('', stmt)
+                stmt = RE_TRAIL_WS.sub('', stmt)
             elif RE_END_OROR.search(stmt):
-                stmt = RE_END_OROR.sub('', stmt)
+                stmt = RE_TRAIL_WS.sub('', stmt)
             elif RE_END_PIPE.search(stmt):
                 pass  # a trailing single pipe stays in the statement
             else:
@@ -134,20 +152,32 @@ def derive_registration(stmts):
 
 
 def tokenize(s):
-    """POSIX shlex with punctuation chars; None on an unbalanced quote
-    (fail-still: the awk payload extractor's unterminated branch)."""
-    lex = shlex.shlex(s, posix=True, punctuation_chars=True)
-    lex.whitespace_split = True
-    lex.commenters = ''
-    toks = []
-    while True:
-        try:
-            t = lex.get_token()
-        except ValueError:
-            return None
-        if t == lex.eof:
-            return toks
-        toks.append(t)
+    """POSIX shlex with punctuation chars; None when no pass parses the
+    statement whole. Two passes (round a C1, #496): pass 1 keeps
+    commenters DISABLED -- '#' is a word byte, so ${VAR#x} and mid-word
+    hashes parse whole. An apostrophe inside a TRAILING COMMENT is the
+    realistic unbalanced-quote shape ('# doesn't ...'), and skipping
+    the whole statement there blinded rules 2-4 on rows the awk still
+    flagged. Pass 2 re-parses with '#' as a commenter: shlex discards
+    the rest of the (single-line, joined) statement from the hash on --
+    the trailing-comment approximation; its collateral (a mid-word hash
+    truncating the token) only fires on statements pass 1 already
+    rejected. Both passes raising -> None (fail-still: the awk payload
+    extractor's unterminated branch)."""
+    for commenters in ('', '#'):
+        lex = shlex.shlex(s, posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        lex.commenters = commenters
+        toks = []
+        while True:
+            try:
+                t = lex.get_token()
+            except ValueError:
+                break  # unbalanced quote: try the next pass
+            if t == lex.eof:
+                return toks
+            toks.append(t)
+    return None
 
 
 def split_legs(toks):
@@ -169,6 +199,26 @@ def shorten(s):
     return s[:160]
 
 
+def has_reg_operand(leg, marked, exempt):
+    """Rule-2 operand conjunct (round a A2, #496): does any leg token
+    reference a registered, non-exempt source variable? Unanchored with
+    a longest-first prefix walk over each $NAME run: shlex assembles
+    '"$(dirname "$SRC")/f"' into ONE token (the old whole-token anchor
+    never matched) and '"$SRC"bak' into '$SRCbak' (the greedy name run
+    swallows the suffix); the prefix walk resolves both toward flagging
+    -- the fail-loud direction (a false flag converts on sight; a
+    missed flag rides silently). Dot-suffixed references flag too (the
+    awk's quote-delimited byte scan stayed silent on '"$SRC".bak')."""
+    for t in leg:
+        for m in RE_REF.finditer(t):
+            name = m.group(1)
+            while name:
+                if marked.get(name) and not exempt.get(name):
+                    return True
+                name = name[:-1]
+    return False
+
+
 def detect_file(path):
     with open(path, 'r', encoding='utf-8', errors='replace') as f:
         text = f.read()
@@ -185,11 +235,7 @@ def detect_file(path):
             # rule 2: strict direct check-grep over a registered source
             if len(leg) > 2 and leg[0] == 'check' and leg[2] == 'grep' \
                     and not inv:
-                if any(
-                    (m := RE_OPERAND.match(t)) and marked.get(m.group(1))
-                    and not exempt.get(m.group(1))
-                    for t in leg
-                ):
+                if has_reg_operand(leg, marked, exempt):
                     hits.append(('DIRECT', start, shorten(stmt)))
             if not (len(leg) > 3 and leg[0] == 'check' and
                     leg[2] == 'sh' and leg[3] == '-c'):
