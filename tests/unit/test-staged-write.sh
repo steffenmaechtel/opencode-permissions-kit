@@ -847,6 +847,23 @@ else
     fail "sandbox scanner pin (leak=$_apl_probe clean=$_apl_clean) (#497 c M3)"
 fi
 
+# --- #479 a F18 sweep: staged_write's mktemp failure names the write ----
+# The shared primitive's raw `|| return 1` aborted callers (set -eu)
+# with only mktemp's own diagnostic — same class as install-core's
+# agent-config site. A dead stage dir must name the interrupted deploy.
+SW_RC=0
+SW_OUT="$(SW_SUDO="" SW_STAGE_DIR="$WORK/no-such-stage-f18" sh -c '
+    . "$1"
+    staged_write 644 "$(id -un):$(id -gn)" /dev/null "$2/nonexistent-dst"
+' _ "$STAGEDWRITE" "$WORK" 2>&1)" || SW_RC=$?
+if [ "$SW_RC" -eq 1 ] &&
+    printf '%s' "$SW_OUT" | grep -qF 'staged_write mktemp failed' &&
+    printf '%s' "$SW_OUT" | grep -qF 'NOT applied'; then
+    pass "staged_write mktemp failure names the interrupted deploy (#479 a F18 sweep)"
+else
+    fail "staged_write mktemp failure must name the deploy (rc=$SW_RC out=$SW_OUT) (#479 a F18 sweep)"
+fi
+
 # --- summary -----------------------------------------------------------------------
 
 suite_done "staged-write / handover gate tests"

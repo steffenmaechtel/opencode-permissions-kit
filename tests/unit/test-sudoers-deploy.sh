@@ -192,6 +192,23 @@ check "visudo reject: no sudoers.d link" test ! -e "$SDD/opencode-permissions-ki
 _n_before=$(find "$WORK" -mindepth 1 -name 'tmp.*' | wc -l)
 check "scratch: no mktemp leftovers in the test workdir" test "$_n_before" -eq 0
 
+# --- #479 a F18 sweep: sudoers_deploy's mktemp failure names the render ----
+# The file-missing arm is loud; a dead TMPDIR must name the interrupted
+# sudoers render too (the config.sh #431 family wording). The template
+# must EXIST so the pin drives past the file arm into the mktemp arm.
+printf 'u-DEFAULT_USER ALL=(ALL) NOPASSWD: /bin/true\n' >"$WORK/f18-template"
+SD_RC=0
+SD_OUT="$(TMPDIR="$WORK/no-such-tmpdir-f18" sh -c '
+    . "$1"
+    SD_CONF_DIR="$2/conf" SD_SUDOERS_D="$2/sudoers.d" sudoers_deploy "$2/f18-template" someuser
+' _ "$LIB" "$WORK" 2>&1)" || SD_RC=$?
+if [ "$SD_RC" -eq 1 ] &&
+    printf '%s' "$SD_OUT" | grep -qF 'mktemp failed (is $TMPDIR writable?) — sudoers render NOT applied'; then
+    pass "sudoers mktemp failure names the interrupted render (#479 a F18 sweep)"
+else
+    fail "sudoers mktemp failure must name the render (rc=$SD_RC out=$SD_OUT) (#479 a F18 sweep)"
+fi
+
 # --- summary ---------------------------------------------------------------
 
 echo ""
