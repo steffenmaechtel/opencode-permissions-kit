@@ -23,14 +23,16 @@ how to work on the code. For what the kit does, see the
 
 `opk` and the management scripts resolve their library relative to
 their own path, so a script invoked from a checkout executes that
-checkout's code — as root when started with `sudo` (a checkout
-`opk config`, or `sudo bash` on a management script inside `files/`).
-That is deliberate ("checkout-first by construction"), and your own
-sudo password is the gate. On kit-managed machines the checkout is
-agent-group-writable (see AGENTS.md, "Checkout ownership") — an AI
-session may have written into `files/`. Review `git status` or the
-diff against `master` before running checkout scripts with sudo, or
-run them from a tree no agent can write to.
+checkout's code as root — and the elevation is not opt-in: the
+management subcommands self-elevate (`opk config`, `opk update` run
+`exec sudo sh` on the checkout's scripts when you are not root), and
+direct script calls take a leading `sudo` (`sudo bash` on a management
+script inside `files/`). That is deliberate ("checkout-first by
+construction"), and your own sudo password is the gate. On kit-managed
+machines the checkout is agent-group-writable (see AGENTS.md,
+"Checkout ownership") — an AI session may have written into `files/`.
+Review `git status` or the diff against `master` before running
+checkout scripts, or run them from a tree no agent can write to.
 
 ### Re-wrapping prose blocks
 

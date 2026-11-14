@@ -217,15 +217,18 @@
             // name mid-command (cat settings.php | grep DB, cp auth.json /tmp)
             // must still hit. Still LEXICAL ONLY — variables (F=.env; cat $F),
             // globs (cat .en?) and indirection (find -exec cat {} \;) evade
-            // it. So do git DIFF DRIVERS (issue #483, zero-ask): the agent
-            // can write .gitattributes itself ("*.env diff=secret") and —
-            // while the .git/config denies above are off — plant a
-            // [diff "secret"] command = cat driver in .git/config; the
-            // ALLOWED "git diff *"/"git log *" then render denied file
-            // content, and the command text names no protected file, so no
-            // tripwire fires. With the hard ACL layer gone this is the LAST
-            // line of defense for bash-spawned reads — treat matches
-            // seriously.
+            // it. So do git DIFF DRIVERS (issue #483): the agent can write
+            // .gitattributes itself ("*.env diff=secret") and plant a
+            // [diff "secret"] command = cat driver in .git/config —
+            // prompt-free only while the .git/config denies above are off
+            // (a default install renders them active) — or in its own
+            // global gitconfig for ONE ask (git config --global hits no
+            // allow and no tripwire; the git-config toggle does not close
+            // that arm). The ALLOWED "git diff *"/"git log *" then render
+            // denied file content, and the command text names no protected
+            // file, so no tripwire fires. With the hard ACL layer gone this
+            // is the LAST line of defense for bash-spawned reads — treat
+            // matches seriously.
             "*additional.php*": "ask",
             "*settings.php*": "ask",
             "*LocalConfiguration.php*": "ask",

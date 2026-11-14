@@ -88,7 +88,9 @@ ddev_devowned_flagged() {
 # the top of the file as last resort — never appended to the end, where
 # ddev's default template carries a wall of commented examples that
 # hides the change. A blank line before and after the block, never
-# doubled. Caller echoes/prints; run as root.
+# doubled. Caller echoes/prints. Callers: the root-run handover scan,
+# and the opencode-uid ddev-as-opencode (dev-owned flag mode, issue
+# #149 — best-effort there).
 ddev_devowned_flag() {
     [ -f "${1:-}/.ddev/config.yaml" ] || return 0
     # 0.0.39g S2: the .ddev tree is agent-group-writable — a planted
@@ -673,9 +675,12 @@ ddev_handover_root() {
         # never descends or prints through a link, so no legitimate
         # tree trips this gate — a symlinked component can only be a
         # swap. Class sweep boundary (#215): the ddev_devowned_flag
-        # write's own mid-write TOCTOU (0.0.46a F8, accepted residual —
-        # effect capped at opencode privilege) stays out of this gate's
-        # scope.
+        # write's own mid-write TOCTOU (0.0.46a F8, accepted residual)
+        # stays out of this gate's scope. Ceiling is caller-dependent
+        # (#506 a B6; security-model.md "Dev-owned flag write"): the
+        # opencode-uid caller (ddev-as-opencode) caps the effect at
+        # opencode privilege; THIS root-run scan performs the same
+        # write as root, where that cap does not apply.
         if ! _ddev_components_sane "$dhr_root" "$dhr_d"; then
             printf '%s\n' "  warn: skipping .ddev handover for $dhr_d — a path""\
  component (parent or operand) is a symlink (swapped mid-scan?)" >&2

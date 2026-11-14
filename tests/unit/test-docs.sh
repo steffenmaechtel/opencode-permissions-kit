@@ -257,20 +257,36 @@ grep -q 'flag-write TOCTOU' "$REPO_ROOT/docs/concepts/security-model.md" ||
 # stay disclosed, and the F11 rework names BOTH callers (the opencode-uid
 # cap claim alone was the finding). One distinctive literal per entry;
 # sabotage: delete any bullet -- this goes red.
+# #506 round a additions: the F13 rework's deployed-default +
+# global-gitconfig truth (B1/B2), the F14 socket-resolving arms (B3),
+# and the guarantee bullet's env_keep exception pointer (B4).
 for _i483_lit in \
     'scratch re-open windows' \
     'performs the same write as root' \
     'Git diff drivers render denied files' \
+    'a default install renders them active' \
+    'global gitconfig' \
     'rides env_keep' \
+    'OPENCODE_PODMAN_SOCKET' \
+    'env_keep exception' \
     'Agent-authored container opt-in' \
     'runs checkout code as root'; do
     grep -qF -- "$_i483_lit" "$REPO_ROOT/docs/concepts/security-model.md" ||
         echo "FAIL security-model.md: residual-gap disclosure '$_i483_lit' missing (#483)" >>"$TMP"
 done
-# F16's contributor-side warning (CONTRIBUTING.md names the
-# agent-group-writable checkout before checkout sudo runs).
-grep -qF -- 'agent-group-writable' "$REPO_ROOT/CONTRIBUTING.md" ||
-    echo "FAIL CONTRIBUTING.md: checkout-root warning missing (#483 F16)" >>"$TMP"
+# The F13 siblings (the class sweep carried the evasion list into the
+# how-to and the glossary too) -- pinned since #506 round a A1.
+grep -qF -- 'planted git diff driver' "$REPO_ROOT/docs/how-to/customize-deny-list.md" ||
+    echo "FAIL customize-deny-list.md: diff-driver disclosure missing (#483/#506 a A1)" >>"$TMP"
+grep -qF -- 'planted git diff drivers' "$REPO_ROOT/docs/reference/glossary.md" ||
+    echo "FAIL glossary.md: diff-driver disclosure missing (#483/#506 a A1)" >>"$TMP"
+# F16's contributor-side warning: bound to the SECTION (heading + the
+# self-elevation claim), not to the shared 'agent-group-writable'
+# vocabulary term (#506 round a A2/C2).
+grep -qF -- 'Checkout scripts run as root' "$REPO_ROOT/CONTRIBUTING.md" ||
+    echo "FAIL CONTRIBUTING.md: checkout-root warning section missing (#483 F16)" >>"$TMP"
+grep -qF -- 'self-elevate' "$REPO_ROOT/CONTRIBUTING.md" ||
+    echo "FAIL CONTRIBUTING.md: self-elevation warning missing (#506 a C2)" >>"$TMP"
 
 # --- a W3 (pr-00256): cli.md keeps the advisories exception ------------------
 # The missing-library claim must keep its exception clause (status.sh's
