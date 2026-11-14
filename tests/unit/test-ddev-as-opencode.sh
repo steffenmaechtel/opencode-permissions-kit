@@ -420,18 +420,19 @@ else
 fi
 
 # --- 2c. hostile-locale IO pins (#510 M4) --------------------------------------
-# A 7-bit locale makes the unpinned embedded python die twice into the
-# silent except arm: the whole-document json.load decode on an unread
-# non-ASCII field (ddev describe carries display text), and the print
-# of a selected non-ASCII value (an approot path). Both degraded to
-# empty output and the callers silently fell back. Buffer read +
-# guarded stdout reconfigure (#485 F22/F23 shapes); the silent-empty
-# MISS contract is untouched. _opk_json_get runs python3 -I (#249),
-# whose -E strips PYTHONIOENCODING — hostility comes from the wrapper
-# (-X utf8=0) + LC_ALL=C: stdin surrogateescape (the unread-field pin
-# discriminates fully only on strict-stdin hosts), stdout strict (the
-# non-ASCII value pin discriminates everywhere). Control arm first
-# (harness #510).
+# A 7-bit locale makes the unpinned embedded python die into the silent
+# except arm: the whole-document json.load decode on strict-stdin hosts
+# (exotic locales), or the print of a selected non-ASCII value where
+# stdout is strict. Both degraded to empty output and the callers
+# silently fell back. Buffer read + guarded stdout reconfigure (#485
+# F22/F23 shapes); the silent-empty MISS contract is untouched.
+# CANARY note (honesty): _opk_json_get runs python3 -I (#249), whose -E
+# strips PYTHONIOENCODING, and under LC_ALL=C BOTH stdio streams use
+# surrogateescape — the unpinned shape byte-round-trips non-ASCII
+# values losslessly there, so these pins discriminate only on
+# strict-stdio hosts; the control arm proves the env's stdout
+# strictness. The unread-field and silence pins assert the fixed code's
+# contract under the hostile env.
 P510="$(hostile_stdio_python)"
 if hostile_stdio_control "$P510"; then
     pass "control arm: strict 7-bit stdout kills the -I non-ASCII write (#510)"

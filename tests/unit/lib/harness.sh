@@ -540,8 +540,8 @@ work_new_file() {
 }
 
 # hostile_stdio_python — the #510 hostile-locale reproduction bin.
-# Writes a `python3` wrapper into a fresh work_new-registered scratch
-# dir and prints the dir. The pin env
+# Writes a `python3` wrapper into a fresh scratch dir and prints the
+# dir. The pin env
 #   PATH="<dir>:$PATH" LC_ALL=C LANG=C PYTHONUTF8=0 \
 #       PYTHONCOERCECLOCALE=0 PYTHONIOENCODING=ascii
 # yields 7-bit stdio: strict stdout kills every non-ASCII write
@@ -555,10 +555,13 @@ work_new_file() {
 # interpreters the wrapper is a no-op (the env alone reaches the same
 # 7-bit state). -I NUANCE: the shipped embedded sites run `python3 -I`
 # (#249) and -I implies -E, which strips PYTHONIOENCODING — an -I site
-# under this env gets surrogateescape stdin (a plain stdin decode does
-# NOT die; the poison surfaces at the strict stdout write instead),
-# while non-I sites (advisory-watch, release.sh feed parses) get the
-# full strict decode. Pins must carry RAW UTF-8 bytes in their
+# under this env gets surrogateescape on BOTH stdio streams: a plain
+# stdin decode does NOT die, and surrogate-poisoned values encode back
+# to their raw bytes losslessly (the C-locale round-trip). Only REAL
+# non-ASCII characters (from strict utf-8 file reads, or decoded from
+# buffer) die at the strict stdout write; non-I sites (advisory-watch,
+# release.sh feed parses) get the full strict decode. Pins must carry
+# RAW UTF-8 bytes in their
 # fixtures (octal printf escapes or literal bytes — a JSON \u escape
 # is ASCII on the wire and never exercises the decode). Every pin run
 # under this bin needs a control arm proving the hostility (the
@@ -566,15 +569,25 @@ work_new_file() {
 # that refuses to go 7-bit.
 hostile_stdio_python() {
     local _hsp _hsp_real
-    _hsp="$(work_new)" || return 1
+    # mktemp + _work_emit, NOT work_new: this lib carries the central
+    # registry trap itself, and a work_* call here would trip the
+    # sandbox-policy mix check (work_* call + local trap in one file,
+    # #395) — _work_emit registers the dir into the same registry the
+    # trap iterates, with no work_* call shape.
+    _hsp="$(mktemp -d)" || return 1
     _hsp_real="$(command -v python3)" || {
         echo "hostile_stdio_python: no python3 on PATH" >&2
+        rm -rf -- "$_hsp"
         return 1
     }
     printf '#!/bin/sh\nexec "%s" -X utf8=0 "$@"\n' "$_hsp_real" \
-        >"$_hsp/python3" || return 1
-    chmod 755 "$_hsp/python3" || return 1
-    printf '%s\n' "$_hsp"
+        >"$_hsp/python3" && chmod 755 "$_hsp/python3" || {
+        rm -rf -- "$_hsp"
+        return 1
+    }
+    # LAST statement: _work_emit registers AND prints the dir (a second
+    # print would make the captured value two-line)
+    _work_emit hostile_stdio_python "$_hsp"
 }
 
 # hostile_stdio_control — the vacuity detector for #510 hostile-locale

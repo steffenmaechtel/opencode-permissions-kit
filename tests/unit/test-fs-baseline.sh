@@ -797,7 +797,8 @@ else
     fail "control arm: hostile stdio not effective -- the #510 pins would pass vacuously"
 fi
 _H510_RC=0
-_H510_ERR="$(work_new_file)"
+_H510_ERR="$WORK/h510-err"
+: >"$_H510_ERR"
 _H510_OUT="$(printf 'a\0b\0c\0' | PATH="$P510:$PATH" LC_ALL=C LANG=C PYTHONUTF8=0 \
     PYTHONCOERCECLOCALE=0 PYTHONIOENCODING=ascii FS_SUDO="" \
     sh -c '. "$1" && _fsb_count_tee lbl' _ "$LIB" 2>"$_H510_ERR" |
