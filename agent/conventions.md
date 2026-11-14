@@ -287,11 +287,13 @@ definition was the suite's 13th grep_absent line, not a site -- plus
 the strict shape by NAME (rule 4, born gated: the registration-bound
 single-positional single-leg sh -c absence form must be
 `check_absent` — the payload is split quote-aware and compound
-payloads stay out; quote-CONCATENATED payloads (sq-dq-sq, sq-sq or
-backslash splicing — any byte other than whitespace directly after
-the closing quote) escape entirely: the first-segment parser cannot
-see the legs behind a concat, and a false flag there demanded an
-impossible conversion); multi-file conjunctions,
+payloads stay out; quote-CONCATENATED payloads (sq-dq-sq, sq-sq, the
+dq-opening spelling) are PARSED THROUGH since the #488 shlex port of
+the detector (tests/unit/lib/rider_detect.py): shlex assembles the
+payload token by construction, so a concat spelling no longer hides
+the payload's real legs — a spliced STRICT absence flags (the escape
+class the hand-rolled first-segment parser had is closed), a spliced
+compound still stays out); multi-file conjunctions,
 compound legs, in-payload pipes, literal-path/log/fixture binds and
 if-form spellings stay the documented raw shapes and convert on
 sight like the counted shape did). A `-r` directory target rides
@@ -325,8 +327,14 @@ over suite source, a fixture row carrying byte-exact shell payload
 bytes — does not hand-roll quote tracking: first-index anchors,
 escape folding and splice-segment walks were each their own finding
 in the #487 loop (a X1, a X2, b B1, c C2; evidence and the library
-pilot order live in #488). For any new parser need, evaluate the
-library option first (python3 `shlex` — python3 is a required suite
+pilot order live in #488). The rider-lint detector itself took the
+library option (#488's shlex pilot, adopted): rules 2–4's quote
+tracking lives in `tests/unit/lib/rider_detect.py` — POSIX
+`shlex(punctuation_chars=True)` tokenizes legs and payloads correctly
+by construction, the splice/concat escape class closed structurally,
+and the suite's arms (plus the spliced-strict row) pin the port. For
+any new parser need, evaluate the library option first (python3
+`shlex` — python3 is a required suite
 dependency); if awk stays, every quote-handling conjunct gets a
 discrimination arm BEFORE the tree sweep runs — the sweep alone
 passes vacuously at zero. NEW fixture rows with escaped payload
