@@ -43,7 +43,8 @@ issue #486. Research outcome — no smooth kcov path exists:
   hardcoded in `src/engines/bash-helper.sh`; the helper is embedded in the
   binary (written to the out dir at runtime). Latest stable v43 (2024-07)
   and v44-pre-test3 (2026-01) both carry the bare PS4. `--bash-method=DEBUG`
-  and `--bash-handle-sh-invocation` are measured dead ends (above).
+  and `--bash-handle-sh-invocation` are measured dead ends (see "Dead ends"
+  below).
 - **The other half is method-inherent, unfixable by ANY bash-tracing
   tool**: PS4 tracing requires bash, so dash semantics tested by the
   suites (e.g. `command -v` on non-executable PATH files, PR #493) always
