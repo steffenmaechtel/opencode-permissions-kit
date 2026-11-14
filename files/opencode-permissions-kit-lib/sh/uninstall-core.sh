@@ -862,11 +862,12 @@ un_projects_revert() {
         # NONEXISTENT line silently first; docs/reference/files.md
         # names the nuance), and no consumer of a hand-edited conf
         # processes an entry the writer would never store.
-        # Deliberate divergence, pinned in the unit suite: the scratch
-        # prefixes /tmp and /var/tmp stay processable (the sandbox
-        # policy pins unit-fixture roots there, and a temp-prefix
-        # entry is bounded — uid/gid-matched chown, kit-gid ACL strip
-        # and one setgid-bit clear (chmod g-s) only).
+        # Deliberate residual, pinned in the unit suite (formerly the
+        # documented /tmp + /var/tmp divergence, closed by #479 a F10):
+        # the scratch arms below screen the prefixes like the writer
+        # does — the unit-suite seam OPK_READER_TMP_ROOTS=1 re-opens
+        # them for the sandboxed fixtures (see the arms for the full
+        # rationale, including the former bounded-ops argument).
         # #377 (review #370 a O1) + pr-00429 a A1: the /var families are
         # FHS-complete — /var/account, /var/backups, /var/crash, /var/games,
         # /var/local, /var/lock, /var/opt, /var/run (verbatim parity with
@@ -884,6 +885,30 @@ un_projects_revert() {
                 continue
                 ;;
         esac
+
+        # Scratch-prefix arms (#479 a F10, the update-core/config.sh
+        # reader twins): the writer (path-sane.sh) refuses /tmp and
+        # /var/tmp; the uninstaller's documented divergence kept them
+        # processable (unit fixtures live there, and a temp-prefix
+        # entry is bounded — uid/gid-matched chown, kit-gid ACL strip
+        # and one setgid-bit clear). A hand-edited or stale conf line
+        # pointing into the world-writable scratch prefixes is exactly
+        # the hand-edited-conf shape fs-baseline anticipates: screened
+        # like the writer now. The unit-suite seam
+        # OPK_READER_TMP_ROOTS=1 (the OPK_INSTALL_CONF test-seam
+        # pattern) re-opens them: the sandbox policy pins unit-fixture
+        # roots under /tmp and /var/tmp; nothing the kit ships ever
+        # sets the seam. Own echo text, so the blocklist extractor's
+        # block-identity key ("Skipping system path") keeps excluding
+        # this block — the scratch set is tripwired separately.
+        if [ "${OPK_READER_TMP_ROOTS:-}" != "1" ]; then
+            case "$root" in
+                /tmp | /tmp/* | /var/tmp | /var/tmp/*)
+                    echo "  Skipping scratch prefix: $root"
+                    continue
+                    ;;
+            esac
+        fi
 
         # Symlinked root gate (issue #245): [ ! -d ] above follows a
         # link, so a conf entry that IS a symlink reaches the ops —

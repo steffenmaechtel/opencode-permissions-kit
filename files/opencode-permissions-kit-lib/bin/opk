@@ -235,7 +235,17 @@ case "$cmd" in
         if [ "$(id -u)" -eq 0 ]; then
             exec sh "$LIBDIR/management/$cmd.sh" "$@"
         fi
-        exec sudo sh "$LIBDIR/management/$cmd.sh" "$@"
+        # Loop guard (#479 a F24, handover-core's OPK_HANDOVER_ROOT
+        # shape): a sudo that exits 0 without actually elevating leaves
+        # the management script running as the invoking user, whose own
+        # privileged helpers re-call sudo — the cycle re-enters arms of
+        # this dispatcher forever. Refuse on the marker the re-exec
+        # itself carries.
+        if [ "${OPK_MGMT_ROOT:-}" = "1" ]; then
+            ui_error "$cmd: sudo did not elevate — giving up"
+            exit 1
+        fi
+        exec sudo env OPK_MGMT_ROOT=1 sh "$LIBDIR/management/$cmd.sh" "$@"
         ;;
     upgrade-opencode)
         # Binary-only shorthand (issue #24): update.sh --yes --only-binary,
@@ -247,7 +257,13 @@ case "$cmd" in
         if [ "$(id -u)" -eq 0 ]; then
             exec sh "$LIBDIR/management/update.sh" --yes --only-binary "$@"
         fi
-        exec sudo sh "$LIBDIR/management/update.sh" --yes --only-binary "$@"
+        # Loop guard (#479 a F24, the config|update arm's shape): a
+        # sudo exiting 0 without elevating must not cycle re-entry arms.
+        if [ "${OPK_UPGRADE_ROOT:-}" = "1" ]; then
+            ui_error "upgrade-opencode: sudo did not elevate — giving up"
+            exit 1
+        fi
+        exec sudo env OPK_UPGRADE_ROOT=1 sh "$LIBDIR/management/update.sh" --yes --only-binary "$@"
         ;;
     openchamber-secure)
         # OpenChamber hardening (issue #154,
@@ -359,7 +375,16 @@ $LIBDIR/sh/openchamber-core.sh) — is the kit installed?"
                 exit 1
             }
         if [ "$(id -u)" -ne 0 ]; then
-            exec sudo sh "$LIBDIR/bin/opk" "$cmd"
+            # Loop guard (#479 a F24, handover-core's OPK_HANDOVER_ROOT
+            # shape): the re-exec enters bin/opk again, which dispatches
+            # back into this arm — a sudo that exits 0 without actually
+            # elevating loops the cycle forever. Refuse on the marker
+            # the re-exec itself carries.
+            if [ "${OPK_WSLFIX_ROOT:-}" = "1" ]; then
+                ui_error "wsl-add-opencode-1-fix: sudo did not elevate — giving up"
+                exit 1
+            fi
+            exec sudo env OPK_WSLFIX_ROOT=1 sh "$LIBDIR/bin/opk" "$cmd"
         fi
         # Running as root: the bridge helper's writes need no sudo prefix.
         OPK_WSL_SUDO=""

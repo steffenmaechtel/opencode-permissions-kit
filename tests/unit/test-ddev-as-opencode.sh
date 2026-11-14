@@ -658,10 +658,10 @@ check_live "update.sh runs the ddev handover unconditionally" "$UPDATE_CORE" -q 
 
 # --- 7. handover helper + call sites ---------------------------------------------
 if live_src "$HANDOVER" | grep -qF 'find "$dhr_root"' &&
-    live_src "$HANDOVER" | grep -qF -- '-type d -name .ddev -prune -print'; then
-    pass "handover helper searches .ddev at any depth"
+    live_src "$HANDOVER" | grep -qF -- '-type d -name .ddev -prune -print0'; then
+    pass "handover helper searches .ddev at any depth (NUL stream, #479 a F12)"
 else
-    fail "handover helper searches .ddev at any depth"
+    fail "handover helper searches .ddev at any depth (NUL stream, #479 a F12)"
 fi
 check_live "handover scan prunes vendor/node_modules (issue #21 pattern)" \
     "$HANDOVER" \
@@ -783,7 +783,7 @@ check_live "handover_root signature carries the dev user (handback target)" "$HA
 # project .ddev still is.
 rm -rf "${HWORK:?}/scan"
 mkdir -p "$HWORK/scan/proj/.ddev" "$HWORK/scan/proj/vendor/some/pkg/.ddev"
-SCAN_OUT=$(sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\"" _ "$HANDOVER" "$HWORK/scan" 2>/dev/null || true)
+SCAN_OUT=$(OPK_DDEV_HANDOVER_LIB="$HANDOVER" sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\"" _ "$HANDOVER" "$HWORK/scan" 2>/dev/null || true)
 if ! printf '%s\n' "$SCAN_OUT" | grep -q 'vendor/some/pkg/.ddev'; then
     pass "handover scan skips .ddev inside vendor/"
 else
@@ -1368,7 +1368,7 @@ chmod 2770 "$DWORK/on/proj"
 # must neither chown them nor write dev-owned flags into their configs.
 mkdir -p "$DWORK/on/ddev-checkout/pkg/ddevapp/testdata/TestHooksMerge/proj/.ddev"
 printf 'name: p\ntype: php\n' >"$DWORK/on/ddev-checkout/pkg/ddevapp/testdata/TestHooksMerge/proj/.ddev/config.yaml"
-DON_OUT=$(DDEV_DEV_OWNED=true sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\"" _ "$HANDOVER" "$DWORK/on" 2>/dev/null || true)
+DON_OUT=$(DDEV_DEV_OWNED=true OPK_DDEV_HANDOVER_LIB="$HANDOVER" sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\"" _ "$HANDOVER" "$DWORK/on" 2>/dev/null || true)
 check "scan mode on: writes the dev-owned flag" \
     sh -c "grep -qx 'disable_settings_management: true' \"\$1/.ddev/config.yaml\"" _ "$DWORK/on/proj"
 check "scan mode on: .ddev inside testdata/ is skipped entirely (issue #29)" \
@@ -1390,7 +1390,7 @@ fi
 mkdir -p "$DWORK/off/proj/.ddev" "$DWORK/off/proj/config/system"
 printf 'type: typo3\ndisable_settings_management: true\n' >"$DWORK/off/proj/.ddev/config.yaml"
 chmod 2755 "$DWORK/off/proj"
-DOFF_OUT=$(DDEV_DEV_OWNED=false sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\"" _ "$HANDOVER" "$DWORK/off" 2>/dev/null || true)
+DOFF_OUT=$(DDEV_DEV_OWNED=false OPK_DDEV_HANDOVER_LIB="$HANDOVER" sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\"" _ "$HANDOVER" "$DWORK/off" 2>/dev/null || true)
 if printf '%s\n' "$DOFF_OUT" | grep -q 'dev-owned handback:' &&
     ! printf '%s\n' "$DOFF_OUT" | grep -q 'dev-owned flag written'; then
     pass "scan mode off: committed flag honored (handback, not handover)"
@@ -1404,7 +1404,7 @@ check "scan mode off: flagged root handed back to 2775" \
 mkdir -p "$DWORK/old/proj/.ddev"
 printf 'type: typo3\n' >"$DWORK/old/proj/.ddev/config.yaml"
 chmod 2775 "$DWORK/old/proj"
-DDEV_DEV_OWNED=false sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\"" _ "$HANDOVER" "$DWORK/old" >/dev/null 2>&1 || true
+DDEV_DEV_OWNED=false OPK_DDEV_HANDOVER_LIB="$HANDOVER" sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\"" _ "$HANDOVER" "$DWORK/old" >/dev/null 2>&1 || true
 check "scan mode off + unflagged: bootstrap root still handed over (2755)" \
     sh -c "test \"\$(stat -c %a \"\$1\")\" = 2755" _ "$DWORK/old/proj"
 rm -rf "$DWORK"
@@ -1420,7 +1420,7 @@ unset DDEV_DEV_OWNED
 # by walking UP from the cwd — no ddev command runs inside .git/).
 rm -rf "${HWORK:?}/gitprune"
 mkdir -p "$HWORK/gitprune/proj/.ddev" "$HWORK/gitprune/proj/.git/modules/sub/.ddev"
-GITPRUNE_OUT=$(sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\"" _ "$HANDOVER" "$HWORK/gitprune" 2>/dev/null || true)
+GITPRUNE_OUT=$(OPK_DDEV_HANDOVER_LIB="$HANDOVER" sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\"" _ "$HANDOVER" "$HWORK/gitprune" 2>/dev/null || true)
 if ! printf '%s\n' "$GITPRUNE_OUT" | grep -q '.git/modules'; then
     pass "handover scan skips .ddev inside .git/ (issue #112)"
 else
@@ -1442,7 +1442,7 @@ mkdir -p "$HWORK/fastpath/proj/.ddev" "$HWORK/fastpath/proj/config/system" \
     "$HWORK/fastpath/proj/vendor/typo3/cms-core/Classes/Information"
 printf 'type: typo3\n' >"$HWORK/fastpath/proj/.ddev/config.yaml"
 touch "$HWORK/fastpath/proj/vendor/typo3/cms-core/Classes/Information/Typo3Version.php"
-FP1=$(sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\"" _ "$HANDOVER" "$HWORK/fastpath" 2>/dev/null || true)
+FP1=$(OPK_DDEV_HANDOVER_LIB="$HANDOVER" sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\"" _ "$HANDOVER" "$HWORK/fastpath" 2>/dev/null || true)
 if printf '%s\n' "$FP1" | grep -q '.ddev handover:'; then
     pass "fast path: first pass hands .ddev over"
 else
@@ -1457,7 +1457,7 @@ fi
 # would also hold for a run that died before printing (|| true alone
 # made the silence assertion pass vacuously).
 FP2_RC=0
-FP2=$(sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\"" _ "$HANDOVER" "$HWORK/fastpath" 2>/dev/null) || FP2_RC=$?
+FP2=$(OPK_DDEV_HANDOVER_LIB="$HANDOVER" sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\"" _ "$HANDOVER" "$HWORK/fastpath" 2>/dev/null) || FP2_RC=$?
 check "fast path: second pass completes (rc 0)" \
     sh -c '[ "$1" -eq 0 ]' _ "$FP2_RC"
 if ! printf '%s\n' "$FP2" | grep -qe '.ddev handover:' -e 'ddev settings handover:'; then
@@ -1524,7 +1524,7 @@ exit \$_rc
 EOF
 chmod +x "$RACESTUB/find"
 RACE_RC=0
-RACE_OUT=$(PATH="$RACESTUB:$PATH" sh -c \
+RACE_OUT=$(OPK_DDEV_HANDOVER_LIB="$HANDOVER" PATH="$RACESTUB:$PATH" sh -c \
     '. "$1" && ddev_handover_root "$2" "$(id -un)" "$(id -gn)"' \
     _ "$HANDOVER" "$RACE/scan/" 2>&1) || RACE_RC=$?
 if [ -d "$RACE/scan/moved-away/.ddev" ] && [ -L "$RACE/scan/proj" ]; then
@@ -1580,7 +1580,7 @@ exit \$_rc
 EOF
 chmod +x "$RACESPS/find"
 RACESP_RC=0
-PATH="$RACESPS:$PATH" sh -c \
+OPK_DDEV_HANDOVER_LIB="$HANDOVER" PATH="$RACESPS:$PATH" sh -c \
     '. "$1" && ddev_handover_root "$2" "$(id -un)" "$(id -gn)"' \
     _ "$HANDOVER" "$RACESP/scan" >/dev/null 2>&1 || RACESP_RC=$?
 if [ -d "$RACESP/scan/moved away/.ddev" ] && [ -L "$RACESP/scan/pro j" ]; then
@@ -1633,7 +1633,7 @@ exit \$_rc
 EOF
 chmod +x "$RACECT/find"
 RACEC_RC=0
-RACEC_OUT=$(PATH="$RACECT:$PATH" sh -c \
+RACEC_OUT=$(OPK_DDEV_HANDOVER_LIB="$HANDOVER" PATH="$RACECT:$PATH" sh -c \
     '. "$1" && ddev_handover_root "$2" "$(id -un)" "$(id -gn)"' \
     _ "$HANDOVER" "$RACEC/scan" 2>&1) || RACEC_RC=$?
 if [ -d "$RACEC/scan/moved-away/.ddev" ] && [ -L "$RACEC/scan/proj" ]; then
@@ -1689,7 +1689,7 @@ exit \$_rc
 EOF
 chmod +x "$RACEFT/find"
 RACEF_RC=0
-RACEF_OUT=$(DDEV_DEV_OWNED=true PATH="$RACEFT:$PATH" sh -c \
+RACEF_OUT=$(DDEV_DEV_OWNED=true OPK_DDEV_HANDOVER_LIB="$HANDOVER" PATH="$RACEFT:$PATH" sh -c \
     '. "$1" && ddev_handover_root "$2" "$(id -un)" "$(id -gn)"' \
     _ "$HANDOVER" "$RACEF/scan" 2>&1) || RACEF_RC=$?
 if [ -d "$RACEF/scan/moved-away/.ddev" ] && [ -L "$RACEF/scan/proj" ]; then
@@ -1725,6 +1725,12 @@ rm -rf "${RACEF:?}" "${RACEFT:?}"
 # pair and right before the tail, so overriding it after sourcing
 # performs the swap at exactly the #266 window, then returns the real
 # flag state so the chosen branch runs into its gate.
+# Since #479 a F12 the scan loop's per-entry work lives in
+# _dhr_entry_one and the loop itself spawns xargs workers — a function
+# override in THIS shell cannot cross the process boundary, so the
+# drives below call _dhr_entry_one DIRECTLY with the fixture's entry
+# (same gates, same tail; the scan itself is covered by the prune and
+# fast-path drives above).
 # Forward (unflagged -> ddev_handover_project): the override returns 1.
 SWAPF=$(mktemp -d)
 mkdir -p "$SWAPF/scan/proj/.ddev" "$SWAPF/victim/.ddev" "$SWAPF/victim/config/system"
@@ -1747,7 +1753,7 @@ SWAPF_OUT=$(OPK_INSTALL_CONF=/nonexistent sh -c '
         ln -s "$_seam_victim" "$_seam_scan/proj"
         return 1
     }
-    ddev_handover_root "$2" "$(id -un)" "$(id -gn)"
+    _dhr_entry_one "$2" "$(id -un)" "$(id -gn)" "" "$_seam_scan/proj/.ddev"
 ' _ "$HANDOVER" "$SWAPF/scan" "$SWAPF/victim" 2>&1) || SWAPF_RC=$?
 if [ -d "$SWAPF/scan/moved-away/.ddev" ] && [ -L "$SWAPF/scan/proj" ]; then
     pass "settings race (fwd): seam fired — parent swapped between the walk and the tail (#266)"
@@ -1790,7 +1796,7 @@ SWAPB_OUT=$(OPK_INSTALL_CONF=/nonexistent sh -c '
         ln -s "$_seam_victim" "$_seam_scan/proj"
         return 0
     }
-    ddev_handover_root "$2" "$(id -un)" "$(id -gn)" "$(id -un)"
+    _dhr_entry_one "$2" "$(id -un)" "$(id -gn)" "$(id -un)" "$_seam_scan/proj/.ddev"
 ' _ "$HANDOVER" "$SWAPB/scan" "$SWAPB/victim" 2>&1) || SWAPB_RC=$?
 if [ -d "$SWAPB/scan/moved-away/.ddev" ] && [ -L "$SWAPB/scan/proj" ]; then
     pass "settings race (back): seam fired — parent swapped between the walk and the tail (#266)"
@@ -1838,7 +1844,7 @@ SWAPR_OUT=$(OPK_INSTALL_CONF=/nonexistent sh -c '
         ln -s "$_seam_victim" "$_seam_nest"
         return 1
     }
-    ddev_handover_root "$2" "$(id -un)" "$(id -gn)"
+    _dhr_entry_one "$2" "$(id -un)" "$(id -gn)" "" "$_seam_nest/proj/.ddev"
 ' _ "$HANDOVER" "$SWAPR/scan" "$SWAPR/victim" 2>&1) || SWAPR_RC=$?
 if [ -d "$SWAPR/scan/moved-away/proj/.ddev" ] && [ -L "$SWAPR/scan/nest" ]; then
     pass "root-op race (fwd): seam fired — the project's PARENT swapped before the tail (#266, #420 a A2)"
@@ -1878,7 +1884,7 @@ SWAPRB_OUT=$(OPK_INSTALL_CONF=/nonexistent sh -c '
         ln -s "$_seam_victim" "$_seam_nest"
         return 0
     }
-    ddev_handover_root "$2" "$(id -un)" "$(id -gn)" "$(id -un)"
+    _dhr_entry_one "$2" "$(id -un)" "$(id -gn)" "$(id -un)" "$_seam_nest/proj/.ddev"
 ' _ "$HANDOVER" "$SWAPRB/scan" "$SWAPRB/victim" 2>&1) || SWAPRB_RC=$?
 assert_eq "root-op race (back): victim project root keeps its mode — the handback's re-walk skips (#266, #420 a A2)" "755" \
     "$(stat -c %a "$SWAPRB/victim/proj")"
@@ -2167,9 +2173,10 @@ grep -q -- 'sudo -n -u opencode' \
 # The root-run handover pairs were `|| true`-silent with unconditional
 # success echoes — a partial handover (EPERM, immutable flag) reported
 # as done. The pairs stay best-effort (self-heal on the next rescan)
-# but the line now tells the truth. Extract the REAL site-1 block and
-# drive it with stubbed chmod/chown; sites 2/3 are wiring-grepped.
-_f14_block="$(sed -n '/^            _dhr_ok=true$/,/^            fi$/p' "$HANDOVER")"
+# but the line now tells the truth. Extract the REAL site-1 block (in
+# _dhr_entry_one since #479 a F12 — 8-space level) and drive it with
+# stubbed chmod/chown; sites 2/3 are wiring-grepped.
+_f14_block="$(sed -n '/^        _dhr_ok=true$/,/^        fi$/p' "$HANDOVER")"
 if [ -n "$_f14_block" ]; then
     pass "dhr handover pair block extractable (#211 a F14)"
     _f14_run() {

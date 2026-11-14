@@ -47,7 +47,16 @@ openchamber_core() {
         esac
     done
     if [ "$(id -u)" -ne 0 ]; then
-        exec sudo sh "$LIBDIR/bin/opk" openchamber-secure "$@"
+        # Loop guard (#479 a F24, handover-core's OPK_HANDOVER_ROOT
+        # shape): this arm re-enters bin/opk, which dispatches back
+        # here — a sudo that exits 0 without actually elevating (fake
+        # or broken sudo) would exec this cycle forever. Refuse on the
+        # marker the re-exec itself carries.
+        if [ "${OPK_OPENCHAMBER_ROOT:-}" = "1" ]; then
+            ui_error "openchamber-secure: sudo did not elevate — giving up"
+            exit 1
+        fi
+        exec sudo env OPK_OPENCHAMBER_ROOT=1 sh "$LIBDIR/bin/opk" openchamber-secure "$@"
     fi
     # Running as root from here.
     _oc_duser=$(sed -n 's/^DEFAULT_USER=//p' "$INSTALL_CONF" 2>/dev/null | tail -1)

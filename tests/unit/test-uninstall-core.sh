@@ -46,6 +46,13 @@ UNINSTALL="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/unins
 
 WORK="$(work_new)"
 
+# #479 a F10 unit seam (the OPK_INSTALL_CONF pattern): the reader
+# blocklists screen /tmp and /var/tmp like the writer does now; this
+# suite's fixture roots live in the sandbox scratch under /tmp — re-open
+# the prefixes for the drivers below. Nothing shipped ever sets this.
+OPK_READER_TMP_ROOTS=1
+export OPK_READER_TMP_ROOTS
+
 # The lib under test, sourced ONCE here the way the entry sources it: every
 # sourcing pin below calls the real functions with per-arm stubs. Purity is
 # pinned first — sourcing must not run anything.
@@ -235,20 +242,26 @@ esac
 # time, NOT re-parsed from a variable expansion — a literal $SCREEN_PATTERNS
 # would be one big never-matching pattern. The helper mirrors the
 # loop's SCREENING chain in full — dot gate, then strip, then
-# blocklist (#243 c X1/d X4, dot gate #243 e X3; scope sharpened per
-# review f S3): the loop's earlier gates (agent-home refusal,
-# [ ! -d ], absolute-path check) precede screening and are NOT
-# mirrored here. Malformed dot/empty-segment forms are screened
-# exactly like the loop skips them, THEN the one-trailing-slash
-# normalization applies (strip once, `/` stays `/` — the blocklist
-# `/` arm), so a static slash-form assertion pins the same screening
-# semantics the shipped loop has.
+# blocklist, then the #479 a F10 scratch arms (gated by the same
+# OPK_READER_TMP_ROOTS seam the shipped block checks, #243 c X1/d X4,
+# dot gate #243 e X3; scope sharpened per review f S3): the loop's
+# earlier gates (agent-home refusal, [ ! -d ], absolute-path check)
+# precede screening and are NOT mirrored here. Malformed dot/empty-
+# segment forms are screened exactly like the loop skips them, THEN the
+# one-trailing-slash normalization applies (strip once, `/` stays `/` —
+# the blocklist `/` arm), so a static slash-form assertion pins the
+# same screening semantics the shipped loop has.
 screen() {
     case "$1" in
         *..* | /./ | */./* | ./* | */. | *//*) return 0 ;;
     esac
     _un_scr="${1%/}"
     [ -n "$_un_scr" ] || _un_scr="/"
+    if [ "${OPK_READER_TMP_ROOTS:-}" != "1" ]; then
+        case "$_un_scr" in
+            /tmp | /tmp/* | /var/tmp | /var/tmp/*) return 0 ;;
+        esac
+    fi
     eval "case \"\$_un_scr\" in
         $SCREEN_PATTERNS) return 0 ;;
         *) return 1 ;;
@@ -294,13 +307,23 @@ if printf '%s' "$SCREEN_PATTERNS" | grep -q '/var/www'; then
 else
     pass "screening patterns must not contain /var/www (legit project area)"
 fi
-# Pinned divergence (#243 b X1): the scratch prefixes stay processable
-# by design — the sandbox policy pins unit-fixture roots under /tmp and
-# /var/tmp (this suite's own primary root lives there), and a
-# temp-prefix conf entry is bounded (uid/gid-matched chown, kit-gid
-# ACL strip and one setgid-bit clear (chmod g-s) only). The writer
-# refuses them for storage; the uninstaller deliberately does not
-# screen them.
+# #479 a F10 (the former #243 b X1 pinned divergence, closed): the
+# scratch prefixes are SCREENED like the writer screens them now — a
+# hand-edited or stale conf line pointing into /tmp or /var/tmp must
+# not reach the root-run revert ops. Without the seam (the shipped
+# default) the screening skips them; with OPK_READER_TMP_ROOTS=1 (the
+# unit seam this suite exports for its own /tmp fixtures) they stay
+# processable — the sandbox policy pins unit-fixture roots there.
+for projpath in /tmp/x /var/tmp/x; do
+    if (
+        unset OPK_READER_TMP_ROOTS
+        screen "$projpath"
+    ); then
+        pass "screening skips scratch prefix without the seam: $projpath (#479 a F10)"
+    else
+        fail "screening must skip scratch prefix without the seam: $projpath (#479 a F10)"
+    fi
+done
 for projpath in /var/www/vhosts /var/www /home/dev/x /tmp/x /var/tmp/x; do
     if screen "$projpath"; then
         fail "screening allows $projpath"
@@ -308,8 +331,41 @@ for projpath in /var/www/vhosts /var/www /home/dev/x /tmp/x /var/tmp/x; do
         pass "screening allows $projpath"
     fi
 done
+# Scratch-arm tripwire (#479 a F10): the seam-gated block in the lib
+# carries exactly the four writer arms and its own echo text — so the
+# block-identity extractor ("Skipping system path") keeps the SYSTEM
+# set clean while this variant keys the scratch block ("Skipping
+# scratch prefix") and asserts its full, seam-gated shape.
+_un_scratch_tokens() { # <file> — scratch-block extraction, #479 a F10
+    awk '
+        /case "\$root" in[[:space:]]*$/ { inblk=1; keep=0; buf=""; next }
+        inblk && /^[[:space:]]*esac[[:space:]]*$/ {
+            if (keep && buf != "") printf "%s", buf
+            inblk=0; next
+        }
+        inblk {
+            if ($0 ~ /Skipping scratch prefix/) keep=1
+            line=$0
+            sub(/\\$/, "", line)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+            gsub(/[[:space:]]+/, "", line)
+            sub(/\)$/, "", line)
+            sub(/\|$/, "", line)
+            if (line ~ /^\//) buf = buf line "|"
+        }
+    ' "$1" | sed -e 's/|$//'
+}
+SCRATCH_PATTERNS="$(_un_scratch_tokens "$LIB")"
+if [ "$SCRATCH_PATTERNS" = "/tmp|/tmp/*|/var/tmp|/var/tmp/*" ] &&
+    live_src "$LIB" | grep -qF '[ "${OPK_READER_TMP_ROOTS:-}" != "1" ]'; then
+    pass "scratch arms: all four writer arms, seam-gated (#479 a F10)"
+else
+    fail "scratch arms: expected /tmp /tmp/* /var/tmp /var/tmp/* gated by OPK_READER_TMP_ROOTS (got: $SCRATCH_PATTERNS) (#479 a F10)"
+fi
 # Parity pin (#243 b X1): reader blocklist == writer blocklist minus
-# the pinned temp-prefix divergence — both sides extracted statically,
+# the four temp-prefix arms — which since #479 a F10 live in their own
+# seam-gated block (own echo text, tripwired above), so the SYSTEM set
+# comparison keeps filtering them. Both sides extracted statically,
 # so writer/reader drift redds here instead of silently diverging (the
 # b S-axis coverage note: the a-X2 pins are form-enumerative; this is
 # the tripwire for the LIST). The writer-side extraction is shape-keyed
