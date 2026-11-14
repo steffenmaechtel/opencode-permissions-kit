@@ -28,7 +28,7 @@ ba4981b1468258c3b94c43c9beafaf476f604ba24ff2dc728986ae9a36de6ecf  files/opencode
 544b164dc7eb31c4972375cce7a8eeee0212275fd97f9227161e9c4b1a3fd2c5  files/opencode-permissions-kit-lib/sh/fs-baseline.sh
 80579d6005c882c689086a3af913ccdf686059905451f43b496aa74005fd0b41  files/opencode-permissions-kit-lib/sh/git-check.sh
 4140f251c24184514e656a6c6b0dc493c7aeae0180a47a6989e9fabe4cd1c0bb  files/opencode-permissions-kit-lib/sh/handover-core.sh
-3af6bdeccf517ad9d0b9eb985dfe1080d6043ef5ff8854b1101c1e8e251a814c  files/opencode-permissions-kit-lib/sh/install-core.sh
+0f0203db6c2b5eba853fbe87ad972fd52556a22faac42f2376f828470f78f55f  files/opencode-permissions-kit-lib/sh/install-core.sh
 575266d6e05f87e5b5444464538ab3c222931bf5d5753d44695308aac067c3bf  files/opencode-permissions-kit-lib/sh/log.sh
 0304e35136d9c52c5d95778a68c86eb8ae3a261a6dfc48c5541458f5aee0ef4b  files/opencode-permissions-kit-lib/sh/openchamber-core.sh
 f584ab754df8a491dab02cd3ec60e1ffece05a07f8aaf9498213f308fab665e4  files/opencode-permissions-kit-lib/sh/path-sane.sh

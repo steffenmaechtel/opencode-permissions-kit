@@ -748,6 +748,40 @@ if live_src "$INSTALL_CORE" | grep -qF '_PRJ_CONF_TMP=' &&
 else
     fail "#482 F19 sweep: projects.conf create must be atomic (temp + mv)"
 fi
+# Real drive of the extracted block (#497 a S3 — presence-only pins
+# were the finding): the block must land the root list through the
+# staged temp and flip projects.conf via mv — no direct write to the
+# live name, no temp residue. /etc/opencode-permissions-kit is
+# rewritten to scratch (the F17 opk-twin pin's idiom); sudo passes
+# through, _tmp_track records.
+_F19P="$WORK/f19p"
+mkdir -p "$_F19P/etc"
+_f19p_block="$(sed -n '/#482 F19 sweep, config.sh/,/sudo mv -f/p' "$INSTALL_CORE" |
+    sed "s|/etc/opencode-permissions-kit|$_F19P/etc|g")"
+if [ -n "$_f19p_block" ]; then
+    pass "projects.conf block extractable + sandboxed (#482 F19, #497 a S3)"
+    _f19p_rc=0
+    _f19p_out=$(
+        sh -c '
+            sudo() { "$@"; }
+            _tmp_track() { echo "TRACK $1" >&2; }
+            log() { echo "log: $*"; }
+            PROJECTS_ROOTS="root-a root-b"
+            eval "$1"
+        ' _ "$_f19p_block" 2>&1
+    ) || _f19p_rc=$?
+    if [ "$_f19p_rc" -eq 0 ] &&
+        [ "$(cat "$_F19P/etc/projects.conf" 2>/dev/null)" = "root-a
+root-b" ] &&
+        [ "$(ls -A "$_F19P/etc" 2>/dev/null)" = "projects.conf" ] &&
+        printf '%s' "$_f19p_out" | grep -qF "TRACK $_F19P/etc/projects.conf.opk-new."; then
+        pass "projects.conf drive: staged temp + mv flip, no residue, temp tracked (#482 F19, #497 a S3)"
+    else
+        fail "projects.conf drive (rc=$_f19p_rc out=$_f19p_out ls=$(ls -A "$_F19P/etc" 2>/dev/null)) (#497 a S3)"
+    fi
+else
+    fail "projects.conf block extractable + sandboxed (#482 F19, #497 a S3)"
+fi
 
 # --- summary -----------------------------------------------------------------------
 

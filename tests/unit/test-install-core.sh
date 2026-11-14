@@ -1106,10 +1106,42 @@ if [ "$_f44r_rc" -ne 0 ] &&
 else
     fail "restore failure must abort loud with the manual hint (rc=$_f44r_rc out=$_f44r_out) (#482 F44)"
 fi
-# Fresh-install arm (no previous tree): aborts loud, keeps the partial
-# new tree — inert, nothing executes it before the symlink phase.
-check_live "fresh-install deploy failure aborts loud, names the re-run (#482 F44)" \
-    "$LIB" -qF 'no previous install existed (partial new tree left; re-run install.sh)'
+# Fresh-install arm (#482 F44; real drive per #497 a Q5 — the other
+# three arms got drives, this one was presence-only): NO previous tree
+# — lib_deploy failure aborts loud with the re-run hint, the partial
+# new tree KEEPS its planted entry (inert; the symlink phase never
+# ran), and no backup material is created (the gate short-circuits).
+mkdir -p "$_F44W/freshroot"
+_f44f_rc=0
+_f44f_out=$(
+    sh -c '
+        SCRIPT_DIR="$1/froot"
+        LIBDIR="$1/freshroot/lib"
+        BACKUP_DIR="$1/backups-fresh"
+        log() { echo "log: $*"; }
+        ui_section() { :; }
+        ui_success() { :; }
+        ui_detail() { :; }
+        ui_warn() { echo "warn: $*"; }
+        ui_error() { echo "error: $*"; }
+        lib_deploy() {
+            mkdir -p "$LIBDIR"
+            echo "new-lib" >"$LIBDIR/planted-new.txt"
+            return 1
+        }
+        . "$2"
+        install_deploy_library
+    ' _ "$_F44W" "$LIB" 2>&1
+) || _f44f_rc=$?
+if [ "$_f44f_rc" -ne 0 ] &&
+    printf '%s\n' "$_f44f_out" | grep -qF 'warn: library deploy FAILED — no previous install existed' &&
+    printf '%s\n' "$_f44f_out" | grep -qF 'error: library deploy failed — install aborted' &&
+    [ -f "$_F44W/freshroot/lib/planted-new.txt" ] &&
+    [ ! -e "$_F44W/backups-fresh" ]; then
+    pass "fresh-install deploy failure: loud abort + re-run hint, partial tree kept, no backup material (#482 F44, #497 a Q5)"
+else
+    fail "fresh-install arm drive (rc=$_f44f_rc out=$_f44f_out) (#482 F44, #497 a Q5)"
+fi
 
 echo ""
 suite_done

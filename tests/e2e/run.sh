@@ -1398,7 +1398,9 @@ E 'sudo sed -i "s/^DEFAULT_USER=.*/DEFAULT_USER=dev/" /etc/opencode-permissions-
 E 'rm -f /tmp/oc-nohome.log'
 # #482 F17: the install-side WRITE arm (absent file + opt-in) — the
 # pin must land atomically with the kit content and root:root 644, no
-# staged temp residue (the arms above only exercised the skip paths).
+# staged temp residue (the INSTALL arms above only exercised the skip
+# path, #497 a Q8; the update re-apply and openchamber-secure arms
+# above write via their own surfaces).
 # Runs AFTER the W4 block on purpose: the divergent-content announce
 # above needs the admin-extended policy this block replaces.
 E 'sudo rm -f /etc/openchamber/policy.json'

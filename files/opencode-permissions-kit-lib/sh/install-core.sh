@@ -2285,13 +2285,17 @@ do_deploy_phase() {
         fi
     fi
     if [ ! -f "$DEFAULT_OC_CONF" ]; then
-        # Atomic deploy (#482 F19, the staged_write class — same shape as
-        # the agent config in Step 8a): a plain cp killed mid-write leaves
-        # a TRUNCATED deny-all config that the only-if-absent gate above
-        # then reads as existing — the protection layer is silently gone,
-        # never healed (this gate skips existing files, and the update
-        # twin leaves them untouched too). staged_write flips content,
-        # owner and mode in via one mv; a bare call aborts under set -e
+        # Atomic deploy (#482 F19, staged_write — the WRITE shape of the
+        # agent config in Step 8a; its agent_home_sane chain gate does
+        # NOT apply here, the developer's home is trusted per the
+        # staged-write.sh contract, #497 a S1): a plain cp killed
+        # mid-write leaves a TRUNCATED deny-all config that this
+        # only-if-absent gate then reads as existing — the protection
+        # silently inactive until the next INSTALL heals it (the backup
+        # arm above, default y; the update twin leaves existing files
+        # untouched, so update never heals, #497 a Q1). staged_write
+        # flips content, owner and mode in via one mv, closing the
+        # truncation window itself; a bare call aborts under set -e
         # (#371 A4R contract).
         staged_write 664 "$DEFAULT_USER:$OPENCODE_GROUP" \
             "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc" \
