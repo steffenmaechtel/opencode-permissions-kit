@@ -654,6 +654,158 @@ check_live "gates: uninstall.sh plugin-removal chain gate" \
 check_live "0.0.39h F3: staged-write.sh refuses a directory destination" "$STAGEDWRITE" \
     -qF 'destination '"'"'$_sw_dst'"'"' is a directory'
 
+# --- 5c. deny-all deploys ride staged_write (#482 F19, install + update twin) ------
+# Real drives of both write sites' [ ! -f ] blocks (the gate + the write
+# the finding is about): each must deploy the REAL template with content
+# + mode 664 through the section-1 staged_write (stage+mv — a mid-write
+# kill can no longer strand a truncated deny-all that the only-if-absent
+# gate then reads as existing), and the install gate must leave an
+# existing file untouched (the never-heals contract the finding rides
+# on). Owner legs ride a self-chown (unprivileged chown-to-self is the
+# verified no-op success; a foreign owner would EPERM the drive).
+_F19W="$WORK/f19"
+mkdir -p "$_F19W/stage" "$_F19W/i-home/.config/opencode" "$_F19W/u-home/.config/opencode"
+_f19_tmpl="$REPO/files/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc"
+_f19_iblock="$(sed -n '/if \[ ! -f "$DEFAULT_OC_CONF" \]; then/,/^    fi$/p' "$INSTALL_CORE")"
+_f19_ublock="$(sed -n '/if \[ ! -f "$DEFAULT_OC_CONF" \]; then/,/^        fi$/p' "$UPDATE_CORE")"
+if [ -n "$_f19_iblock" ] && [ -n "$_f19_ublock" ]; then
+    pass "deny-all blocks extractable, install + update twin (#482 F19)"
+    _f19_i_rc=0
+    _f19_i_out=$(
+        sh -c '
+            DEFAULT_OC_CONF="$1/i-home/.config/opencode/opencode.jsonc"
+            DEFAULT_USER="$2"
+            OPENCODE_GROUP="$3"
+            SCRIPT_DIR="$4"
+            SW_SUDO=""
+            SW_STAGE_DIR="$1/stage"
+            ui_success() { echo "success: $*"; }
+            log() { echo "log: $*"; }
+            . "$5"
+            eval "$6"
+        ' _ "$_F19W" "$(id -un)" "$(id -gn)" "$REPO/files" "$STAGEDWRITE" "$_f19_iblock"
+    ) || _f19_i_rc=$?
+    if [ "$_f19_i_rc" -eq 0 ] &&
+        [ "$(cat "$_F19W/i-home/.config/opencode/opencode.jsonc" 2>/dev/null)" = "$(cat "$_f19_tmpl")" ] &&
+        [ "$(stat -c %a "$_F19W/i-home/.config/opencode/opencode.jsonc" 2>/dev/null)" = 664 ] &&
+        [ -z "$(ls -A "$_F19W/stage" 2>/dev/null)" ]; then
+        pass "install deny-all: real template via staged_write, mode 664, no staging leftovers (#482 F19)"
+    else
+        fail "install deny-all staged_write deploy (rc=$_f19_i_rc) (#482 F19)"
+    fi
+    printf 'USER-OWNED-SENTINEL\n' >"$_F19W/i-home/.config/opencode/opencode.jsonc"
+    sh -c '
+        DEFAULT_OC_CONF="$1/i-home/.config/opencode/opencode.jsonc"
+        DEFAULT_USER="$2"
+        OPENCODE_GROUP="$3"
+        SCRIPT_DIR="$4"
+        SW_SUDO=""
+        SW_STAGE_DIR="$1/stage"
+        ui_success() { :; }
+        log() { :; }
+        . "$5"
+        eval "$6"
+    ' _ "$_F19W" "$(id -un)" "$(id -gn)" "$REPO/files" "$STAGEDWRITE" "$_f19_iblock"
+    if [ "$(cat "$_F19W/i-home/.config/opencode/opencode.jsonc" 2>/dev/null)" = "USER-OWNED-SENTINEL" ]; then
+        pass "install deny-all gate: existing config left untouched (#482 F19)"
+    else
+        fail "install deny-all gate must not overwrite an existing config (#482 F19)"
+    fi
+    _f19_u_rc=0
+    _f19_u_out=$(
+        sh -c '
+            sudo() { "$@"; }
+            DEFAULT_OC_CONF="$1/u-home/.config/opencode/opencode.jsonc"
+            DEFAULT_USER="$2"
+            NEW_OPENCODE_GROUP="$3"
+            FILES_ROOT="$4"
+            SW_SUDO=""
+            SW_STAGE_DIR="$1/stage"
+            ui_success() { echo "success: $*"; }
+            ui_detail() { echo "detail: $*"; }
+            log() { echo "log: $*"; }
+            . "$5"
+            eval "$6"
+        ' _ "$_F19W" "$(id -un)" "$(id -gn)" "$REPO/files" "$STAGEDWRITE" "$_f19_ublock"
+    ) || _f19_u_rc=$?
+    if [ "$_f19_u_rc" -eq 0 ] &&
+        [ "$(cat "$_F19W/u-home/.config/opencode/opencode.jsonc" 2>/dev/null)" = "$(cat "$_f19_tmpl")" ] &&
+        [ "$(stat -c %a "$_F19W/u-home/.config/opencode/opencode.jsonc" 2>/dev/null)" = 664 ]; then
+        pass "update twin: real template via staged_write, mode 664 (#482 F19)"
+    else
+        fail "update deny-all staged_write deploy (rc=$_f19_u_rc out=$_f19_u_out) (#482 F19)"
+    fi
+else
+    fail "deny-all blocks extractable, install + update twin (#482 F19)"
+fi
+# #482 F19 sweep: the projects.conf CREATE at install rides the same
+# temp+mv shape as config.sh's atomic rewrite of the same file (the
+# install.conf stamp C5 pin above is the neighboring idiom).
+if live_src "$INSTALL_CORE" | grep -qF '_PRJ_CONF_TMP=' &&
+    live_src "$INSTALL_CORE" | grep -qF 'mv -f "$_PRJ_CONF_TMP"' &&
+    ! grep -qF 'sudo tee /etc/opencode-permissions-kit/projects.conf' "$INSTALL_CORE"; then
+    pass "#482 F19 sweep: projects.conf create is temp + mv (config.sh twin shape)"
+else
+    fail "#482 F19 sweep: projects.conf create must be atomic (temp + mv)"
+fi
+# Real drive of the extracted block (#497 a S3 — presence-only pins
+# were the finding): the block must land the root list through the
+# staged temp and flip projects.conf via mv — no direct write to the
+# live name, no temp residue. /etc/opencode-permissions-kit is
+# rewritten to scratch (the F17 opk-twin pin's idiom); sudo passes
+# through, _tmp_track records.
+_F19P="$WORK/f19p"
+mkdir -p "$_F19P/etc"
+_f19p_block="$(sed -n '/#482 F19 sweep, config.sh/,/sudo mv -f/p' "$INSTALL_CORE" |
+    sed "s|/etc/opencode-permissions-kit|$_F19P/etc|g")"
+# Sandbox guard (#497 b B1; widened to ALL absolute-path operands by
+# #497 c M2 — the quoted-only grep could not see the block's own
+# unquoted mv-target style). The pass below claims "sandboxed" — pin
+# it: the sed rewrite is verified, not trusted. Future drift adding any
+# other real path to the block (quoted or not) makes the drive skip
+# loud instead of writing outside its scratch (a confusing red as the
+# non-root suite user, a silent out-of-scratch write in any as-root
+# run). /dev/null is scanned-out by the scanner; the block carries no
+# other non-scratch operands today.
+_f19p_leak="$(abs_path_leaks "$_f19p_block" "$_F19P")"
+if [ -n "$_f19p_block" ] && [ -z "$_f19p_leak" ]; then
+    pass "projects.conf block extractable + sandboxed, every absolute path scratch-prefixed (#482 F19, #497 a S3, #497 b B1, #497 c M2)"
+    _f19p_rc=0
+    _f19p_out=$(
+        sh -c '
+            sudo() { "$@"; }
+            _tmp_track() { echo "TRACK $1" >&2; }
+            log() { echo "log: $*"; }
+            PROJECTS_ROOTS="root-a root-b"
+            eval "$1"
+        ' _ "$_f19p_block" 2>&1
+    ) || _f19p_rc=$?
+    if [ "$_f19p_rc" -eq 0 ] &&
+        [ "$(cat "$_F19P/etc/projects.conf" 2>/dev/null)" = "root-a
+root-b" ] &&
+        [ "$(ls -A "$_F19P/etc" 2>/dev/null)" = "projects.conf" ] &&
+        printf '%s' "$_f19p_out" | grep -qF "TRACK $_F19P/etc/projects.conf.opk-new."; then
+        pass "projects.conf drive: staged temp + mv flip, no residue, temp tracked (#482 F19, #497 a S3)"
+    else
+        fail "projects.conf drive (rc=$_f19p_rc out=$_f19p_out ls=$(ls -A "$_F19P/etc" 2>/dev/null)) (#497 a S3)"
+    fi
+else
+    fail "projects.conf block extraction/sandbox (empty or unrewritten absolute path:$_f19p_leak) (#482 F19, #497 a S3, #497 b B1)"
+fi
+
+# Sandbox scanner firing pin (#497 c M3): the SAME scanner the drive
+# guards gate on stays exercised in-suite — a synthetic foreign
+# absolute path must surface as a leak (leak arm) and a scratch-bound
+# block must scan clean (clean arm). A broken scanner (dropped leak
+# accumulation, inverted pattern) fails one of the two arms loud.
+_apl_probe="$(abs_path_leaks 'echo probe | sudo tee "/var/apl-probe/f" >/dev/null' /nonexistent-apl-prefix)"
+_apl_clean="$(abs_path_leaks 'mv -f "$t" /tmp/apl-allowed/f ; echo x >/dev/null' /tmp/apl-allowed)"
+if printf '%s' "$_apl_probe" | grep -qF '/var/apl-probe/f' && [ -z "$_apl_clean" ]; then
+    pass "sandbox scanner: foreign absolute path flagged, scratch-bound block clean (#497 c M3)"
+else
+    fail "sandbox scanner pin (leak=$_apl_probe clean=$_apl_clean) (#497 c M3)"
+fi
+
 # --- summary -----------------------------------------------------------------------
 
 suite_done "staged-write / handover gate tests"

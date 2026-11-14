@@ -709,8 +709,16 @@ _dg_eval_reads() {
         PS4="+ " # kcov shield: PS4 ${BASH_SOURCE} vs set -u (internal/records/kcov-coverage.md)
         set -eu
         (set -o pipefail) 2>/dev/null && set -o pipefail || true
-        eval "$(printf "%s\n" "$1" | sed "s|/etc/os-release|$2|")"
-        eval "$(printf "%s\n" "$3" | sed "s|/etc/os-release|$2|")"
+        _dg_rw_id="$(printf "%s\n" "$1" | sed "s|/etc/os-release|$2|g")"
+        _dg_rw_ver="$(printf "%s\n" "$3" | sed "s|/etc/os-release|$2|g")"
+        # Post-rewrite assert (#497 c M6): the rewrite is verified, not
+        # trusted — /g catches a second occurrence on the same line, and
+        # a surviving literal would read the REAL /etc/os-release.
+        for _dg_rw in "$_dg_rw_id" "$_dg_rw_ver"; do
+            case "$_dg_rw" in *"/etc/os-release"*) exit 9 ;; esac
+        done
+        eval "$_dg_rw_id"
+        eval "$_dg_rw_ver"
         printf "%s\n%s" "${_dg_id:-}" "${_dg_ver:-}"
     ' _dg_read_sh "$_dg_line_id" "$1" "$_dg_line_ver"
 }

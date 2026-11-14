@@ -688,6 +688,33 @@ OC_BLOCK="$(printf '%s\n' "$OC_BLOCK" | sed \
     -e "s|/usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode|$OC_KIT_WRAPPER|g" \
     -e "s|/usr/local/bin/opencode|$OC_KIT_BIN|g" \
     -e "s|/etc/openchamber/policy.json|$OC_POLICY|g")"
+# The rewrite is verified, not trusted (#497 d N2 — the sixth
+# trusted-rewrite drive, missed by the #497 c M1 sweep): none of the
+# three rewritten forms may survive — a missed literal leaves real host
+# operands in the guard eval and the bypass matrix becomes
+# host-state-dependent (the 0.0.46a F2 class). The scratch values are
+# masked before the literal grep. Read-only consequence class
+# (openchamber_guard carries no write verbs), so the token scan is not
+# applied here (OCV precedent: variable-bound operands make it
+# false-positive-noisy).
+_oc_lit="$(printf '%s\n' "$OC_BLOCK" |
+    sed "s|$OC_KIT_WRAPPER|@SCRATCH@|g; s|$OC_KIT_BIN|@SCRATCH@|g; s|$OC_POLICY|@SCRATCH@|g" |
+    sed 's/^[[:space:]]*//; /^#/d' | tr -d "\"'" |
+    grep -F \
+        -e '/usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode' \
+        -e '/usr/local/bin/opencode' \
+        -e '/etc/openchamber/policy.json' |
+    head -n 1)"
+if [ -n "$OC_BLOCK" ] && [ -z "$_oc_lit" ]; then
+    pass "openchamber_guard rewrite hermetic (no host literal survives) (#497 d N2)"
+elif [ -n "$OC_BLOCK" ]; then
+    # extraction-empty already failed named above — only a non-empty
+    # block with a surviving literal fails here (#497 e P1). Recorded
+    # residual (#497 e P2): the assert covers the three REWRITTEN
+    # literals; a FOREIGN new absolute literal added to the guard is
+    # neither rewritten nor asserted (OCV precedent).
+    fail "openchamber_guard rewrite sandbox (surviving literal:$_oc_lit) (#497 d N2, #497 e P1)"
+fi
 
 # oc_run <home> — eval the block with a stubbed note(), run the guard,
 # print every non-empty note prefixed with its color stub (W: warning,
@@ -701,7 +728,23 @@ oc_run() {
         note() { if [ -n "$1" ]; then _oc_notes="$_oc_notes
 $1"; fi; }
         eval "$OC_BLOCK"
-        openchamber_guard
+        # Guarded call (#497 f rider — pre-existing): an empty OC_BLOCK
+        # (extraction drift) never defines the function, and the
+        # unguarded call killed the whole suite rc 127 mid-run — no
+        # tally, downstream pins unseen. The guard reads the EXTRACTION
+        # (the drift path empties exactly this variable). command -v
+        # was avoided on the maintainer's suspicion that an eval-
+        # defined symbol is invisible to it under the kcov coverage
+        # shell — an UNVERIFIED suspicion, no in-repo record
+        # substantiates the mechanism (#497 f R2); the extraction
+        # rationale stands alone. Under extraction drift every
+        # warning-expectation arm reds on its own; the clean-home arm
+        # alone passes vacuously — its expectation IS the empty output
+        # (#497 f R5) — so suite-level red rides the upstream fails
+        # and the other arms.
+        if [ -n "$OC_BLOCK" ]; then
+            openchamber_guard
+        fi
         printf '%s' "$_oc_notes"
     )
 }

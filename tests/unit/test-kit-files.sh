@@ -6,9 +6,11 @@
 #      so drift has to be caught here.
 #   2. every listed file must exist in the checkout (a removed file would
 #      404 every streamed install; VERSION lives at the repo root).
-#   3. every `cp "$SCRIPT_DIR/<path>"` deploy target in install.sh and
-#      update.sh must be in the list — otherwise the streamed install
-#      aborts mid-deploy (set -e) because the temp fetch never pulled it.
+#   3. every file the install/update flows DEPLOY out of the fetched
+#      tree (cp, copy_file_atomic, sudoers_deploy, agent_config_render,
+#      staged_write source operands) must be in the list — otherwise
+#      the streamed install aborts mid-deploy (set -e) because the temp
+#      fetch never pulled it.
 #
 # Run: sh tests/unit/test-kit-files.sh
 set -u
@@ -17,6 +19,7 @@ REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 INSTALL="$REPO/files/install.sh"
 INSTALL_CORE="$REPO/files/opencode-permissions-kit-lib/sh/install-core.sh"
 UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
+UPDATE_CORE="$REPO/files/opencode-permissions-kit-lib/sh/update-core.sh"
 # Shared harness (issue #394): pass/fail, colors, counters
 # (and check/assert_eq where present) live in lib/harness.sh now.
 . "$REPO/tests/unit/lib/harness.sh"
@@ -100,17 +103,31 @@ norm_files_path() {
     }'
 }
 
+# extract_deploy_sources <script> — the deploy-source operands: quoted
+# <root>/<path> paths fed to the deploy helpers (cp, copy_file_atomic,
+# sudoers_deploy, agent_config_render, staged_write). Backslash
+# continuations are joined first — staged_write/agent_config_render
+# calls carry their source operand on the call's second line, and the
+# cp-only extraction this replaces went vacuous when #482 F19 moved the
+# deny-all deploy from cp to staged_write (the 4c canary caught the
+# blind guard — exactly its job).
+extract_deploy_sources() {
+    sed -e ':a' -e '/\\$/{N; s/\\\n[[:space:]]*//; ba' -e '}' "$1" |
+        grep -oE '(cp|copy_file_atomic|sudoers_deploy|agent_config_render|staged_write).*"\$(SCRIPT_DIR|FILES_ROOT)/[^"]+"' |
+        sed -e 's/^.*"\$\(SCRIPT_DIR\|FILES_ROOT\)\///' -e 's/".*$//'
+}
+
 deploy_missing=""
-# install-core.sh joined the scan with #346 wave 3: the deploy cp sites
-# moved into the phase lib, but $SCRIPT_DIR still resolves to files/ at
-# run time (the lib is sourced, SCRIPT_DIR is install.sh's) — same
-# base as install.sh itself.
-for script in "$INSTALL" "$INSTALL_CORE" "$UPDATE"; do
+# install-core.sh joined the scan with #346 wave 3, update-core.sh with
+# #482: the deploy sites live in the phase libs, but $SCRIPT_DIR (the
+# lib is sourced, SCRIPT_DIR is the entry's) and $FILES_ROOT both
+# resolve to the files/ root at run time — same empty base for all four
+# scripts.
+for script in "$INSTALL" "$INSTALL_CORE" "$UPDATE" "$UPDATE_CORE"; do
     name="${script##*/}"
     base=""
-    [ "$name" = "update.sh" ] && base=""
-    # collect `cp "$SCRIPT_DIR/<target>"` / `cp "$FILES_ROOT/<target>"` sources
-    targets=$(grep -oE 'cp "\$(SCRIPT_DIR|FILES_ROOT)/[^"]+"' "$script" | cut -d'"' -f3)
+    # collect the deploy-source operands of every deploy helper
+    targets=$(extract_deploy_sources "$script")
     for t in $targets; do
         ft="$(norm_files_path "$base/$t")"
         case " $update_list " in
@@ -120,7 +137,7 @@ for script in "$INSTALL" "$INSTALL_CORE" "$UPDATE"; do
     done
 done
 if [ -z "$deploy_missing" ]; then
-    pass "every deploy cp target in install.sh/update.sh is in the fetch list"
+    pass "every deploy-source operand in install/update flows is in the fetch list"
 else
     fail "deploy targets missing from the fetch list (streamed install would abort):$deploy_missing"
 fi
@@ -165,11 +182,13 @@ else
     fail "canary: missing-file detection works (got: '$_missing')"
 fi
 
-# 4c. deploy coverage: section 3's logic must flag the cp'd file that the
-#     mutated KIT_FILES no longer lists. The cp sites live in
-#     install-core.sh since #346 wave 3.
+# 4c. deploy coverage: section 3's logic must flag the fetched-file
+#     deploy that the mutated KIT_FILES no longer lists. The deploy
+#     sources live in install-core.sh since #346 wave 3; the deny-all
+#     deploy moved from cp to staged_write with #482 F19 (the cp-only
+#     extraction went vacuous right here — the canary held the line).
 _deploy_missing=""
-targets=$(grep -oE 'cp "\$SCRIPT_DIR/[^"]+"' "$INSTALL_CORE" | sed -e 's|cp "\$SCRIPT_DIR/||' -e 's|"||')
+targets=$(extract_deploy_sources "$INSTALL_CORE")
 for t in $targets; do
     case " $mutated_update_list " in
         *" $t "*) ;;

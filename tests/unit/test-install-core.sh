@@ -51,7 +51,8 @@ fi
 # --- 2. every phase function + wrapped helper is defined by sourcing -------------
 _defs="do_plan_phase do_ddev_phase do_deploy_phase
 install_reuse_home_guard install_reuse_group_guard
-install_project_roots_select install_agents_form_normalize"
+install_project_roots_select install_agents_form_normalize
+install_deploy_library"
 _missing=""
 for _fn in $_defs; do
     sh -c '. "$1" && command -v "$2" >/dev/null' _ "$LIB" "$_fn" 2>/dev/null ||
@@ -929,6 +930,217 @@ if live_src "$LIB" |
     pass "re-configure ask stays default-y, disposition documented (#428)"
 else
     fail "re-configure ask default flipped or undocumented (#428)"
+fi
+
+# --- #482 F17: install-side openchamber pin is atomic stage+mv ---------------------
+# Mechanism pin (the #211 a F17 update-twin pin's shape, issue #482):
+# recording stubs prove the content lands on a pid-suffixed temp, the
+# temp is registered with the cleanup trap BEFORE staging (an abort
+# during the tee strands nothing), and the live file flips via mv only
+# — no write may target the final path directly.
+_f17i_block="$(sed -n '/#482 F17, install twin of #211 a F17/,/sudo mv -f/p' "$LIB")"
+if [ -n "$_f17i_block" ]; then
+    pass "openchamber install block extractable (#482 F17)"
+    _f17i_out=$(
+        sh -c '
+            _tmp_track() { echo "TRACK $1" >&2; }
+            sudo() {
+                case "$1" in
+                    mkdir | chown | chmod) return 0 ;;
+                    tee) shift; printf "TEE %s\n" "$1" >&2 ;;
+                    mv) shift; case "$1" in -*) shift ;; esac
+                        printf "MV %s -> %s\n" "$1" "$2" ;;
+                esac
+            }
+            eval "$1"
+        ' sh "$_f17i_block" 2>&1
+    ) || true
+    if printf '%s' "$_f17i_out" | grep -q 'TEE /etc/openchamber/policy.json.opk-new\.' &&
+        printf '%s' "$_f17i_out" | grep -q 'MV /etc/openchamber/policy.json.opk-new\.[0-9]* -> /etc/openchamber/policy.json' &&
+        ! printf '%s' "$_f17i_out" | grep -q 'TEE /etc/openchamber/policy.json$'; then
+        pass "install.sh: content staged on temp, live file flips via mv (#482 F17)"
+    else
+        fail "install.sh: staged write + mv (out=$_f17i_out) (#482 F17)"
+    fi
+    _f17i_trk=$(printf '%s\n' "$_f17i_out" | grep -n 'TRACK /etc/openchamber/policy.json.opk-new\.' | cut -d: -f1)
+    _f17i_tee=$(printf '%s\n' "$_f17i_out" | grep -n 'TEE /etc/openchamber/policy.json.opk-new\.' | cut -d: -f1)
+    if [ -n "$_f17i_trk" ] && [ -n "$_f17i_tee" ] && [ "$_f17i_trk" -lt "$_f17i_tee" ]; then
+        pass "install.sh: temp registered with the trap BEFORE staging (#482 F17, #211 c W3 order)"
+    else
+        fail "install.sh: temp registration before staging (trk=${_f17i_trk:-none} tee=${_f17i_tee:-none}) (#482 F17)"
+    fi
+    # The chown || true is the block's one fail-soft leg (the update
+    # twin's shape — the tee already created the file root-owned, the
+    # chown is belt): L1 — the failure path EXECUTED, the flip must
+    # still happen.
+    _f17i_out2=$(
+        sh -c '
+            _tmp_track() { echo "TRACK $1" >&2; }
+            sudo() {
+                case "$1" in
+                    mkdir | chmod) return 0 ;;
+                    chown) return 1 ;;
+                    tee) shift; printf "TEE %s\n" "$1" >&2 ;;
+                    mv) shift; case "$1" in -*) shift ;; esac
+                        printf "MV %s -> %s\n" "$1" "$2" ;;
+                esac
+            }
+            eval "$1"
+        ' sh "$_f17i_block" 2>&1
+    ) || true
+    if printf '%s' "$_f17i_out2" | grep -q 'MV /etc/openchamber/policy.json.opk-new\.[0-9]* -> /etc/openchamber/policy.json'; then
+        pass "install.sh: chown failure does not block the flip (#482 F17 fail-soft arm)"
+    else
+        fail "install.sh: chown fail-soft arm must still flip (out=$_f17i_out2) (#482 F17)"
+    fi
+else
+    fail "openchamber install block extractable (#482 F17)"
+fi
+
+# --- #482 F44: install_deploy_library restores the pre-install tree ----------------
+# The #376 B5 update-twin pin's shape (test-update-core.sh §18):
+# lib_deploy stubbed to rc 1 after half-planting a new file (the mixed
+# old/new state of the finding); real cp/mv on scratch. The helper must
+# back the existing tree up, move the mixed tree aside, restore the
+# pre-install copy and abort loud.
+_F44W="$(work_new)"
+mkdir -p "$_F44W/ldir" "$_F44W/backups/install-test"
+printf 'old-lib\n' >"$_F44W/ldir/marker-old.txt"
+_f44_out=$(
+    sh -c '
+        SCRIPT_DIR="$1/froot"
+        LIBDIR="$1/ldir"
+        BACKUP_DIR="$1/backups/install-test"
+        log() { echo "log: $*"; }
+        ui_section() { :; }
+        ui_success() { echo "success: $*"; }
+        ui_detail() { echo "detail: $*"; }
+        ui_warn() { echo "warn: $*"; }
+        ui_error() { echo "error: $*"; }
+        lib_deploy() { echo "new-lib" >"$LIBDIR/planted-new.txt"; return 1; }
+        . "$2"
+        install_deploy_library
+        echo "BAD: rc 0"
+    ' _ "$_F44W" "$LIB" 2>&1
+) || true
+if printf '%s\n' "$_f44_out" | grep -qF 'warn: library deploy FAILED — previous library tree restored' &&
+    printf '%s\n' "$_f44_out" | grep -qF 'error: library deploy failed — install aborted' &&
+    ! printf '%s\n' "$_f44_out" | grep -q 'BAD: rc 0' &&
+    [ -f "$_F44W/ldir/marker-old.txt" ] &&
+    [ ! -f "$_F44W/ldir/planted-new.txt" ] &&
+    [ -f "$_F44W/backups/install-test/lib/marker-old.txt" ] &&
+    [ -f "$(find "$_F44W/backups/install-test" -maxdepth 1 -name 'lib-failed.*' -type d 2>/dev/null | head -1)/planted-new.txt" ]; then
+    pass "failed lib_deploy: mixed tree moved aside, pre-install tree restored (#482 F44)"
+else
+    fail "failed lib_deploy must restore the pre-install tree (out=$_f44_out) (#482 F44)"
+fi
+# Fail-closed backup gate (the update twin's pre-deploy doctrine): a
+# backup that cannot be produced aborts BEFORE anything is touched —
+# cp fails on an unwritable backup dir, lib_deploy must never run (the
+# marker stub proves the ordering), the live tree stays as-is.
+mkdir -p "$_F44W/ldir2" "$_F44W/nobackup/install"
+printf 'old-lib-2\n' >"$_F44W/ldir2/marker-old.txt"
+chmod 500 "$_F44W/nobackup/install"
+_f44g_rc=0
+_f44g_out=$(
+    sh -c '
+        SCRIPT_DIR="$1/froot"
+        LIBDIR="$1/ldir2"
+        BACKUP_DIR="$1/nobackup/install"
+        log() { :; }
+        ui_section() { :; }
+        ui_success() { :; }
+        ui_detail() { :; }
+        ui_warn() { echo "warn: $*"; }
+        ui_error() { echo "error: $*"; }
+        lib_deploy() { echo "DEPLOY-RAN"; return 0; }
+        . "$2"
+        install_deploy_library
+    ' _ "$_F44W" "$LIB" 2>&1
+) || _f44g_rc=$?
+chmod 700 "$_F44W/nobackup/install"
+if [ "$_f44g_rc" -ne 0 ] &&
+    printf '%s\n' "$_f44g_out" | grep -qF 'error: cannot back up the existing library tree' &&
+    ! printf '%s\n' "$_f44g_out" | grep -q 'DEPLOY-RAN' &&
+    [ -f "$_F44W/ldir2/marker-old.txt" ]; then
+    pass "unbackable tree: aborts before the deploy, live tree untouched (#482 F44)"
+else
+    fail "backup gate must abort before deploying (rc=$_f44g_rc out=$_f44g_out) (#482 F44)"
+fi
+# Incomplete-restore arm (L1 — the new `mv … 2>/dev/null` failure path
+# EXECUTED): the backup cp succeeds, the restore cp fails — the run must
+# abort loud with the manual-recovery hint, not paper over a half
+# restore with success rows. Counting cp stub: call 1 (backup) real,
+# call 2 (restore) fails.
+mkdir -p "$_F44W/ldir3" "$_F44W/backups3"
+printf 'old-lib-3\n' >"$_F44W/ldir3/marker-old.txt"
+_f44r_rc=0
+_f44r_out=$(
+    sh -c '
+        SCRIPT_DIR="$1/froot"
+        LIBDIR="$1/ldir3"
+        BACKUP_DIR="$1/backups3"
+        _cpn=0
+        cp() {
+            _cpn=$((_cpn + 1))
+            [ "$_cpn" -ge 2 ] && return 1
+            command cp "$@"
+        }
+        log() { echo "log: $*"; }
+        ui_section() { :; }
+        ui_success() { echo "success: $*"; }
+        ui_detail() { echo "detail: $*"; }
+        ui_warn() { echo "warn: $*"; }
+        ui_error() { echo "error: $*"; }
+        lib_deploy() { echo "new-lib" >"$LIBDIR/planted-new.txt"; return 1; }
+        . "$2"
+        install_deploy_library
+    ' _ "$_F44W" "$LIB" 2>&1
+) || _f44r_rc=$?
+if [ "$_f44r_rc" -ne 0 ] &&
+    printf '%s\n' "$_f44r_out" | grep -qF 'warn: library deploy FAILED and the automatic restore did not complete' &&
+    printf '%s\n' "$_f44r_out" | grep -qF 'recoverable at' &&
+    printf '%s\n' "$_f44r_out" | grep -qF 'error: library deploy failed — install aborted' &&
+    [ -f "$_F44W/backups3/lib/marker-old.txt" ]; then
+    pass "restore failure: aborts loud, keeps the recovery material + manual hint (#482 F44)"
+else
+    fail "restore failure must abort loud with the manual hint (rc=$_f44r_rc out=$_f44r_out) (#482 F44)"
+fi
+# Fresh-install arm (#482 F44; real drive per #497 a Q5 — the other
+# three arms got drives, this one was presence-only): NO previous tree
+# — lib_deploy failure aborts loud with the re-run hint, the partial
+# new tree KEEPS its planted entry (inert; the symlink phase never
+# ran), and no backup material is created (the gate short-circuits).
+mkdir -p "$_F44W/freshroot"
+_f44f_rc=0
+_f44f_out=$(
+    sh -c '
+        SCRIPT_DIR="$1/froot"
+        LIBDIR="$1/freshroot/lib"
+        BACKUP_DIR="$1/backups-fresh"
+        log() { echo "log: $*"; }
+        ui_section() { :; }
+        ui_success() { :; }
+        ui_detail() { :; }
+        ui_warn() { echo "warn: $*"; }
+        ui_error() { echo "error: $*"; }
+        lib_deploy() {
+            mkdir -p "$LIBDIR"
+            echo "new-lib" >"$LIBDIR/planted-new.txt"
+            return 1
+        }
+        . "$2"
+        install_deploy_library
+    ' _ "$_F44W" "$LIB" 2>&1
+) || _f44f_rc=$?
+if [ "$_f44f_rc" -ne 0 ] &&
+    printf '%s\n' "$_f44f_out" | grep -qF 'warn: library deploy FAILED — no previous install existed' &&
+    printf '%s\n' "$_f44f_out" | grep -qF 'error: library deploy failed — install aborted' &&
+    [ -f "$_F44W/freshroot/lib/planted-new.txt" ] &&
+    [ ! -e "$_F44W/backups-fresh" ]; then
+    pass "fresh-install deploy failure: loud abort + re-run hint, partial tree kept, no backup material (#482 F44, #497 a Q5)"
+else
+    fail "fresh-install arm drive (rc=$_f44f_rc out=$_f44f_out) (#482 F44, #497 a Q5)"
 fi
 
 echo ""

@@ -1000,7 +1000,8 @@ kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/install-core.sh"
 install_pairing_guard() {
     for _ipg in do_plan_phase do_ddev_phase do_deploy_phase \
         install_agents_form_normalize install_project_roots_select \
-        install_reuse_group_guard install_reuse_home_guard; do
+        install_reuse_group_guard install_reuse_home_guard \
+        install_deploy_library; do
         command -v "$_ipg" >/dev/null 2>&1 || {
             echo "error: function '$_ipg' missing from install-core.sh — version-skewed entry/lib pairing, aborting" >&2
             return 1

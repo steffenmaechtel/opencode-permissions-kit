@@ -850,7 +850,14 @@ do_plan_phase() {
 
     sudo mkdir -p /etc/opencode-permissions-kit
     if [ -n "$PROJECTS_ROOTS" ]; then
-        echo "$PROJECTS_ROOTS" | tr ' ' '\n' | sudo tee /etc/opencode-permissions-kit/projects.conf >/dev/null
+        # Atomic write (#482 F19 sweep, config.sh's projects_remove
+        # shape): a kill mid-tee left a truncated projects.conf whose
+        # partial root list silently narrows every later read (status,
+        # the config.sh rewrites) — stage beside it, then rename in.
+        _PRJ_CONF_TMP="/etc/opencode-permissions-kit/projects.conf.opk-new.$$"
+        _tmp_track "$_PRJ_CONF_TMP"
+        echo "$PROJECTS_ROOTS" | tr ' ' '\n' | sudo tee "$_PRJ_CONF_TMP" >/dev/null
+        sudo mv -f "$_PRJ_CONF_TMP" /etc/opencode-permissions-kit/projects.conf
         echo "Project roots: $PROJECTS_ROOTS"
         log "projects.conf written: $PROJECTS_ROOTS"
     else
@@ -1319,6 +1326,47 @@ install_agents_form_normalize() {
     esac
 }
 
+# install_deploy_library (#482 F44, the #376 B5 update twin
+# update_redeploy_library): lib_deploy is atomic PER ENTRY only — a
+# failed or interrupted deploy over an EXISTING install (re-install)
+# leaves a mixed old/new library set behind, previously healed solely
+# by re-running (the exact gap #376 closed on the update side). Back
+# the deployed tree up into the run's durable BACKUP_DIR (created in
+# do_plan_phase) first; a backup that cannot be produced aborts BEFORE
+# anything is touched (fail-closed, the update twin's pre-deploy
+# doctrine). On a FAILED deploy the mixed tree is moved aside (kept
+# for inspection, no rm -rf of a live path) and the pre-install tree
+# restored. A fresh install has no previous tree — that arm aborts
+# loud too; the partial new tree stays but is inert (the wrapper/cli
+# symlinks are only created after this call).
+install_deploy_library() {
+    if [ -d "$LIBDIR" ] && ! cp -a "$LIBDIR" "$BACKUP_DIR/lib"; then
+        ui_error "cannot back up the existing library tree ($LIBDIR) — install aborted, nothing changed"
+        exit 1
+    fi
+    if ! lib_deploy "$SCRIPT_DIR" "$LIBDIR"; then
+        if [ -d "$BACKUP_DIR/lib" ]; then
+            _ilb_failed="$BACKUP_DIR/lib-failed.$$"
+            if mv "$LIBDIR" "$_ilb_failed" 2>/dev/null &&
+                cp -a "$BACKUP_DIR/lib" "$LIBDIR"; then
+                ui_warn "library deploy FAILED — previous library tree restored"
+                ui_detail "the mixed tree is kept for inspection: $_ilb_failed"
+                log "lib_deploy failed; library tree restored from $BACKUP_DIR/lib (mixed state: $_ilb_failed)"
+            else
+                ui_warn "library deploy FAILED and the automatic restore did not complete"
+                ui_warn "the pre-install tree is recoverable at $BACKUP_DIR/lib — restore manually:"
+                ui_warn "  sudo cp -a $BACKUP_DIR/lib/. $LIBDIR/"
+                log "lib_deploy failed; AUTOMATIC RESTORE INCOMPLETE, manual material: $BACKUP_DIR/lib"
+            fi
+        else
+            ui_warn "library deploy FAILED — no previous install existed (partial new tree left; re-run install.sh)"
+            log "lib_deploy failed; no rollback material existed (fresh deploy)"
+        fi
+        ui_error "library deploy failed — install aborted"
+        exit 1
+    fi
+}
+
 # === Phase 3: deploy (Step 5 .. Step 9) =========================================
 # Group baseline + ddev handover + git safe.directory, opencode binary +
 # wrapper + shell hooks, library/sudoers/browser-bridge deploy, agent
@@ -1718,8 +1766,10 @@ do_deploy_phase() {
     # set and modes live there, enforced against the fetch lists by
     # test-kit-files. The browser-bridge stand-in tree + wsl.conf carrier
     # are applied by browser_bridge_install below, after the library is
-    # in place.
-    lib_deploy "$SCRIPT_DIR" "$LIBDIR"
+    # in place. Tree-level rollback around the deploy (#482 F44):
+    # install_deploy_library backs an existing tree up and restores it
+    # when lib_deploy fails mid-deploy.
+    install_deploy_library
     log "library deployed to $LIBDIR"
     ui_success "kit library deployed: $LIBDIR"
 
@@ -1755,10 +1805,23 @@ do_deploy_phase() {
         else
             ui_info "Pinning OpenChamber to the kit wrapper ..."
             sudo mkdir -p /etc/openchamber
+            # Atomic stage+mv (#482 F17, install twin of #211 a F17): the
+            # live policy.json flips via rename only — a kill mid-tee used
+            # to leave a truncated file and a silently inactive pin.
+            _ocp_tmp="/etc/openchamber/policy.json.opk-new.$$"
+            # Registered BEFORE staging (#211 b W8, order per #211 c W3):
+            # the trap's rm -f tolerates an absent path, so an abort DURING
+            # the tee (temp created, write fails — ENOSPC under set -e) is
+            # covered too, not just aborts between staging and the flip.
+            _tmp_track "$_ocp_tmp"
             printf '{ "opencodeBinary": "/usr/local/bin/opencode" }\n' |
-                sudo tee /etc/openchamber/policy.json >/dev/null
-            sudo chown root:root /etc/openchamber/policy.json
-            sudo chmod 644 /etc/openchamber/policy.json
+                sudo tee "$_ocp_tmp" >/dev/null
+            sudo chown root:root "$_ocp_tmp" 2>/dev/null || true
+            sudo chmod 644 "$_ocp_tmp"
+            # mv replaces a symlink at policy.json rather than writing
+            # through it (#211 b W19) — replaces are this arm's job, the
+            # divergent-content case never reaches here.
+            sudo mv -f "$_ocp_tmp" /etc/openchamber/policy.json
             ui_success "openchamber policy pin: /etc/openchamber/policy.json"
             log "openchamber policy pin written: /etc/openchamber/policy.json"
         fi
@@ -2222,9 +2285,21 @@ do_deploy_phase() {
         fi
     fi
     if [ ! -f "$DEFAULT_OC_CONF" ]; then
-        sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc" "$DEFAULT_OC_CONF"
-        sudo chown "$DEFAULT_USER:$OPENCODE_GROUP" "$DEFAULT_OC_CONF"
-        sudo chmod 664 "$DEFAULT_OC_CONF"
+        # Atomic deploy (#482 F19, staged_write — the WRITE shape of the
+        # agent config in Step 8a; its agent_home_sane chain gate does
+        # NOT apply here, the developer's home is trusted per the
+        # staged-write.sh contract, #497 a S1): a plain cp killed
+        # mid-write leaves a TRUNCATED deny-all config that this
+        # only-if-absent gate then reads as existing — the protection
+        # silently inactive until the next INSTALL heals it (the backup
+        # arm above, default y; the update twin leaves existing files
+        # untouched, so update never heals, #497 a Q1). staged_write
+        # flips content, owner and mode in via one mv, closing the
+        # truncation window itself; a bare call aborts under set -e
+        # (#371 A4R contract).
+        staged_write 664 "$DEFAULT_USER:$OPENCODE_GROUP" \
+            "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc" \
+            "$DEFAULT_OC_CONF"
         ui_success "deny-all config installed for default user: $DEFAULT_OC_CONF"
         log "deny-all config installed for default user: $DEFAULT_OC_CONF"
     fi
