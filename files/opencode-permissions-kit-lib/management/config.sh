@@ -33,11 +33,20 @@ set -eu
 # in a registry the trap empties; a Ctrl-C must never leak the rendered
 # sudoers tempfile.
 _TMP_REGISTRY=""
-_tmp_track() { _TMP_REGISTRY="$_TMP_REGISTRY $1"; }
+# Newline-separated registry (#479 a F8, the install.sh twin): a TMPDIR
+# containing whitespace must not word-split an entry at cleanup — each
+# entry leaves as ONE quoted operand. A newline inside a path stays an
+# accepted residual, like install.sh: no mktemp template produces one.
+_tmp_track() {
+    _TMP_REGISTRY="${_TMP_REGISTRY}${1}
+"
+}
 cleanup() {
-    # word splitting intended: registry entries are mktemp paths
-    # shellcheck disable=SC2086
-    if [ -n "${_TMP_REGISTRY:-}" ]; then rm -f $_TMP_REGISTRY; fi
+    if [ -n "${_TMP_REGISTRY:-}" ]; then
+        printf '%s' "$_TMP_REGISTRY" | while IFS= read -r _cl_e; do
+            if [ -n "$_cl_e" ]; then rm -f "$_cl_e"; fi
+        done
+    fi
 }
 trap cleanup EXIT
 trap 'cleanup; exit 1' INT TERM
@@ -334,6 +343,10 @@ for cand in "$SCRIPT_DIR/../sh/ddev-handover.sh" "$LIBDIR/sh/ddev-handover.sh"; 
     if [ -f "$cand" ]; then
         . "$cand"
         _handover="$cand"
+        # Worker lib path (#479 a F12, the install.sh twin): the scan
+        # worker re-sources the copy THIS run sourced.
+        OPK_DDEV_HANDOVER_LIB="$cand"
+        export OPK_DDEV_HANDOVER_LIB
         break
     fi
 done
@@ -963,11 +976,12 @@ refresh() {
             # by #418 a A2 (every reader's form gate refuses the same
             # spellings; a nonexistent line may still be eaten silently
             # by an existence gate — docs/reference/files.md names the
-            # nuance). Deliberate divergence, pinned in
-            # the unit suite (the uninstaller's documented divergence):
-            # the scratch prefixes /tmp and /var/tmp stay processable —
-            # unit fixtures live there by sandbox policy, and no
-            # sanctioned writer ever stores them.
+            # nuance). Deliberate residual, pinned in the unit suite
+            # (formerly the documented /tmp + /var/tmp divergence,
+            # closed by #479 a F10): the scratch arms below screen the
+            # prefixes like the writer does — the unit-suite seam
+            # OPK_READER_TMP_ROOTS=1 re-opens them for the sandboxed
+            # fixtures (see the arms for the full rationale).
             case "$p" in
                 # #377 (review #370 a O1) + pr-00429 a A1: FHS-complete
                 # /var families — path-sane.sh parity.
@@ -983,6 +997,22 @@ refresh() {
                     continue
                     ;;
             esac
+            # Scratch-prefix arms (#479 a F10, the update-core reader
+            # twin): a hand-edited or stale conf line pointing into
+            # /tmp or /var/tmp must not reach the root-run recursive
+            # group baseline — screened like the writer (path-sane.sh)
+            # now. The unit-suite seam OPK_READER_TMP_ROOTS=1 (the
+            # OPK_INSTALL_CONF test-seam pattern) re-opens them: the
+            # sandbox policy pins unit-fixture roots under /tmp and
+            # /var/tmp; nothing the kit ships ever sets the seam.
+            if [ "${OPK_READER_TMP_ROOTS:-}" != "1" ]; then
+                case "$p" in
+                    /tmp | /tmp/* | /var/tmp | /var/tmp/*)
+                        ui_warn "skip $p (scratch prefix — never a project root)"
+                        continue
+                        ;;
+                esac
+            fi
             # Shared helper with live per-pass progress (issue #14).
             fs_baseline_root "$p" "$OPENCODE_GROUP" "$OPENCODE_USER"
             ddev_handover_root "$p" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"

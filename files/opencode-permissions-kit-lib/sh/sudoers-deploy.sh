@@ -57,7 +57,14 @@ sudoers_deploy() {
     fi
     _sd_conf="${SD_CONF_DIR:-/etc/opencode-permissions-kit}"
     _sd_d="${SD_SUDOERS_D:-/etc/sudoers.d}"
-    _sd_tmp=$(mktemp) || return 1
+    _sd_tmp=$(mktemp) || {
+        # Named-cause mktemp guard (#479 a F18 sweep, the config.sh
+        # #431 family): the file-missing arm above is loud — a dead
+        # TMPDIR must name the interrupted sudoers render too, not
+        # abort with only mktemp's own diagnostic.
+        echo "error: mktemp failed (is \$TMPDIR writable?) — sudoers render NOT applied" >&2
+        return 1
+    }
     # Register for the caller's scratch-cleanup trap (0.0.39e C3) when
     # the caller has one — the explicit rm paths below make the trap a
     # no-op, a missing trap never leaks the temp on the handled paths.

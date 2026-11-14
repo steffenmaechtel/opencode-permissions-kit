@@ -55,13 +55,22 @@ _BIN_TMP=""
 # (ensure_local_file fetch temps, wsl-browser-bridge rewrites) — the
 # trap empties it on every exit path (review 0.0.39e C3).
 _TMP_REGISTRY=""
-_tmp_track() { _TMP_REGISTRY="$_TMP_REGISTRY $1"; }
+# Newline-separated registry (#479 a F8, the install.sh twin): a TMPDIR
+# containing whitespace must not word-split an entry at cleanup — each
+# entry leaves as ONE quoted operand. A newline inside a path stays an
+# accepted residual, like install.sh: no mktemp template produces one.
+_tmp_track() {
+    _TMP_REGISTRY="${_TMP_REGISTRY}${1}
+"
+}
 cleanup() {
     if [ -n "${_FETCH_TREE:-}" ]; then rm -rf "$_FETCH_TREE"; fi
     if [ -n "${_BIN_TMP:-}" ]; then rm -rf "$_BIN_TMP"; fi
-    # word splitting intended: registry entries are mktemp paths
-    # shellcheck disable=SC2086
-    if [ -n "${_TMP_REGISTRY:-}" ]; then rm -f $_TMP_REGISTRY; fi
+    if [ -n "${_TMP_REGISTRY:-}" ]; then
+        printf '%s' "$_TMP_REGISTRY" | while IFS= read -r _cl_e; do
+            if [ -n "$_cl_e" ]; then rm -f "$_cl_e"; fi
+        done
+    fi
 }
 # A signal handler must EXIT (see install.sh); the EXIT trap re-runs the
 # idempotent cleanup.

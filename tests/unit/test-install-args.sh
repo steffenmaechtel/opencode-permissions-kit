@@ -407,6 +407,46 @@ else
     fail "install.sh traps EXIT + exiting INT/TERM and registers the fetch tree for cleanup"
 fi
 
+# --- scratch registry survives a spaced TMPDIR (#479 a F8) ------------------------
+# The registry used to space-append and cleanup ran an UNQUOTED
+# `rm -f $_TMP_REGISTRY` — a TMPDIR (hence every mktemp path) containing
+# whitespace split each entry into wrong fragments: root-owned 0600
+# scratch leaked despite the cleanup contract. Drive the REAL
+# _tmp_track + cleanup pair (extracted, eval'd — the re-type trap is
+# what this pin exists to avoid) against a spaced scratch path: the
+# file must be GONE after cleanup. Static twins for update.sh/config.sh
+# below.
+_f8_w="$(mktemp -d)/dir with space"
+mkdir -p "$_f8_w"
+_f8_f="$(mktemp "$_f8_w/scratch.XXXXXXXX")"
+_f8_c="$(extract_func "$INSTALL" _tmp_track)
+$(extract_func "$INSTALL" cleanup)"
+if [ -n "$_f8_c" ]; then
+    if (
+        _FETCH_TREE=""
+        _TMP_REGISTRY=""
+        eval "$_f8_c"
+        _tmp_track "$_f8_f"
+        cleanup
+        [ ! -f "$_f8_f" ]
+    ); then
+        pass "cleanup removes a whitespace-named tracked scratch file whole (#479 a F8)"
+    else
+        fail "cleanup must remove a whitespace-named tracked scratch file (#479 a F8)"
+    fi
+else
+    fail "_tmp_track/cleanup extractable (#479 a F8)"
+fi
+_f8_update="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh"
+_f8_config="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh"
+if live_src "$INSTALL" | grep -qF '_TMP_REGISTRY="${_TMP_REGISTRY}${1}' &&
+    live_src "$_f8_update" | grep -qF '_TMP_REGISTRY="${_TMP_REGISTRY}${1}' &&
+    live_src "$_f8_config" | grep -qF '_TMP_REGISTRY="${_TMP_REGISTRY}${1}'; then
+    pass "newline registry shape in all three entry twins (#479 a F8)"
+else
+    fail "newline registry shape missing in an entry twin (#479 a F8)"
+fi
+
 # --- scratch cleanup: fetch refuses empty bodies (review 0.0.39e C1) --------------
 # Fake curl: every file gets content EXCEPT etc/umask.sh, which answers
 # HTTP-200-style success with an EMPTY body (captive portal / broken

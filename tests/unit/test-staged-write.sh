@@ -273,6 +273,11 @@ printf '#!/bin/sh\necho "chmod $*" >> "$OPS_HR_LOG"\n' >"$WORK/stubhr/chmod"
 chmod +x "$WORK/stubhr/chown" "$WORK/stubhr/chmod"
 OPS_HR_LOG="$WORK/ops-hr.log"
 export OPS_HR_LOG
+# OPK_DDEV_HANDOVER_LIB (#479 a F12): the scan worker re-sources the
+# lib — hand it the copy under test (what install.sh/config.sh/
+# update-core.sh export at their sourcing sites).
+OPK_DDEV_HANDOVER_LIB="$HANDOVER"
+export OPK_DDEV_HANDOVER_LIB
 OUT_HR="$(PATH="$WORK/stubhr:$PATH" OPK_INSTALL_CONF=/nonexistent sh -c '. "$1" && ddev_handover_root "$2" ocuser ocgroup devuser' _ "$HANDOVER" "$WORK/hr")"
 check "handover_root: .ddev reaches chown -R" \
     grep -qxF "chown -R ocuser:ocgroup $WORK/hr/proj/.ddev" "$OPS_HR_LOG"
@@ -300,7 +305,8 @@ chmod +x "$WORK/stubhr2/chown" "$WORK/stubhr2/chmod"
 RACE_D="$WORK/hr2/proj/.ddev"
 RACE_V="$WORK/hr2-victim"
 export RACE_D RACE_V
-OUT_HR2="$(PATH="$WORK/stubhr2:$PATH" OPK_INSTALL_CONF=/nonexistent sh -c '. "$1" && ddev_handover_root "$2" ocuser ocgroup devuser' _ "$HANDOVER" "$WORK/hr2")"
+OUT_HR2="$(OPK_DDEV_HANDOVER_LIB="$HANDOVER" PATH="$WORK/stubhr2:$PATH" OPK_INSTALL_CONF=/nonexistent \
+    sh -c '. "$1" && ddev_handover_root "$2" ocuser ocgroup devuser' _ "$HANDOVER" "$WORK/hr2")"
 check "handover_root recheck: swapped .ddev still hit the chmod walk (the stub ran first)" \
     grep -qxF "chmod -R g+w $WORK/hr2/proj/.ddev" "$OPS_HR_LOG"
 if grep -qxF "chown -R ocuser:ocgroup $WORK/hr2/proj/.ddev" "$OPS_HR_LOG"; then
@@ -312,6 +318,68 @@ if echo "$OUT_HR2" | grep -qF ".ddev handover: $WORK/hr2/proj/.ddev"; then
     fail "handover_root recheck: swapped .ddev produces no handover echo"
 else
     pass "handover_root recheck: swapped .ddev produces no handover echo"
+fi
+
+# --- 2c-nl. #479 a F12: a directory name containing a NEWLINE must
+# reach the pair WHOLE. The former newline-based operand stream split
+# "…/we<newline>ird/.ddev" at the newline and the loop acted on the
+# WRONG (prefix) directory "…/we" — chmod -R/chown -R over an
+# unselected subtree. The NUL stream hands the worker the unsplit
+# name. The stubs map embedded newlines to '?' so the ops log stays
+# line-discriminable (a raw newline in the operand would split the LOG
+# line at the same byte and make fragment and whole name
+# indistinguishable to grep).
+mkdir -p "$WORK/nl/we
+ird/.ddev" "$WORK/stubnl"
+printf 'type: php\n' >"$WORK/nl/we
+ird/.ddev/config.yaml"
+printf '#!/bin/sh\necho "chown $(printf %%s "$*" | tr "\\n" "?")" >> "$OPS_HR_LOG"\n' >"$WORK/stubnl/chown"
+printf '#!/bin/sh\necho "chmod $(printf %%s "$*" | tr "\\n" "?")" >> "$OPS_HR_LOG"\n' >"$WORK/stubnl/chmod"
+chmod +x "$WORK/stubnl/chown" "$WORK/stubnl/chmod"
+OPK_DDEV_HANDOVER_LIB="$HANDOVER" PATH="$WORK/stubnl:$PATH" OPK_INSTALL_CONF=/nonexistent \
+    sh -c '. "$1" && ddev_handover_root "$2" ocuser ocgroup devuser' _ "$HANDOVER" "$WORK/nl" >/dev/null 2>&1 || true
+_nl_target="$(printf '%s/nl/we?ird/.ddev' "$WORK")"
+if grep -qxF "chown -R ocuser:ocgroup $_nl_target" "$OPS_HR_LOG" &&
+    grep -qxF "chmod -R g+w $_nl_target" "$OPS_HR_LOG"; then
+    pass "handover_root: newline-named .ddev reaches the pair whole (#479 a F12)"
+else
+    fail "handover_root: newline-named .ddev must reach the pair whole (log: $(tail -6 "$OPS_HR_LOG" | tr '\n' '|')) (#479 a F12)"
+fi
+# The split fragment — the OLD stream's wrong operand — must never be
+# logged as a WHOLE line (the prefix directory must not be chowned).
+if grep -qxF "chown -R ocuser:ocgroup $WORK/nl/we" "$OPS_HR_LOG"; then
+    fail "handover_root: the newline-split prefix directory never reaches the pair (#479 a F12)"
+else
+    pass "handover_root: the newline-split prefix directory never reaches the pair (#479 a F12)"
+fi
+
+# --- 2c-g. the two rc=1 guard arms of ddev_handover_root (pr-00507 a
+# Q2): every other drive in this suite exports the lib env on a live
+# TMPDIR, so a broken guard (wrong var name, inverted test, a silent
+# return 0) would ship green. Both refusals are discriminated here:
+# the missing-env arm (env -u strips the suite's export) and the
+# scan-stream mktemp arm (dead TMPDIR, post-#507 wording with the
+# hint). The root must pass the belt gates first — they run before
+# the env check.
+mkdir -p "$WORK/g"
+_g_rc=0
+_g_out="$(env -u OPK_DDEV_HANDOVER_LIB PATH="$WORK/stubhr:$PATH" OPK_INSTALL_CONF=/nonexistent \
+    sh -c '. "$1" && ddev_handover_root "$2" ocuser ocgroup devuser' _ "$HANDOVER" "$WORK/g" 2>&1)" || _g_rc=$?
+if [ "$_g_rc" -eq 1 ] &&
+    printf '%s' "$_g_out" | grep -qF 'OPK_DDEV_HANDOVER_LIB is unset or missing'; then
+    pass "handover_root guard: missing lib env refuses loud, rc 1 (#479 a F12)"
+else
+    fail "handover_root guard: missing lib env must refuse rc 1 (rc=$_g_rc out=$_g_out) (#479 a F12)"
+fi
+_g2_rc=0
+_g2_out="$(OPK_DDEV_HANDOVER_LIB="$HANDOVER" TMPDIR="$WORK/no-such-tmpdir-g" \
+    PATH="$WORK/stubhr:$PATH" OPK_INSTALL_CONF=/nonexistent \
+    sh -c '. "$1" && ddev_handover_root "$2" ocuser ocgroup devuser' _ "$HANDOVER" "$WORK/g" 2>&1)" || _g2_rc=$?
+if [ "$_g2_rc" -eq 1 ] &&
+    printf '%s' "$_g2_out" | grep -qF 'mktemp failed (is $TMPDIR writable?) — cannot stage the .ddev scan stream'; then
+    pass "handover_root guard: scan-stream mktemp failure refuses loud, rc 1 (#479 a F12)"
+else
+    fail "handover_root guard: scan-stream mktemp failure must refuse rc 1 (rc=$_g2_rc out=$_g2_out) (#479 a F12)"
 fi
 
 # --- 2e. ddev_handover_project_back (0.0.39h F9): planted settings-dir
@@ -363,7 +431,9 @@ fi
 # inside each function block; a reverted swap flips the comparison, a
 # collapsed (order-shared) executor leaves the grep unmatched (rc 1,
 # still discriminating — no count here, unlike bin/opk's exactly-twice
-# pins; wording corrected 0.0.45f W3).
+# pins; wording corrected 0.0.45f W3). ddev_handover_root's pair moved
+# to _dhr_entry_one with the #479 a F12 NUL-stream worker — the pin
+# follows the function that carries the pair.
 _dh_order() {
     # comment-stripped at extraction (#385): sed s/// keeps the line
     # numbers stable for the -lt comparison below
@@ -373,8 +443,8 @@ _dh_order() {
     [ -n "$_dh_cl" ] && [ -n "$_dh_hl" ] || return 1
     if [ "$2" = chmod ]; then [ "$_dh_cl" -lt "$_dh_hl" ]; else [ "$_dh_hl" -lt "$_dh_cl" ]; fi
 }
-check "W1 static order: ddev_handover_root chmods before chowning (dev->agent)" \
-    _dh_order ddev_handover_root chmod
+check "W1 static order: _dhr_entry_one (ex ddev_handover_root) chmods before chowning (dev->agent)" \
+    _dh_order _dhr_entry_one chmod
 check "W1 static order: ddev_handover_project chmods before chowning (dev->agent)" \
     _dh_order ddev_handover_project chmod
 check "W1 static order: ddev_handover_project_back chowns before chmodding (agent->dev)" \
@@ -804,6 +874,23 @@ if printf '%s' "$_apl_probe" | grep -qF '/var/apl-probe/f' && [ -z "$_apl_clean"
     pass "sandbox scanner: foreign absolute path flagged, scratch-bound block clean (#497 c M3)"
 else
     fail "sandbox scanner pin (leak=$_apl_probe clean=$_apl_clean) (#497 c M3)"
+fi
+
+# --- #479 a F18 sweep: staged_write's mktemp failure names the write ----
+# The shared primitive's raw `|| return 1` aborted callers (set -eu)
+# with only mktemp's own diagnostic — same class as install-core's
+# agent-config site. A dead stage dir must name the interrupted deploy.
+SW_RC=0
+SW_OUT="$(SW_SUDO="" SW_STAGE_DIR="$WORK/no-such-stage-f18" sh -c '
+    . "$1"
+    staged_write 644 "$(id -un):$(id -gn)" /dev/null "$2/nonexistent-dst"
+' _ "$STAGEDWRITE" "$WORK" 2>&1)" || SW_RC=$?
+if [ "$SW_RC" -eq 1 ] &&
+    printf '%s' "$SW_OUT" | grep -qF 'staged_write mktemp failed' &&
+    printf '%s' "$SW_OUT" | grep -qF 'NOT applied'; then
+    pass "staged_write mktemp failure names the interrupted deploy (#479 a F18 sweep)"
+else
+    fail "staged_write mktemp failure must name the deploy (rc=$SW_RC out=$SW_OUT) (#479 a F18 sweep)"
 fi
 
 # --- summary -----------------------------------------------------------------------

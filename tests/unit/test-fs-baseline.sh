@@ -1015,7 +1015,10 @@ mkdir -p "$S245/bin"
 printf '#!/bin/sh\n[ "$1" = passwd ] && [ "$2" = toc ] && echo "toc:x:1:1::/relocated/opencode:/bin/sh" && exit 0\nexit 2\n' \
     >"$S245/bin/getent"
 chmod +x "$S245/bin/getent"
-S245R_OUT=$(PATH="$S245/bin:$PATH" PROJECTS_CONF="$S245/conf" OPENCODE_GROUP=tg OPENCODE_USER=toc DEFAULT_USER=tdv \
+# OPK_READER_TMP_ROOTS=1 (#479 a F10 unit seam): the fixture roots live
+# in this suite's /tmp scratch — the readers screen scratch prefixes
+# like the writer does now; the seam re-opens them for the fixtures.
+S245R_OUT=$(OPK_READER_TMP_ROOTS=1 PATH="$S245/bin:$PATH" PROJECTS_CONF="$S245/conf" OPENCODE_GROUP=tg OPENCODE_USER=toc DEFAULT_USER=tdv \
     sh "$S245/run-refresh.sh" 2>&1)
 if [ "$(printf '%s\n' "$S245R_OUT" | grep -c '^FSB: ')" -eq 2 ] &&
     [ "$(printf '%s\n' "$S245R_OUT" | grep -c '^HO: ')" -eq 2 ] &&
@@ -1063,7 +1066,7 @@ fi
     sed -n '/while IFS= read -r root; do/,/done <"\$PROJECTS_CONF"/p' "$UPDATE_CORE" |
         sed 's|done <"$PROJECTS_CONF"|done|'
 } >"$S245/run-update-loop.sh"
-S245U_OUT=$(PATH="$S245/bin:$PATH" sh "$S245/run-update-loop.sh" <"$S245/conf" 2>&1)
+S245U_OUT=$(OPK_READER_TMP_ROOTS=1 PATH="$S245/bin:$PATH" sh "$S245/run-update-loop.sh" <"$S245/conf" 2>&1)
 if [ "$(printf '%s\n' "$S245U_OUT" | grep -c '^FSB: ')" -eq 2 ] &&
     [ "$(printf '%s\n' "$S245U_OUT" | grep -c '^HO: ')" -eq 2 ] &&
     printf '%s\n' "$S245U_OUT" | grep -qF "FSB: $S245/real" &&
