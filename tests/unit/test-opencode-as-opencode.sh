@@ -707,8 +707,13 @@ _oc_lit="$(printf '%s\n' "$OC_BLOCK" |
     head -n 1)"
 if [ -n "$OC_BLOCK" ] && [ -z "$_oc_lit" ]; then
     pass "openchamber_guard rewrite hermetic (no host literal survives) (#497 d N2)"
-else
-    fail "openchamber_guard rewrite sandbox (surviving literal:$_oc_lit) (#497 d N2)"
+elif [ -n "$OC_BLOCK" ]; then
+    # extraction-empty already failed named above — only a non-empty
+    # block with a surviving literal fails here (#497 e P1). Recorded
+    # residual (#497 e P2): the assert covers the three REWRITTEN
+    # literals; a FOREIGN new absolute literal added to the guard is
+    # neither rewritten nor asserted (OCV precedent).
+    fail "openchamber_guard rewrite sandbox (surviving literal:$_oc_lit) (#497 d N2, #497 e P1)"
 fi
 
 # oc_run <home> — eval the block with a stubbed note(), run the guard,

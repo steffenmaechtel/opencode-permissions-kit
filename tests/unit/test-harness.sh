@@ -30,6 +30,13 @@
 #     register receivers, work_register / work_register_var migrate
 #     pre-existing ones, the central trap collects on green, red, set -e
 #     abort and SIGTERM -- with a disarmed control arm that must leak
+#   - abs_path_leaks (#497 c M2, #497 d N1): the drive-block sandbox
+#     scanner -- rc 0 on leak AND clean input (the answer rides the
+#     output), full-line comment exclusion, quote-strip equivalence,
+#     /dev/null scan-out, token-boundary allowlist (sibling extensions
+#     leak), the documented variable-operand limits, the trailing-
+#     comment trade, multi-allowlist arity, and the trailing-slash
+#     allow-arg trap
 #
 # Independent by design: this suite uses its OWN local ok/bad counters
 # and its own summary gate -- NOT the harness under test. A corrupted
@@ -888,6 +895,17 @@ if [ -z "$_arm_out" ]; then
 else
     bad "12.7 ... the documented invisible-variable limit drifted (got: $_arm_out)"
 fi
+arm "abs_path_leaks 'tee /etc/apl-code >/dev/null # prose /etc/apl-tail' /nonexistent-pin"
+has "/etc/apl-code" "12.8 a code-line trailing comment's prose leaks with the code (strip trade, #497 e P4)"
+has "/etc/apl-tail" "12.8 ... and the trailing prose token leaks too (nothing strips it)"
+arm "abs_path_leaks 'tee /tmp/apl-2nd/b >/dev/null; tee /tmp/apl-2nd/a >/dev/null' /tmp/apl-2nd/a /tmp/apl-2nd/b"
+if [ -z "$_arm_out" ]; then
+    ok "12.9 multi-allowlist arity: every allow argument is honored (#497 e P5)"
+else
+    bad "12.9 ... tokens matching EITHER allow argument must pass (got: $_arm_out)"
+fi
+arm "abs_path_leaks 'tee /tmp/apl-slash/x >/dev/null' /tmp/apl-slash/"
+has "/tmp/apl-slash/x" "12.10 a trailing-slash allow arg fails to allow its subpath (documented trap, #497 e P6)"
 
 # --- summary gate (independent on purpose -- see header) ------------------------
 echo ""
