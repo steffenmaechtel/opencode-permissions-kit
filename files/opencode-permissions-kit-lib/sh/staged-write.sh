@@ -41,7 +41,13 @@ staged_write() {
     _sw_src="$3"
     _sw_dst="$4"
     _sw_stage="${SW_STAGE_DIR:-/etc/opencode-permissions-kit}"
-    _sw_tmp=$(_sw_sudo mktemp "$_sw_stage/.opk-stage.XXXXXX") || return 1
+    _sw_tmp=$(_sw_sudo mktemp "$_sw_stage/.opk-stage.XXXXXX") || {
+        # Named-cause mktemp guard (#479 a F18 sweep, the config.sh
+        # #431 family): callers run set -eu — a raw rc 1 aborted with
+        # only mktemp's own diagnostic, the interrupted write unnamed.
+        echo "error: staged_write mktemp failed (is $_sw_stage writable?) — deploy of $_sw_dst NOT applied" >&2
+        return 1
+    }
     # Register for the caller's scratch-cleanup trap (0.0.39e C3): the
     # entry is gone after a successful mv, so the trap's rm is a no-op.
     if command -v _tmp_track >/dev/null 2>&1; then

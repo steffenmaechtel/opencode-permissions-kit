@@ -178,8 +178,8 @@ assert_eq "uninstall passes flags" "uninstall:euid=$(id -u):args=--dry-run" "$ou
 # pins stay on $KIT). oc_bypass_bin stays in bin/opk (dispatcher-level
 # helper): its definition is pinned on $KIT, its USE sites on $OCCORE.
 check_live "openchamber-secure dispatch exists" "$KIT" -q '    openchamber-secure)'
-check_live "openchamber-secure auto-elevates with flags intact" "$OCCORE" \
-    -qF 'exec sudo sh "$LIBDIR/bin/opk" openchamber-secure "$@"'
+check_live "openchamber-secure auto-elevates with flags intact (#479 a F24 guard)" "$OCCORE" \
+    -qF 'exec sudo env OPK_OPENCHAMBER_ROOT=1 sh "$LIBDIR/bin/opk" openchamber-secure "$@"'
 # review a S1 (#468): this compound was doubly broken -- the leading
 # raw grep duplicated the first half and the trailing OPENCHAMBER grep
 # was dead operand bytes (`-q` exits before it), so "records the
@@ -867,6 +867,67 @@ if printf '%s' "$out" | grep -qF "takes back the declared container tree"; then
 else
     pass "root re-entry does not repeat the warning (#356 a A9)"
 fi
+
+# --- sudo-elevation loop guards (#479 a F24) --------------------------------------
+# handover-core refuses "sudo did not elevate — giving up" via
+# OPK_HANDOVER_ROOT; the four sibling re-exec arms (config|update,
+# upgrade-opencode, wsl-add-opencode-1-fix, openchamber-secure) carried
+# no guard — a sudo exiting 0 without elevating re-enters the
+# dispatcher arm forever. Self-contained fixture (the lib above is
+# mutated by intermediate sections): the REAL dispatcher, stub
+# management entries, the REAL openchamber core, and a fake sudo that
+# ONLY logs (never execs — the unmarked control must not actually run
+# anything). Marker set -> the named refusal + rc 1 + NO sudo call;
+# marker absent -> the arm reaches sudo (the guard, not a missing
+# file, is what fired).
+F24="$WORK/f24"
+mkdir -p "$F24/lib/bin" "$F24/lib/management" "$F24/lib/sh" "$F24/sbin"
+cp "$KIT" "$F24/lib/bin/opk"
+chmod +x "$F24/lib/bin/opk"
+for _f24_s in config update; do
+    printf '#!/bin/sh\necho "%s-stub-ran"\n' "$_f24_s" >"$F24/lib/management/$_f24_s.sh"
+done
+cp "$OCCORE" "$F24/lib/sh/openchamber-core.sh"
+: >"$F24/lib/sh/wsl-browser-bridge.sh"
+printf '#!/bin/sh\necho "SUDO-CALLED $*" >> "%s/sudo.log"\nexit 0\n' "$F24" >"$F24/sbin/sudo"
+chmod +x "$F24/sbin/sudo"
+_f24_run() { # <marker-env|-> <cmd...>: rc in _f24_rc, merged out in _f24_out
+    _f24_m="$1"
+    shift
+    : >"$F24/sudo.log"
+    _f24_rc=0
+    if [ "$_f24_m" = "-" ]; then
+        _f24_out="$(OPK_INSTALL_CONF="$WORK/install.conf" NO_COLOR=1 \
+            PATH="$F24/sbin:$PATH" "$F24/lib/bin/opk" "$@" 2>&1)" || _f24_rc=$?
+    else
+        _f24_out="$(env "$_f24_m=1" OPK_INSTALL_CONF="$WORK/install.conf" NO_COLOR=1 \
+            PATH="$F24/sbin:$PATH" "$F24/lib/bin/opk" "$@" 2>&1)" || _f24_rc=$?
+    fi
+}
+_f24_check() { # <marker-env> <cmd...>
+    _f24_marker="$1"
+    shift
+    _f24_run "$_f24_marker" "$@"
+    if [ "$_f24_rc" -eq 1 ] &&
+        printf '%s' "$_f24_out" | grep -qF 'sudo did not elevate — giving up' &&
+        ! grep -qF 'SUDO-CALLED' "$F24/sudo.log"; then
+        pass "loop guard: $_f24_marker set -> refuse before sudo ($*) (#479 a F24)"
+    else
+        fail "loop guard: $_f24_marker set -> refuse before sudo (rc=$_f24_rc out=$_f24_out sudo-log=$(cat "$F24/sudo.log" 2>/dev/null)) (#479 a F24)"
+    fi
+    _f24_run - "$@"
+    if grep -qF 'SUDO-CALLED' "$F24/sudo.log" &&
+        ! printf '%s' "$_f24_out" | grep -qF 'sudo did not elevate'; then
+        pass "loop guard: unmarked control reaches sudo ($*) (#479 a F24)"
+    else
+        fail "loop guard: unmarked control must reach sudo ($*) (out=$_f24_out) (#479 a F24)"
+    fi
+}
+_f24_check OPK_MGMT_ROOT config
+_f24_check OPK_MGMT_ROOT update
+_f24_check OPK_UPGRADE_ROOT upgrade-opencode
+_f24_check OPK_WSLFIX_ROOT wsl-add-opencode-1-fix
+_f24_check OPK_OPENCHAMBER_ROOT openchamber-secure
 
 # --- ensure-shared: short heal wrapper (issue #159) ----------------------------
 # The real helper (bin/ddev-as-opencode) is stubbed with an argument

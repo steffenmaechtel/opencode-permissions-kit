@@ -436,6 +436,71 @@ else
     check "enable_linger extractable (#211 a F13)" false
 fi
 
+# --- sysctl message conditioned on its rc (#479 a F7) -----------------------------
+# The former inline block wrote the sysctl conf + runtime value behind
+# a double `|| true` and then LOGGED "applied before daemon start"
+# unconditionally — a failed write (read-only /etc) claimed the daemon
+# can bind 80/443 and ddev-router deferred-failed with nothing pointing
+# back at provisioning. Extract the REAL apply_unprivileged_port_start
+# (the enable_linger extraction twin) and drive it with function stubs:
+# ok -> "applied" log only, fail -> WARN + retry hint + FAILED log,
+# already-<=80 -> silent, no sudo call at all.
+_f7_fn="$(extract_func "$SETUP" apply_unprivileged_port_start)"
+if [ -n "$_f7_fn" ]; then
+    check "apply_unprivileged_port_start extractable (#479 a F7)" true
+    F7="$(work_new)"
+    _out=$(F7LOG="$F7/log" sh -c '
+        log() { echo "$*" >> "$F7LOG"; }
+        cat() { echo 1024; }
+        sudo() { return 0; }
+        eval "$1"; apply_unprivileged_port_start
+    ' sh "$_f7_fn" 2>&1) || true
+    if grep -q 'applied before daemon start' "$F7/log" &&
+        ! printf '%s' "$_out" | grep -q 'WARN'; then
+        check "ok rc: applied log only (#479 a F7)" true
+    else
+        check "ok rc: applied log only (got: $_out log: $(cat "$F7/log" 2>/dev/null))" false
+    fi
+    F7B="$(work_new)"
+    _out=$(F7LOG="$F7B/log" sh -c '
+        log() { echo "$*" >> "$F7LOG"; }
+        cat() { echo 1024; }
+        sudo() { return 1; }
+        eval "$1"; apply_unprivileged_port_start
+    ' sh "$_f7_fn" 2>&1) || true
+    if printf '%s' "$_out" | grep -q 'WARN: could not set net.ipv4.ip_unprivileged_port_start=80' &&
+        printf '%s' "$_out" | grep -q 'retry: sudo sysctl -w' &&
+        grep -q 'setting ip_unprivileged_port_start=80 FAILED' "$F7B/log" &&
+        ! grep -q 'applied before daemon start' "$F7B/log"; then
+        check "failed rc: WARN + retry hint + FAILED log, no applied claim (#479 a F7)" true
+    else
+        check "failed rc: WARN + retry hint + FAILED log (got: $_out log: $(cat "$F7B/log" 2>/dev/null))" false
+    fi
+    F7C="$(work_new)"
+    _out=$(F7LOG="$F7C/log" sh -c '
+        log() { echo "$*" >> "$F7LOG"; }
+        cat() { echo 80; }
+        sudo() { echo "SUDO-CALLED" >> "$F7LOG"; return 0; }
+        eval "$1"; apply_unprivileged_port_start
+    ' sh "$_f7_fn" 2>&1) || true
+    if [ -z "$_out" ] && [ ! -s "$F7C/log" ]; then
+        check "already <=80: silent, no sudo call (#479 a F7)" true
+    else
+        check "already <=80: silent (got: $_out log: $(cat "$F7C/log" 2>/dev/null))" false
+    fi
+    rm -rf "$F7" "$F7B" "$F7C"
+else
+    check "apply_unprivileged_port_start extractable (#479 a F7)" false
+fi
+
+# pr-00507 a M1: the get.docker.com staging mktemp is named-cause now
+# (the #479 a F18 class, swept by review round a): a raw `|| exit 1`
+# aborted provisioning with only mktemp's own diagnostic, the
+# interrupted step unnamed. Presence pin — the site is inline in the
+# provisioning function (no extraction arm like the F7 block above).
+check_live "get.docker.com mktemp failure names the interrupted install (pr-00507 a M1)" "$SETUP" \
+    -qF 'mktemp failed (is \$TMPDIR writable?) — get.docker.com install NOT run'
+
 # --- subuid/subgid fields validated before arithmetic (#211 a F16) ----------------
 # allocate_range fed raw /etc/subuid fields into $(( )) — digit-leading
 # junk aborted provisioning under set -e with a cryptic foreign error,

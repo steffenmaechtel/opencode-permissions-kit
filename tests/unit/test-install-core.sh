@@ -64,6 +64,32 @@ else
     fail "functions missing after sourcing:$_missing"
 fi
 
+# --- 2b. named-cause mktemp in the agent-config deploy (#479 a F18) ---------------
+# install-core runs set -eu: the raw `mktemp || return 1` aborted the
+# whole install with only mktemp's own diagnostic, the interrupted
+# action unnamed (the config.sh git-config #431 twin's guard names
+# exactly this site). The helper is nested inside do_deploy_phase, so
+# the pin extracts its definition by indent span and drives the REAL
+# body: a dead TMPDIR must die with the family wording, rc 1 — the
+# behavioral-probe exemption (an eval'd extraction, not a count).
+_f18_src="$(sed -n '/^    _oc_install_agent_config() {/,/^    }$/p' "$LIB")"
+if [ -n "$_f18_src" ]; then
+    _rc=0
+    _out=$(TMPDIR="$WORK/no-such-tmpdir-f18" sh -c '
+        eval "$1"
+        ui_error() { printf "ui_error: %s\n" "$*" >&2; }
+        _oc_install_agent_config
+    ' _ "$_f18_src" 2>&1) || _rc=$?
+    if [ "$_rc" -eq 1 ] &&
+        printf '%s' "$_out" | grep -qF 'mktemp failed (is $TMPDIR writable?) — agent config NOT deployed'; then
+        pass "agent-config mktemp failure names the interrupted action (#479 a F18)"
+    else
+        fail "agent-config mktemp failure must name the action (rc=$_rc out=$_out) (#479 a F18)"
+    fi
+else
+    fail "_oc_install_agent_config extractable (#479 a F18)"
+fi
+
 # --- 3. the entry resolves the lib from its own tree, no LIBDIR fallback ----------
 # install.sh never runs from the installed tree (re-deploys go through
 # update.sh), so a deployed-lib fallback could feed stale phases to a

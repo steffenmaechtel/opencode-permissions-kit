@@ -131,6 +131,36 @@ if advisory_range_holds "" ">=1.0.0"; then
 else
     pass "range: empty version fails safe (outside)"
 fi
+# #479 a F21: an EMPTY version component is malformed too — "1..2" and
+# "1...0" passed the old shape gate (only the negated class was
+# checked), and sort -V ranks "1..2" between real releases, so a
+# ">=1..2" comparator HELD for real 1.x installs and warned
+# false-positive (measured). Every multi-dot spelling must fail safe;
+# the dotted control keeps discriminating (a class-wide rejection of
+# dots would break it). The versions are the measured sort -V ranks:
+# "1..2" sits between 1.0.216 and 2.0.11 — 2.0.11 makes >=1..2 HOLD
+# under the OLD gate (the false-positive warn), 1.1.0 does the same
+# for <=1...0; both arms discriminate, not just match.
+if advisory_range_holds 2.0.11 ">=1..2"; then
+    fail "range: multi-dot comparator (1..2) fails safe (outside) (#479 a F21)"
+else
+    pass "range: multi-dot comparator (1..2) fails safe (outside) (#479 a F21)"
+fi
+if advisory_range_holds 1.1.0 "<=1...0"; then
+    fail "range: multi-dot comparator (1...0) fails safe (outside) (#479 a F21)"
+else
+    pass "range: multi-dot comparator (1...0) fails safe (outside) (#479 a F21)"
+fi
+if advisory_range_holds 1.1.0 ".."; then
+    fail "range: bare dots comparator fails safe (outside) (#479 a F21)"
+else
+    pass "range: bare dots comparator fails safe (outside) (#479 a F21)"
+fi
+if advisory_range_holds 1.14.30 ">=1.14.30"; then
+    pass "range: dotted comparators still hold (control, #479 a F21)"
+else
+    fail "range: dotted comparators must keep working (#479 a F21)"
+fi
 
 # --- 4. shipped record shape ---------------------------------------------------------
 

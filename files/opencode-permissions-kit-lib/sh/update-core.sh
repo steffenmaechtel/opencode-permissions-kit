@@ -430,6 +430,12 @@ update_redeploy_project_roots() {
         for cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-handover.sh"; do
             if [ -f "$cand" ]; then
                 . "$cand"
+                # Worker lib path (#479 a F12, the install.sh twin):
+                # the scan worker re-sources the copy THIS run
+                # sourced — checkout copy first-wins, never a
+                # deployed-lib shadow.
+                OPK_DDEV_HANDOVER_LIB="$cand"
+                export OPK_DDEV_HANDOVER_LIB
                 break
             fi
         done
@@ -546,12 +552,12 @@ update_redeploy_project_roots() {
             # the same spellings; a nonexistent line may still be eaten
             # silently by an existence gate — docs/reference/files.md
             # names the nuance).
-            # Deliberate divergence, pinned in the unit suite (the
-            # uninstaller's documented divergence, uninstall-core.sh):
-            # the scratch prefixes /tmp and /var/tmp stay processable —
-            # unit fixtures live there by sandbox policy (nothing else
-            # the blocklist allows is creatable in a unit sandbox),
-            # and no sanctioned writer ever stores them.
+            # Deliberate residual, pinned in the unit suite (formerly
+            # the uninstaller's documented divergence, closed by
+            # #479 a F10): the scratch arms below screen /tmp and
+            # /var/tmp like the writer does — the unit-suite seam
+            # OPK_READER_TMP_ROOTS=1 re-opens them for the sandboxed
+            # fixtures (see the arms for the full rationale).
             case "$root" in
                 # #377 (review #370 a O1) + pr-00429 a A1: FHS-complete
                 # /var families — path-sane.sh parity.
@@ -567,6 +573,25 @@ update_redeploy_project_roots() {
                     continue
                     ;;
             esac
+            # Scratch-prefix arms (#479 a F10): the writer (path-sane.sh)
+            # refuses /tmp and /var/tmp; the readers used to leave them
+            # processable as a documented divergence (unit fixtures live
+            # there, no sanctioned writer ever stores them). A
+            # hand-edited or stale conf line pointing into the
+            # world-writable scratch prefixes reached the ROOT-run
+            # recursive group baseline — screen them like the writer
+            # now. The unit-suite seam OPK_READER_TMP_ROOTS=1 (the
+            # OPK_INSTALL_CONF test-seam pattern) re-opens them: the
+            # sandbox policy pins unit-fixture roots under /tmp and
+            # /var/tmp; nothing the kit ships ever sets the seam.
+            if [ "${OPK_READER_TMP_ROOTS:-}" != "1" ]; then
+                case "$root" in
+                    /tmp | /tmp/* | /var/tmp | /var/tmp/*)
+                        ui_warn "skip $root (scratch prefix — never a project root)"
+                        continue
+                        ;;
+                esac
+            fi
             if [ "$REFRESH" != true ] &&
                 ddev_handover_stamp_valid "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"; then
                 _ho_skip=$((_ho_skip + 1))

@@ -93,7 +93,13 @@ advisory_range_holds() {
                 ;;
         esac
         case "$_arh_cmp" in
-            '' | .* | *. | *[!0-9.]*) return 1 ;;
+            # #479 a F21: an empty version component is malformed too —
+            # "1..2" and "1...0" passed the old gate (only the negated
+            # class was checked) while sort -V ranks them between real
+            # releases, so a ">=1..2" comparator HELD for real 1.x
+            # installs and warned false-positive (measured). Any ".."
+            # means an empty component: reject, fail safe.
+            '' | .* | *. | *..* | *[!0-9.]*) return 1 ;;
         esac
         _arh_rel=$(advisories_version_cmp "$_arh_version" "$_arh_cmp")
         case "${_arh_op}_${_arh_rel}" in

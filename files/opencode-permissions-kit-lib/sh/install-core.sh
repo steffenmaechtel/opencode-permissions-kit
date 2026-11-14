@@ -2182,7 +2182,16 @@ do_deploy_phase() {
     # agent-owned destination; a link swapped in the window between the two
     # would disclose a root-readable file into the agent config.
     _oc_install_agent_config() {
-        _oic_tmp=$(mktemp) || return 1
+        # Named-cause mktemp guard (#479 a F18, the config.sh git-config
+        # #431 twin): install-core runs set -eu — a raw failure (dead
+        # TMPDIR, full /tmp) aborted the install with only mktemp's own
+        # diagnostic, the interrupted action unnamed. ui_error does not
+        # exit; return 1 keeps the rc contract of the propagation block
+        # below (#371 A4R).
+        _oic_tmp=$(mktemp) || {
+            ui_error "mktemp failed (is \$TMPDIR writable?) — agent config NOT deployed"
+            return 1
+        }
         _tmp_track "$_oic_tmp"
         _oic_mode=off
         [ "$SECURE_GIT_CONFIG" = true ] && _oic_mode=on

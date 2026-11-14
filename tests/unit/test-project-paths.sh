@@ -185,11 +185,15 @@ fi
 # #243 b X1): each reader's blocklist must equal the writer's set minus
 # its PINNED temp divergence — writer/reader drift redds here instead of
 # silently diverging (the O1 gap itself was exactly this drift: five
-# /var families present in none of them). update-core's root loop and
-# config's refresh process /tmp and /var/tmp (unit-fixture roots, the
-# documented #418 divergence); opk's handover additionally leaves /tmp
-# SUBpaths open (a temp build tree is a legitimate handover operand)
-# while keeping /tmp itself and /var/tmp blocked.
+# /var families present in none of them). #479 a F10 closed the former
+# /tmp + /var/tmp divergence for update-core's root loop and config's
+# refresh: the scratch arms ship inside the same functions now (the
+# seam-gated block contributes its /-leading arms to the extraction),
+# so those two sites pin the FULL writer set — the sandboxed fixtures
+# under /tmp and /var/tmp ride the OPK_READER_TMP_ROOTS=1 seam. opk's
+# handover keeps its own deliberate operand openness: /tmp SUBpaths
+# stay open (a temp build tree is a legitimate handover operand) while
+# /tmp itself and /var/tmp stay blocked.
 _LIBDIR="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib"
 # extract_func since #441 a A1 (strict col-0 site; the harness's
 # project-paths boundary citation covers the INDENT-tolerant extractor
@@ -206,8 +210,8 @@ _pp377_tokens() {
 }
 _PP377_WRITER=$(_pp377_arms "$PATH_SANE" project_path_sane)
 for _pp377_site in \
-    "sh/update-core.sh:update_redeploy_project_roots:/tmp /tmp/* /var/tmp /var/tmp/*" \
-    "management/config.sh:refresh:/tmp /tmp/* /var/tmp /var/tmp/*" \
+    "sh/update-core.sh:update_redeploy_project_roots:" \
+    "management/config.sh:refresh:" \
     "sh/handover-core.sh:_ho_np:/tmp/*"; do
     _pp377_file=${_pp377_site%%:*}
     _pp377_rest=${_pp377_site#*:}
@@ -236,7 +240,7 @@ for _pp377_site in \
     if [ -n "$_pp377_raw" ] && [ "$(_pp377_tokens "$_pp377_raw")" = "$_pp377_wset" ]; then
         pass "reader blocklist at writer parity: $_pp377_file (#377 O1)"
     else
-        fail "reader blocklist drift in $_pp377_file (expected writer set minus ${_pp377_div}) (#377 O1)"
+        fail "reader blocklist drift in $_pp377_file (expected writer set minus ${_pp377_div:-<nothing, full set>}) (#377 O1)"
     fi
 done
 

@@ -61,12 +61,23 @@ _FK_DIR=""
 # (fetch temps, wsl-browser-bridge rewrites) — the trap empties it on
 # every exit path (review 0.0.39e C3).
 _TMP_REGISTRY=""
-_tmp_track() { _TMP_REGISTRY="$_TMP_REGISTRY $1"; }
+# Newline-separated registry (#479 a F8): the old space-append fed an
+# unquoted `rm -f $_TMP_REGISTRY` — a TMPDIR containing whitespace split
+# every entry into wrong fragments and the root-owned 0600 scratch
+# leaked despite this very contract. cleanup rm's each entry as ONE
+# quoted operand below; a newline inside a path stays an accepted
+# residual (no mktemp template produces one).
+_tmp_track() {
+    _TMP_REGISTRY="${_TMP_REGISTRY}${1}
+"
+}
 cleanup() {
     if [ -n "${_FETCH_TREE:-}" ]; then rm -rf "$_FETCH_TREE"; fi
-    # word splitting intended: registry entries are mktemp paths
-    # shellcheck disable=SC2086
-    if [ -n "${_TMP_REGISTRY:-}" ]; then rm -f $_TMP_REGISTRY; fi
+    if [ -n "${_TMP_REGISTRY:-}" ]; then
+        printf '%s' "$_TMP_REGISTRY" | while IFS= read -r _cl_e; do
+            if [ -n "$_cl_e" ]; then rm -f "$_cl_e"; fi
+        done
+    fi
 }
 # A signal handler must EXIT: without it the interrupted script resumes
 # running after cleanup — with its scratch files already deleted
@@ -433,6 +444,11 @@ kit_source() {
 # The browser-bridge pair at the sourcing below is silent too —
 # guarded by its is_wsl rc-1 twin, see the comment there.
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-handover.sh"
+# Worker lib path (#479 a F12): ddev_handover_root's xargs worker
+# re-sources the lib — export the copy THIS run sourced (checkout or
+# fetched tree), never a deployed LIBDIR guess.
+OPK_DDEV_HANDOVER_LIB="$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-handover.sh"
+export OPK_DDEV_HANDOVER_LIB
 command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() {
     echo "error: ddev_handover_root unavailable (ddev-handover.sh incomplete) — the handover is not optional" >&2
     return 1

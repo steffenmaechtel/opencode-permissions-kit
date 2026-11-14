@@ -589,6 +589,122 @@ _ddev_components_sane() {
     return 0
 }
 
+# _dhr_entry_one <root> <user> <group> <dev> <entry>: processes ONE
+# scanned .ddev entry — verbatim the former scan-loop body (#479 a F12).
+# Hoisted into a function so the xargs worker in ddev_handover_root can
+# re-source this lib and drive it per entry: the operand stream between
+# find and the per-entry work is NUL-separated now (the fs-baseline
+# _fsb_pass / uninstall _un_revert_chown class sweep) — the former
+# newline stream split a directory name containing a newline AT the
+# newline and acted on the WRONG (prefix) directory: root handed the
+# agent ownership of an unselected subtree (in-tree only — the leaf +
+# component gates below still held). `return 0` where the loop body had
+# `continue`; every gate and op is the former body, comments included.
+_dhr_entry_one() {
+    dhr_root="${1:-}"
+    dhr_user="${2:-}"
+    dhr_group="${3:-}"
+    dhr_dev="${4:-}"
+    dhr_d="${5:-}"
+    # Consume-time leaf gate (roles split by the 0.0.45e W1 order
+    # swap; wording corrected for #215 / pr-00234 a W8 — it claimed
+    # to catch statically planted links at SCAN time): find's
+    # `-type d` keeps planted links out of the scan output entirely
+    # (find without -L never classifies a symlink as a directory) —
+    # what this [ -L ] catches is a leaf SWAPPED in the
+    # emit->consume window, re-tested per entry as the stream is
+    # consumed. The scanned trees are agent-group-writable
+    # (fs-baseline deeec30 pattern, 0.0.39g S2).
+    [ -L "$dhr_d" ] && return 0
+    # Exec-time component walk (#215; hoisted above the fast-path
+    # probe by pr-00234 a W1): re-test EVERY component between the
+    # scan root and the operand immediately before the iteration
+    # acts — a parent swapped since the scan resolves the operand
+    # outside the scan root, and chmod -R (which dereferences
+    # operands) would root-walk the swap target. The walk MUST run
+    # before the conform probe, not only before the pair: a swap
+    # victim's .ddev is exactly a top inode that already conforms
+    # (every previously handed-over project), and the settings
+    # pairs' own gates cannot catch a relocated project root —
+    # their resolved containment (0.0.42e S2 / 0.0.42f S1)
+    # canonicalizes BOTH sides through the swapped parent, so the
+    # victim stays "contained". A fired gate skips the WHOLE
+    # iteration: the dev-owned flag write and the project handovers
+    # below must not act through a swapped parent either. Skip !=
+    # failure (the leaf-skip semantics above), but announced: find
+    # never descends or prints through a link, so no legitimate
+    # tree trips this gate — a symlinked component can only be a
+    # swap. Class sweep boundary (#215): the ddev_devowned_flag
+    # write's own mid-write TOCTOU (0.0.46a F8, accepted residual)
+    # stays out of this gate's scope. Ceiling is caller-dependent
+    # (#506 a B6; security-model.md "Dev-owned flag write"): the
+    # opencode-uid caller (ddev-as-opencode) caps the effect at
+    # opencode privilege; THIS root-run scan performs the same
+    # write as root, where that cap does not apply.
+    if ! _ddev_components_sane "$dhr_root" "$dhr_d"; then
+        printf '%s\n' "  warn: skipping .ddev handover for $dhr_d — a path""\
+ component (parent or operand) is a symlink (swapped mid-scan?)" >&2
+        return 0
+    fi
+    # Top-inode fast path (issue #112): skip the recursive pair when
+    # the tree already conforms — the steady-state re-scan used to
+    # chown -R/chmod -R every .ddev on every update for nothing.
+    if _ddev_tree_conforms "$dhr_d" "$dhr_user" "$dhr_group"; then
+        :
+    else
+        # ORDER is direction-dependent (0.0.45c S4 / 0.0.45d W1 in
+        # bin/opk; this pair joined with 0.0.45e W1): dev->agent
+        # chmods FIRST, while the tree is still dev-owned — the
+        # agent cannot swap what it cannot write — and hands
+        # ownership over LAST (chown -R lchowns, never
+        # dereferences). The old chown-first order ran the walk
+        # over a just-re-owned, fully agent-writable tree: an entry
+        # swapped between the walk's scan and chmod is followed,
+        # root chmod g+w through it on an out-of-tree target.
+        # Inherent residual either way: write modes the agent
+        # pre-arranged (g+w from an earlier handover, o+w entries
+        # it created while owning the tree — modes on owned entries
+        # are owner-controlled) keep those subtrees agent-writable
+        # through the run; not closed by ordering. The walk above
+        # shrunk the swap window from scan length to gate->op
+        # length; a swap inside THAT window stays undetected (the
+        # mid-recheck below is leaf-only, defense-in-depth for the
+        # SECOND op, the chown hand-over — chown -R defaults to -P:
+        # lchowns, never traverses, 0.0.44a V24 — and it skips the
+        # hand-over echo for a swapped operand).
+        _dhr_ok=true
+        chmod -R g+w "$dhr_d" 2>/dev/null || _dhr_ok=false
+        [ -L "$dhr_d" ] && return 0
+        chown -R "$dhr_user:$dhr_group" "$dhr_d" 2>/dev/null || _dhr_ok=false
+        if [ "$_dhr_ok" = true ]; then
+            echo "  .ddev handover: $dhr_d -> $dhr_user"
+        else
+            # Best-effort stays (root context, self-heals on the next
+            # rescan) but the line must not claim a completed
+            # handover (#211 a F14).
+            echo "  warn: .ddev handover incomplete for $dhr_d (chmod/chown errors —""\
+ the next update rescans and heals)" >&2
+        fi
+    fi
+    dhr_p="$(dirname "$dhr_d")"
+    # Dev-owned mode (see file header): write the ddev flag first,
+    # then branch on the FLAG (per-project truth, mode-independent).
+    if ddev_devowned_enabled; then
+        ddev_devowned_flag "$dhr_p"
+    fi
+    if ddev_devowned_flagged "$dhr_p"; then
+        ddev_handover_project_back "$dhr_p" "$dhr_user" "$dhr_group" "$dhr_dev" "$dhr_root"
+    else
+        # The scan root rides along as the optional last argument
+        # (#266): the settings pairs AND the single-inode root ops
+        # re-run the component walk per operand against it — see
+        # their gates (#420 a A2 closed the root ops' gap).
+        ddev_handover_project "$dhr_p" "$dhr_user" "$dhr_group" "$dhr_root"
+        ddev_handover_project_root "$dhr_p" "$dhr_user" "$dhr_group" "$dhr_dev" "$dhr_root"
+    fi
+    return 0
+}
+
 # ddev_handover_root <root> <user> <group> [dev-user]
 # Hands every .ddev tree under <root> (any depth) plus the owning
 # project's ddev settings directories over to <user>:<group> with g+w.
@@ -644,105 +760,61 @@ ddev_handover_root() {
     # directory structure in a project, and a .ddev inside it is never a
     # project — ddev locates .ddev by walking UP from the cwd, and no
     # ddev command ever runs from inside .git/.
+    # NUL operand stream (#479 a F12, the fs-baseline _fsb_pass /
+    # uninstall _un_revert_chown class sweep): the former
+    # `-print | while IFS= read -r` was newline-based — a directory
+    # name containing a newline split at the newline and the loop
+    # acted on the WRONG (prefix) directory. The stream is staged
+    # NUL-separated into a temp file and consumed by an xargs -0
+    # worker that re-sources THIS lib via OPK_DDEV_HANDOVER_LIB (the
+    # path of the copy the sourcing entry sourced — this file is
+    # definitions-only, re-sourcing is side-effect free) and drives
+    # _dhr_entry_one per entry, the former loop body verbatim.
+    if [ -z "${OPK_DDEV_HANDOVER_LIB:-}" ] || [ ! -f "$OPK_DDEV_HANDOVER_LIB" ]; then
+        printf '%s\n' "  warn: OPK_DDEV_HANDOVER_LIB is unset or missing — the .ddev scan""\
+ worker cannot run for $dhr_root (broken kit pairing?)" >&2
+        return 1
+    fi
+    # Named-cause mktemp guard (#431 B4 class, the #479 a F18 family):
+    # callers run set -eu — a raw failure aborts with only mktemp's own
+    # diagnostic, the interrupted scan unnamed. Loud warn + rc 1 (the
+    # entry stubs' refuse-loud contract); the next update rescans.
+    _dhr_nul="$(mktemp "${TMPDIR:-/tmp}/opk-dhr-scan.XXXXXXXX")" || {
+        printf '%s\n' "  warn: mktemp failed (is \$TMPDIR writable?) — cannot stage the""\
+ .ddev scan stream, handover scan refused for $dhr_root" >&2
+        return 1
+    }
+    if command -v _tmp_track >/dev/null 2>&1; then
+        _tmp_track "$_dhr_nul"
+    fi
+    # find's rc tracked (0.0.43b W4 shape, the _fsb_pass twin): a find
+    # that died wholesale left an empty/partial stream the consumer
+    # no-ops green on — warn honest below; entries self-heal on the
+    # next rescan. The per-entry work still never fails the pass
+    # (best-effort idempotent, the file-header contract).
+    _dhr_frc=0
     find "$dhr_root" -type d \( -name vendor -o -name node_modules -o -name testdata -o -name .git \) -prune -o \
-        -type d -name .ddev -prune -print 2>/dev/null | while IFS= read -r dhr_d; do
-        # Consume-time leaf gate (roles split by the 0.0.45e W1 order
-        # swap; wording corrected for #215 / pr-00234 a W8 — it claimed
-        # to catch statically planted links at SCAN time): find's
-        # `-type d` keeps planted links out of the scan output entirely
-        # (find without -L never classifies a symlink as a directory) —
-        # what this [ -L ] catches is a leaf SWAPPED in the
-        # emit->consume window, re-tested per entry as the stream is
-        # consumed. The scanned trees are agent-group-writable
-        # (fs-baseline deeec30 pattern, 0.0.39g S2).
-        [ -L "$dhr_d" ] && continue
-        # Exec-time component walk (#215; hoisted above the fast-path
-        # probe by pr-00234 a W1): re-test EVERY component between the
-        # scan root and the operand immediately before the iteration
-        # acts — a parent swapped since the scan resolves the operand
-        # outside the scan root, and chmod -R (which dereferences
-        # operands) would root-walk the swap target. The walk MUST run
-        # before the conform probe, not only before the pair: a swap
-        # victim's .ddev is exactly a top inode that already conforms
-        # (every previously handed-over project), and the settings
-        # pairs' own gates cannot catch a relocated project root —
-        # their resolved containment (0.0.42e S2 / 0.0.42f S1)
-        # canonicalizes BOTH sides through the swapped parent, so the
-        # victim stays "contained". A fired gate skips the WHOLE
-        # iteration: the dev-owned flag write and the project handovers
-        # below must not act through a swapped parent either. Skip !=
-        # failure (the leaf-skip semantics above), but announced: find
-        # never descends or prints through a link, so no legitimate
-        # tree trips this gate — a symlinked component can only be a
-        # swap. Class sweep boundary (#215): the ddev_devowned_flag
-        # write's own mid-write TOCTOU (0.0.46a F8, accepted residual)
-        # stays out of this gate's scope. Ceiling is caller-dependent
-        # (#506 a B6; security-model.md "Dev-owned flag write"): the
-        # opencode-uid caller (ddev-as-opencode) caps the effect at
-        # opencode privilege; THIS root-run scan performs the same
-        # write as root, where that cap does not apply.
-        if ! _ddev_components_sane "$dhr_root" "$dhr_d"; then
-            printf '%s\n' "  warn: skipping .ddev handover for $dhr_d — a path""\
- component (parent or operand) is a symlink (swapped mid-scan?)" >&2
-            continue
-        fi
-        # Top-inode fast path (issue #112): skip the recursive pair when
-        # the tree already conforms — the steady-state re-scan used to
-        # chown -R/chmod -R every .ddev on every update for nothing.
-        if _ddev_tree_conforms "$dhr_d" "$dhr_user" "$dhr_group"; then
-            :
-        else
-            # ORDER is direction-dependent (0.0.45c S4 / 0.0.45d W1 in
-            # bin/opk; this pair joined with 0.0.45e W1): dev->agent
-            # chmods FIRST, while the tree is still dev-owned — the
-            # agent cannot swap what it cannot write — and hands
-            # ownership over LAST (chown -R lchowns, never
-            # dereferences). The old chown-first order ran the walk
-            # over a just-re-owned, fully agent-writable tree: an entry
-            # swapped between the walk's scan and chmod is followed,
-            # root chmod g+w through it on an out-of-tree target.
-            # Inherent residual either way: write modes the agent
-            # pre-arranged (g+w from an earlier handover, o+w entries
-            # it created while owning the tree — modes on owned entries
-            # are owner-controlled) keep those subtrees agent-writable
-            # through the run; not closed by ordering. The walk above
-            # shrunk the swap window from scan length to gate->op
-            # length; a swap inside THAT window stays undetected (the
-            # mid-recheck below is leaf-only, defense-in-depth for the
-            # SECOND op, the chown hand-over — chown -R defaults to -P:
-            # lchowns, never traverses, 0.0.44a V24 — and it skips the
-            # hand-over echo for a swapped operand).
-            _dhr_ok=true
-            chmod -R g+w "$dhr_d" 2>/dev/null || _dhr_ok=false
-            [ -L "$dhr_d" ] && continue
-            chown -R "$dhr_user:$dhr_group" "$dhr_d" 2>/dev/null || _dhr_ok=false
-            if [ "$_dhr_ok" = true ]; then
-                echo "  .ddev handover: $dhr_d -> $dhr_user"
-            else
-                # Best-effort stays (root context, self-heals on the next
-                # rescan) but the line must not claim a completed
-                # handover (#211 a F14).
-                echo "  warn: .ddev handover incomplete for $dhr_d (chmod/chown errors —""\
- the next update rescans and heals)" >&2
-            fi
-        fi
-        dhr_p="$(dirname "$dhr_d")"
-        # Dev-owned mode (see file header): write the ddev flag first,
-        # then branch on the FLAG (per-project truth, mode-independent).
-        if ddev_devowned_enabled; then
-            ddev_devowned_flag "$dhr_p"
-        fi
-        if ddev_devowned_flagged "$dhr_p"; then
-            ddev_handover_project_back "$dhr_p" "$dhr_user" "$dhr_group" "$dhr_dev" "$dhr_root"
-        else
-            # The scan root rides along as the optional last argument
-            # (#266): the settings pairs AND the single-inode root ops
-            # re-run the component walk per operand against it — see
-            # their gates (#420 a A2 closed the root ops' gap).
-            ddev_handover_project "$dhr_p" "$dhr_user" "$dhr_group" "$dhr_root"
-            ddev_handover_project_root "$dhr_p" "$dhr_user" "$dhr_group" "$dhr_dev" "$dhr_root"
-        fi
-    done
+        -type d -name .ddev -prune -print0 2>/dev/null >"$_dhr_nul" || _dhr_frc=$?
+    if [ "$_dhr_frc" -ne 0 ]; then
+        printf '%s\n' "  warn: the .ddev scan under $dhr_root exited rc=$_dhr_frc — the""\
+ pass may be incomplete (the next update rescans and heals)" >&2
+    fi
+    _dhr_xrc=0
+    xargs -0 -r -n1 sh -c '
+        # $1..$4: root, user, group, dev; $5: one NUL-delimited entry.
+        # Re-source fails only for a lib vanishing mid-run (guarded
+        # above) — announce, do not fail the batch (best-effort).
+        . "$OPK_DDEV_HANDOVER_LIB" || {
+            echo "  warn: cannot re-source $OPK_DDEV_HANDOVER_LIB — .ddev entry skipped" >&2
+            exit 0
+        }
+        _dhr_entry_one "$1" "$2" "$3" "$4" "$5"
+    ' _ "$dhr_root" "$dhr_user" "$dhr_group" "$dhr_dev" <"$_dhr_nul" || _dhr_xrc=$?
+    rm -f "$_dhr_nul"
+    if [ "$_dhr_xrc" -ne 0 ]; then
+        printf '%s\n' "  warn: a .ddev scan worker exited rc=$_dhr_xrc — the pass may""\
+ be incomplete (the next update rescans and heals)" >&2
+    fi
     return 0
 }
 

@@ -32,9 +32,10 @@ asks before removing the kit block; your own entries always stay.
   written by install and `opk config` only: every consumer that runs
   root operations over the roots (`opk update`, `opk config refresh`,
   `opk uninstall`) re-validates each line reader-side and skips
-  malformed entries, system paths and the agent home loudly — a
-  hand-edited line cannot drive the recursive group baseline over
-  system trees. (A line naming a path that does NOT exist is skipped
+  malformed entries, system paths, the scratch prefixes (`/tmp`,
+  `/var/tmp`) and the agent home loudly — a hand-edited line cannot
+  drive the recursive group baseline over system or scratch trees.
+  (A line naming a path that does NOT exist is skipped
   silently by the existence gates before the loud arms — the safety
   property is the refusal, not the volume.)
 - `handover/` holds one root-owned file per project root recording the
