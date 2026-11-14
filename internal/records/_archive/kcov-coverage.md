@@ -1,8 +1,14 @@
 # kcov coverage over the unit suites — spike findings + runner design
 
-> Status: **CURRENT** — line-coverage report over the unit suites
-> (`make coverage`): runner rules, measured dead ends, digest-bump
-> checklist. Issue #255 stage 0b, 2026-11-01.
+> Status: **ARCHIVED (removed 2026-11-14)** — the kcov coverage setup was
+> removed from the working tree (issue #486 decision): runner
+> (`scripts/coverage.sh`), CI coverage job, pin suite
+> (`tests/unit/test-coverage.sh`), `make coverage`. This record survives
+> for its measured dead ends (do not re-try them), the removal decision
+> and its research, and the re-entry options. The COMPLETE working setup
+> at removal time is snapshotted by the `kcov-coverage-corpus` tag —
+> cite the tag, not the tree: `git show kcov-coverage-corpus:scripts/coverage.sh`.
+> Born as issue #255 stage 0b, 2026-11-01.
 
 `make coverage` (`scripts/coverage.sh`, CI job `coverage` in
 `test-unit.yml`) runs every unit suite under kcov and publishes a merged
@@ -10,13 +16,62 @@ line-coverage report over `files/` + `scripts/` — the review surface. This
 record holds what the spike measured, every dead end (so they are not
 re-tried), and the rules the runner encodes.
 
-## Verdict
+## Verdict (2026-11-01, at adoption)
 
 Adopted. Coverage made "pins discriminate" (#255's goal) measurable and
 immediately named real review hotspots: `management/update.sh` 20%,
 `management/status.sh` 8%, `sh/ddev-terminal.sh` 51%, `sh/ddev-handover.sh`
 82% vs `sh/ui.sh` 95%. The report is a review ARTIFACT — nothing gates on a
 percentage (stage 0b explicitly; a ratchet would need its own decision).
+
+## Removal decision (2026-11-14, issue #486) — research summary
+
+Removed because the method's recurring cost outran its prio:info value.
+The coverage run is a **different environment** than the unit run (bash via
+the sh→bash shim, PS4 tracing, signal→rc-1 mapping), so green unit runs
+reddened under it and every new suite could hit a new divergence. Evidence
+log with the full history and the PR #493 timeline (unit green + coverage
+red on the same commit, run 43433087257; rework reached shipped code):
+issue #486. Research outcome — no smooth kcov path exists:
+
+- **Upstream bug unfixed since Feb 2018**: the PS4-vs-`set -u` collision is
+  kcov issue #236 ("BASH_SOURCE: unbound variable"), still open; no PR.
+  A patch commit existed only in a since-deleted fork (Aug 2026,
+  "Patch kcov's PS4 helper to survive `set -u`" — 404 now). The fix itself
+  is trivial (a `${BASH_SOURCE:-fallback}` in PS4) but unreleased.
+- **No option addresses it**: `PS4='kcov@${BASH_SOURCE}@${LINENO}@'` is
+  hardcoded in `src/engines/bash-helper.sh`; the helper is embedded in the
+  binary (written to the out dir at runtime). Latest stable v43 (2024-07)
+  and v44-pre-test3 (2026-01) both carry the bare PS4. `--bash-method=DEBUG`
+  and `--bash-handle-sh-invocation` are measured dead ends (see "Dead ends"
+  below).
+- **The other half is method-inherent, unfixable by ANY bash-tracing
+  tool**: PS4 tracing requires bash, so dash semantics tested by the
+  suites (e.g. `command -v` on non-executable PATH files, PR #493) always
+  diverge under the shim; signal-death→rc-1 mapping is engine logic.
+- **Forks/alternatives**: active kcov "forks" are mirror syncs; bashcov is
+  bash-only/main-script-only and dormant; shcov is dead (~2012); shellspec
+  wraps kcov for coverage (same engine) and would be a full test rewrite.
+
+**Re-entry options (a conscious new decision, not a restoration):**
+(a) a self-built patched kcov (PS4 fallback) — fixes only the shield class,
+still leaves the shim-divergence class; (b) a DIY mini-tracer (~100 lines:
+BASH_ENV prelude with `PS4='+OPK@${BASH_SOURCE:-?}@${LINENO}@'`,
+BASH_XTRACEFD to a per-suite log, python post-processing) — no LD_PRELOAD
+(real signal rcs), no sh shim needed (dash children run under real dash —
+the #493 class disappears, they are simply untraced), no set-u collision
+by construction. Neither was built: prio:info does not carry tool
+maintenance.
+
+Removal scope: CI job + pin-suite step (`test-unit.yml`), `make coverage`
++ `make test-coverage` (Makefile), `scripts/coverage.sh`,
+`tests/unit/test-coverage.sh`, the record you are reading (moved to
+`_archive/`). Deferred to the follow-up issue: the 7 PS4 shield lines in
+4 suites and the `OPK_KCOV_RUN` skip in `test-fs-baseline.sh` (harmless
+without kcov — the marker is never set — to be removed there for
+dead-code hygiene).
+Issue #490 (skip coverage on docs-only diffs) became moot and was closed
+wontfix.
 
 ## Baseline numbers (2026-11-01, 41/42 suites, host run)
 

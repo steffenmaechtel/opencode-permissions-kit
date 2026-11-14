@@ -29,11 +29,14 @@ archive).
 | [review-independence.md](review-independence.md) | redundancy context: external reviewer checkout | CURRENT |
 | [rules-meta.md](rules-meta.md) | rule-rationale system: metas, revisit ladder, audit invariants | CURRENT |
 | [review-calibration.md](review-calibration.md) | review-process history: calibration + incident evidence | CURRENT |
-| [kcov-coverage.md](kcov-coverage.md) | line-coverage report: runner rules, spike dead ends | CURRENT |
 | [cross-lib-pairing-guards.md](cross-lib-pairing-guards.md) | two-tier skew guards | CURRENT |
 
 Superseded and purely historical records live in
 [_archive/](_archive/) — `design/` (pre-streamline records),
-`security/` (the three proof write-ups), and `evaluations/` (third-party
+`security/` (the three proof write-ups), `evaluations/` (third-party
 tool assessments from issues #40/#41: verdicts that mattered flowed
-into the records above; the rest is kept as an information collection).
+into the records above; the rest is kept as an information collection),
+and the archive root (`kcov-coverage.md` — the coverage era's record,
+kept for its measured dead ends and the 2026-11 removal decision,
+issue #486; the `kcov-coverage-corpus` tag snapshots the complete
+working setup at removal time).

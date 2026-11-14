@@ -146,7 +146,7 @@ outgrows it, the candidates in the shell-testing ecosystem:
 - **shellspec** — BDD framework for dash/bash/all POSIX shells with
   first-class **command-based mocks** (`Mock` directive), a `--sandbox`
   mode that forces mocks over real commands, a `Data` directive for
-  stdin control, parameterized examples, parallel runs, kcov coverage.
+  stdin control, parameterized examples, parallel runs.
   The mock/sandbox model directly addresses double fidelity — but a
   framework alone does not fix fidelity; the behavioral lessons above
   apply in any framework.
