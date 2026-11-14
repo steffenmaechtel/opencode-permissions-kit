@@ -23,6 +23,16 @@ import json
 import re
 import sys
 
+# Output side of the same locale pin (#485 F22): deny patterns are paths
+# and can carry non-ASCII, and under a 7-bit locale stdout (strict error
+# handler) would become the choke point the reads just stopped being —
+# printing a non-ASCII pattern used to die with UnicodeEncodeError.
+# stderr needs no pin: its default error handler (backslashreplace)
+# never raises. The hasattr guard keeps embedded imports (tui-register's
+# spec loader) safe when stdout is not a reconfigurable stream.
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+
 # Candidate commands used to detect a broad docker/ddev allow in the project's
 # own permission.bash. Invocations ("docker ps", "ddev start") mirror real
 # usage; bare names ("docker", "ddev") only count via an exact pattern like
@@ -112,10 +122,17 @@ def read_config(config_path):
     """Read the raw config text. "-" means stdin, so callers can pipe in
     `opencode debug config` output — plain JSON whose object key order
     (json.loads preserves insertion order) carries the merged global +
-    project rule order that last-match-wins evaluation needs."""
+    project rule order that last-match-wins evaluation needs.
+
+    Both paths decode UTF-8 EXPLICITLY (#485 F22): the platform default
+    is locale-dependent, and on a 7-bit-locale host (PYTHONUTF8=0 and
+    PYTHONCOERCECLOCALE=0, or an exotic non-C locale) any non-ASCII
+    config used to raise UnicodeDecodeError here — which escaped
+    load_config's except arms as a raw traceback. doctor-core.sh's
+    embedded python already pinned encoding="utf-8"; this matches it."""
     if config_path == '-':
-        return sys.stdin.read()
-    with open(config_path, 'r') as f:
+        return sys.stdin.buffer.read().decode('utf-8')
+    with open(config_path, 'r', encoding='utf-8') as f:
         return f.read()
 
 
@@ -125,11 +142,16 @@ def load_config(config_path):
     try/except — the kind of twin that diverges silently); exits with a
     diagnostic on unreadable files and invalid JSON (a missing/unreadable
     config used to surface as a raw OSError traceback while parse errors
-    got the polished message — 0.0.39g Q4)."""
+    got the polished message — 0.0.39g Q4) and on undecodable bytes —
+    UnicodeDecodeError is a ValueError sibling of JSONDecodeError that
+    used to escape these arms (#485 F22)."""
     try:
         return json.loads(strip_jsonc_comments(read_config(config_path)))
     except OSError as e:
         print(f"Error reading {config_path}: {e}", file=sys.stderr)
+        sys.exit(1)
+    except UnicodeDecodeError as e:
+        print(f"Error decoding {config_path} as UTF-8: {e}", file=sys.stderr)
         sys.exit(1)
     except json.JSONDecodeError as e:
         print(f"Error parsing {config_path}: {e}", file=sys.stderr)

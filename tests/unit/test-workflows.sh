@@ -210,6 +210,81 @@ else
     fail "Makefile chain layout: unwrapped or multi-name lines:$_layout_bad"
 fi
 
+# --- make help <-> .PHONY parity (#476 rot class, pinned per #485 F27) ------
+# PR #477 made `make help` echo every .PHONY target but shipped no pin:
+# the #476 rot class (targets without a help line, 20 at the time) can
+# silently reopen, and `help` itself was absent from its own list.
+# Derivation-based, no hand-maintained list: the .PHONY block feeds the
+# expected set, the LIVE `make help` output the actual set. Both
+# directions compared -- a .PHONY target without a help line AND a help
+# line naming a non-.PHONY target redden.
+_phony_list() {
+    awk '
+        /^\.PHONY:/ {
+            _in = 1; _cont = ($0 ~ /\\$/)
+            sub(/^\.PHONY:[ \t]*/, ""); sub(/\\$/, "")
+            gsub(/^[ \t]+|[ \t]+$/, "")
+            if (length($0)) print
+            if (!_cont) _in = 0
+            next
+        }
+        _in && /^\t/ { _in = 0 }
+        _in {
+            _cont = ($0 ~ /\\$/)
+            sub(/\\$/, "")
+            gsub(/^[ \t]+|[ \t]+$/, "")
+            if (length($0)) print
+            if (!_cont) _in = 0
+        }
+    ' "$1"
+}
+TMP_PHONY="$(work_new_file)" || {
+    echo "workflows tests: scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
+TMP_HELP="$(work_new_file)" || {
+    echo "workflows tests: scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
+_phony_list "$REPO/Makefile" | sort >"$TMP_PHONY"
+make -C "$REPO" --no-print-directory help 2>/dev/null |
+    sed -n 's/^  make \([A-Za-z0-9._-]*\).*/\1/p' | sort -u >"$TMP_HELP"
+_help_missing="$(comm -23 "$TMP_PHONY" "$TMP_HELP")"
+_help_extra="$(comm -13 "$TMP_PHONY" "$TMP_HELP")"
+if [ -z "$_help_missing" ] && [ -z "$_help_extra" ]; then
+    pass "make help lists exactly the .PHONY targets, both directions (#485 F27)"
+else
+    fail "make help <-> .PHONY drift (#485 F27):"
+    [ -n "$_help_missing" ] && printf '         no help line: %s\n' "$(printf '%s ' $_help_missing)"
+    [ -n "$_help_extra" ] && printf '         help for non-.PHONY: %s\n' "$(printf '%s ' $_help_extra)"
+fi
+
+# --- check-py scope is disk-derived (#485 F29) -------------------------------
+# check-py's py-file list used to be hand-maintained (2 entries) and
+# pinned by nothing -- the rot class the shell gate's disk derivation
+# killed ("had silently dropped seven shipped scripts"). The scope is
+# derived from disk now; these pins hold the derivation shape, the
+# vacuous-pass guard (`python3 -m py_compile` with zero operands exits
+# 0) and -- behaviorally -- that the derivation actually resolves to
+# every shipped py script (make -n prints the expanded recipe).
+check_live "Makefile: check-py scope derived from disk (find over py/, #485 F29)" "$REPO/Makefile" \
+    -qF "CHECK_PY_FILES = \$(shell find files/opencode-permissions-kit-lib/py -type f -name '*.py' | sort)"
+check_live "Makefile: check-py runs py_compile over the derived list (#485 F29)" "$REPO/Makefile" \
+    -qF 'python3 -m py_compile $(CHECK_PY_FILES)'
+check_live "Makefile: check-py fails loud on an empty derivation (#485 F29)" "$REPO/Makefile" \
+    -qF 'test -n "$(CHECK_PY_FILES)"'
+_cpy_recipe="$(make -C "$REPO" --no-print-directory -n check-py 2>/dev/null || true)"
+_cpy_missing=""
+for _cpy_f in "$REPO"/files/opencode-permissions-kit-lib/py/*.py; do
+    printf '%s\n' "$_cpy_recipe" | grep -qF -- "${_cpy_f#"$REPO"/}" ||
+        _cpy_missing="$_cpy_missing $(basename "$_cpy_f")"
+done
+if [ -z "$_cpy_missing" ] && [ -n "$_cpy_recipe" ]; then
+    pass "check-py: the derived scope resolves to every shipped py script (make -n, #485 F29)"
+else
+    fail "check-py: derived scope misses:$_cpy_missing (recipe empty: $([ -z "$_cpy_recipe" ] && echo yes))"
+fi
+
 # Behavioral pin of the command-position rule itself (0.0.42e C2): an
 # argument-position .sh on a run: line must NOT count as executed.
 _FAKEWF="$(work_new_file)" || {
@@ -378,6 +453,21 @@ if [ "$_n_latest" = 1 ] && [ "$_n_distro" = 1 ]; then
     pass "git channel values appear exactly once each (latest + distro, git pair only)"
 else
     fail "git channel value counts off (latest:$_n_latest, distro:$_n_distro — expected 1/1)"
+fi
+
+# --- OLD-version cache-key extraction fails loud (#485 F25) ---------------
+# The sed feeding the e2e cache keys is 5x-duplicated in this file and
+# shape-pinned to lib.sh's E2E_OLD_VERSION default line: drift there
+# used to yield an EMPTY value -- silently cold OLD-binary caches,
+# nothing red. Every one of the 5 lanes now anchored-validates the
+# extraction (the version-resolution steps' ::error:: shape); the count
+# pin keeps all five copies guarded as lanes are added or renamed.
+# Comment-stripped: a commented-out validation must stop counting.
+_ov_e2e=$(live_src "$WF_E2E" | grep -c '::error::E2E_OLD_VERSION extraction' || true)
+if [ "$_ov_e2e" = 5 ]; then
+    pass "test-e2e.yml: all 5 lanes validate the OLD_VERSION cache-key extraction (#485 F25)"
+else
+    fail "test-e2e.yml: OLD_VERSION extraction validation on $_ov_e2e of 5 lanes (#485 F25)"
 fi
 
 # --- outage-wave CI hardening (2026-11-11; pins owed by issue #467) -----------

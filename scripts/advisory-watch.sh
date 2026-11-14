@@ -174,7 +174,14 @@ while IFS='|' read -r ID SEVERITY RANGES PATCHED SUMMARY URL; do
     # advisory with drifted upstream fields would otherwise redden the
     # daily watch although the tracking issue exists and no argv/query
     # field beyond the charset-gated id is ever used.
-    TRACKED=$(gh issue list -R "$GITHUB_REPOSITORY" --state all --search "$ID in:title" --json number --jq 'length' 2>/dev/null || echo 0)
+    # Fail-loud probe (#485 F26): the old `|| echo 0` read a transient
+    # gh failure as "not tracked" — a duplicate tracking issue was
+    # opened and the run exited green. The probe dies instead; the
+    # one-duplicate window only ever existed between this probe and the
+    # create below, and a create failure already dies loud.
+    TRACKED=$(gh issue list -R "$GITHUB_REPOSITORY" --state all --search "$ID in:title" \
+        --json number --jq 'length') ||
+        die "gh issue list failed for '$ID' — cannot establish tracking status, refusing to guess not-tracked (#485 F26)"
     if [ "$TRACKED" -gt 0 ] 2>/dev/null; then
         say "$ID already tracked (issue exists) — ok"
         continue

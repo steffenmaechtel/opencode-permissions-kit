@@ -139,6 +139,99 @@ check_live "e2e_resolve_cache uses e2e_fetch_opencode" "$LIB" \
 check_live "e2e_fetch_old uses e2e_fetch_opencode" "$LIB" \
     -q 'e2e_fetch_opencode "\$OLD_VERSION"'
 
+# --- installer cache validation + atomic fetch (#485 F30) ----------------------
+# The cached installer used to be probed with `[ ! -f ]` only and
+# fetched DIRECTLY to the final name: a mid-transfer curl death left a
+# partial install.sh in tests/e2e/cache — persisted via actions/cache,
+# propagated across version bumps by restore-key prefixes, recurring
+# false reds, no self-heal (the binary path was already guarded).
+check_live "lib.sh probes the cached installer with -s, not just -f (#485 F30)" "$LIB" \
+    -qF '[ ! -s "$OC_INSTALLER" ]'
+check_live "lib.sh fetches the installer to a temp name first (#485 F30)" "$LIB" \
+    -qF -- '-o "$_oc_ins_tmp"'
+check_live "lib.sh moves the fetched installer into place atomically (#485 F30)" "$LIB" \
+    -qF 'mv -f "$_oc_ins_tmp" "$OC_INSTALLER"'
+
+# Behavioral drive of the real e2e_resolve_cache against a fake curl:
+# the lib copy's OC_CACHE_DIR is rewritten into scratch (the ONE
+# rewrite; everything else runs verbatim), a pinned E2E_OC_VERSION
+# skips network resolution, and the primary binary is pre-seeded so the
+# installer fetch is the only download. The child runs with cwd INSIDE
+# the scratch dir: lib.sh's EXIT trap dumps failure evidence relative
+# to $0, which must never touch the repo tree (sandbox policy).
+INSTWORK="$(work_new)" || {
+    echo "e2e-sources tests: scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
+mkdir -p "$INSTWORK/cache/opencode-1.18.15" "$INSTWORK/bin" "$INSTWORK/proj"
+printf '#!/bin/sh\n' >"$INSTWORK/cache/opencode-1.18.15/opencode"
+chmod +x "$INSTWORK/cache/opencode-1.18.15/opencode"
+sed "s|OC_CACHE_DIR=\"\$SCRIPT_DIR/cache\"|OC_CACHE_DIR=\"$INSTWORK/cache\"|" "$LIB" >"$INSTWORK/lib.sh"
+if ! grep -qF "OC_CACHE_DIR=\"$INSTWORK/cache\"" "$INSTWORK/lib.sh"; then
+    fail "installer-cache drive: the OC_CACHE_DIR rewrite did not apply (lib.sh shape drifted?)"
+else
+    cat >"$INSTWORK/bin/curl" <<'INSTCURL'
+#!/bin/sh
+# fake curl, switched by FAKE_CURL_MODE; the download target is the
+# argument after -o (lib.sh puts -o LAST on the installer fetch):
+#   good    -> a complete installer
+#   partial -> three bytes, then transfer death (exit 1)
+_t=""
+_prev=""
+for _a in "$@"; do
+    [ "$_prev" = "-o" ] && _t="$_a"
+    _prev="$_a"
+done
+case "${FAKE_CURL_MODE:-good}" in
+    good) printf '#!/bin/sh\necho "fake installer v1"\n' >"$_t" ;;
+    partial) printf 'par' >"$_t"; exit 1 ;;
+    *) exit 1 ;;
+esac
+INSTCURL
+    chmod +x "$INSTWORK/bin/curl"
+    _inst_drive() { # $1 = FAKE_CURL_MODE; prints nothing, rc is the verdict
+        (
+            cd "$INSTWORK" || exit 99
+            E2E_OC_VERSION=1.18.15 TMP_PROJECT="$INSTWORK/proj" \
+                FAKE_CURL_MODE="$1" PATH="$INSTWORK/bin:$PATH" \
+                sh -c '. "$1"; e2e_resolve_cache' _ "$INSTWORK/lib.sh" 2>/dev/null
+        )
+    }
+    _rc=0
+    _inst_drive good >/dev/null || _rc=$?
+    if [ "$_rc" -eq 0 ] && [ -s "$INSTWORK/cache/install.sh" ] &&
+        ! grep -q 'fake installer v1' /dev/null false 2>/dev/null; then
+        if grep -q 'fake installer v1' "$INSTWORK/cache/install.sh"; then
+            pass "installer cache: complete fetch lands atomically (good path, #485 F30)"
+        else
+            fail "installer cache: good-path install.sh has wrong content (#485 F30)"
+        fi
+    else
+        fail "installer cache: good-path fetch failed (rc=$_rc, install.sh present: $([ -s "$INSTWORK/cache/install.sh" ] && echo yes))"
+    fi
+    rm -f "${INSTWORK:?}/cache/install.sh"
+    _rc=0
+    _inst_drive partial >/dev/null || _rc=$?
+    _ins_tmp_leftover="$(find "$INSTWORK/cache" -name 'install.sh.tmp.*' 2>/dev/null || true)"
+    if [ "$_rc" -ne 0 ] && [ ! -e "$INSTWORK/cache/install.sh" ] &&
+        [ -z "$_ins_tmp_leftover" ]; then
+        pass "installer cache: mid-transfer death leaves NO partial install.sh and no temp (#485 F30)"
+    else
+        fail "installer cache: partial fetch visible at the final name (rc=$_rc, install.sh: $([ -e "$INSTWORK/cache/install.sh" ] && echo left) tmp:$_ins_tmp_leftover)"
+    fi
+    # a zero-byte leftover from an interrupted pre-fix run refetches
+    # (the -s probe, not just -f)
+    : >"$INSTWORK/cache/install.sh"
+    _rc=0
+    _inst_drive good >/dev/null || _rc=$?
+    if [ "$_rc" -eq 0 ] && grep -q 'fake installer v1' "$INSTWORK/cache/install.sh"; then
+        pass "installer cache: an empty cached installer refetches (-s probe, #485 F30)"
+    else
+        fail "installer cache: empty cached installer treated as fresh (rc=$_rc)"
+    fi
+fi
+rm -rf "$INSTWORK"
+
 # --- rate-limit resilience (CI crash 2026-09-25: api.github.com 60 req/h
 # per IP on shared runners killed the ddev-2x job at version resolution) ---
 RUN_DDEV="$(cd "$(dirname "$0")/../e2e" && pwd)/run-ddev.sh"

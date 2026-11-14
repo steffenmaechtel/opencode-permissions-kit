@@ -423,13 +423,24 @@ e2e_resolve_cache() {
     # reserved for install.sh's real bootstrap (fresh machines, no binary
     # yet); flip this only if the v1 URL ever dies upstream.
     OC_INSTALLER="$OC_CACHE_DIR/install.sh"
-    if [ ! -f "$OC_INSTALLER" ]; then
+    # #485 F30: the probe checks -s (a zero-byte leftover from an
+    # interrupted older run refetches instead of passing) and the fetch
+    # is ATOMIC (temp + mv, the binary path's shape): curl writing the
+    # destination directly used to leave a PARTIAL install.sh behind on
+    # a mid-transfer death — persisted via actions/cache and propagated
+    # across version bumps by restore-key prefixes, recurring false
+    # reds with no self-heal. A partial temp never becomes install.sh;
+    # the rm keeps a failed run from littering the cache dir.
+    if [ ! -s "$OC_INSTALLER" ]; then
+        local _oc_ins_tmp="$OC_INSTALLER.tmp.$$"
         curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 60 \
-            https://opencode.ai/install -o "$OC_INSTALLER" ||
+            https://opencode.ai/install -o "$_oc_ins_tmp" ||
             {
+                rm -f "$_oc_ins_tmp"
                 echo "  ${RED}FAIL${NC}  cannot fetch opencode installer"
                 exit 1
             }
+        mv -f "$_oc_ins_tmp" "$OC_INSTALLER"
     fi
 
     echo "  Using opencode $OC_VERSION (cache: $OC_BIN)"

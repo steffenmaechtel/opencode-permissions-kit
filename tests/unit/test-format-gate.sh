@@ -250,9 +250,19 @@ if [ -d "$_isf" ]; then
     fi
     # positive arm (review b D2): a succeeding stub (its own PATH dir --
     # the recipe resolves plain `curl`) downloads a working "shfmt"; the
-    # recipe must run it through the --version probe and install it INTO
-    # the override dir; a stale .shfmt.tmp.* orphan there must be swept
-    # (review b D7).
+    # recipe must run it through the digest gate (#485 F28: the stub's
+    # own digest is passed as the platform's SHFMT_SHA256_* override --
+    # plain make variables, so the command line wins over the file pin
+    # without weakening the real gate) and the --version probe, and
+    # install it INTO the override dir; a stale .shfmt.tmp.* orphan
+    # there must be swept (review b D7).
+    _isf_plat=""
+    case "$(uname -s)/$(uname -m)" in
+        Linux/x86_64) _isf_plat=linux_amd64 ;;
+        Linux/aarch64) _isf_plat=linux_arm64 ;;
+        Darwin/x86_64) _isf_plat=darwin_amd64 ;;
+        Darwin/arm64) _isf_plat=darwin_arm64 ;;
+    esac
     mkdir -p "$_isf/okstub" "$_isf/okbin"
     cat >"$_isf/okstub/curl" <<'OKSTUB'
 #!/bin/sh
@@ -260,23 +270,60 @@ printf '#!/bin/sh\necho v9.9.9-stub\n' >"$3"
 exit 0
 OKSTUB
     chmod +x "$_isf/okstub/curl"
+    printf '#!/bin/sh\necho v9.9.9-stub\n' >"$_isf/okstub-payload"
+    if command -v sha256sum >/dev/null 2>&1; then
+        _ok_sha="$(sha256sum "$_isf/okstub-payload" | awk '{print $1}')"
+    else
+        _ok_sha="$(shasum -a 256 "$_isf/okstub-payload" | awk '{print $1}')"
+    fi
+    _ok_override=""
+    [ -n "$_isf_plat" ] && _ok_override="SHFMT_SHA256_${_isf_plat}=$_ok_sha"
     # the orphan is planted OLD (round c F3 made the sweep age-guarded:
     # only 30min+ temps match) -- and a FRESH in-flight temp must
     # survive it (concurrent-run safety).
     printf 'orphan\n' >"$_isf/okbin/.shfmt.tmp.99999"
     touch -t 197001010000 "$_isf/okbin/.shfmt.tmp.99999"
     printf 'in-flight\n' >"$_isf/okbin/.shfmt.tmp.$$"
-    PATH="$_isf/okstub:$PATH" SHFMT_BIN_DIR="$_isf/okbin" make install-shfmt >/dev/null 2>&1
+    # shellcheck disable=SC2086  # _ok_override is one KEY=VALUE word (or empty)
+    PATH="$_isf/okstub:$PATH" SHFMT_BIN_DIR="$_isf/okbin" make install-shfmt $_ok_override >/dev/null 2>&1
     _ok_rc=$?
     if [ "$_ok_rc" -eq 0 ] &&
         [ "$("$_isf/okbin/shfmt" 2>/dev/null)" = "v9.9.9-stub" ] &&
         [ ! -e "$_isf/okbin/.shfmt.tmp.99999" ] &&
         [ -e "$_isf/okbin/.shfmt.tmp.$$" ]; then
-        pass "install lands in SHFMT_BIN_DIR, version-probed; stale orphan swept, fresh temp kept (F3)"
+        pass "install lands in SHFMT_BIN_DIR, digest+version probed; stale orphan swept, fresh temp kept (F3/F28)"
     else
         fail "destination redirect/probe/sweep broken (rc=$_ok_rc bin=$("$_isf/okbin/shfmt" 2>/dev/null))"
     fi
     rm -f "${_isf:?}/okbin/.shfmt.tmp.$$"
+    # F28 (#485): the digest gate must REFUSE a well-formed but wrong
+    # artifact BEFORE anything is executed or installed -- the ok-curl
+    # stub (a "shfmt" that happily reports v9.9.9-stub) with NO sha
+    # override models exactly the compromised/corrupted release that
+    # satisfies --version: the pinned digest must reject it, loudly,
+    # with nothing installed and no temp left behind.
+    mkdir -p "$_isf/evilbin"
+    PATH="$_isf/okstub:$PATH" SHFMT_BIN_DIR="$_isf/evilbin" make install-shfmt >"$_isf/evil.log" 2>&1
+    _evil_rc=$?
+    _evil_tmp="$(find "$_isf/evilbin" -name '.shfmt.tmp.*' 2>/dev/null || true)"
+    if [ "$_evil_rc" -ne 0 ] &&
+        grep -q 'checksum mismatch' "$_isf/evil.log" &&
+        [ ! -e "$_isf/evilbin/shfmt" ] &&
+        [ -z "$_evil_tmp" ]; then
+        pass "install-shfmt refuses a digest mismatch loudly, installs nothing (F28)"
+    else
+        fail "install-shfmt digest gate broken (rc=$_evil_rc installed=$([ -e "$_isf/evilbin/shfmt" ] && echo yes) tmp=$_evil_tmp)"
+    fi
+    # Shape pin: every platform the recipe routes to carries a pinned
+    # digest -- an empty SHFMT_SHA256_* would fail every real install
+    # (got != ''), but the shape pin catches the missing/deformed entry
+    # at review time, not at first use.
+    _n_sha="$(grep -cE '^SHFMT_SHA256_(linux|darwin)_(amd64|arm64) = [0-9a-f]{64}$' Makefile || true)"
+    if [ "$_n_sha" = 4 ]; then
+        pass "all four SHFMT_SHA256_* platform pins present and well-formed (F28)"
+    else
+        fail "SHFMT_SHA256_* platform pins: $_n_sha of 4 present/well-formed"
+    fi
     # F1 (round c): the fail-stub models argv position $3 -- valid only
     # while the recipe keeps `curl -fsSL -o "$$tmp"`; a reorder must be
     # LOUD, not a silently vacuous atomicity pin.

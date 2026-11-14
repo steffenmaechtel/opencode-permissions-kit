@@ -509,6 +509,51 @@ else
     pass "scan guard: garbage element inside patched rejected (V4)"
 fi
 
+# --- 10. dedup probe fails loud (#485 F26) ---------------------------------
+# The gh-issue dedup used to swallow probe failures (`|| echo 0`): a
+# transient gh error read as "not tracked" — a duplicate tracking issue
+# was opened and the daily watch exited GREEN. Behavioral drive, the
+# way CI observes it: the whole script runs against a fake feed (curl
+# stub) and a gh stub that fails exactly like a transient API error;
+# the probe must die loudly instead of falling through to the create
+# arm (OPK_SCAN_DRY_RUN keeps that arm inert either way).
+AWWORK="$(work_new)" || {
+    echo "security advisory tests: scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
+mkdir -p "$AWWORK/bin"
+cat >"$AWWORK/bin/curl" <<'AWCURL'
+#!/bin/sh
+# fake upstream feed: one unknown but well-formed advisory
+cat <<'JSON'
+[{"ghsa_id":"GHSA-9999-zzzz-9999","severity":"low","html_url":"https://example/x","summary":"probe pin","vulnerabilities":[{"vulnerable_version_range":">=1.0.0","patched_versions":"1.0.1"}]}]
+JSON
+AWCURL
+cat >"$AWWORK/bin/gh" <<'AWGH'
+#!/bin/sh
+echo "gh-stub: simulated transient failure" >&2
+exit 1
+AWGH
+chmod +x "$AWWORK/bin/curl" "$AWWORK/bin/gh"
+_aw_rc=0
+GITHUB_REPOSITORY=owner/repo OPK_SCAN_DRY_RUN=1 PATH="$AWWORK/bin:$PATH" \
+    sh "$SCAN" >"$AWWORK/out" 2>"$AWWORK/err" || _aw_rc=$?
+if [ "$_aw_rc" -ne 0 ] && grep -q "gh issue list failed" "$AWWORK/err"; then
+    pass "advisory-watch.sh: transient gh failure dies loud, never reads as not-tracked (F26)"
+else
+    fail "advisory-watch.sh: dedup probe fail-open (rc=$_aw_rc, stderr: $(head -2 "$AWWORK/err" 2>/dev/null))"
+fi
+if ! grep -q "would open" "$AWWORK/out"; then
+    pass "advisory-watch.sh: a failed probe never reaches the create arm (F26)"
+else
+    fail "advisory-watch.sh: the failed probe fell through to issue creation (F26)"
+fi
+# The fail-open shape stays gone (raw grep, the absence carve-out: a
+# commented-out residue still trips).
+check_absent "advisory-watch.sh: no fail-open '|| echo 0' probe residue (F26)" "$SCAN" \
+    -F -- ' || echo 0)'
+rm -rf "$AWWORK"
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"
