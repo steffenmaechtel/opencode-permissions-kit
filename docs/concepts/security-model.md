@@ -192,14 +192,16 @@ Operational notes:
   tools run, not whose privileges they run with.
 - **Checkout-first `opk` runs checkout code as root:** `opk` resolves its
   library relative to its own path, so an `opk` (or management script)
-  invoked from a checkout executes that checkout's code with root
-  privileges — the management subcommands self-elevate (`opk config`,
-  `opk update` run `exec sudo sh` on the checkout's scripts when the
-  caller is not root); direct script calls take a leading `sudo`. On
-  kit-managed machines the checkout is agent-group-writable, so an
-  agent session could have planted content in `files/`. Deliberate
-  design ("checkout-first by construction" — the developer's own sudo
-  password is the gate); see the repository's CONTRIBUTING.md for the
+  invoked from a checkout executes that checkout's code — with root
+  privileges via internal sudo for the elevating subcommands (`opk
+  config`, `opk update` run `exec sudo sh` when the caller is not
+  root) or a leading `sudo` for direct script calls, while `opk
+  status`, `opk doctor` and unsudoed direct calls stay the invoking
+  uid (still checkout code). On kit-managed machines the checkout is
+  agent-group-writable, so an agent session could have planted
+  content in `files/`. Deliberate design ("checkout-first by
+  construction" — the developer's own sudo password is the gate where
+  root is involved); see the repository's CONTRIBUTING.md for the
   contributor-side warning.
 
 ## WSL2: the /mnt/c exposure
