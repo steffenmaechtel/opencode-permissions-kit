@@ -728,7 +728,17 @@ oc_run() {
         note() { if [ -n "$1" ]; then _oc_notes="$_oc_notes
 $1"; fi; }
         eval "$OC_BLOCK"
-        openchamber_guard
+        # Guarded call (#497 f rider — pre-existing): an empty OC_BLOCK
+        # (extraction drift) never defines the function, and the
+        # unguarded call killed the whole suite rc 127 mid-run — no
+        # tally, downstream pins unseen. The guard reads the EXTRACTION
+        # (the drift path empties exactly this variable), not
+        # command -v — an eval-defined symbol is invisible to it under
+        # the kcov coverage shell. Undefined -> the arms' asserts red
+        # on their own (expected warnings missing), suite stays whole.
+        if [ -n "$OC_BLOCK" ]; then
+            openchamber_guard
+        fi
         printf '%s' "$_oc_notes"
     )
 }
