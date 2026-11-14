@@ -217,9 +217,9 @@ try:
                 sys.stderr.flush()
             except OSError:
                 # stderr-side failure only (#265, pr-00263 c C1): the
-                # PROGRESS sink died — EPIPE (BrokenPipeError is an
+                # PROGRESS sink died -- EPIPE (BrokenPipeError is an
                 # OSError subclass; the reader of the sink closed) or
-                # e.g. ENOSPC (stderr at a full device) — never the
+                # e.g. ENOSPC (stderr at a full device) -- never the
                 # data consumer. Degrade the progress display alone and
                 # keep the data stream alive. Falling through to the
                 # outer except here would dup2 stdout to devnull and
@@ -228,21 +228,21 @@ try:
                 # finished, buffered bytes lost, every rc 0).
                 progress_dead = True
                 # And the interpreter shutdown flush must not retry the
-                # dead sink either — it would exit 120 over a progress
+                # dead sink either -- it would exit 120 over a progress
                 # line (the stdout dup2 idiom below, stderr side).
                 os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stderr.fileno())
 except (BrokenPipeError, KeyboardInterrupt):
-    # A dead consumer (xargs died first — the pr-00221 W2/W6 sweep
-    # recorded this missing clause — or Ctrl-C hit the whole pipeline,
+    # A dead consumer (xargs died first -- the pr-00221 W2/W6 sweep
+    # recorded this missing clause -- or Ctrl-C hit the whole pipeline,
     # #221 a W6 shape) must not end the tee in a traceback, and an
-    # aborted pass must not print its completion line — counted is
+    # aborted pass must not print its completion line -- counted is
     # bytes READ, not entries applied (#244 a S2/W3/Q4). The
     # interpreter shutdown flush over the broken pipe would print a
     # traceback anyway, so point stdout at devnull before exiting (the
     # CPython SIGPIPE idiom). rc contract, stated truly (#244 a Q1):
     # the production callers run bash WITH pipefail (install.sh:47,
     # config.sh:28, update.sh:41) and the rc of this pipeline lands
-    # in the _fsbp_rc capture of _fsb_pass — exiting 0 on EPIPE is
+    # in the _fsbp_rc capture of _fsb_pass -- exiting 0 on EPIPE is
     # deliberate: a consumer that closed early cannot fail the pass
     # alone, while a consumer that DIED leaves its own rc in the
     # pipeline and pipefail fails the pass through it. Unit tests
@@ -252,11 +252,11 @@ except (BrokenPipeError, KeyboardInterrupt):
     os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
 if counted and not aborted and not progress_dead:
     # progress_dead skips the line outright (the sink is known dead);
-    # the try is the race belt — the sink may die between the last
+    # the try is the race belt -- the sink may die between the last
     # progress write and here, with the data already flushed. The lost
     # completion line is cosmetic (#265, pr-00263 c C1).
     try:
-        sys.stderr.write("\r    %-16s %d entries — done\n" % (label, counted))
+        sys.stderr.write("\r    %-16s %d entries \u2014 done\n" % (label, counted))
         sys.stderr.flush()
     except OSError:
         pass

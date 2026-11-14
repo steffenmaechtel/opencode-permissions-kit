@@ -77,6 +77,10 @@ _st_progress_tee() {
     # progress display (or its consumer loop) — stdlib-only import.
     python3 -I -c '
 import sys, threading, time
+# Keep this -c source pure ASCII (#510): the command text reaches the
+# interpreter as ARGV (locale codec + surrogateescape) -- non-ASCII
+# bytes die at compile under a 7-bit locale, before any IO code runs.
+# The display glyphs ride \u escapes (byte-identical stderr output).
 label = sys.argv[1]
 count = 0
 start = time.monotonic()
@@ -90,9 +94,9 @@ def draw():
     if not sys.stderr.isatty():
         return
     el = int(time.monotonic() - start)
-    line = "  %s — %d found, %d:%02d" % (label, count, el // 60, el % 60)
+    line = "  %s \u2014 %d found, %d:%02d" % (label, count, el // 60, el % 60)
     if len(line) > 76:
-        line = "  …" + line[-73:]
+        line = "  \u2026" + line[-73:]
     out("\r%-76s" % line)
 
 def ticker():
@@ -601,6 +605,8 @@ EOF
 # summary anywhere in the feed) would kill the parse and render the
 # row "unavailable". Buffer read, same pin as the jsonc parser (#485
 # F22); the guarded stdout reconfigure covers the id print (#485 F23).
+# Keep this -c source pure ASCII (#510 compile-death class): non-ASCII
+# argv bytes die at compile under a 7-bit locale.
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 try:
@@ -608,7 +614,7 @@ try:
 except Exception:
     sys.exit(1)
 # pr-00263 a F11: a non-array feed (dict envelope, scalar array) used
-# to raise a raw traceback on cron stderr — shape-invalid is
+# to raise a raw traceback on cron stderr -- shape-invalid is
 # "unavailable" (exit 1), a non-dict entry is skipped.
 if not isinstance(feed, list):
     sys.exit(1)
@@ -616,7 +622,7 @@ for entry in feed:
     if not isinstance(entry, dict):
         continue
     # str(... or ""): a JSON null defeats the .get default (the F7
-    # class, 0.0.44a V19 — advisory-watch got the coercion in 0.0.43a;
+    # class, 0.0.44a V19 -- advisory-watch got the coercion in 0.0.43a;
     # this twin printed the literal string "None").
     print(str(entry.get("ghsa_id") or ""))'); then
                     ADV_PARSE_OK=true

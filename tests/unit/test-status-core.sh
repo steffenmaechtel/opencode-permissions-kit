@@ -264,6 +264,27 @@ fi
 rm -rf "${WORK:?}/advbin510" "${WORK:?}/adv-feed-nb.json"
 rm -f "${ADV:?}/bin/opencode"
 
+# -c source purity (#510 compile-death class): the -c command text
+# reaches the interpreter as ARGV (locale codec + surrogateescape) --
+# non-ASCII bytes die at compile under a 7-bit locale, before any IO
+# code runs. The ticker's display glyphs ride \u escapes, comments stay
+# "--"; ui text OUTSIDE the two -c regions is deliberately UTF-8 and
+# not scanned (doctor prefilter idiom: any 8th-bit byte).
+for _510_range in \
+    "/^    python3 -I -c '\$/,/^' \"\\\$1\"\$/p" \
+    "/python3 -I -c 'import json,sys/,/ghsa_id\") or \"\"))'); then/p"; do
+    if sed -n "$_510_range" "$LIB" |
+        LC_ALL=C grep -q "$(printf '[\200-\377]')"; then
+        fail "-c source must stay pure ASCII (range $_510_range) (#510 compile-death class)"
+        _510_bad=1
+    fi
+done
+if [ "${_510_bad:-0}" = 0 ]; then
+    pass "ticker + advisory ids -c sources are pure ASCII (#510 compile-death class)"
+else
+    : # the per-range fail rows above carry the detail
+fi
+
 # --- 7. pairing guard (#413): a version-skewed entry/lib pairing dies loud -----------
 # status is deliberately fail-soft (set -u only) — an undefined call
 # does NOT abort, the report silently loses the section while the

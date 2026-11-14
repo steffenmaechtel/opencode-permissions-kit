@@ -778,6 +778,52 @@ else
 fi
 rm -rf "$W23EP"
 
+# --- 11d-bis. hostile-locale compile+IO (#510) --------------------------------------
+# Two layers under a 7-bit locale (the harness #510 wrapper + env):
+#   compile — the tee's python source travels as -c ARGV (locale codec +
+#       surrogateescape); non-ASCII source bytes used to die at startup
+#       with "Unable to decode the command from the command line"
+#       (em-dashes in comments and the completion line). The source is
+#       pure ASCII now, the rendered em-dash rides a \u2014 escape
+#       (byte-identical stderr), and the region scan pins it.
+#   IO — already buffer-based (binary passthrough + counter); the pin
+#       proves it survives the hostile env byte-exact, stderr clean.
+# Control arm first (harness #510): the strict stdout must actually
+# kill the unpinned non-ASCII write, or every pin here is vacuous.
+P510="$(hostile_stdio_python)"
+if hostile_stdio_control "$P510"; then
+    pass "control arm: strict 7-bit stdout kills the -I non-ASCII write (#510)"
+else
+    fail "control arm: hostile stdio not effective -- the #510 pins would pass vacuously"
+fi
+_H510_RC=0
+_H510_ERR="$(work_new_file)"
+_H510_OUT="$(printf 'a\0b\0c\0' | PATH="$P510:$PATH" LC_ALL=C LANG=C PYTHONUTF8=0 \
+    PYTHONCOERCECLOCALE=0 PYTHONIOENCODING=ascii FS_SUDO="" \
+    sh -c '. "$1" && _fsb_count_tee lbl' _ "$LIB" 2>"$_H510_ERR" |
+    od -An -tx1 | tr -s ' ')" || _H510_RC=$?
+# stderr carries the cosmetic completion line (under the hostile locale
+# stderr's backslashreplace renders the em-dash as "\u2014" text — the
+# documented cosmetic class); the discriminators are the absent compile
+# traceback and the byte-exact passthrough.
+if [ "$_H510_RC" = 0 ] &&
+    [ "$_H510_OUT" = " 61 00 62 00 63 00" ] &&
+    ! grep -q "Traceback\|Unable to decode" "$_H510_ERR"; then
+    pass "count tee: hostile locale cannot kill the compile or the passthrough (#510)"
+else
+    fail "count tee must compile and stream under the 7-bit locale (rc=$_H510_RC out=[$_H510_OUT] err=$(head -2 "$_H510_ERR" 2>/dev/null)) (#510)"
+fi
+# region scan: the -c source must stay pure ASCII (#510 compile-death
+# class; the doctor prefilter idiom detects any 8th-bit byte — ui text
+# outside this region is deliberately UTF-8 and NOT scanned)
+if sed -n "/^    python3 -I -c '$/,^' \"\\\$1\"\$/p" "$LIB" |
+    LC_ALL=C grep -q "$(printf '[\200-\377]')"; then
+    fail "fs-baseline -c source must stay pure ASCII (#510 compile-death class)"
+else
+    pass "fs-baseline -c source is pure ASCII (#510 compile-death class)"
+fi
+rm -f "$_H510_ERR"
+
 # --- 11e. Ctrl-C ends the tee silently (#244 a W4 — the KI arm of 11c's clause) --------
 # 11c pins BrokenPipeError; the except tuple's OTHER arm —
 # KeyboardInterrupt — needs its own executed failure path (L1). The
