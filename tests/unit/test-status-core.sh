@@ -212,6 +212,48 @@ else
     fail "advisories: missing-binary gate broken (out=$(printf '%s' "$_out" | head -5))"
 fi
 
+# --- 6b. advisory feed parse under the hostile locale (#510 M4) ---------------------
+# The freshness check decodes the whole advisory feed document; under a
+# 7-bit locale (LC_ALL=C with the PEP 538/540 escapes disabled) the
+# unpinned json.load used to die on an unread non-ASCII field (a
+# summary ANYWHERE in the feed) and the row degraded to "live check
+# unavailable". Buffer read + guarded stdout reconfigure (#485 F22/F23
+# shapes): with a curl stub serving a feed whose summary carries
+# non-ASCII, the ids must parse and the freshness row must render.
+mkdir -p "$WORK/advbin510"
+for _t in stat grep sed head cat python3; do
+    ln -s "$(command -v "$_t")" "$WORK/advbin510/$_t" 2>/dev/null || true
+done
+printf '#!/bin/sh\ncat "%s"\n' "$WORK/adv-feed-nb.json" >"$WORK/advbin510/curl"
+chmod 755 "$WORK/advbin510/curl"
+cat >"$WORK/adv-feed-nb.json" <<'EOF'
+[{"ghsa_id":"GHSA-9999-9999-9999","severity":"medium","html_url":"https://example/9",
+  "summary":"Prüfung: nicht-ASCII Zusammenfassung",
+  "vulnerabilities":[]}]
+EOF
+printf '#!/bin/sh\necho "opencode version 9.9.9"\n' >"$ADV/bin/opencode"
+chmod 755 "$ADV/bin/opencode"
+_adv_nb_rc=0
+_out=$(
+    export LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0
+    PATH="$WORK/advbin510" # stub curl + the section's few externals
+    export PATH NO_COLOR=1
+    . "$UI_LIB"
+    . "$LIB"
+    LIBDIR="$ADV"
+    VERSION=0.0.0
+    OPENCODE_USER=opencode-no-such-user-424242
+    status_section_advisories
+) 2>&1 || _adv_nb_rc=$?
+if printf '%s' "$_out" | grep -qF 'new advisory(ies) upstream, not yet in this kit: GHSA-9999-9999-9999' &&
+    ! printf '%s' "$_out" | grep -qF 'live check unavailable'; then
+    pass "advisories: non-ASCII feed parses under the 7-bit locale, freshness row renders (#510 M4)"
+else
+    fail "advisories feed parse must survive a non-ASCII summary under LC_ALL=C (rc=$_adv_nb_rc out=$(printf '%s' "$_out" | head -5)) (#510 M4)"
+fi
+rm -rf "${WORK:?}/advbin510" "${WORK:?}/adv-feed-nb.json"
+rm -f "${ADV:?}/bin/opencode"
+
 # --- 7. pairing guard (#413): a version-skewed entry/lib pairing dies loud -----------
 # status is deliberately fail-soft (set -u only) — an undefined call
 # does NOT abort, the report silently loses the section while the

@@ -807,6 +807,28 @@ if PYTHONHOME="$_RES/nonexistent-py-home" python3 -c 'import json' 2>/dev/null; 
 else
     pass "control arm: bare python3 breaks under the hostile PYTHONHOME (#249)"
 fi
+
+# --- resolve under the hostile locale (#510 M4) ------------------------------------
+# The packument decode pins to utf-8 buffer reads (#485 F22 shape): a
+# 7-bit locale (LC_ALL=C with the PEP 538/540 escapes disabled) used to
+# decode the whole document with the C codec -- a non-ASCII description
+# anywhere in the packument killed the resolve (warn "cannot
+# determine"). The printed dist-tag is a version string (ASCII by
+# format). Octal escapes: dash's printf does not interpret \xHH
+# (\303\274 = UTF-8 "ü").
+cat >"$_RES/bin/curl" <<'EOF'
+#!/bin/sh
+# non-ASCII field NEXT to dist-tags: the whole-document decode class
+printf '{"dist-tags":{"latest":"2.9.9"},"description":"Pr\303\274fung"}\n'
+EOF
+_res_lc_rc=0
+_res_lc_out=$(PATH="$_RES/bin:/usr/bin:/bin" LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 \
+    sh -c '. "$1"; resolve_latest_opencode_version 2' _ "$LIB" 2>/dev/null) || _res_lc_rc=$?
+if [ "$_res_lc_out" = "2.9.9" ]; then
+    pass "resolve: non-ASCII packument decodes under the 7-bit locale (#510 M4)"
+else
+    fail "resolve must survive a non-ASCII packument under LC_ALL=C (rc=$_res_lc_rc got [$_res_lc_out]) (#510 M4)"
+fi
 # Sweep floor: update-core's own site runs isolated (floor — the
 # tree-wide absence pin below is the ceiling).
 _pc=$(live_src "$LIB" | grep -c 'python3 -I' || true)

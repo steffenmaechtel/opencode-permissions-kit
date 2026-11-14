@@ -444,6 +444,29 @@ if printf '%s\n' "$FEED_OUT" | grep -qxF "$EXPECT3"; then
 else
     fail "feed parser: an all-null advisory yields six empty fields"
 fi
+
+# hostile-locale pin (#510 M3): the feed is UTF-8 JSON with free-text
+# summaries; under a 7-bit locale (LC_ALL=C with the PEP 538/540
+# escapes disabled) the unpinned parser used to die on the whole-document
+# json.load decode AND on the summary print, and the caller reports the
+# misleading "failed to parse the upstream feed". Buffer read + guarded
+# stdout reconfigure (#485 F22/F23 shapes): the summary must round-trip.
+FEED_JSON_NB="$(work_new_file)"
+cat >"$FEED_JSON_NB" <<'EOF'
+[{"ghsa_id":"GHSA-3333-3333-3333","severity":"low","html_url":"https://example/3",
+  "summary":"Prüfung: nicht-ASCII Zusammenfassung",
+  "vulnerabilities":[{"vulnerable_version_range":">=1.0.0","patched_versions":null}]}]
+EOF
+FEED_NB_RC=0
+FEED_NB_OUT="$(LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 \
+    python3 "$FEED_PY" <"$FEED_JSON_NB" 2>/dev/null)" || FEED_NB_RC=$?
+if [ "$FEED_NB_RC" = 0 ] &&
+    printf '%s\n' "$FEED_NB_OUT" | grep -qF "Prüfung: nicht-ASCII Zusammenfassung"; then
+    pass "feed parser: non-ASCII summary round-trips under the 7-bit locale (#510 M3)"
+else
+    fail "feed parser must survive a non-ASCII summary under LC_ALL=C (rc=$FEED_NB_RC out=$FEED_NB_OUT) (#510 M3)"
+fi
+
 rm -f "$FEED_PY" "$FEED_JSON"
 
 # reader side: '|' IFS + the medium->moderate boundary mapping + known-id

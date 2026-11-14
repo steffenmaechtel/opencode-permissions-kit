@@ -419,6 +419,29 @@ else
     fail "_opk_json_get: absent python3 must stay silent (err=$(cat "$TMPDIR/gj-abs.err"))"
 fi
 
+# --- 2c. hostile-locale IO pins (#510 M4) --------------------------------------
+# A 7-bit locale (LC_ALL=C with the PEP 538/540 escapes disabled) makes
+# the unpinned embedded python die twice into the silent except arm:
+# the whole-document json.load decode on an unread non-ASCII field
+# (ddev describe carries display text), and the print of a selected
+# non-ASCII value (an approot path). Both degraded to empty output and
+# the callers silently fell back. Buffer read + guarded stdout
+# reconfigure (#485 F22/F23 shapes); the silent-empty MISS contract is
+# untouched.
+GJ_OUT=$(LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 \
+    sh -c ". '$FUNC' && _opk_json_get '{\"raw\":{\"primary_url\":\"https://x.y\",\"notes\":\"Prüfung\"}}' primary_url" 2>"$TMPDIR/gj-lc.err") || true
+assert_eq "_opk_json_get: unread non-ASCII field does not kill the decode (#510 M4)" \
+    "https://x.y" "$GJ_OUT"
+GJ_OUT=$(LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 \
+    sh -c ". '$FUNC' && _opk_json_get '{\"raw\":{\"approot\":\"/var/Prüfung/web\"}}' approot" 2>>"$TMPDIR/gj-lc.err") || true
+assert_eq "_opk_json_get: non-ASCII value round-trips under the 7-bit locale (#510 M4)" \
+    "/var/Prüfung/web" "$GJ_OUT"
+if [ ! -s "$TMPDIR/gj-lc.err" ]; then
+    pass "_opk_json_get stays silent under the hostile locale (#510 M4)"
+else
+    fail "_opk_json_get must stay silent under LC_ALL=C (err=$(cat "$TMPDIR/gj-lc.err")) (#510 M4)"
+fi
+
 check_live "function execs the kit's sudoers helper for the developer" \
     "$FUNC" \
     -q 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode'

@@ -596,8 +596,15 @@ EOF
                 # PYTHONHOME/PYTHONPATH must not steer the freshness row —
                 # stdlib-only import.
                 if ADV_IDS=$(printf '%s' "$ADV_FEED" | python3 -I -c 'import json,sys
+# Locale-independent decode (#510 M4): a 7-bit host locale decodes the
+# whole feed document with the C codec -- unread non-ASCII fields (a
+# summary anywhere in the feed) would kill the parse and render the
+# row "unavailable". Buffer read, same pin as the jsonc parser (#485
+# F22); the guarded stdout reconfigure covers the id print (#485 F23).
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 try:
-    feed = json.load(sys.stdin)
+    feed = json.loads(sys.stdin.buffer.read().decode("utf-8"))
 except Exception:
     sys.exit(1)
 # pr-00263 a F11: a non-array feed (dict envelope, scalar array) used

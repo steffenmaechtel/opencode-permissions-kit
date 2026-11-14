@@ -47,8 +47,16 @@ command -v curl >/dev/null 2>&1 || die "curl is required"
 FEED=$(curl -fsSL --max-time 30 "$UPSTREAM_API" 2>/dev/null) ||
     die "upstream feed unreachable (offline, blocked, or rate-limited): $UPSTREAM_API"
 if ! UPSTREAM=$(printf '%s' "$FEED" | python3 -c 'import json,sys
+# Locale-independent IO (#510 M3): the feed is UTF-8 JSON with free-text
+# summaries; a 7-bit host locale (LC_ALL=C with the PEP 538/540 escapes
+# disabled) makes json.load(sys.stdin) and the summary print raise on
+# non-ASCII and the caller dies as "failed to parse the upstream feed".
+# Buffer read + guarded stdout reconfigure, same pins as the jsonc
+# parser (#485 F22/F23).
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 try:
-    feed = json.load(sys.stdin)
+    feed = json.loads(sys.stdin.buffer.read().decode("utf-8"))
 except Exception:
     sys.exit(1)
 for adv in feed or []:

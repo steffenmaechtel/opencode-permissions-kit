@@ -220,7 +220,12 @@ else
                 HEAD_SHA="$HEAD_REV" python3 -c '
 import json, os, sys
 try:
-    data = json.load(sys.stdin)
+    # Locale-independent decode (#510 M4): a 7-bit host locale decodes
+    # the whole runs list with the C codec -- unread non-ASCII fields
+    # (a run display title anywhere in the list) would kill the check.
+    # Buffer read, same pin as the jsonc parser (#485 F22); the printed
+    # status/conclusion are Actions enums (ASCII by format).
+    data = json.loads(sys.stdin.buffer.read().decode("utf-8"))
 except Exception:
     sys.exit(1)
 sha = os.environ.get("HEAD_SHA")

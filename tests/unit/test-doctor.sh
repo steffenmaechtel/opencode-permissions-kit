@@ -328,6 +328,33 @@ _out="$(pol '{"version":1,"futureKey":true,"containerTrees":[{"path":"a","role":
     pass "unknown keys ignored (forward compatibility)" ||
     fail "unknown keys ignored (forward compatibility) (got: $_out)"
 
+# hostile-locale pin (#510, the #485 F23 class beyond the two py files):
+# paths and notes tolerate non-ASCII (only control characters are
+# gated), and under a 7-bit locale (LC_ALL=C with the PEP 538/540
+# escapes disabled) the unpinned TSV write used to raise
+# UnicodeEncodeError -- a VALID policy surfaced as "rejected" (the
+# caller renders "the policy file was rejected -- fix opk.json"). The
+# heredoc reconfigures stdout to utf-8: the TSV must round-trip
+# byte-exact.
+pol_lc() { # <json-string> -> TSV on stdout under the 7-bit locale
+    printf '%s\n' "$1" >"$WORK/opk.json"
+    (
+        PATH="$SCRATCHBIN"
+        export PATH
+        LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0
+        export LC_ALL LANG PYTHONUTF8 PYTHONCOERCECLOCALE
+        . "$POL_FN"
+        doctor_load_policy "$WORK" 2>"$WORK/pol-lc.err"
+    )
+}
+_out="$(pol_lc '{"version":1,"containerTrees":[{"path":"Prüfung/baubau","note":"Prüfung: nicht-ASCII Notiz"}]}')"
+[ "$_out" = "$(printf 'Prüfung/baubau\tPrüfung: nicht-ASCII Notiz')" ] &&
+    pass "non-ASCII path+note round-trip under the 7-bit locale (#510)" ||
+    fail "non-ASCII path+note must round-trip under LC_ALL=C (got: $_out)"
+[ ! -s "$WORK/pol-lc.err" ] &&
+    pass "policy loader stays silent under the hostile locale (#510)" ||
+    fail "policy loader must stay silent under LC_ALL=C (err=$(cat "$WORK/pol-lc.err")) (#510)"
+
 # every rejection branch: non-zero rc AND a stderr message
 for _bad in \
     '{bad json' \
