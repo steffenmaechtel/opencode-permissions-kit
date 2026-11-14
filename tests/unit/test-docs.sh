@@ -253,6 +253,25 @@ done
 grep -q 'flag-write TOCTOU' "$REPO_ROOT/docs/concepts/security-model.md" ||
     echo "FAIL security-model.md: dev-owned flag-write TOCTOU disclosure missing (#256 a W2)" >>"$TMP"
 
+# --- #483 (PR #479 round a): the six snapshot-review residual findings ---
+# stay disclosed, and the F11 rework names BOTH callers (the opencode-uid
+# cap claim alone was the finding). One distinctive literal per entry;
+# sabotage: delete any bullet -- this goes red.
+for _i483_lit in \
+    'scratch re-open windows' \
+    'performs the same write as root' \
+    'Git diff drivers render denied files' \
+    'rides env_keep' \
+    'Agent-authored container opt-in' \
+    'runs checkout code as root'; do
+    grep -qF -- "$_i483_lit" "$REPO_ROOT/docs/concepts/security-model.md" ||
+        echo "FAIL security-model.md: residual-gap disclosure '$_i483_lit' missing (#483)" >>"$TMP"
+done
+# F16's contributor-side warning (CONTRIBUTING.md names the
+# agent-group-writable checkout before checkout sudo runs).
+grep -qF -- 'agent-group-writable' "$REPO_ROOT/CONTRIBUTING.md" ||
+    echo "FAIL CONTRIBUTING.md: checkout-root warning missing (#483 F16)" >>"$TMP"
+
 # --- a W3 (pr-00256): cli.md keeps the advisories exception ------------------
 # The missing-library claim must keep its exception clause (status.sh's
 # advisories row names the skipped checks, not the file). Sabotage: shorten

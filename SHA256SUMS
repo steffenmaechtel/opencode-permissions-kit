@@ -45,7 +45,7 @@ b84c5ae854e30e7286c258f7108e1bced15d9cba829e872e35e3197a9c869f2f  files/opencode
 d09d5e53cd4cd2a6b9ee4741952b1a90115df3fbfe2bbbf5e6204d5fef1023cb  files/opencode-permissions-kit-lib/sh/update-core.sh
 49cf2952831b66edadf452762cad54d762477348cb0725ee1e11f9a199c8f8c5  files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh
 3023ff29a8be14b26025762b6f2885e6e10cc2b291b77aff536a53ad62327623  files/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc
-4fe0365d86cc2a93786ea8ba2f166ef740cb7a14a7a8b2207b5e3fb002bab8e0  files/opencode-permissions-kit-lib/templates/opencode.jsonc
+eeec07e5841d8954172f2f52ef0a7459b96ae16deafdb48689f23855c40c8103  files/opencode-permissions-kit-lib/templates/opencode.jsonc
 a6e73bab547bb4eac6575ce148820ac8894ab79a9c93a8fb31ef2d2749ac9666  files/opencode-permissions-kit-lib/templates/sudoers.template
 fe653f918890fef6e62f8ace36af1970672ad847716fb8f6b683ed331d48c4c3  files/opencode-permissions-kit-lib/tui/kit-mode-2x.tsx
 086f1578f65c044004af017b0fa400241f14b3619ca77ad998a8cbeda37f07a4  files/opencode-permissions-kit-lib/tui/kit-mode.tsx

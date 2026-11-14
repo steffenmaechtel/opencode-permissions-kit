@@ -40,8 +40,9 @@ the OS. Bash-spawned processes are only caught by tripwires. See
 
 **Tripwire**
 A bash `ask` rule mirroring a deny pattern (with trailing `*`) so a command
-that merely names a sensitive file still prompts. Lexical — variables and
-globs evade it. See [customize the deny list](../how-to/customize-deny-list.md).
+that merely names a sensitive file still prompts. Lexical — variables,
+globs, and planted git diff drivers evade it. See
+[customize the deny list](../how-to/customize-deny-list.md).
 
 **Wrapper**
 The script at `/usr/local/bin/opencode` that every invocation passes
