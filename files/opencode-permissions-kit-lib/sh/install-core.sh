@@ -854,6 +854,13 @@ do_plan_phase() {
         # shape): a kill mid-tee left a truncated projects.conf whose
         # partial root list silently narrows every later read (status,
         # the config.sh rewrites) — stage beside it, then rename in.
+        # Mode contract (#501): no explicit chmod — the final mode is
+        # umask-dependent (0644 under root's usual 022) and fail-closed
+        # by construction (a stricter umask tightens, never loosens).
+        # The empty-file touch branch below creates 0666&~umask when
+        # the file is absent and leaves a pre-existing mode as-is on
+        # re-install — neither branch ever loosens; config.sh's
+        # projects_remove twin shares the contract (#508 a A6).
         _PRJ_CONF_TMP="/etc/opencode-permissions-kit/projects.conf.opk-new.$$"
         _tmp_track "$_PRJ_CONF_TMP"
         echo "$PROJECTS_ROOTS" | tr ' ' '\n' | sudo tee "$_PRJ_CONF_TMP" >/dev/null

@@ -475,11 +475,26 @@ else
 fi
 if live_src "$CONFIG" | grep -qF '_pr_out=$(sudo grep -vxF "$p" "$PROJECTS_CONF" 2>/dev/null) || _pr_rc=$?' &&
     live_src "$CONFIG" | grep -qF '[ "$_pr_rc" -le 1 ] || die' &&
-    live_src "$CONFIG" | grep -qF '_pr_tmp="$PROJECTS_CONF.tmp.$$"' &&
+    live_src "$CONFIG" | grep -qF '_pr_tmp="$PROJECTS_CONF.opk-new.$$"' &&
     live_src "$CONFIG" | grep -qF '_tmp_track "$_pr_tmp"'; then
-    pass "C3 (0.0.39g) / F4 (0.0.39h) / 0.0.44a V11: config.sh narrows the guard (rc <= 1 ok, rc 2 dies) + stages per-process"
+    pass "C3 (0.0.39g) / F4 (0.0.39h) / 0.0.44a V11 / #502: guard narrowed (rc <= 1 ok, 2 dies) + per-process .opk-new.$$"
 else
-    fail "C3 (0.0.39g) / F4 (0.0.39h) / 0.0.44a V11: config.sh narrows the guard (rc <= 1 ok, rc 2 dies) + stages per-process"
+    fail "C3 (0.0.39g) / F4 (0.0.39h) / 0.0.44a V11 / #502: guard narrowed (rc <= 1 ok, 2 dies) + per-process .opk-new.$$"
+fi
+# #501 mode contract: projects.conf's final mode is umask-dependent by
+# design — the projects_remove block carries NO explicit chmod command.
+# The pattern is command-anchored because the contract's own comment
+# prose mentions chmod (an unanchored absence grep would match its own
+# documentation and sit permanently red); absence pins stay un-ridden,
+# the anchor is the discrimination. Emptiness probe first — an absence
+# leg over an empty extraction would pass vacuously.
+_pr_block=$(extract_func "$CONFIG" projects_remove)
+if [ -z "$_pr_block" ]; then
+    fail "#501: projects_remove block not found in config.sh (extract_func empty)"
+elif printf '%s\n' "$_pr_block" | grep -qE '^[[:space:]]*(sudo )?chmod '; then
+    fail "#501: projects_remove keeps the umask-dependent mode (no explicit chmod in the block)"
+else
+    pass "#501: projects_remove keeps the umask-dependent mode (no explicit chmod in the block)"
 fi
 SD_LIB="$REPO/files/opencode-permissions-kit-lib/sh/sudoers-deploy.sh"
 WSL_LIB="$REPO/files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh"
