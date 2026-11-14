@@ -221,15 +221,25 @@ assert_eq "fallback residual: the /proc-less probe stays defeatable by the inter
 # both dash ("cannot open /proc/.../cmdline-absent") and bash-as-sh
 # (".../cmdline-absent: No such file or directory") print it, so the
 # pin discriminates the old spelling under either shell.
-_fbn="$(cd "$WORK/clean" && PATH="$_FBBIN" "$_SH_BIN" -c 'eval "$1" >/dev/null' sh "$_fbk" 2>&1)"
-case "$_fbn" in
-    *cmdline-absent*)
-        fail "fallback arm stays silent on /proc-less hosts (#437 a A2)"
-        ;;
-    *)
-        pass "fallback arm stays silent on /proc-less hosts (#437 a A2)"
-        ;;
-esac
+# rc-capture on the assignment (#499): a broken-non-empty span makes
+# eval fatal in the child, and the bare assignment aborted the suite
+# mid-run under set -e -- no tally, downstream pins unseen. The rc gate
+# also keeps a loud child death OUT of the silent-pass arm below (the
+# noise of a dead child is just not this arm's needle).
+_fbn_rc=0
+_fbn="$(cd "$WORK/clean" && PATH="$_FBBIN" "$_SH_BIN" -c 'eval "$1" >/dev/null' sh "$_fbk" 2>&1)" || _fbn_rc=$?
+if [ "$_fbn_rc" -eq 0 ]; then
+    case "$_fbn" in
+        *cmdline-absent*)
+            fail "fallback arm stays silent on /proc-less hosts (#437 a A2)"
+            ;;
+        *)
+            pass "fallback arm stays silent on /proc-less hosts (#437 a A2)"
+            ;;
+    esac
+else
+    fail "fallback arm stays silent on /proc-less hosts (child rc=$_fbn_rc out=$_fbn) (#437 a A2, #499)"
+fi
 
 # --- 1d. the set -eu entries reach the fallback instead of dying (#479 a F1) ---------
 # status.sh and doctor.sh run `set -u`, uninstall.sh sets no options at

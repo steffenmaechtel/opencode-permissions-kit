@@ -341,13 +341,19 @@ fi
 # and a dropped name would false-pass).
 _pg_src="$(extract_func "$UPDATE" update_pairing_guard)"
 _pg_src_s="$(printf '%s\n' "$_pg_src" | sed 's/^[[:space:]]*#.*$//')"
-_pg_full=$(sh -c 'eval "$1"; . "$2"; update_pairing_guard; echo "rc=$?"' _ "$_pg_src" "$LIB" 2>&1)
+# rc-capture on the assignment (#499): a broken-non-empty extraction
+# makes eval itself fatal in the child, and the bare assignment aborted
+# the whole suite mid-run under set -e -- no tally, downstream pins
+# unseen. The capture routes the child death into the assert's own row
+# (the _pg_tr_rc idiom below).
+_pg_full_rc=0
+_pg_full=$(sh -c 'eval "$1"; . "$2"; update_pairing_guard; echo "rc=$?"' _ "$_pg_src" "$LIB" 2>&1) || _pg_full_rc=$?
 _pg_tr_rc=0
 _pg_tr_out="$(sh -c 'eval "$1"; update_pairing_guard' _ "$_pg_src" 2>&1)" || _pg_tr_rc=$?
-if printf '%s' "$_pg_full" | grep -q 'rc=0'; then
+if [ "$_pg_full_rc" -eq 0 ] && printf '%s' "$_pg_full" | grep -q 'rc=0'; then
     pass "pairing guard: real lib passes (every function defined) (#413)"
 else
-    fail "pairing guard must pass against the real lib (out=$_pg_full) (#413)"
+    fail "pairing guard must pass against the real lib (rc=$_pg_full_rc out=$_pg_full) (#413)"
 fi
 if [ "$_pg_tr_rc" -eq 1 ] &&
     printf '%s' "$_pg_tr_out" | grep -qF "function 'update_redeploy_library' missing from update-core.sh" &&

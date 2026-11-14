@@ -758,14 +758,25 @@ oc_mkbin() { # <home> [names...] — real shadow binaries
 }
 
 # clean home -> quiet
+# rc-capture on every oc_run caller below (#499): a broken-non-empty
+# OC_BLOCK (extraction truncation, the #396 class) makes the eval
+# inside oc_run fatal, the subshell dies, and the bare assignment
+# aborted the whole suite mid-run under set -e (empirically rc 2, no
+# tally). Each arm now reds on its own rc row; without it the
+# quiet-expectation arms would pass vacuously on a dead child (the
+# #497 f R5 note).
 mkdir -p "$TMPDIR/oc-clean"
-out=$(oc_run "$TMPDIR/oc-clean")
+oc_rc=0
+out=$(oc_run "$TMPDIR/oc-clean") || oc_rc=$?
+assert_eq "openchamber guard: clean home child exits 0 (#499)" "0" "$oc_rc"
 assert_eq "openchamber guard: clean home -> quiet" "" "$out"
 
 # bins only -> shadow warning, both names, rm -f fix, no bypass wording
 mkdir -p "$TMPDIR/oc-bins"
 oc_mkbin "$TMPDIR/oc-bins" opencode opencode2
-out=$(oc_run "$TMPDIR/oc-bins")
+oc_rc=0
+out=$(oc_run "$TMPDIR/oc-bins") || oc_rc=$?
+assert_eq "openchamber guard: bins only child exits 0 (#499)" "0" "$oc_rc"
 assert_eq "openchamber guard: bins only -> warns (shadow)" "1" \
     "$(printf '%s' "$out" | grep -c 'self-installed opencode detected')"
 assert_eq "openchamber guard: bins only -> names both binaries (detect + fix lines)" "2" \
@@ -777,7 +788,9 @@ assert_eq "openchamber guard: bins only -> rm -f fix, no rm -rf" "1" \
 mkdir -p "$TMPDIR/oc-pin/.config/openchamber"
 printf '{ "opencodeBinary": "%s/.opencode/bin/opencode" }\n' "$TMPDIR/oc-pin" \
     >"$TMPDIR/oc-pin/.config/openchamber/settings.json"
-out=$(oc_run "$TMPDIR/oc-pin")
+oc_rc=0
+out=$(oc_run "$TMPDIR/oc-pin") || oc_rc=$?
+assert_eq "openchamber guard: pin only child exits 0 (#499)" "0" "$oc_rc"
 assert_eq "openchamber guard: pin only -> hang warning" "1" \
     "$(printf '%s' "$out" | grep -c 'will hang')"
 assert_eq "openchamber guard: pin only -> fix removes the settings line" "1" \
@@ -788,7 +801,9 @@ mkdir -p "$TMPDIR/oc-both/.config/openchamber"
 oc_mkbin "$TMPDIR/oc-both" opencode opencode2
 printf '{ "opencodeBinary": "/home/dev/.opencode/bin/opencode" }\n' \
     >"$TMPDIR/oc-both/.config/openchamber/settings.json"
-out=$(oc_run "$TMPDIR/oc-both")
+oc_rc=0
+out=$(oc_run "$TMPDIR/oc-both") || oc_rc=$?
+assert_eq "openchamber guard: bins+pin child exits 0 (#499)" "0" "$oc_rc"
 assert_eq "openchamber guard: bins+pin -> bypass wording" "1" \
     "$(printf '%s' "$out" | grep -c 'OUTSIDE the kit')"
 assert_eq "openchamber guard: bins+pin -> BOTH-steps fix advice" "1" \
@@ -800,20 +815,26 @@ assert_eq "openchamber guard: bins+pin -> fix names binaries AND settings line" 
 mkdir -p "$TMPDIR/oc-wrapped/.config/openchamber"
 printf '{ "opencodeBinary": "%s" }\n' "$OC_KIT_BIN" \
     >"$TMPDIR/oc-wrapped/.config/openchamber/settings.json"
-out=$(oc_run "$TMPDIR/oc-wrapped")
+oc_rc=0
+out=$(oc_run "$TMPDIR/oc-wrapped") || oc_rc=$?
+assert_eq "openchamber guard: pin-on-wrapper child exits 0 (#499)" "0" "$oc_rc"
 assert_eq "openchamber guard: pin on the kit wrapper -> quiet" "" "$out"
 
 # empty-string pin -> unset (openchamber optionalText semantics), quiet
 mkdir -p "$TMPDIR/oc-empty/.config/openchamber"
 printf '{ "opencodeBinary": "" }\n' >"$TMPDIR/oc-empty/.config/openchamber/settings.json"
-out=$(oc_run "$TMPDIR/oc-empty")
+oc_rc=0
+out=$(oc_run "$TMPDIR/oc-empty") || oc_rc=$?
+assert_eq "openchamber guard: empty pin child exits 0 (#499)" "0" "$oc_rc"
 assert_eq "openchamber guard: empty pin counts as unset" "" "$out"
 
 # kit-owned symlink -> not a shadow; the plain opencode2 shim still is
 mkdir -p "$TMPDIR/oc-link/.opencode/bin"
 ln -s "$OC_KIT_WRAPPER" "$TMPDIR/oc-link/.opencode/bin/opencode"
 echo "sh shim" >"$TMPDIR/oc-link/.opencode/bin/opencode2"
-out=$(oc_run "$TMPDIR/oc-link")
+oc_rc=0
+out=$(oc_run "$TMPDIR/oc-link") || oc_rc=$?
+assert_eq "openchamber guard: kit-symlink child exits 0 (#499)" "0" "$oc_rc"
 assert_eq "openchamber guard: kit symlink not listed, shim still is (2 lines)" "2" \
     "$(printf '%s' "$out" | grep -c 'bin/opencode2')"
 assert_eq "openchamber guard: kit symlink ignored (no pair listing)" "0" \
@@ -822,7 +843,9 @@ assert_eq "openchamber guard: kit symlink ignored (no pair listing)" "0" \
 # kit policy pins the wrapper -> secured NOTE (cyan), not a bypass warning,
 # even with bins + settings pin present
 printf '{ "opencodeBinary": "%s" }\n' "$OC_KIT_BIN" >"$OC_POLICY"
-out=$(oc_run "$TMPDIR/oc-both")
+oc_rc=0
+out=$(oc_run "$TMPDIR/oc-both") || oc_rc=$?
+assert_eq "openchamber guard: policy-secures child exits 0 (#499)" "0" "$oc_rc"
 assert_eq "openchamber guard: policy secures -> NOTE not WARNING" "1" \
     "$(printf '%s' "$out" | grep -c '^C:NOTE')"
 assert_eq "openchamber guard: policy secures -> both leftovers called inert" "2" \
@@ -833,7 +856,9 @@ assert_eq "openchamber guard: policy secures -> no bypass wording" "0" \
     "$(printf '%s' "$out" | grep -c 'OUTSIDE the kit')"
 # policy + pin-only leftover (0.0.47a F2): the stale settings pin is named,
 # no dangling "safe to remove:" list without binaries
-out=$(oc_run "$TMPDIR/oc-pin")
+oc_rc=0
+out=$(oc_run "$TMPDIR/oc-pin") || oc_rc=$?
+assert_eq "openchamber guard: policy+pin child exits 0 (#499)" "0" "$oc_rc"
 assert_eq "openchamber guard: policy + pin-only -> NOTE not WARNING" "1" \
     "$(printf '%s' "$out" | grep -c '^C:NOTE')"
 assert_eq "openchamber guard: policy + pin-only -> stale pin named" "1" \
@@ -846,7 +871,9 @@ assert_eq "openchamber guard: policy + pin-only -> no dangling remove list" "0" 
 mkdir -p "$TMPDIR/oc-otherkey/.config/openchamber"
 printf '{ "theme": "dark", "port": 3000 }\n' \
     >"$TMPDIR/oc-otherkey/.config/openchamber/settings.json"
-out=$(oc_run "$TMPDIR/oc-otherkey")
+oc_rc=0
+out=$(oc_run "$TMPDIR/oc-otherkey") || oc_rc=$?
+assert_eq "openchamber guard: foreign-keys child exits 0 (#499)" "0" "$oc_rc"
 assert_eq "openchamber guard: foreign settings keys -> quiet" "" "$out"
 
 # untrusted pin value must never reach the output (printf %b expansion,
@@ -854,7 +881,9 @@ assert_eq "openchamber guard: foreign settings keys -> quiet" "" "$out"
 mkdir -p "$TMPDIR/oc-evil/.config/openchamber"
 printf '{ "opencodeBinary": "/tmp/x\\n\\033[31mFAKE $(touch %s/pwned)" }\n' "$TMPDIR" \
     >"$TMPDIR/oc-evil/.config/openchamber/settings.json"
-out=$(oc_run "$TMPDIR/oc-evil")
+oc_rc=0
+out=$(oc_run "$TMPDIR/oc-evil") || oc_rc=$?
+assert_eq "openchamber guard: evil-pin child exits 0 (#499)" "0" "$oc_rc"
 assert_eq "openchamber guard: pin VALUE never printed" "0" \
     "$(printf '%s' "$out" | grep -c 'FAKE')"
 if [ -e "$TMPDIR/pwned" ]; then
