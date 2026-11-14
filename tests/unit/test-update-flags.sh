@@ -837,10 +837,19 @@ oc164_run() {
         eval "$1"
     )
 }
-if [ -n "$OC164_BLOCK" ]; then
-    OC164_FIXED="$(printf '%s' "$OC164_BLOCK" | sed "s|/etc/openchamber|$OC164_ETC|g")"
-    OC164_SABOTAGE="$(printf '%s' "$OC164_FIXED" |
-        sed 's|sudo test -f \([^ ]*\) |[ -f \1 ] |')"
+# The rewrite is verified, not trusted (#497 c M1): every absolute-path
+# token in the rewritten block must be scratch-prefixed — the expected
+# content's /usr/local/bin/opencode is data, not an operand — and no
+# /etc/openchamber literal may survive: a missed literal would make the
+# stub's REAL probe arms read the HOST's file instead of the fixture.
+OC164_FIXED="$(printf '%s' "$OC164_BLOCK" | sed "s|/etc/openchamber|$OC164_ETC|g")"
+OC164_SABOTAGE="$(printf '%s' "$OC164_FIXED" |
+    sed 's|sudo test -f \([^ ]*\) |[ -f \1 ] |')"
+_oc164_leak="$(abs_path_leaks "$OC164_FIXED" "$OC164_ETC" '/usr/local/bin/opencode')"
+_oc164_lit="$(printf '%s\n' "$OC164_FIXED" | sed "s|$OC164_ETC|@SCRATCH@|g" |
+    sed 's/^[[:space:]]*//; /^#/d' |
+    tr -d "\"'" | grep -F '/etc/openchamber' | head -n 1)"
+if [ -n "$OC164_BLOCK" ] && [ -z "$_oc164_leak" ] && [ -z "$_oc164_lit" ]; then
     # S1: admin 0700 dir (mode 000 = caller-blind), divergent content.
     printf '{ "opencodeBinary": "/usr/local/bin/somewhere-else" }\n' \
         >"$OC164_ETC/policy.json"
@@ -886,6 +895,8 @@ if [ -n "$OC164_BLOCK" ]; then
         fi
     fi
     chmod 755 "$OC164_ETC"
+else
+    fail "gate block sandbox (lit:$_oc164_lit leak:$_oc164_leak) (#164, #497 c M1)"
 fi
 
 # --- shell-startup hook re-apply via getent home (issue #192) --------------------
@@ -1340,13 +1351,22 @@ _f17_opk_block="$(sed -n '/#211 a F17, the 0.0.44a V10 sibling gap/,/^    fi$/p'
 # (Re-targeted from bin/opk by the #415 wave-1 extraction: the arm's
 # body moved to the lib and dedented 4 — the end anchor's `fi` now
 # sits at 4 spaces, matching the moved comment inside the block.)
-if [ -n "$_f17_opk_block" ]; then
-    # Hermetic: rewrite /etc/openchamber to scratch so the redirect can
-    # actually write (the mechanism — temp + mv to the final name — is
-    # what the pin asserts).
-    F17=$(mktemp -d)
-    mkdir -p "$F17/oc"
-    _f17_opk_block="$(printf '%s\n' "$_f17_opk_block" | sed "s|/etc/openchamber|$F17/oc|g")"
+# Hermetic: rewrite /etc/openchamber to scratch so the redirect can
+# actually write (the mechanism — temp + mv to the final name — is
+# what the pin asserts). The rewrite is verified, not trusted (#497 c
+# M1): every absolute-path token in the rewritten block must be
+# scratch-prefixed — the policy content's /usr/local/bin/opencode is
+# data and the /mv in the ui_error text is prose, neither is an
+# operand — and no /etc/openchamber literal may survive (the scratch
+# value itself is masked before the literal grep).
+F17=$(mktemp -d)
+mkdir -p "$F17/oc"
+_f17_opk_block="$(printf '%s\n' "$_f17_opk_block" | sed "s|/etc/openchamber|$F17/oc|g")"
+_f17_opk_leak="$(abs_path_leaks "$_f17_opk_block" "$F17" '/usr/local/bin/opencode' '/mv')"
+_f17_opk_lit="$(printf '%s\n' "$_f17_opk_block" | sed "s|$F17|@SCRATCH@|g" |
+    sed 's/^[[:space:]]*//; /^#/d' |
+    tr -d "\"'" | grep -F '/etc/openchamber' | head -n 1)"
+if [ -n "$_f17_opk_block" ] && [ -z "$_f17_opk_leak" ] && [ -z "$_f17_opk_lit" ]; then
     _out=$(sh -c 'mv() { case "$1" in -*) shift ;; esac; printf "MV %s -> %s\n" "$1" "$2"; }; ui_error() { echo "UIERR" >&2; }; eval "$1"' \
         sh "$_f17_opk_block" 2>&1) || true
     if printf '%s' "$_out" | grep -q "MV $F17/oc/policy.json.opk-new\.[0-9]* -> $F17/oc/policy.json"; then
@@ -1387,10 +1407,10 @@ if [ -n "$_f17_opk_block" ]; then
     else
         fail "opk twin: staging write gate (rc=$_f17_rc residue=$_f17_residue out=$_out) (#211 c W7)"
     fi
-    rm -rf "$F17"
 else
-    fail "opk openchamber block extractable (#211 a F17)"
+    fail "opk twin block sandbox (lit:$_f17_opk_lit leak:$_f17_opk_leak) (#211 a F17, #497 c M1)"
 fi
+rm -rf "${F17:?}"
 
 # --- pr-00263 a F2(b): OPENCODE_USER shape gate in update.sh (#243 e X1 mirror) --
 # Extract and drive REAL (the uninstall-suite idiom): valid custom name

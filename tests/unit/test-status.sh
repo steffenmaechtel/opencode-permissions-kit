@@ -952,6 +952,28 @@ if [ -n "$OCV_BLOCK" ]; then
 else
     fail "openchamber verdict block not extractable from sh/status-core.sh"
 fi
+# The rewrite is verified, not trusted (#497 c M4): none of the four
+# rewritten forms may survive the hermetic rewrite — a missed literal
+# (pattern drift) leaves real host operands in the verdict eval and the
+# matrix becomes host-state-dependent. Comment lines are excluded (the
+# prose mentions /home/<user>); the block's variable-bound uses
+# ($_oc_home/...) are bound to the rewritten assignment and stay inside
+# the fixture root by construction. A FOREIGN new path added to the
+# block is NOT caught here — recorded residual (#497 c M4): the token
+# scan is false-positive-noisy on this block's sed programs and
+# variable-bound operands.
+_ocv_lit="$(printf '%s\n' "$OCV_BLOCK" | sed 's/^[[:space:]]*//; /^#/d' | tr -d "\"'" |
+    grep -F \
+        -e '/etc/openchamber/policy.json' \
+        -e '/usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode' \
+        -e '/usr/local/bin/opencode' \
+        -e '/home/' |
+    head -n 1)"
+if [ -n "$OCV_BLOCK" ] && [ -z "$_ocv_lit" ]; then
+    pass "openchamber verdict block hermetically rewritten (no host literal survives) (#497 c M4)"
+else
+    fail "openchamber verdict block rewrite sandbox (surviving literal:$_ocv_lit) (#497 c M4)"
+fi
 # ocv_run <with|without> — eval the block under the hermetic PATH;
 # "with" prepends the fake-openchamber bin, "without" sees no openchamber
 # at all — the host's real one included. Prints the ui_kv lines. The

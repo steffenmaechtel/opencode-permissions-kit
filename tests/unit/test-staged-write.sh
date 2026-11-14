@@ -758,22 +758,18 @@ _F19P="$WORK/f19p"
 mkdir -p "$_F19P/etc"
 _f19p_block="$(sed -n '/#482 F19 sweep, config.sh/,/sudo mv -f/p' "$INSTALL_CORE" |
     sed "s|/etc/opencode-permissions-kit|$_F19P/etc|g")"
-# Sandbox guard (#497 b B1): the pass below claims "sandboxed" — pin it.
-# Every QUOTED absolute path in the rewritten block must be scratch-
-# prefixed; the sed rewrite was trusted, never verified, before. Future
-# drift adding any other real path to the block would otherwise make the
-# drive write outside its scratch (a confusing red as the non-root suite
-# user, a silent out-of-scratch write in any as-root run).
-_f19p_leak=""
-# shellcheck disable=SC2086  # word splitting intended (kit paths carry no spaces)
-for _f19p_p in $(printf '%s\n' "$_f19p_block" | grep -oE '"/[^"]*"' | tr -d '"'); do
-    case "$_f19p_p" in
-        "$_F19P"/*) ;;
-        *) _f19p_leak="$_f19p_leak $_f19p_p" ;;
-    esac
-done
+# Sandbox guard (#497 b B1; widened to ALL absolute-path operands by
+# #497 c M2 — the quoted-only grep could not see the block's own
+# unquoted mv-target style). The pass below claims "sandboxed" — pin
+# it: the sed rewrite is verified, not trusted. Future drift adding any
+# other real path to the block (quoted or not) makes the drive skip
+# loud instead of writing outside its scratch (a confusing red as the
+# non-root suite user, a silent out-of-scratch write in any as-root
+# run). /dev/null is scanned-out by the scanner; the block carries no
+# other non-scratch operands today.
+_f19p_leak="$(abs_path_leaks "$_f19p_block" "$_F19P")"
 if [ -n "$_f19p_block" ] && [ -z "$_f19p_leak" ]; then
-    pass "projects.conf block extractable + sandboxed, every quoted path scratch-prefixed (#482 F19, #497 a S3, #497 b B1)"
+    pass "projects.conf block extractable + sandboxed, every absolute path scratch-prefixed (#482 F19, #497 a S3, #497 b B1, #497 c M2)"
     _f19p_rc=0
     _f19p_out=$(
         sh -c '
@@ -795,6 +791,19 @@ root-b" ] &&
     fi
 else
     fail "projects.conf block extraction/sandbox (empty or unrewritten absolute path:$_f19p_leak) (#482 F19, #497 a S3, #497 b B1)"
+fi
+
+# Sandbox scanner firing pin (#497 c M3): the SAME scanner the drive
+# guards gate on stays exercised in-suite — a synthetic foreign
+# absolute path must surface as a leak (leak arm) and a scratch-bound
+# block must scan clean (clean arm). A broken scanner (dropped leak
+# accumulation, inverted pattern) fails one of the two arms loud.
+_apl_probe="$(abs_path_leaks 'echo probe | sudo tee "/var/apl-probe/f" >/dev/null' /nonexistent-apl-prefix)"
+_apl_clean="$(abs_path_leaks 'mv -f "$t" /tmp/apl-allowed/f ; echo x >/dev/null' /tmp/apl-allowed)"
+if printf '%s' "$_apl_probe" | grep -qF '/var/apl-probe/f' && [ -z "$_apl_clean" ]; then
+    pass "sandbox scanner: foreign absolute path flagged, scratch-bound block clean (#497 c M3)"
+else
+    fail "sandbox scanner pin (leak=$_apl_probe clean=$_apl_clean) (#497 c M3)"
 fi
 
 # --- summary -----------------------------------------------------------------------

@@ -336,6 +336,38 @@ extract_func() {
     sed -n "/^$2() {/,/^}/p" "$1"
 }
 
+# abs_path_leaks BLOCK ALLOWED_PREFIX_OR_TOKEN... -- the drive-block
+# sandbox scanner (#497 c M1/M2): an eval-drive block whose sed rewrite
+# sandboxes it to scratch must be VERIFIED, not trusted. Prints every
+# absolute-path token in BLOCK that is neither /dev/null nor prefixed by
+# one of the ALLOWED arguments (textual prefix match: the scratch value
+# and deeper scratch paths pass; a foreign /var/... or /etc/... operand
+# leaks). Comment lines are ignored (prose slashes are not operands)
+# and quote characters are stripped before tokenizing, so quoted and
+# unquoted drift forms weigh the same. Empty output = clean; the
+# answer rides the OUTPUT, never the exit status (call sites run under
+# set -e).
+abs_path_leaks() {
+    local _apl_block="$1" _apl_scan="" _apl_leaks="" _apl_tok _apl_ok _apl_hit
+    shift
+    # || true normalizes the rc only (errexit-safe in set -e suites):
+    # a zero-match scan is the CLEAN result, not a swallowed failure.
+    _apl_scan="$(printf '%s\n' "$_apl_block" | sed 's/^[[:space:]]*//; /^#/d' |
+        tr -d "\"'" | grep -oE '/[A-Za-z0-9_][A-Za-z0-9_./$-]*' || true)"
+    # shellcheck disable=SC2086  # tokens are space-free by construction
+    for _apl_tok in $_apl_scan; do
+        case "$_apl_tok" in /dev/null) continue ;; esac
+        _apl_hit=""
+        for _apl_ok in "$@"; do
+            case "$_apl_tok" in
+                "$_apl_ok"*) _apl_hit=1 ;;
+            esac
+        done
+        [ -n "$_apl_hit" ] || _apl_leaks="$_apl_leaks $_apl_tok"
+    done
+    printf '%s' "$_apl_leaks"
+}
+
 suite_done() {
     _label="$1"
     echo ""
