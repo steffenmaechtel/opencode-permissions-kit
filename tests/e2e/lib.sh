@@ -429,10 +429,14 @@ e2e_resolve_cache() {
     # destination directly used to leave a PARTIAL install.sh behind on
     # a mid-transfer death — persisted via actions/cache and propagated
     # across version bumps by restore-key prefixes, recurring false
-    # reds with no self-heal. A partial temp never becomes install.sh;
-    # the rm keeps a failed run from littering the cache dir.
+    # reds with no self-heal. A partial temp never becomes install.sh.
+    # The temp name is mktemp-random, not PID-predictable (#509 a S2:
+    # curl -o writes through a symlink planted at a predictable name —
+    # the tui-register mkstemp standard), and every failure edge,
+    # mv included (#509 a S3), cleans its temp and exits loud.
     if [ ! -s "$OC_INSTALLER" ]; then
-        local _oc_ins_tmp="$OC_INSTALLER.tmp.$$"
+        local _oc_ins_tmp
+        _oc_ins_tmp="$(mktemp "$OC_INSTALLER.tmp.XXXXXX")"
         curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 60 \
             https://opencode.ai/install -o "$_oc_ins_tmp" ||
             {
@@ -440,7 +444,12 @@ e2e_resolve_cache() {
                 echo "  ${RED}FAIL${NC}  cannot fetch opencode installer"
                 exit 1
             }
-        mv -f "$_oc_ins_tmp" "$OC_INSTALLER"
+        mv -f "$_oc_ins_tmp" "$OC_INSTALLER" ||
+            {
+                rm -f "$_oc_ins_tmp"
+                echo "  ${RED}FAIL${NC}  cannot move fetched installer into place"
+                exit 1
+            }
     fi
 
     echo "  Using opencode $OC_VERSION (cache: $OC_BIN)"

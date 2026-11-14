@@ -200,14 +200,10 @@ INSTCURL
     _rc=0
     _inst_drive good >/dev/null || _rc=$?
     if [ "$_rc" -eq 0 ] && [ -s "$INSTWORK/cache/install.sh" ] &&
-        ! grep -q 'fake installer v1' /dev/null false 2>/dev/null; then
-        if grep -q 'fake installer v1' "$INSTWORK/cache/install.sh"; then
-            pass "installer cache: complete fetch lands atomically (good path, #485 F30)"
-        else
-            fail "installer cache: good-path install.sh has wrong content (#485 F30)"
-        fi
+        grep -q 'fake installer v1' "$INSTWORK/cache/install.sh"; then
+        pass "installer cache: complete fetch lands atomically (good path, #485 F30)"
     else
-        fail "installer cache: good-path fetch failed (rc=$_rc, install.sh present: $([ -s "$INSTWORK/cache/install.sh" ] && echo yes))"
+        fail "installer cache: good-path fetch failed or wrong content (rc=$_rc, install.sh present: $([ -s "$INSTWORK/cache/install.sh" ] && echo yes))"
     fi
     rm -f "${INSTWORK:?}/cache/install.sh"
     _rc=0

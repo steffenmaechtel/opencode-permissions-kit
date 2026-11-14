@@ -12,6 +12,9 @@
 # Usage (CI sets GITHUB_REPOSITORY + GH_TOKEN; locally: export both):
 #   scripts/advisory-watch.sh
 #   OPK_SCAN_DRY_RUN=1 scripts/advisory-watch.sh   # print instead of create
+# NB: the dry run still needs a working `gh` — the dedup probe (#485 F26)
+# dies loud on gh failures instead of guessing "not tracked", so a local
+# preview requires gh auth just like the real run.
 set -eu
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
