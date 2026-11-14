@@ -780,8 +780,8 @@ ddev_handover_root() {
     # diagnostic, the interrupted scan unnamed. Loud warn + rc 1 (the
     # entry stubs' refuse-loud contract); the next update rescans.
     _dhr_nul="$(mktemp "${TMPDIR:-/tmp}/opk-dhr-scan.XXXXXXXX")" || {
-        printf '%s\n' "  warn: cannot stage the .ddev scan stream (mktemp failed) —""\
- handover scan refused for $dhr_root" >&2
+        printf '%s\n' "  warn: mktemp failed (is \$TMPDIR writable?) — cannot stage the""\
+ .ddev scan stream, handover scan refused for $dhr_root" >&2
         return 1
     }
     if command -v _tmp_track >/dev/null 2>&1; then

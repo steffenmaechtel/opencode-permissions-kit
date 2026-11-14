@@ -334,7 +334,14 @@ setup_docker_rootless() {
             echo "  Running get.docker.com (installs docker-ce + docker-ce-rootless-extras) ..."
             # mktemp, never a fixed /tmp path: this script runs as root, and a
             # pre-planted file at a predictable path would be executed as root.
-            GET_DOCKER_TMP="$(mktemp)" || exit 1
+            # Named-cause mktemp guard (#479 a F18 class, pr-00507 a M1):
+            # a raw `|| exit 1` aborted provisioning with only mktemp's
+            # own diagnostic — the interrupted get.docker.com step unnamed
+            # (the config.sh #431 family wording).
+            GET_DOCKER_TMP="$(mktemp)" || {
+                echo "${RED}mktemp failed (is \$TMPDIR writable?) — get.docker.com install NOT run${NC}" >&2
+                exit 1
+            }
             if curl -fsSL https://get.docker.com -o "$GET_DOCKER_TMP" 2>/dev/null; then
                 sh "$GET_DOCKER_TMP" 2>&1 | sed 's/^/    /' || true
                 apt-get update -qq 2>/dev/null || true

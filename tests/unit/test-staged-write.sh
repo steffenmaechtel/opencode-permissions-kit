@@ -353,6 +353,35 @@ else
     pass "handover_root: the newline-split prefix directory never reaches the pair (#479 a F12)"
 fi
 
+# --- 2c-g. the two rc=1 guard arms of ddev_handover_root (pr-00507 a
+# Q2): every other drive in this suite exports the lib env on a live
+# TMPDIR, so a broken guard (wrong var name, inverted test, a silent
+# return 0) would ship green. Both refusals are discriminated here:
+# the missing-env arm (env -u strips the suite's export) and the
+# scan-stream mktemp arm (dead TMPDIR, post-#507 wording with the
+# hint). The root must pass the belt gates first — they run before
+# the env check.
+mkdir -p "$WORK/g"
+_g_rc=0
+_g_out="$(env -u OPK_DDEV_HANDOVER_LIB PATH="$WORK/stubhr:$PATH" OPK_INSTALL_CONF=/nonexistent \
+    sh -c '. "$1" && ddev_handover_root "$2" ocuser ocgroup devuser' _ "$HANDOVER" "$WORK/g" 2>&1)" || _g_rc=$?
+if [ "$_g_rc" -eq 1 ] &&
+    printf '%s' "$_g_out" | grep -qF 'OPK_DDEV_HANDOVER_LIB is unset or missing'; then
+    pass "handover_root guard: missing lib env refuses loud, rc 1 (#479 a F12)"
+else
+    fail "handover_root guard: missing lib env must refuse rc 1 (rc=$_g_rc out=$_g_out) (#479 a F12)"
+fi
+_g2_rc=0
+_g2_out="$(OPK_DDEV_HANDOVER_LIB="$HANDOVER" TMPDIR="$WORK/no-such-tmpdir-g" \
+    PATH="$WORK/stubhr:$PATH" OPK_INSTALL_CONF=/nonexistent \
+    sh -c '. "$1" && ddev_handover_root "$2" ocuser ocgroup devuser' _ "$HANDOVER" "$WORK/g" 2>&1)" || _g2_rc=$?
+if [ "$_g2_rc" -eq 1 ] &&
+    printf '%s' "$_g2_out" | grep -qF 'mktemp failed (is $TMPDIR writable?) — cannot stage the .ddev scan stream'; then
+    pass "handover_root guard: scan-stream mktemp failure refuses loud, rc 1 (#479 a F12)"
+else
+    fail "handover_root guard: scan-stream mktemp failure must refuse rc 1 (rc=$_g2_rc out=$_g2_out) (#479 a F12)"
+fi
+
 # --- 2e. ddev_handover_project_back (0.0.39h F9): planted settings-dir
 # links never reach the recursive ops; the root-inode handback fires only
 # for a kit-owned root (stubbed stat).

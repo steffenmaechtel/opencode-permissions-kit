@@ -1506,11 +1506,12 @@ chmod 755 "$RACE/victim/.ddev"
 cat >"$RACESTUB/find" <<EOF
 #!/bin/sh
 # Buffer the real find's output, perform the swap, THEN release the
-# scan stream — a stream-through stub races the consumer loop (the
-# loop can run the whole iteration while the stub is still between
-# find and mv; measured ~8% flake before the buffer). The temp file is
-# the a F1 barrier, moved into the stub because ddev_handover_root
-# streams find directly into the while loop.
+# scan stream — a stream-through stub races the consumer (#479 a F12
+# stages find into a NUL temp file first, but the stub's own write
+# window still overlaps find's exit; the buffer keeps the swap
+# deterministically INSIDE the stub before anything downstream can
+# observe). The temp file is the a F1 barrier, moved into the stub
+# because the scan consumes find's output through a staged file.
 _out=\$(mktemp)
 "$(command -v find)" "\$@" > "\$_out"
 _rc=\$?

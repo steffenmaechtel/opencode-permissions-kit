@@ -493,6 +493,14 @@ else
     check "apply_unprivileged_port_start extractable (#479 a F7)" false
 fi
 
+# pr-00507 a M1: the get.docker.com staging mktemp is named-cause now
+# (the #479 a F18 class, swept by review round a): a raw `|| exit 1`
+# aborted provisioning with only mktemp's own diagnostic, the
+# interrupted step unnamed. Presence pin — the site is inline in the
+# provisioning function (no extraction arm like the F7 block above).
+check_live "get.docker.com mktemp failure names the interrupted install (pr-00507 a M1)" "$SETUP" \
+    -qF 'mktemp failed (is \$TMPDIR writable?) — get.docker.com install NOT run'
+
 # --- subuid/subgid fields validated before arithmetic (#211 a F16) ----------------
 # allocate_range fed raw /etc/subuid fields into $(( )) — digit-leading
 # junk aborted provisioning under set -e with a cryptic foreign error,

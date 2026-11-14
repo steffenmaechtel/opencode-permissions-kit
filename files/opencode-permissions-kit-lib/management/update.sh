@@ -57,7 +57,8 @@ _BIN_TMP=""
 _TMP_REGISTRY=""
 # Newline-separated registry (#479 a F8, the install.sh twin): a TMPDIR
 # containing whitespace must not word-split an entry at cleanup — each
-# entry leaves as ONE quoted operand.
+# entry leaves as ONE quoted operand. A newline inside a path stays an
+# accepted residual, like install.sh: no mktemp template produces one.
 _tmp_track() {
     _TMP_REGISTRY="${_TMP_REGISTRY}${1}
 "
