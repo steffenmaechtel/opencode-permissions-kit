@@ -7,7 +7,6 @@
     install-shfmt \
     check-host \
     check-py \
-    coverage \
     test-opencode-as-opencode \
     test-as-opencode-core \
     test-fs-baseline \
@@ -35,7 +34,6 @@
     test-line-length \
     test-string-continuations \
     test-format-gate \
-    test-coverage \
     test-install-args \
     test-kit-files \
     test-tui-mode \
@@ -153,8 +151,6 @@ help:
 	@echo "  make fmt-scope     Print the gate's file scope (single source, used by the format-gate suite)"
 	@echo "  make sums          Regenerate SHA256SUMS (issue #478; commit it when files/ changed)"
 	@echo "  make install-shfmt Download the pinned shfmt to ~/.local/bin (no root)"
-	@echo "  make coverage      kcov line-coverage report over the unit suites (report only, docker once; SUITE=name filters)"
-	@echo "  make test-coverage  Run coverage-runner pins (issue #255 stage 0b)"
 	@echo "  make test-opencode-as-opencode  Run wrapper (opencode-as-opencode) validation tests"
 	@echo "  make test-as-opencode-core      Run wrapper core lib (as-opencode-core.sh) tests"
 	@echo "  make test-fs-baseline  Run group-baseline progress tests (issue #14)"
@@ -258,7 +254,6 @@ test: lint \
       test-secure-binary \
       test-sudoers-deploy \
       test-format-gate \
-      test-coverage \
       test-update-check \
       test-browser-bridge \
       test-rider-lint \
@@ -374,13 +369,6 @@ sums:
 			rm -f "$$_sums_tmp"; \
 			echo "SHA256SUMS already fresh ($$(wc -l < SHA256SUMS | tr -d ' ') entries)"; \
 		fi
-
-# kcov coverage report over the unit suites (issue #255 stage 0b). Report
-# only — never part of `make test` and never a percentage gate. Needs
-# docker once (kcov binary extraction); see scripts/coverage.sh and
-# internal/records/kcov-coverage.md.
-coverage:
-	@./scripts/coverage.sh $(if $(SUITE),$(SUITE))
 
 # Download the pinned shfmt into ~/.local/bin (single static binary,
 # no root). CI uses this too -- the Makefile is the one source of the
@@ -572,10 +560,6 @@ test-check-host:
 test-format-gate:
 	@echo "=== shfmt Format-Gate Pins (issue #255 stage 0a) ==="
 	@./tests/unit/test-format-gate.sh
-
-test-coverage:
-	@echo "=== Coverage-Runner Pins (issue #255 stage 0b) ==="
-	@./tests/unit/test-coverage.sh
 
 test-install-args:
 	@echo "=== install.sh Arg-Parsing Tests ==="
