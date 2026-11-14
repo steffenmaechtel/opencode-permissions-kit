@@ -688,6 +688,28 @@ OC_BLOCK="$(printf '%s\n' "$OC_BLOCK" | sed \
     -e "s|/usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode|$OC_KIT_WRAPPER|g" \
     -e "s|/usr/local/bin/opencode|$OC_KIT_BIN|g" \
     -e "s|/etc/openchamber/policy.json|$OC_POLICY|g")"
+# The rewrite is verified, not trusted (#497 d N2 — the sixth
+# trusted-rewrite drive, missed by the #497 c M1 sweep): none of the
+# three rewritten forms may survive — a missed literal leaves real host
+# operands in the guard eval and the bypass matrix becomes
+# host-state-dependent (the 0.0.46a F2 class). The scratch values are
+# masked before the literal grep. Read-only consequence class
+# (openchamber_guard carries no write verbs), so the token scan is not
+# applied here (OCV precedent: variable-bound operands make it
+# false-positive-noisy).
+_oc_lit="$(printf '%s\n' "$OC_BLOCK" |
+    sed "s|$OC_KIT_WRAPPER|@SCRATCH@|g; s|$OC_KIT_BIN|@SCRATCH@|g; s|$OC_POLICY|@SCRATCH@|g" |
+    sed 's/^[[:space:]]*//; /^#/d' | tr -d "\"'" |
+    grep -F \
+        -e '/usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode' \
+        -e '/usr/local/bin/opencode' \
+        -e '/etc/openchamber/policy.json' |
+    head -n 1)"
+if [ -n "$OC_BLOCK" ] && [ -z "$_oc_lit" ]; then
+    pass "openchamber_guard rewrite hermetic (no host literal survives) (#497 d N2)"
+else
+    fail "openchamber_guard rewrite sandbox (surviving literal:$_oc_lit) (#497 d N2)"
+fi
 
 # oc_run <home> — eval the block with a stubbed note(), run the guard,
 # print every non-empty note prefixed with its color stub (W: warning,

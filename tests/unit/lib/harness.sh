@@ -347,6 +347,12 @@ extract_func() {
 # unquoted drift forms weigh the same. Empty output = clean; the
 # answer rides the OUTPUT, never the exit status (call sites run under
 # set -e).
+#
+# Known textual limits (#497 d N4, pinned in test-harness.sh): a token
+# must START with '/' to enter the scan — a whole-operand variable
+# (`mv x "$_target"`, $_target holding a host path) produces no token
+# and stays invisible; a slash-tailed variable (`mv x "$_host/etc/x"`)
+# is caught via its literal tail.
 abs_path_leaks() {
     local _apl_block="$1" _apl_scan="" _apl_leaks="" _apl_tok _apl_ok _apl_hit
     shift
@@ -360,7 +366,11 @@ abs_path_leaks() {
         _apl_hit=""
         for _apl_ok in "$@"; do
             case "$_apl_tok" in
-                "$_apl_ok"*) _apl_hit=1 ;;
+                # Token-boundary match (#497 d N3): the allowed token
+                # itself or a path BELOW it passes — a sibling
+                # extension (/usr/local/bin/opencode2) must leak, not
+                # inherit the allowlist.
+                "$_apl_ok" | "$_apl_ok"/*) _apl_hit=1 ;;
             esac
         done
         [ -n "$_apl_hit" ] || _apl_leaks="$_apl_leaks $_apl_tok"

@@ -971,8 +971,10 @@ _ocv_lit="$(printf '%s\n' "$OCV_BLOCK" | sed 's/^[[:space:]]*//; /^#/d' | tr -d 
     head -n 1)"
 if [ -n "$OCV_BLOCK" ] && [ -z "$_ocv_lit" ]; then
     pass "openchamber verdict block hermetically rewritten (no host literal survives) (#497 c M4)"
-else
-    fail "openchamber verdict block rewrite sandbox (surviving literal:$_ocv_lit) (#497 c M4)"
+elif [ -n "$OCV_BLOCK" ]; then
+    # extraction-empty already failed named above — only a non-empty
+    # block with a surviving literal fails here (#497 d N5)
+    fail "openchamber verdict block rewrite sandbox (surviving literal:$_ocv_lit) (#497 c M4, #497 d N5)"
 fi
 # ocv_run <with|without> — eval the block under the hermetic PATH;
 # "with" prepends the fake-openchamber bin, "without" sees no openchamber

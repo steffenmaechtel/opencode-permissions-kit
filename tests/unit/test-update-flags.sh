@@ -896,7 +896,12 @@ if [ -n "$OC164_BLOCK" ] && [ -z "$_oc164_leak" ] && [ -z "$_oc164_lit" ]; then
     fi
     chmod 755 "$OC164_ETC"
 else
-    fail "gate block sandbox (lit:$_oc164_lit leak:$_oc164_leak) (#164, #497 c M1)"
+    # extraction-empty already failed named above (#198 a W5 arm) —
+    # only a non-empty block with a sandbox failure fails here
+    # (#497 d N5: the diagnosis must name the cause).
+    if [ -n "$OC164_BLOCK" ]; then
+        fail "gate block sandbox (lit:$_oc164_lit leak:$_oc164_leak) (#164, #497 c M1, #497 d N5)"
+    fi
 fi
 
 # --- shell-startup hook re-apply via getent home (issue #192) --------------------
@@ -1408,7 +1413,11 @@ if [ -n "$_f17_opk_block" ] && [ -z "$_f17_opk_leak" ] && [ -z "$_f17_opk_lit" ]
         fail "opk twin: staging write gate (rc=$_f17_rc residue=$_f17_residue out=$_out) (#211 c W7)"
     fi
 else
-    fail "opk twin block sandbox (lit:$_f17_opk_lit leak:$_f17_opk_leak) (#211 a F17, #497 c M1)"
+    if [ -z "$_f17_opk_block" ]; then
+        fail "opk openchamber block extractable (#211 a F17)"
+    else
+        fail "opk twin block sandbox (lit:$_f17_opk_lit leak:$_f17_opk_leak) (#211 a F17, #497 c M1, #497 d N5)"
+    fi
 fi
 rm -rf "${F17:?}"
 
