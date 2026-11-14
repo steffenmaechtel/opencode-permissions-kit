@@ -758,8 +758,22 @@ _F19P="$WORK/f19p"
 mkdir -p "$_F19P/etc"
 _f19p_block="$(sed -n '/#482 F19 sweep, config.sh/,/sudo mv -f/p' "$INSTALL_CORE" |
     sed "s|/etc/opencode-permissions-kit|$_F19P/etc|g")"
-if [ -n "$_f19p_block" ]; then
-    pass "projects.conf block extractable + sandboxed (#482 F19, #497 a S3)"
+# Sandbox guard (#497 b B1): the pass below claims "sandboxed" — pin it.
+# Every QUOTED absolute path in the rewritten block must be scratch-
+# prefixed; the sed rewrite was trusted, never verified, before. Future
+# drift adding any other real path to the block would otherwise make the
+# drive write outside its scratch (a confusing red as the non-root suite
+# user, a silent out-of-scratch write in any as-root run).
+_f19p_leak=""
+# shellcheck disable=SC2086  # word splitting intended (kit paths carry no spaces)
+for _f19p_p in $(printf '%s\n' "$_f19p_block" | grep -oE '"/[^"]*"' | tr -d '"'); do
+    case "$_f19p_p" in
+        "$_F19P"/*) ;;
+        *) _f19p_leak="$_f19p_leak $_f19p_p" ;;
+    esac
+done
+if [ -n "$_f19p_block" ] && [ -z "$_f19p_leak" ]; then
+    pass "projects.conf block extractable + sandboxed, every quoted path scratch-prefixed (#482 F19, #497 a S3, #497 b B1)"
     _f19p_rc=0
     _f19p_out=$(
         sh -c '
@@ -780,7 +794,7 @@ root-b" ] &&
         fail "projects.conf drive (rc=$_f19p_rc out=$_f19p_out ls=$(ls -A "$_F19P/etc" 2>/dev/null)) (#497 a S3)"
     fi
 else
-    fail "projects.conf block extractable + sandboxed (#482 F19, #497 a S3)"
+    fail "projects.conf block extraction/sandbox (empty or unrewritten absolute path:$_f19p_leak) (#482 F19, #497 a S3, #497 b B1)"
 fi
 
 # --- summary -----------------------------------------------------------------------
