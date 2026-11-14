@@ -30,6 +30,13 @@
 #     register receivers, work_register / work_register_var migrate
 #     pre-existing ones, the central trap collects on green, red, set -e
 #     abort and SIGTERM -- with a disarmed control arm that must leak
+#   - abs_path_leaks (#497 c M2, #497 d N1): the drive-block sandbox
+#     scanner -- rc 0 on leak AND clean input (the answer rides the
+#     output), full-line comment exclusion, quote-strip equivalence,
+#     /dev/null scan-out, token-boundary allowlist (sibling extensions
+#     leak), the documented variable-operand limits, the trailing-
+#     comment trade, multi-allowlist arity, and the trailing-slash
+#     allow-arg trap
 #
 # Independent by design: this suite uses its OWN local ok/bad counters
 # and its own summary gate -- NOT the harness under test. A corrupted
@@ -833,6 +840,72 @@ printf '%s\n' \
     '	@echo hi' >"$_tc_fix/empty-head.mk"
 arm "printf 'OUT:%s|END' \"\$(test_chain \"$_tc_fix/empty-head.mk\" | tr '\n' '|')\""
 has "OUT:a|END" "11.6 zero-name head emits no leading empty token"
+
+# --- 12. abs_path_leaks (#497 c M2, #497 d N1): the drive-block sandbox scanner
+# Pin-on-entry for the scanner the drive guards gate on (the #393 rule:
+# an unpinned harness function can print a FAIL row yet exit 0). Pinned
+# contracts: the answer rides the OUTPUT and the rc stays 0 on leak AND
+# clean input (set -e suites source this file), full-line comments are
+# excluded, quote stripping makes quoted/unquoted drift weigh the same,
+# /dev/null is scanned out, the allowlist matches on token boundary
+# (#497 d N3 — a sibling extension leaks), and the documented textual
+# limit (#497 d N4: whole-operand variables invisible, slash-tailed
+# variables caught via their tail) holds. Sabotage arms (committed
+# tree, restore + re-run green):
+#   - make the function return nonzero on a leak -> the 12.1 pins go red
+#   - revert the boundary match to a bare prefix ("$_apl_ok"*) ->
+#     the 12.6 sibling-extension pin goes red
+#   - drop the /^#/d comment-strip -> the 12.3 prose pin goes red
+arm "abs_path_leaks 'echo p | sudo tee \"/var/apl-pin/f\" >/dev/null' /nonexistent-pin >/dev/null; echo rc=\$?"
+rc_is 0 "12.1 leaky input: rc stays 0 (the answer rides the output, set -e safe)"
+arm "abs_path_leaks 'mv -f \"\$t\" /nonexistent-pin/ok/f' /nonexistent-pin; echo rc=\$?"
+rc_is 0 "12.1 clean input: rc stays 0"
+if [ "$_arm_out" = "rc=0" ]; then
+    ok "12.1 ... clean block scans empty (rc-only output)"
+else
+    bad "12.1 ... clean block must scan empty (got: $_arm_out)"
+fi
+arm "abs_path_leaks 'echo p | sudo tee \"/var/apl-pin/f\" >/dev/null' /nonexistent-pin"
+has "/var/apl-pin/f" "12.2 a foreign absolute path surfaces as a leak"
+arm "abs_path_leaks 'tee /etc/apl-real <x
+# prose: never write to /etc/apl-prose directly' /nonexistent-pin"
+lacks "/etc/apl-prose" "12.3 full-line comment prose is excluded (not an operand)"
+has "/etc/apl-real" "12.3 ... code lines still leak"
+arm "abs_path_leaks 'tee \"/var/apl-q/f\" >/dev/null; tee /var/apl-q/f >/dev/null' /nonexistent-pin"
+has "/var/apl-q/f /var/apl-q/f" "12.4 quoted and unquoted drift weigh the same"
+arm "abs_path_leaks 'tee /tmp/apl-ok/f >/dev/null; cat /dev/null' /tmp/apl-ok"
+if [ -z "$_arm_out" ]; then
+    ok "12.5 scratch-bound operands and /dev/null scan clean"
+else
+    bad "12.5 ... scratch-bound operands must not leak (got: $_arm_out)"
+fi
+arm "abs_path_leaks 'tee /usr/local/bin/opencode >/dev/null' /usr/local/bin/opencode"
+if [ -z "$_arm_out" ]; then
+    ok "12.6 the exact allowlist token passes"
+else
+    bad "12.6 ... exact allowlist token must pass (got: $_arm_out)"
+fi
+arm "abs_path_leaks 'tee /usr/local/bin/opencode2 >/dev/null' /usr/local/bin/opencode"
+has "/usr/local/bin/opencode2" "12.6 ... a sibling extension leaks (token boundary, #497 d N3)"
+arm "abs_path_leaks 'mv x \"\$_host/etc/x\" >/dev/null' /nonexistent-pin"
+has "/etc/x" "12.7 a slash-tailed variable is caught via its literal tail"
+arm "abs_path_leaks 'mv x \"\$_target\" >/dev/null' /nonexistent-pin"
+if [ -z "$_arm_out" ]; then
+    ok "12.7 ... a whole-operand variable produces no token (documented limit, #497 d N4)"
+else
+    bad "12.7 ... the documented invisible-variable limit drifted (got: $_arm_out)"
+fi
+arm "abs_path_leaks 'tee /etc/apl-code >/dev/null # prose /etc/apl-tail' /nonexistent-pin"
+has "/etc/apl-code" "12.8 a code-line trailing comment's prose leaks with the code (strip trade, #497 e P4)"
+has "/etc/apl-tail" "12.8 ... and the trailing prose token leaks too (nothing strips it)"
+arm "abs_path_leaks 'tee /tmp/apl-2nd/b >/dev/null; tee /tmp/apl-2nd/a >/dev/null' /tmp/apl-2nd/a /tmp/apl-2nd/b"
+if [ -z "$_arm_out" ]; then
+    ok "12.9 multi-allowlist arity: every allow argument is honored (#497 e P5)"
+else
+    bad "12.9 ... tokens matching EITHER allow argument must pass (got: $_arm_out)"
+fi
+arm "abs_path_leaks 'tee /tmp/apl-slash/x >/dev/null' /tmp/apl-slash/"
+has "/tmp/apl-slash/x" "12.10 a trailing-slash allow arg fails to allow its subpath (documented trap, #497 e P6)"
 
 # --- summary gate (independent on purpose -- see header) ------------------------
 echo ""

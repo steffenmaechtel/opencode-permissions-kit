@@ -1396,6 +1396,22 @@ check "12k: openchamber-secure announces replacing divergent content (0.0.47a F1
     E 'grep -q "replacing it" /tmp/oc-nohome.log'
 E 'sudo sed -i "s/^DEFAULT_USER=.*/DEFAULT_USER=dev/" /etc/opencode-permissions-kit/install.conf'
 E 'rm -f /tmp/oc-nohome.log'
+# #482 F17: the install-side WRITE arm (absent file + opt-in) — the
+# pin must land atomically with the kit content and root:root 644, no
+# staged temp residue (the INSTALL arms above only exercised the skip
+# path, #497 a Q8; the update re-apply and openchamber-secure arms
+# above write via their own surfaces).
+# Runs AFTER the W4 block on purpose: the divergent-content announce
+# above needs the admin-extended policy this block replaces.
+E 'sudo rm -f /etc/openchamber/policy.json'
+E 'sudo bash /home/dev/repo/files/install.sh --yes --container-backend podman-rootless --projects /var/www/vhosts --ddev-settings ddev --openchamber-policy yes > /tmp/oc-install-write.log 2>&1'
+check "12k: install writes the policy pin when absent + opt-in (#482 F17)" \
+    E 'test "$(cat /etc/openchamber/policy.json)" = "{ \"opencodeBinary\": \"/usr/local/bin/opencode\" }"'
+check "12k: install-written pin is root:root 644 (#482 F17)" \
+    E 'sudo stat -c "%U:%G %a" /etc/openchamber/policy.json | grep -q "^root:root 644$"'
+check "12k: install-written pin leaves no staged temp behind (#482 F17)" \
+    E '! ls /etc/openchamber/policy.json.opk-new.* 2>/dev/null'
+E 'rm -f /tmp/oc-install-write.log'
 
 echo "--- 12l. Corrupt-binary detection (issue #163) ---"
 # The recorded reachability was an update cp killed mid-write: a
