@@ -838,12 +838,18 @@ if [ "$_uig_rc" -eq 1 ] &&
 else
     fail "ui guard must refuse a skewed ui.sh (rc=$_uig_rc out=$_uig_out) (#456)"
 fi
+# rc-capture on the assignment (#499): a broken-non-empty extraction
+# makes eval itself fatal in the child, and the bare assignment aborted
+# the whole suite mid-run under set -e -- no tally, downstream pins
+# unseen. The capture routes the child death into the assert's own row
+# (the _uig_rc idiom above).
+_uig_full_rc=0
 _uig_full=$(sh -c 'eval "$1"; . "$2"; install_ui_pairing_guard; echo "rc=$?"' _ \
-    "$_uig_src" "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/ui.sh" 2>&1)
-if printf '%s' "$_uig_full" | grep -q 'rc=0'; then
+    "$_uig_src" "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/ui.sh" 2>&1) || _uig_full_rc=$?
+if [ "$_uig_full_rc" -eq 0 ] && printf '%s' "$_uig_full" | grep -q 'rc=0'; then
     pass "ui guard passes against the real ui.sh (every used function defined) (#456)"
 else
-    fail "ui guard must pass against the real ui.sh (out=$_uig_full) (#456)"
+    fail "ui guard must pass against the real ui.sh (rc=$_uig_full_rc out=$_uig_full) (#456)"
 fi
 if live_src "$INSTALL" | grep -qF 'install_ui_pairing_guard || exit 1'; then
     pass "install.sh wires the ui guard right after the ui.sh kit_source (#456)"

@@ -95,6 +95,17 @@ fi
 # The group redirect must sit INSIDE the substitution — a `) 2>&1"`
 # spelling makes the redirect literal string content and stderr escapes
 # the capture (the bug this pin's first version shipped).
+# rc-capture on the assignment (#503 b B1a): the #499 class in its
+# inline form -- _stub_c is the indent-tolerant extract_fn span and
+# the identity probe above sees emptiness/drift, not syntax; a
+# broken-non-empty stub makes the eval fatal inside the { ... }
+# subshell, and the bare assignment aborted the whole suite mid-run
+# under set -e: no tally, this fail-closed pin and everything after
+# it unseen. The three-needle pass pattern below cannot match a dead
+# child's captured output (the syntax error text), so there is no
+# vacuous-pass arm -- the capture's job is solely the abort; the
+# fail row carries the rc.
+_stub_rc=0
 _stub_out="$(
     {
         eval "$_stub_c"
@@ -105,13 +116,13 @@ _stub_out="$(
         fi
         echo "cell-done"
     } 2>&1
-)"
+)" || _stub_rc=$?
 case "$_stub_out" in
     *"project_path_sane unavailable"*"refused rc=1"*"cell-done"*)
         pass "stub refuses loudly: rc 1 + stderr error, never silent (fail closed, issue #216)"
         ;;
     *)
-        fail "stub must refuse loudly with rc 1 (fail closed, issue #216; got: $_stub_out)"
+        fail "stub must refuse loudly with rc 1 (fail closed, issue #216; rc=$_stub_rc got: $_stub_out)"
         ;;
 esac
 

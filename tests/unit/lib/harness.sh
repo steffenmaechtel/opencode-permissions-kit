@@ -103,6 +103,18 @@
 #                        bad name or missing file. Callers own the
 #                        emptiness probe, the eval, and post-pipelines
 #                        (the comment-strip rider composes on stdout).
+#                        Catchability boundary (pr-503 round c): an
+#                        eval-of-extraction has two shapes with
+#                        different blast radii. Inside a CHILD (sh -c,
+#                        or a substitution subshell) a broken-non-empty
+#                        extraction kills only the child -- the caller
+#                        MUST rc-capture the assignment (`_rc=0;
+#                        x=$(...) || _rc=$?`, issue #499). A DIRECT
+#                        parent eval cannot be captured at all: dash
+#                        exits the suite on an eval parse error even
+#                        behind `||` (empirically pinned, rc 2) -- that
+#                        residual is accepted and recorded HERE so
+#                        fresh reviews stop re-deriving it.
 #   suite_done <label>   the summary gate: Passed count, the red Failed
 #                        count + exit 1 on any failure, the green
 #                        "All <label> passed." line + exit 0 otherwise.
