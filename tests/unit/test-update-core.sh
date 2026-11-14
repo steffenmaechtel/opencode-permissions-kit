@@ -809,13 +809,26 @@ else
 fi
 
 # --- resolve under the hostile locale (#510 M4) ------------------------------------
-# The packument decode pins to utf-8 buffer reads (#485 F22 shape): a
-# 7-bit locale (LC_ALL=C with the PEP 538/540 escapes disabled) used to
-# decode the whole document with the C codec -- a non-ASCII description
-# anywhere in the packument killed the resolve (warn "cannot
+# The packument decode pins to utf-8 buffer reads (#485 F22 shape): on
+# strict-stdin 7-bit hosts an unread non-ASCII description anywhere in
+# the document used to kill the whole-document decode (warn "cannot
 # determine"). The printed dist-tag is a version string (ASCII by
-# format). Octal escapes: dash's printf does not interpret \xHH
-# (\303\274 = UTF-8 "ü").
+# format). CANARY note (honesty): the resolver runs python3 -I (#249),
+# whose -E strips PYTHONIOENCODING — under LC_ALL=C the stdin decode is
+# surrogateescape, so the unpinned shape survives on C-locale hosts and
+# the pin discriminates only where stdin is strict (exotic locales);
+# the control arm proves the env's strict stdout. Control arm first
+# (harness #510).
+P510="$(hostile_stdio_python)"
+if hostile_stdio_control "$P510"; then
+    pass "control arm: strict 7-bit stdout kills the -I non-ASCII write (#510)"
+else
+    fail "control arm: hostile stdio not effective -- the #510 pins would pass vacuously"
+fi
+# wrapper python3 into the stub bin dir: the resolver's PATH finds it
+# before the ambient interpreter (-X utf8=0, see harness #510)
+cp "$P510/python3" "$_RES/bin/python3"
+chmod 755 "$_RES/bin/python3"
 cat >"$_RES/bin/curl" <<'EOF'
 #!/bin/sh
 # non-ASCII field NEXT to dist-tags: the whole-document decode class

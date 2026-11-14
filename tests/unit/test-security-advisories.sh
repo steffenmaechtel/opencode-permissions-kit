@@ -446,11 +446,22 @@ else
 fi
 
 # hostile-locale pin (#510 M3): the feed is UTF-8 JSON with free-text
-# summaries; under a 7-bit locale (LC_ALL=C with the PEP 538/540
-# escapes disabled) the unpinned parser used to die on the whole-document
-# json.load decode AND on the summary print, and the caller reports the
-# misleading "failed to parse the upstream feed". Buffer read + guarded
-# stdout reconfigure (#485 F22/F23 shapes): the summary must round-trip.
+# summaries; under a 7-bit locale the unpinned parser used to die on
+# the whole-document json.load decode AND on the summary print, and the
+# caller reports the misleading "failed to parse the upstream feed".
+# Buffer read + guarded stdout reconfigure (#485 F22/F23 shapes): the
+# summary must round-trip. The shipped parser invokes python3 WITHOUT
+# -I, so PYTHONIOENCODING=ascii is honored here (strict stdin AND
+# strict stdout — the full failure mode); the extracted parser below
+# runs under the same shape. Control arm first (harness #510).
+P510="$(hostile_stdio_python)"
+if printf '{"k":"Pr\303\274fung"}' | PATH="$P510:$PATH" LC_ALL=C LANG=C PYTHONUTF8=0 \
+    PYTHONCOERCECLOCALE=0 PYTHONIOENCODING=ascii \
+    python3 -c 'import json,sys; json.load(sys.stdin)' >/dev/null 2>&1; then
+    fail "control arm: hostile stdio not effective -- the #510 pins would pass vacuously"
+else
+    pass "control arm: strict 7-bit stdin kills the unpinned decode (#510)"
+fi
 FEED_JSON_NB="$(work_new_file)"
 cat >"$FEED_JSON_NB" <<'EOF'
 [{"ghsa_id":"GHSA-3333-3333-3333","severity":"low","html_url":"https://example/3",
@@ -458,8 +469,8 @@ cat >"$FEED_JSON_NB" <<'EOF'
   "vulnerabilities":[{"vulnerable_version_range":">=1.0.0","patched_versions":null}]}]
 EOF
 FEED_NB_RC=0
-FEED_NB_OUT="$(LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 \
-    python3 "$FEED_PY" <"$FEED_JSON_NB" 2>/dev/null)" || FEED_NB_RC=$?
+FEED_NB_OUT="$(PATH="$P510:$PATH" LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 \
+    PYTHONIOENCODING=ascii python3 "$FEED_PY" <"$FEED_JSON_NB" 2>/dev/null)" || FEED_NB_RC=$?
 if [ "$FEED_NB_RC" = 0 ] &&
     printf '%s\n' "$FEED_NB_OUT" | grep -qF "Prüfung: nicht-ASCII Zusammenfassung"; then
     pass "feed parser: non-ASCII summary round-trips under the 7-bit locale (#510 M3)"

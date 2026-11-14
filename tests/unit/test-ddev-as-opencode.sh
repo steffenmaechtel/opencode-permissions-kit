@@ -420,20 +420,30 @@ else
 fi
 
 # --- 2c. hostile-locale IO pins (#510 M4) --------------------------------------
-# A 7-bit locale (LC_ALL=C with the PEP 538/540 escapes disabled) makes
-# the unpinned embedded python die twice into the silent except arm:
-# the whole-document json.load decode on an unread non-ASCII field
-# (ddev describe carries display text), and the print of a selected
-# non-ASCII value (an approot path). Both degraded to empty output and
-# the callers silently fell back. Buffer read + guarded stdout
-# reconfigure (#485 F22/F23 shapes); the silent-empty MISS contract is
-# untouched.
-GJ_OUT=$(LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 \
-    sh -c ". '$FUNC' && _opk_json_get '{\"raw\":{\"primary_url\":\"https://x.y\",\"notes\":\"Prüfung\"}}' primary_url" 2>"$TMPDIR/gj-lc.err") || true
+# A 7-bit locale makes the unpinned embedded python die twice into the
+# silent except arm: the whole-document json.load decode on an unread
+# non-ASCII field (ddev describe carries display text), and the print
+# of a selected non-ASCII value (an approot path). Both degraded to
+# empty output and the callers silently fell back. Buffer read +
+# guarded stdout reconfigure (#485 F22/F23 shapes); the silent-empty
+# MISS contract is untouched. _opk_json_get runs python3 -I (#249),
+# whose -E strips PYTHONIOENCODING — hostility comes from the wrapper
+# (-X utf8=0) + LC_ALL=C: stdin surrogateescape (the unread-field pin
+# discriminates fully only on strict-stdin hosts), stdout strict (the
+# non-ASCII value pin discriminates everywhere). Control arm first
+# (harness #510).
+P510="$(hostile_stdio_python)"
+if hostile_stdio_control "$P510"; then
+    pass "control arm: strict 7-bit stdout kills the -I non-ASCII write (#510)"
+else
+    fail "control arm: hostile stdio not effective -- the #510 pins would pass vacuously"
+fi
+GJ_OUT=$(LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 PYTHONIOENCODING=ascii \
+    PATH="$P510:$PATH" sh -c ". '$FUNC' && _opk_json_get '{\"raw\":{\"primary_url\":\"https://x.y\",\"notes\":\"Prüfung\"}}' primary_url" 2>"$TMPDIR/gj-lc.err") || true
 assert_eq "_opk_json_get: unread non-ASCII field does not kill the decode (#510 M4)" \
     "https://x.y" "$GJ_OUT"
-GJ_OUT=$(LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 \
-    sh -c ". '$FUNC' && _opk_json_get '{\"raw\":{\"approot\":\"/var/Prüfung/web\"}}' approot" 2>>"$TMPDIR/gj-lc.err") || true
+GJ_OUT=$(LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 PYTHONIOENCODING=ascii \
+    PATH="$P510:$PATH" sh -c ". '$FUNC' && _opk_json_get '{\"raw\":{\"approot\":\"/var/Prüfung/web\"}}' approot" 2>>"$TMPDIR/gj-lc.err") || true
 assert_eq "_opk_json_get: non-ASCII value round-trips under the 7-bit locale (#510 M4)" \
     "/var/Prüfung/web" "$GJ_OUT"
 if [ ! -s "$TMPDIR/gj-lc.err" ]; then

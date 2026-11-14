@@ -214,12 +214,22 @@ fi
 
 # --- 6b. advisory feed parse under the hostile locale (#510 M4) ---------------------
 # The freshness check decodes the whole advisory feed document; under a
-# 7-bit locale (LC_ALL=C with the PEP 538/540 escapes disabled) the
-# unpinned json.load used to die on an unread non-ASCII field (a
-# summary ANYWHERE in the feed) and the row degraded to "live check
-# unavailable". Buffer read + guarded stdout reconfigure (#485 F22/F23
-# shapes): with a curl stub serving a feed whose summary carries
-# non-ASCII, the ids must parse and the freshness row must render.
+# 7-bit locale the unpinned json.load used to degrade the row to "live
+# check unavailable" when the decode died (an unread non-ASCII field on
+# strict-stdin hosts) or when the id print died. Buffer read + guarded
+# stdout reconfigure (#485 F22/F23 shapes). CANARY note (honesty): the
+# shipped parser runs python3 -I (#249), whose -E strips
+# PYTHONIOENCODING — under LC_ALL=C the stdin decode is surrogateescape,
+# so with the ASCII ghsa_id the unpinned shape survives on C-locale
+# hosts; the write side and the decode kill still discriminate on
+# strict-stdin (exotic-locale) hosts, and the control arm proves the
+# env's strict stdout. Control arm first (harness #510).
+P510="$(hostile_stdio_python)"
+if hostile_stdio_control "$P510"; then
+    pass "control arm: strict 7-bit stdout kills the -I non-ASCII write (#510)"
+else
+    fail "control arm: hostile stdio not effective -- the #510 pins would pass vacuously"
+fi
 mkdir -p "$WORK/advbin510"
 for _t in stat grep sed head cat python3; do
     ln -s "$(command -v "$_t")" "$WORK/advbin510/$_t" 2>/dev/null || true
@@ -235,8 +245,8 @@ printf '#!/bin/sh\necho "opencode version 9.9.9"\n' >"$ADV/bin/opencode"
 chmod 755 "$ADV/bin/opencode"
 _adv_nb_rc=0
 _out=$(
-    export LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0
-    PATH="$WORK/advbin510" # stub curl + the section's few externals
+    export LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 PYTHONIOENCODING=ascii
+    PATH="$P510:$WORK/advbin510" # wrapper python3 + stub curl + externals
     export PATH NO_COLOR=1
     . "$UI_LIB"
     . "$LIB"

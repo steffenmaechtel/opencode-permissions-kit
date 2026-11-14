@@ -870,19 +870,32 @@ fi
 
 # hostile-locale stdout pin (#510 M2): declared tree paths tolerate
 # non-ASCII (only control characters are gated), and under a 7-bit
-# locale (LC_ALL=C with the PEP 538/540 escapes disabled) the unpinned
-# heredoc write used to raise UnicodeEncodeError -- rc non-zero, and
-# the wrapper misreads that as "opk.json is unreadable -- declared-tree
-# warning skipped" (2>/dev/null hides the traceback). The heredoc
-# reconfigures stdout to utf-8 (#485 F23 shape), so the warning must
-# fire with the path intact. The fixture carries the non-ASCII as a
-# JSON \u escape: dash's printf interprets neither \xHH nor \uHHHH, so
-# printf writes the literal \u00fc text and JSON decodes it to "ü" --
-# the raw-byte decode is already pinned by the encoding="utf-8" open,
-# the stdout write is this pin's subject.
+# locale the unpinned heredoc write used to raise UnicodeEncodeError --
+# rc non-zero, and the wrapper misreads that as "opk.json is unreadable
+# -- declared-tree warning skipped" (2>/dev/null hides the traceback).
+# The heredoc reconfigures stdout to utf-8 (#485 F23 shape), so the
+# warning must fire with the path intact. The fixture carries the
+# non-ASCII as a JSON \u escape: it is ASCII on the wire (printf octal
+# is only needed for raw-byte decode fixtures) and decodes to "ü"
+# inside python -- the strict-stdout write of the DECODED path is this
+# pin's subject. The heredoc runs python3 -I (-E strips
+# PYTHONIOENCODING), so hostility comes from the wrapper (-X utf8=0) +
+# LC_ALL=C; the control arm proves it before the pin runs.
+P510="$(hostile_stdio_python)"
+if hostile_stdio_control "$P510"; then
+    pass "control arm: strict 7-bit stdout kills the -I non-ASCII write (#510)"
+else
+    fail "control arm: hostile stdio not effective -- the #510 pins would pass vacuously"
+fi
 printf '{"version":1,"containerTrees":["Pr\\u00fcfbau"]}\n' >"$HO_PROJ/opk.json"
 _hw_rc=0
-out="$(LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 _ho_warn_run "$HO_PROJ" me . --dry-run)" || _hw_rc=$?
+out="$(
+    PATH="$P510:$PATH"
+    export PATH
+    LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 PYTHONIOENCODING=ascii
+    export LC_ALL LANG PYTHONUTF8 PYTHONCOERCECLOCALE PYTHONIOENCODING
+    _ho_warn_run "$HO_PROJ" me . --dry-run
+)" || _hw_rc=$?
 if [ "$_hw_rc" = 0 ] &&
     printf '%s' "$out" | grep -qF "takes back the declared container tree 'Prüfbau'" &&
     ! printf '%s' "$out" | grep -qF "is unreadable"; then
