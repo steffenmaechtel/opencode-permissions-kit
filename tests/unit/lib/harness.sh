@@ -357,9 +357,11 @@ extract_func() {
 # Trailing comments on code lines are NOT stripped — their prose
 # slashes leak with the code (over-detection, safe direction; pinned
 # 12.8, #497 e P4). An allow argument must not end in a slash: 'foo/'
-# compiles to patterns that miss the single-slash subpath 'foo/x', so
-# a subpath of a slash-tailed allow LEAKS (pinned 12.10, #497 e P6 —
-# no current caller passes a trailing slash; keep it that way).
+# compiles to patterns that miss the single-slash subpath 'foo/x',
+# which leaks (pinned 12.10, #497 e P6); a DOUBLE-slash-formed
+# subpath 'foo//x' matches 'foo//*' and would be ALLOWED instead
+# (#497 f R4) — neither form is covered, and no current caller passes
+# a trailing slash; keep it that way.
 abs_path_leaks() {
     local _apl_block="$1" _apl_scan="" _apl_leaks="" _apl_tok _apl_ok _apl_hit
     shift

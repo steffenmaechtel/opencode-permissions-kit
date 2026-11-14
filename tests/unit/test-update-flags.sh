@@ -1363,7 +1363,12 @@ _f17_opk_block="$(sed -n '/#211 a F17, the 0.0.44a V10 sibling gap/,/^    fi$/p'
 # scratch-prefixed — the policy content's /usr/local/bin/opencode is
 # data and the /mv in the ui_error text is prose, neither is an
 # operand — and no /etc/openchamber literal may survive (the scratch
-# value itself is masked before the literal grep).
+# value itself is masked before the literal grep). The /mv allow is
+# exact-token-bound under the boundary match, by fail-loud intent
+# (#497 f R3, the in-tree P7 record): a wording change to that
+# ui_error text yielding a different /-token is a DELIBERATE
+# sandbox-fail red — extend the allowlist consciously, never re-read
+# it as a boundary-match regression.
 F17=$(mktemp -d)
 mkdir -p "$F17/oc"
 _f17_opk_block="$(printf '%s\n' "$_f17_opk_block" | sed "s|/etc/openchamber|$F17/oc|g")"
