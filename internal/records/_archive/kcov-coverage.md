@@ -67,7 +67,8 @@ Removal scope: CI job + pin-suite step (`test-unit.yml`), `make coverage`
 `tests/unit/test-coverage.sh`, the record you are reading (moved to
 `_archive/`). Deferred to the follow-up issue: the 7 PS4 shield lines in
 4 suites and the `OPK_KCOV_RUN` skip in `test-fs-baseline.sh` (harmless
-without kcov — the marker is never set — removed for dead-code hygiene).
+without kcov — the marker is never set — to be removed there for
+dead-code hygiene).
 Issue #490 (skip coverage on docs-only diffs) became moot and was closed
 wontfix.
 
