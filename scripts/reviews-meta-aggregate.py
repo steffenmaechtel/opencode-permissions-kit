@@ -166,6 +166,13 @@ out['trend'] = trend
 with open(DATA + '/stats.json', 'w', encoding='utf-8') as fh:
     json.dump(out, fh, indent=1, default=list)
 
+# console summary: printed values derive from batch data (areas, class
+# names, reviewer keys, stems); under a 7-bit locale stdout would become
+# the choke point the pinned reads just stopped being (#517 S1, the
+# jsonc-parser.py guard shape). stderr keeps its default handler.
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+
 # console summary
 print("TOTALS", out['totals'])
 print("SEV", out['severity'])
