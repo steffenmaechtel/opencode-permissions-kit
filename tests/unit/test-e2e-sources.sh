@@ -266,6 +266,101 @@ else
     fail "workflows export the workflow token to the api.github.com-calling steps"
 fi
 
+# --- tarball temps are mktemp-random (#511, the #509 a S2 remainder) ----------
+# e2e_fetch_opencode curled the release tarball to the FIXED cache name
+# the caller passed — curl -o writes through a symlink planted at a
+# predictable name (the exact class #509 a S2 closed for the installer
+# temp, one function below). The temp is now mktemp-random off the
+# caller's base, and every failure edge removes it: a dead download
+# must not leave random-name debris in tests/e2e/cache (the fixed name
+# self-overwrote before). run-ddev.sh's ddev tarball had the same shape
+# in the same cache dir — swept with it.
+check_live "e2e_fetch_opencode mktemps the tarball temp off the caller's base (#511)" "$LIB" \
+    -qF 'tmp="$(mktemp "$3.tmp.XXXXXX")"'
+check_absent "e2e_fetch_opencode never curls to the caller-fixed name (#511)" "$LIB" \
+    -qF 'tmp="$3"'
+check_live "run-ddev.sh mktemps the ddev tarball temp (#511 sweep)" "$RUN_DDEV" \
+    -qF 'DD_TMP="$(mktemp "$DD_CACHE/ddev.tar.gz.tmp.XXXXXX")"'
+check_absent "run-ddev.sh never curls to the fixed ddev.tar.gz name (#511 sweep)" "$RUN_DDEV" \
+    -qF -- '-o "$DD_CACHE/ddev.tar.gz"'
+# Claim audit for the comment above ("every failure edge removes it"):
+# 3 cleanups — curl-fail edge, tar-fail edge, success path (comment-
+# stripped count; a commented-out cleanup must stop counting).
+_ddt_rms=$(live_src "$RUN_DDEV" | grep -cF 'rm -f "$DD_TMP"' || true)
+if [ "$_ddt_rms" -eq 3 ]; then
+    pass "run-ddev.sh failure edges + success path all clean the ddev temp (#511 sweep)"
+else
+    fail "run-ddev.sh ddev temp cleanups: $_ddt_rms (expected 3)"
+fi
+
+# Behavioral drive of the real e2e_fetch_opencode against a fake curl
+# (the #485 F30 pattern): a symlink planted at the FIXED cache name
+# points at a canary — the fetch must never open that name (canary
+# intact), land the binary, and leave no temp debris on the good AND
+# the mid-transfer-death path. The fake curl's redirect follows the
+# symlink exactly like the real curl -o does, so a regression to the
+# fixed name clobbers the canary and the pin goes red for the reason it
+# exists. GitHub 1.x channel driven; the mktemp sits above the case, so
+# both channels share it.
+TARWORK="$(work_new)" || {
+    echo "e2e-sources tests: scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
+mkdir -p "$TARWORK/cache/opencode-1.18.15" "$TARWORK/bin" "$TARWORK/pkg"
+printf '#!/bin/sh\necho fake-opencode\n' >"$TARWORK/pkg/opencode"
+tar -czf "$TARWORK/fake.tgz" -C "$TARWORK/pkg" opencode
+printf 'canary\n' >"$TARWORK/canary"
+ln -s "$TARWORK/canary" "$TARWORK/cache/opencode.tar.gz"
+cat >"$TARWORK/bin/curl" <<'TARCURL'
+#!/bin/sh
+# fake curl: the download target is the argument after -o
+# (lib.sh puts -o LAST on the tarball fetches)
+_t=""
+_prev=""
+for _a in "$@"; do
+    [ "$_prev" = "-o" ] && _t="$_a"
+    _prev="$_a"
+done
+case "${FAKE_CURL_MODE:-good}" in
+    good) cat "${FAKE_TGZ:?}" >"$_t" ;;
+    partial) printf 'par' >"$_t"; exit 1 ;;
+    *) exit 1 ;;
+esac
+TARCURL
+chmod +x "$TARWORK/bin/curl"
+extract_func "$LIB" e2e_fetch_opencode >"$TARWORK/fn.sh"
+_tar_drive() { # $1 = FAKE_CURL_MODE; prints nothing, rc is the verdict
+    target=linux-x64 FAKE_CURL_MODE="$1" FAKE_TGZ="$TARWORK/fake.tgz" \
+        PATH="$TARWORK/bin:$PATH" \
+        sh -c '. "$1"; e2e_fetch_opencode 1.18.15 "$2" "$3"' \
+        _ "$TARWORK/fn.sh" "$TARWORK/cache/opencode-1.18.15/opencode" \
+        "$TARWORK/cache/opencode.tar.gz"
+}
+_canary_ok() { [ "$(cat "$TARWORK/canary" 2>/dev/null)" = "canary" ]; }
+_tar_temps() { find "$TARWORK/cache" -name 'opencode.tar.gz.tmp.*' 2>/dev/null; }
+_rc=0
+_tar_drive good >/dev/null 2>&1 || _rc=$?
+if [ "$_rc" -eq 0 ] && _canary_ok &&
+    [ -x "$TARWORK/cache/opencode-1.18.15/opencode" ] && [ -z "$(_tar_temps)" ]; then
+    pass "tarball fetch: planted symlink at the fixed name stays inert, temp cleaned (#511)"
+else
+    _ci=no
+    _canary_ok && _ci=yes
+    _bi=no
+    [ -x "$TARWORK/cache/opencode-1.18.15/opencode" ] && _bi=yes
+    fail "tarball fetch good path (rc=$_rc canary=$_ci bin=$_bi temps='$(_tar_temps)')"
+fi
+_rc=0
+_tar_drive partial >/dev/null 2>&1 || _rc=$?
+if [ "$_rc" -ne 0 ] && _canary_ok && [ -z "$(_tar_temps)" ]; then
+    pass "tarball fetch: mid-transfer death cleans its temp, symlink untouched (#511)"
+else
+    _ci=no
+    _canary_ok && _ci=yes
+    fail "tarball fetch partial path (rc=$_rc canary=$_ci temps='$(_tar_temps)')"
+fi
+rm -rf "$TARWORK"
+
 # --- git channel knob (issue #118): lib.sh must forward E2E_GIT_CHANNEL as a
 # build-arg on BOTH builder paths (BuildKit + the classic setuid fallback) —
 # a knob wired to only one path silently degrades the rootless suite and the

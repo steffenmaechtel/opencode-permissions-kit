@@ -116,19 +116,25 @@ DD_BIN="$DD_CACHE/ddev"
 if [ ! -x "$DD_BIN" ]; then
     echo "  Downloading ddev $DD_WANT (linux-$DD_ARCH) into cache..."
     mkdir -p "$DD_CACHE"
+    # #511 sweep (the #509 a S2 class, same exposure as the opencode
+    # tarball in lib.sh): the temp is mktemp-random, never a fixed name a
+    # planted symlink could capture, and every failure edge removes it.
+    DD_TMP="$(mktemp "$DD_CACHE/ddev.tar.gz.tmp.XXXXXX")"
     curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 300 \
         "https://github.com/ddev/ddev/releases/download/$DD_WANT/ddev_linux-$DD_ARCH.$DD_WANT.tar.gz" \
-        -o "$DD_CACHE/ddev.tar.gz" ||
+        -o "$DD_TMP" ||
         {
+            rm -f "$DD_TMP"
             echo "  ${RED}FAIL${NC}  ddev $DD_WANT download failed"
             exit 1
         }
-    tar -xzf "$DD_CACHE/ddev.tar.gz" -C "$DD_CACHE" ||
+    tar -xzf "$DD_TMP" -C "$DD_CACHE" ||
         {
+            rm -f "$DD_TMP"
             echo "  ${RED}FAIL${NC}  cannot extract ddev tarball"
             exit 1
         }
-    rm -f "${DD_CACHE:?}/ddev.tar.gz"
+    rm -f "$DD_TMP"
     chmod +x "$DD_BIN" 2>/dev/null || true
 fi
 [ -s "$DD_BIN" ] || {
