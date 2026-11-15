@@ -217,7 +217,14 @@ git add && git commit`: the freshness pin inside `make test` reddens on
 a stale `SHA256SUMS` (issue #478), so the regeneration must land in
 the log before the suite reads it (#524 §1 paid one red gate for the
 order); `make sums` itself is idempotent (no-op output when the
-manifest is already fresh). While the maintainer co-edits the working
+manifest is already fresh). The same ordering duty holds for the
+rules-meta INDEX: a wave that adds or amends metas regenerates
+`internal/rules-meta/INDEX.md` inside the chain BEFORE the suite
+reads it (`sh scripts/rules-audit.sh`, or
+`python3 scripts/gen-rules-index.py`) — the freshness pins redden on
+a stale INDEX otherwise, and the red is self-healing but costs the
+cycle (issue #549 §1: a fix wave paid one red gate for the order).
+While the maintainer co-edits the working
 tree (interactive iteration), stage explicitly by path — `git add -A`
 is for solo phases with a verified-clean tree (a `git add -A` chain
 once swept the maintainer's template file into a commit, #528 §2).
