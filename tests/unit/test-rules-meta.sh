@@ -610,7 +610,8 @@ expect_ok "inv7 overdue non-blocking" "overdue metas"
 #     scratch INDEX carried the Overdue variant and the next make test
 #     rejected the tree with the misleading hand-edit message.
 cp "$SCRATCH/internal/rules-meta/INDEX.md" "$WORK/index7.audit"
-(cd "$SCRATCH" && python3 scripts/gen-rules-index.py) >/dev/null 2>&1
+(cd "$SCRATCH" && python3 scripts/gen-rules-index.py) >/dev/null 2>&1 ||
+    fail "inv7b: bare regen exited non-zero -- pin exercised nothing (#529 a A1)"
 if cmp -s "$SCRATCH/internal/rules-meta/INDEX.md" "$WORK/index7.audit"; then
     pass "inv7b audit leaves the date-invariant INDEX (#527)"
 else
