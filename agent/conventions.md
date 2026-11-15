@@ -332,7 +332,19 @@ library option (#488's shlex pilot, adopted): rules 2–4's quote
 tracking lives in `tests/unit/lib/rider_detect.py` — POSIX
 `shlex(punctuation_chars=True)` tokenizes legs and payloads correctly
 by construction, the splice/concat escape class closed structurally,
-and the suite's arms (plus the spliced-strict row) pin the port. For
+and the suite's arms (plus the spliced-strict row) pin the port. The
+sandbox-policy trap-arm analyzer followed (#498, the #496 playbook):
+its hand-rolled quote walk — four #287 defect rounds of this class —
+is now `tests/unit/lib/trap_detect.py` (rider_detect's two-pass
+tokenize with the commenter pass first, arms read as the tokens after
+the action word; the receiver regex and the own-call view stayed
+faithful ports — the shlex option does not fit them, they feed
+structural line views, not token walks); the adoption differential
+(old awk vs the port over tests/unit + the probe corpus: byte-identical
+rows on the whole corpus, the delta shapes measured on scratch torture
+files, none live — review a B3, #516) is the
+equivalence record, the suite's probe arms pin the four defect-round
+shapes. For
 any new parser need, evaluate the library option first (python3
 `shlex` — python3 is a required suite
 dependency); if awk stays, every quote-handling conjunct gets a

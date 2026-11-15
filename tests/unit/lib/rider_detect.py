@@ -158,7 +158,7 @@ def derive_registration(stmts):
     return marked, exempt
 
 
-def tokenize(s):
+def tokenize(s, passes=('', '#')):
     """POSIX shlex with punctuation chars; None when no pass parses the
     statement whole. Two passes (round a C1, #496): pass 1 keeps
     commenters DISABLED -- '#' is a word byte, so ${VAR#x} and mid-word
@@ -170,8 +170,12 @@ def tokenize(s):
     the trailing-comment approximation; its collateral (a mid-word hash
     truncating the token) only fires on statements pass 1 already
     rejected. Both passes raising -> None (fail-still: the awk payload
-    extractor's unterminated branch)."""
-    for commenters in ('', '#'):
+    extractor's unterminated branch). The pass ORDER is a parameter
+    since #498: the trap-arm port (tests/unit/lib/trap_detect.py) needs
+    the commenter pass FIRST -- its awk predecessor cut a trailing
+    comment before reading the arms, so a comment naming arms must not
+    parse as arm tokens -- with the comment-disabled pass as fallback."""
+    for commenters in passes:
         lex = shlex.shlex(s, posix=True, punctuation_chars=True)
         lex.whitespace_split = True
         lex.commenters = commenters

@@ -150,14 +150,16 @@ _rh_p1="sed '"${_rh_core}'$//'"' "
 _rh_p2='sed "s/^[[:space:]]*#.*\$//" '
 _rh_p3='sed "s/^[[:space:]]*#.*$//" '
 
-# _rider_hits <file>: prints "<file>:<NR>: <line>" for every file-operand
-# inline rider. Full-comment lines are skipped; an operand start is
-# any next byte except the command terminators and EOL -- the
-# stdin/block-strip shapes, including output redirection into a
-# file (round a C2: `>` and backtick join the terminator class).
-# awk -v processes backslash escapes in assigned values, so
-# backslashes are doubled on the way in (the \$ byte of the sh -c
-# form survives as \$). KNOWN BOUNDARY (round a C3): the detector
+# _rider_hits <file>...: prints "<file>:<FNR>: <line>" for every
+# file-operand inline rider. Multi-file capable since #498 (one awk
+# start for the whole rule-1 sweep; FNR keeps the row's line number
+# file-local the way the per-file invocations did). Full-comment lines
+# are skipped; an operand start is any next byte except the command
+# terminators and EOL -- the stdin/block-strip shapes, including output
+# redirection into a file (round a C2: `>` and backtick join the
+# terminator class). awk -v processes backslash escapes in assigned
+# values, so backslashes are doubled on the way in (the \$ byte of the
+# sh -c form survives as \$). KNOWN BOUNDARY (round a C3): the detector
 # is byte-form-exact -- a TAB after the expression, `sed -e`/
 # `--expression` forms, a `g` suffix, or an operand on a
 # continuation line escape rule 1; conventions.md scopes the
@@ -181,9 +183,9 @@ _rider_hits() {
                 c = substr($0, i + length(p3), 1)
                 if (c != "" && c !~ /[|);&>`]/) hit = 1
             }
-            if (hit) printf "%s:%d: %s\n", FILENAME, NR, $0
+            if (hit) printf "%s:%d: %s\n", FILENAME, FNR, $0
         }
-    ' "$1"
+    ' "$@"
 }
 
 # _rule2_detect <file>: prints "<file>:<start-line>: DIRECT <stmt>"
@@ -385,11 +387,43 @@ check "a check_absent call stays unflagged (it is the name)" test "$_n" = 0
 
 # --- 2. tree sweep --------------------------------------------------------------
 # Every suite except this one (self-allowlist, header). lib/ is not
-# matched by the glob.
+# matched by the glob. One _rider_hits start for the whole sweep (#498,
+# the #488 pilot's shape): rows carry FILENAME/FNR, and a per-file loop
+# over the capture keeps the per-suite fail rows unchanged.
+_RULE1_OUT="$(work_new_file)" || {
+    echo "rider lint tests: scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
+# Fail-loud (#498, the #496 round-a B1 shape): the sweep's verdict is
+# only as good as the detector output it reads -- an awk death (missing
+# or unreadable sweep file, a future program-text edit) leaves the
+# capture at zero bytes (death before any row) or PARTIAL (a mid-list
+# death keeps earlier files' rows), and the loop below would pass
+# green over whatever is missing. The rc guard turns either shape into
+# a hard suite failure; the arms under it execute the failure path
+# through the guard message, observed on stderr the way a real run
+# observes it.
+_rule1_batch() { # $@ = suite files -> $_RULE1_OUT; loud on death
+    _rider_hits "$@" >"$_RULE1_OUT" || {
+        echo "rider lint tests: rider-hits batch failed (rc=$?) -- rule 1 sweep output unreliable" >&2
+        return 1
+    }
+}
+_r1_rc=0
+_r1_err="$( (_rule1_batch "$_cell/no-such-sweep-file.sh") 2>&1 >/dev/null)" || _r1_rc=$?
+_n="$(printf '%s\n' "$_r1_err" | grep -c 'rule 1 sweep output unreliable')"
+check "a rider-hits batch death fails loud with the guard message (#498)" test "$_n" = 1
+check "a rider-hits batch death returns nonzero (guard rc wiring, #498)" test "$_r1_rc" -ne 0
+set --
+for _f in "$SCRIPT_DIR"/test-*.sh; do
+    [ "$(basename "$_f")" = "test-rider-lint.sh" ] && continue
+    set -- "$@" "$_f"
+done
+_rule1_batch "$@" || exit 1
 _total=0
 for _f in "$SCRIPT_DIR"/test-*.sh; do
     [ "$(basename "$_f")" = "test-rider-lint.sh" ] && continue
-    _hits="$(_rider_hits "$_f")"
+    _hits="$(grep -F "${_f}:" "$_RULE1_OUT" || true)"
     if [ -n "$_hits" ]; then
         fail "inline file-operand rider(s) in $(basename "$_f") -- use live_src"
         echo "$_hits" | sed 's/^/        /'
