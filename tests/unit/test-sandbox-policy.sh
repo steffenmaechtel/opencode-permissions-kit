@@ -13,7 +13,8 @@
 # Two checks over the continuation-joined view of each line (full-comment
 # lines skipped): check 1 scans the quote-blanked operand view, check 2
 # the RAW line (quotes included — see its own header below). Checks 3-5
-# each run their own scan (sections 3-5: grep, find+awk, behavioral
+# each run their own scan (sections 3-5: grep, find+python — check 4's
+# detector is tests/unit/lib/trap_detect.py since #498 —, behavioral
 # cells):
 #
 # 1. MUTATION: a mutating verb (rm, rmdir, mkdir, ln, cp, mv, chown,
@@ -367,8 +368,11 @@ fi
 # function. Line-based like check 3: a trap statement split across a
 # backslash continuation hides its arms from the scan — keep the arms
 # on the trap's physical line (the self-probes pin the shape). Arms are
-# read AFTER the action's closing quote, so action text (kill -TERM, an
-# in-action comment naming the arms) cannot satisfy the arm check.
+# the TOKENS AFTER the action word (shlex, since #498 — see the
+# detector note below), so action text (kill -TERM, an in-action
+# comment naming the arms) and trailing-comment arm words cannot
+# satisfy the arm check — the four #287 defect rounds (b S1/C2, c S1,
+# d D1) were exactly this quote-tracking class in the former awk walk.
 # Known latent shape gaps, documented not scanned (no live instance;
 # heredoc-aware scanning needs a parser the floor deliberately avoids):
 # prefixed receivers (local/readonly/export V=…), trap lines inside
@@ -380,109 +384,32 @@ fi
 # covers the one shape the corpus uses (test-status's _w2_dir).
 # This suite excludes itself like checks 1-2 (its own trap is pinned by
 # shipping the guard, not by scanning itself).
+# The detector itself lives in tests/unit/lib/trap_detect.py since
+# #498 -- the shlex port of this check's awk program: the trap-arm
+# analyzer reads arms from shlex tokens (rider_detect.tokenize with the
+# commenter pass first), the receiver regex and the own-call view
+# (sq-blanked line, escaped \$( mangled, work_* call shapes) are
+# faithful ports -- their latent-shape documentation above carries
+# over unchanged. This wrapper is the fail-loud seam: a detector death
+# (unreadable file, an EMPTY scan set -- vanished dir, find error --
+# or a python start failure) returns nonzero with the guard message on
+# stderr, and the callers below fail the suite instead of scanning
+# green over missing rows (the #496 round-a B1 vacuity class; the
+# guard arm after the probe scans executes the death path).
 trap_scan() {
-    find "$1" \( -name "${2:-test-*.sh}" -o -path '*/lib/*.sh' \) ! -name 'test-sandbox-policy.sh' | sort | while IFS= read -r f; do
-        awk -v f="$f" -v dq='"' -v sq="'" -v wnames='work_new|work_new_file|work_register|work_register_var' '
-            function workline(s,  _i, _ch, _ins, _ind, _out) {
-                # the own-call view for check 4b: single-quoted spans
-                # blanked (skipped entirely), trailing comment cut, double
-                # quotes kept -- a real suite calls work_* bare or inside
-                # "$( )"; single quotes carry child-code strings
-                # (meta-suite arm() lines) that run in children, where a
-                # trap statement of the parent file is irrelevant. An
-                # escaped \$ ( is the documented child-script shape of
-                # the receiver check (round A C1) and is placeholder-
-                # mangled to break the \$\( adjacency -- outside quotes
-                # and inside dq alike (the dq "W="\$(...)" variant is the
-                # same child-code shape).
-                _ins = 0; _ind = 0; _out = ""
-                for (_i = 1; _i <= length(s); _i++) {
-                    _ch = substr(s, _i, 1)
-                    if (!_ins && _ch == "\\" && substr(s, _i + 1, 1) == "$") {
-                        _out = _out "#"
-                        _i++
-                        continue
-                    }
-                    if (!_ins && !_ind && _ch == "\\") {
-                        _out = _out _ch
-                        _i++
-                        if (_i <= length(s)) _out = _out substr(s, _i, 1)
-                        continue
-                    }
-                    if (_ch == sq && !_ind) { _ins = !_ins; continue }
-                    if (_ins) continue
-                    if (_ch == dq) { _ind = !_ind; _out = _out _ch; continue }
-                    if (_ch == "#" && !_ind) break
-                    _out = _out _ch
-                }
-                return _out
-            }
-            /^[[:space:]]*#/ { next }
-            /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*="?[$][(](command[[:space:]]+)?mktemp/ { recv++ }
-            # work_* CALL detection (#395 check 4b): a call shape, not
-            # bare word presence -- `$(name`, command position at line
-            # start, or after ; && ||. An ESCAPED \$(name) does NOT
-            # count (round A C1): it is the documented child-script
-            # shape of the receiver check -- child scripts own their
-            # cleanup -- and is placeholder-mangled in workline.
-            # strings of pin labels ("the work_new receiver collected")
-            # carry the word without a call shape and must not flag. A
-            # function definition (`work_new() {`) is followed by "("
-            # and matches no branch; lib/harness.sh defines but never
-            # calls. Scanned on the sq-blanked, comment-cut line
-            # (workline).
-            # Known latent shape gaps, documented not scanned (no live
-            # instance; line-based scanning deliberately avoids a
-            # parser -- the rationale of sibling check 4): dq strings
-            # carrying call-shape TEXT ("done; work_new" in a label
-            # counts as a call; the sq blanking protects arm()-style
-            # child-code strings only), work tokens on CONTINUATION
-            # lines of multi-line sq strings (per-line quote state
-            # resets), and the call shapes `V=1 work_new` (assignment
-            # prefix), keyword position (`if work_new; then`), single-
-            # pipe stage (`| work_new`) and `$( name )` with an inner
-            # space.
-            {
-                _wl = workline($0)
-                if (_wl ~ "(\\$\\(|^[[:space:]]*|;[[:space:]]*|&&[[:space:]]*|\\|\\|[[:space:]]*)(" wnames ")([[:space:]]|\\))") workcall++
-            }
-            /^[[:space:]]*trap[[:space:]].*/ {
-                traps++
-                _ln = NR
-                # cut a trailing comment FIRST (#287 b S1: the greedy
-                # last-quote strip alone ate the ARMS whenever the comment
-                # carried a quote — an apostrophe is ordinary comment text),
-                # quote-aware so an in-action # survives (#287 b C2: comment
-                # words must not satisfy the arms either); backslash-aware
-                # so an escaped \" never toggles the state (#287 c S1: an
-                # odd escaped-quote count cut at a shell-internal # and
-                # false-flagged all three arms) — but ONLY outside single
-                # quotes, where backslash is a literal, not an escape
-                # (#287 d D1: the unconditional skip ate an sq-closing
-                # quote after a trailing \ and let a trailing comment
-                # satisfy the arms — fail-open)
-                _ap = $0
-                _ins = 0; _ind = 0; _cut = 0
-                for (_i = 1; _i <= length(_ap); _i++) {
-                    _ch = substr(_ap, _i, 1)
-                    if (!_ins && _ch == "\\") { _i++; continue }
-                    if (_ch == sq && !_ind) _ins = !_ins
-                    else if (_ch == dq && !_ins) _ind = !_ind
-                    else if (_ch == "#" && !_ins && !_ind) { _cut = _i; break }
-                }
-                if (_cut) _ap = substr(_ap, 1, _cut - 1)
-                sub(".*[" dq sq "]", "", _ap)
-                if (_ap !~ /[^A-Za-z]EXIT([^A-Za-z]|$)/) arms = arms " " _ln ":no-EXIT"
-                if (_ap !~ /[^A-Za-z]INT([^A-Za-z]|$)/) arms = arms " " _ln ":no-INT"
-                if (_ap !~ /[^A-Za-z]TERM([^A-Za-z]|$)/) arms = arms " " _ln ":no-TERM"
-            }
-            END {
-                if (recv > 0 && traps == 0) print f "|notrap"
-                if (arms != "") print f "|arms" arms
-                if (workcall > 0 && traps > 0) print f "|mixtrap"
-            }
-        ' "$f"
-    done
+    _ts_list="$(mktemp)"
+    find "$1" \( -name "${2:-test-*.sh}" -o -path '*/lib/*.sh' \) ! -name 'test-sandbox-policy.sh' |
+        sort >"$_ts_list"
+    set --
+    while IFS= read -r _ts_f; do
+        set -- "$@" "$_ts_f"
+    done <"$_ts_list"
+    python3 "$REPO_ROOT/tests/unit/lib/trap_detect.py" --batch "$@" || {
+        echo "sandbox-policy tests: trap_detect failed (rc=$?) -- trap floor output unreliable (#498)" >&2
+        command rm -f "$_ts_list"
+        return 1
+    }
+    command rm -f "$_ts_list"
 }
 # The scan target must exist and hold at least one suite OTHER than this
 # guard itself — an absent, emptied or guard-only tests/unit would leave
@@ -502,7 +429,9 @@ else
     fail "scan target missing: tests/unit must exist and hold test-*.sh (floor cannot run)"
 fi
 : >"$VIOL"
-trap_scan tests/unit >"$VIOL" || true
+if ! trap_scan tests/unit >"$VIOL"; then
+    fail "trap_scan died on tests/unit -- check 4 floor cannot run (#498)"
+fi
 if [ -s "$VIOL" ]; then
     while IFS='|' read -r tf tk; do
         case "$tk" in
@@ -527,7 +456,9 @@ printf '#!/bin/sh\n# probe: function form passes (arms on the trap line, rm in t
 printf '#!/bin/sh\n# probe: heredoc-escaped receiver (child script) is not a suite receiver\n_cat > /dev/null <<EOF\n_h = \\$(mktemp -d)\nEOF\n' \
     >"$PROBE_DIR/unit/test-probe-trap-heredoc.sh"
 : >"$VIOL"
-trap_scan "$PROBE_DIR/unit" >"$VIOL" || true
+if ! trap_scan "$PROBE_DIR/unit" >"$VIOL"; then
+    fail "trap_scan died on the probe scan -- check 4 self-probes unreliable (#498)"
+fi
 if grep -q 'test-probe-trap-none.sh|notrap' "$VIOL"; then
     pass "self-probe: trapless receiver suite is caught"
 else
@@ -563,7 +494,9 @@ printf '#!/bin/sh\n# probe: escaped quotes around an in-action # must not cut th
 printf '#!/bin/sh\n# probe: sq action ending in a backslash — the skip must not eat the closing quote (#287 d D1)\nP4K="$(mktemp -d)"\ntrap '"'"'rm -rf "$P4K" \\'"'"' EXIT # add INT TERM arms\n' \
     >"$PROBE_DIR/unit/test-probe-trap-sqbs.sh"
 : >"$VIOL"
-trap_scan "$PROBE_DIR/unit" >"$VIOL" || true
+if ! trap_scan "$PROBE_DIR/unit" >"$VIOL"; then
+    fail "trap_scan died on the probe scan -- check 4 self-probes unreliable (#498)"
+fi
 if grep -q 'test-probe-trap-cmd.sh|notrap' "$VIOL"; then
     pass "self-probe: command-prefixed receiver caught"
 else
@@ -617,7 +550,9 @@ printf '#!/bin/sh\n# probe: the function definition form is not a call\nwork_new
 printf '#!/bin/sh\n# probe: escaped child code is not the parent call (C1)\n_h = \\$(work_new)\nW="\\$(work_new_file)"\ntrap "rm -rf \\"$H\\" \\"$W\\"" EXIT INT TERM\n' \
     >"$PROBE_DIR/unit/test-probe-work-esc.sh"
 : >"$VIOL"
-trap_scan "$PROBE_DIR/unit" >"$VIOL" || true
+if ! trap_scan "$PROBE_DIR/unit" >"$VIOL"; then
+    fail "trap_scan died on the probe scan -- check 4 self-probes unreliable (#498)"
+fi
 if grep -q 'test-probe-trap-mix.sh|mixtrap' "$VIOL"; then
     pass "self-probe: work_new + local trap mix is caught"
 else
@@ -628,6 +563,21 @@ if grep -qE 'test-probe-(work-only|work-cmt|work-def|work-esc)\.sh\|' "$VIOL"; t
     grep -E 'test-probe-(work-only|work-cmt|work-def|work-esc)' "$VIOL" || true
 else
     pass "self-probe: work-only, comment-only, definition and escaped-child forms pass clean"
+fi
+# detector-death guard arm (#498, the #496 a B1/b D3 shape): one
+# executed death through the wrapper -- a scan target whose file list
+# comes back empty (vanished dir, find error) reaches the detector with
+# no operands; the wrapper must fail loud with the guard message on
+# stderr and a nonzero rc, observed the way a failing sweep observes it
+# (stderr captured, stdout discarded). Without the guard an empty or
+# dead scan writes zero rows and every check-4 verdict below greps an
+# empty file green.
+_tsg_rc=0
+_tsg_err="$( (trap_scan "$PROBE_DIR/no-such-dir-$$") 2>&1 >/dev/null)" || _tsg_rc=$?
+if [ "$_tsg_rc" -ne 0 ] && printf '%s\n' "$_tsg_err" | grep -q 'trap floor output unreliable'; then
+    pass "self-probe: a trap_detect death fails loud (guard message + rc, #498)"
+else
+    fail "self-probe: a trap_scan death must fail loud with the guard message (#498)"
 fi
 # scan-target assert must fail loudly on a vanished directory (#287 a S3)
 _ts_probe=0
