@@ -209,9 +209,9 @@ in CI exactly through that gap. A change to a shared list consumed by
 tests (the rules audit's `SCOPE_FILES`, `KIT_FILES`, suite
 inventories) greps every consumer suite BEFORE the gate run — the
 gate stops at the first red and masks later same-cause suites behind
-it (PR #539: the rules-meta fixture mirror surfaced only after
-rules-revisit's was fixed and the chain re-ran). A wave whose diff
-touches `files/`
+it (issue #540 §1: the rules-meta fixture mirror surfaced only after
+rules-revisit's was fixed and the chain re-ran, in PR #539's session).
+A wave whose diff touches `files/`
 also owes `make sums` IN the chain, first — `make sums && make test &&
 git add && git commit`: the freshness pin inside `make test` reddens on
 a stale `SHA256SUMS` (issue #478), so the regeneration must land in

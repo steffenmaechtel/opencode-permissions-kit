@@ -142,8 +142,9 @@ make e2e-rootless      # docker-rootless daemon suite (needs systemd-in-containe
   Docker image builds, before any repo content executes) is an upstream
   transient until proven otherwise: the git-core PPA has failed image
   builds with Launchpad's `GPGKeyTemporarilyNotFoundError` from
-  `add-apt-repository -y ppa:git-core/ppa`, and apt `Err:`/hash-sum
-  classes fail the same way (PR #531: a red `e2e-2x-git-latest` lane on
+  `add-apt-repository -y ppa:git-core/ppa` — the verified instance —
+  and apt `Err:`/hash-sum classes are the same signature family
+  (issue #534 §1's list) (PR #531: a red `e2e-2x-git-latest` lane on
   a comment-only push; the job re-run went green with near-identical
   runtime). Re-run the failed job — CI lanes and local `make e2e` runs
   alike. Suspect the diff only when the failure sits in a test step or

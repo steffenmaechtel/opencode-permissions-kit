@@ -402,10 +402,16 @@ waves (#496 a B1, #498, #519: `_rule2_batch`, `_rule1_batch`,
 
 ## Named-cause failure guards (shipped runners)
 
-Every `mktemp` on a runner-visible path in shipped code fails with a
-named cause — the `#364 class` shape, three live sites: the SHA256SUMS
+Shipped code runs where `$TMPDIR` can be unset, read-only or full — a
+bare `$(mktemp)` death aborts with the shell's generic message and the
+user cannot tell what stopped. Every shipped fetcher already guards
+its mktemp with a named cause (the `#364` class): the SHA256SUMS
 fetches in `files/install.sh` and `management/update.sh`, and the
-get.docker.com fetch in `bin/setup-container-backend`.
+get.docker.com fetch in `bin/setup-container-backend`. This section
+prescribes the standard for new and touched shipped code — existing
+unguarded receivers (the `sh/ddev-migrate.sh` bare `|| return 1`
+shape) are the class debt named in the rule below, not a state the
+tree already holds.
 
 - A `mktemp` receiver in shipped code carries a named-cause guard:
   `tmp=$(mktemp) || { echo "… mktemp failed (is \$TMPDIR writable?) —

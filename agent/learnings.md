@@ -274,8 +274,8 @@ empty-match greps (`grep … || true` where empty output is rc 1), `IFS= read
   parallel tracker calls (`gh issue create`) land next to their
   subject AT creation time, read from each call's own output;
   reconstructing the mapping afterward from assumed launch sequence
-  crossed two of three work orders (#541/#542/#543 vs the PR-body
-  table, PR #544 round a A3 MED).
+  crossed the work-order mapping — all three of #541/#542/#543 vs the
+  PR-body table (PR #544 round a A3 MED).
 
 ## When a rule fails
 
