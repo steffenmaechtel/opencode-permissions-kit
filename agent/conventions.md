@@ -541,6 +541,21 @@ Citations in new text name the file and section, never the bare ID:
   `internal/reviews/`, the README is covered while the
   machine-generated legacy-index is exempt. (RM-0116)
 
+## Referencing, not restating
+
+Content (a contract, question, label list, command shape) should
+live in exactly ONE owning document; every other site should name it
+— skill ID, file path, section link — and stop there. Copying
+content into a second document turns a future change into an N-place
+update, and each missed place is a silent contradiction. A pointer
+sentence ("what the skill does lives in the skill alone") stays true
+while the referenced content is freely editable with no co-moves.
+This applies to newly written and edited content; existing
+duplication is retired in passing when a site is touched anyway —
+no mass pass. (Maintainer directive 2026-11-15, the opk-improve-docs
+wave — its first draft restated one skill's contract in four
+documents.)
+
 ## Language
 
 All shipped content (scripts, docs, prompts, messages) is English — see

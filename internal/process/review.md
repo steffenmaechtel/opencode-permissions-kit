@@ -120,6 +120,10 @@ where its review role ends.
   comment), every NO is recorded as deliberately not done, and the
   closing summary lists what was filed alongside the declines. The
   mechanics live in the review concept's stop-rule section.
+- When that ask is settled and the issues are filed, the agent's
+  disposition report ends by asking you — "run the `opk-improve-docs`
+  skill now?" — answer drives the invocation; what the skill then
+  does lives in the skill alone, never restated here.
 - **Required approvals = 1 on master** is the hard merge gate: the
   machine account cannot approve its own PRs, so only your approval
   unlocks a merge. Bot-authored PRs are safe by construction.
