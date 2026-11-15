@@ -277,6 +277,19 @@ fi
 # in the same cache dir — swept with it.
 check_live "e2e_fetch_opencode mktemps the tarball temp off the caller's base (#511)" "$LIB" \
     -qF 'tmp="$(mktemp "$3.tmp.XXXXXX")"'
+# Order pin (#532 a S2): the mktemp must sit ABOVE the channel split —
+# only then do both channels share the random temp. The presence pin
+# above matches the line anywhere in the function; a refactor moving it
+# into one case arm would keep every pin green while the npm channel
+# silently loses the random temp. Comment-stripped, the file's
+# order-pin idiom (the pin-before-resolution pin above).
+_mk_ln=$(live_src "$LIB" | grep -nF 'tmp="$(mktemp "$3.tmp.XXXXXX")"' | head -1 | cut -d: -f1)
+_case_ln=$(live_src "$LIB" | grep -n 'case "$ver" in' | head -1 | cut -d: -f1)
+if [ -n "$_mk_ln" ] && [ -n "$_case_ln" ] && [ "$_mk_ln" -lt "$_case_ln" ]; then
+    pass "tarball mktemp sits above the channel split (both channels share it, #532 a S2)"
+else
+    fail "tarball mktemp not above the channel split (mk line: ${_mk_ln:-missing}, case line: ${_case_ln:-missing})"
+fi
 check_absent "e2e_fetch_opencode never curls to the caller-fixed name (#511)" "$LIB" \
     -qF 'tmp="$3"'
 check_live "run-ddev.sh mktemps the ddev tarball temp (#511 sweep)" "$RUN_DDEV" \
@@ -301,7 +314,7 @@ fi
 # symlink exactly like the real curl -o does, so a regression to the
 # fixed name clobbers the canary and the pin goes red for the reason it
 # exists. GitHub 1.x channel driven; the mktemp sits above the case, so
-# both channels share it.
+# both channels share it (order-pinned above — #532 a S2).
 TARWORK="$(work_new)" || {
     echo "e2e-sources tests: scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
     exit 1
