@@ -103,10 +103,27 @@ PROBE_DIR=""
 # The sourced test lib (tests/unit/lib/*.sh) is scanned like a suite --
 # it is runtime part of every suite that sources it (review #398 a F9:
 # the name glob alone let the lib escape the policy scan).
+# #519 (from #516 a A2): the old find|sort|while pipeline swallowed a
+# per-file awk death (the || true call sites read green over partial
+# or empty output); the scan now runs per-file with an rc guard and
+# fails loud on any detector death or an empty scan set.
 scan() {
-    _scan_dir="$1"
-    find "$_scan_dir" \( -name 'test-*.sh' -o -path '*/lib/*.sh' \) ! -name 'test-sandbox-policy.sh' | sort | while IFS= read -r f; do
-        awk -v f="$f" -v allow="$ALLOW" -v trees="$RATCHET_TREES" -v dq='"' -v sq="'" '
+    _sc_dir="$1"
+    _sc_list="$(mktemp)"
+    find "$_sc_dir" \( -name 'test-*.sh' -o -path '*/lib/*.sh' \) ! -name 'test-sandbox-policy.sh' |
+        sort >"$_sc_list"
+    set --
+    while IFS= read -r _sc_f; do
+        set -- "$@" "$_sc_f"
+    done <"$_sc_list"
+    command rm -f "$_sc_list"
+    if [ "$#" -eq 0 ]; then
+        echo "sandbox-policy tests: scan found no suites in '$_sc_dir' -- checks 1-2 output unreliable (#519)" >&2
+        return 1
+    fi
+    _sc_bad=0
+    for _sc_f; do
+        awk -v f="$_sc_f" -v allow="$ALLOW" -v trees="$RATCHET_TREES" -v dq='"' -v sq="'" '
             function isbad(t) {
                 if (substr(t, 1, 1) != "/") return 0
                 if (t ~ /^\/(tmp\/|var\/tmp\/|dev\/null$)/) return 0
@@ -225,13 +242,19 @@ scan() {
                     }
                 }
             }
-        ' "$f"
+        ' "$_sc_f" || {
+            echo "sandbox-policy tests: scan died on '$_sc_f' (rc=$?) -- checks 1-2 output unreliable (#519)" >&2
+            _sc_bad=1
+        }
     done
+    [ "$_sc_bad" -eq 0 ]
 }
 
 # --- 1. the real tree ---------------------------------------------------------
 : >"$VIOL"
-scan tests/unit >"$VIOL" || true
+if ! scan tests/unit >"$VIOL"; then
+    fail "scan died on tests/unit -- checks 1-2 cannot run (#519)"
+fi
 if [ -s "$VIOL" ]; then
     while IFS='|' read -r vf vl vk vp; do
         case "$vk" in
@@ -257,7 +280,9 @@ printf '#!/bin/sh\n# probe: redirect-glued literal must be caught (0.0.42g C3)\n
 printf '#!/bin/sh\n# probe: sandboxed fixture passes both checks\napproot: /var/tmp/opencode-ddev-mig-roots/vhosts/x\nrm -rf /var/tmp/opencode-ddev-mig-roots\n' \
     >"$PROBE_DIR/unit/test-probe-clean.sh"
 : >"$VIOL"
-scan "$PROBE_DIR/unit" >"$VIOL" || true
+if ! scan "$PROBE_DIR/unit" >"$VIOL"; then
+    fail "scan died on the probe scan -- checks 1-2 self-probes unreliable (#519)"
+fi
 if grep -q "test-probe-cont.sh|4|mutate|/var/www/vhosts/probe-evil" "$VIOL"; then
     pass "self-probe: continuation-split rm -rf is caught"
 else
@@ -310,14 +335,46 @@ fi
 # carried no :? while the scan stopped at tests/unit. Checks 1/2 stay
 # unit-scoped: e2e scripts legitimately name container paths
 # (/var/www/vhosts fixtures) that the real-tree ratchet would flag.
+# #519 (from #516 a A2): same restructure as scan() -- the per-file
+# grep rc is captured directly (rc 1 = no suffix match, the normal
+# clean case; rc >= 2 = detector death, loud); the || true call sites
+# read green over partial or empty output before.
 sfx_scan() {
-    find "$1" \( -name "${2:-test-*.sh}" -o -path '*/lib/*.sh' \) ! -name 'test-sandbox-policy.sh' | sort | while IFS= read -r f; do
-        grep -HnE 'rm( -[A-Za-z]+| "[^"]*"| [^";&| ]+)*( "\$[A-Za-z_][A-Za-z0-9_]*/| "\$\{[A-Za-z_][A-Za-z0-9_]*\}/| "\$[A-Za-z_][A-Za-z0-9_]*"/| \$[A-Za-z_][A-Za-z0-9_]*/| "\$[A-Za-z_][A-Za-z0-9_]*\.| "\$\{[A-Za-z_][A-Za-z0-9_]*\}\.| \$[A-Za-z_][A-Za-z0-9_]*\.)' "$f" | grep -Ev ':[0-9]+:[[:space:]]*#' || true
+    _sx_dir="$1"
+    _sx_list="$(mktemp)"
+    find "$_sx_dir" \( -name "${2:-test-*.sh}" -o -path '*/lib/*.sh' \) ! -name 'test-sandbox-policy.sh' |
+        sort >"$_sx_list"
+    set --
+    while IFS= read -r _sx_f; do
+        set -- "$@" "$_sx_f"
+    done <"$_sx_list"
+    command rm -f "$_sx_list"
+    if [ "$#" -eq 0 ]; then
+        echo "sandbox-policy tests: sfx_scan found no suites in '$_sx_dir' -- check 3 output unreliable (#519)" >&2
+        return 1
+    fi
+    _sx_bad=0
+    for _sx_f; do
+        _sx_rc=0
+        _sx_out="$(grep -HnE 'rm( -[A-Za-z]+| "[^"]*"| [^";&| ]+)*( "\$[A-Za-z_][A-Za-z0-9_]*/| "\$\{[A-Za-z_][A-Za-z0-9_]*\}/| "\$[A-Za-z_][A-Za-z0-9_]*"/| \$[A-Za-z_][A-Za-z0-9_]*/| "\$[A-Za-z_][A-Za-z0-9_]*\.| "\$\{[A-Za-z_][A-Za-z0-9_]*\}\.| \$[A-Za-z_][A-Za-z0-9_]*\.)' "$_sx_f" 2>/dev/null)" || _sx_rc=$?
+        if [ "$_sx_rc" -gt 1 ]; then
+            echo "sandbox-policy tests: sfx_scan died on '$_sx_f' (rc=$_sx_rc) -- check 3 output unreliable (#519)" >&2
+            _sx_bad=1
+            continue
+        fi
+        if [ -n "$_sx_out" ]; then
+            printf '%s\n' "$_sx_out" | grep -Ev ':[0-9]+:[[:space:]]*#' || true
+        fi
     done
+    [ "$_sx_bad" -eq 0 ]
 }
 : >"$VIOL"
-sfx_scan tests/unit >"$VIOL" || true
-sfx_scan tests/e2e '*.sh' >>"$VIOL" || true
+if ! sfx_scan tests/unit >"$VIOL"; then
+    fail "sfx_scan died on tests/unit -- check 3 cannot run (#519)"
+fi
+if ! sfx_scan tests/e2e '*.sh' >>"$VIOL"; then
+    fail "sfx_scan died on tests/e2e -- check 3 cannot run (#519)"
+fi
 if [ -s "$VIOL" ]; then
     while IFS= read -r vrow; do
         fail "$vrow  <-- rm on a var+suffix operand without the :? empty-var guard"
@@ -331,7 +388,9 @@ fi
 printf '#!/bin/sh\n# probe: unguarded rm suffix variants must be caught (check 3)\nrm -rf "$PX/evil"\nrm -fr "$PX/evil2"\nrm "$PX/evil3"\nrm -rf "$PX/ok" "$PX/evil4"\nrm "${PX:?}/fine"\nrm -f "${PX:?}/fine2"\nrm -rf "${PX}/evil5"\nrm -rf "$PX"/evil6\nrm -rf $PX/evil7\nrm -rf "${PX:?}/sub/fine3"\nrm -f "$PX"\nrm -f "$PX.evil8"\nrm -f "${PX:?}.fine8"\nrm -f $PX.evil9\n' \
     >"$PROBE_DIR/unit/test-probe-sfx.sh"
 : >"$VIOL"
-sfx_scan "$PROBE_DIR/unit" >"$VIOL" || true
+if ! sfx_scan "$PROBE_DIR/unit" >"$VIOL"; then
+    fail "sfx_scan died on the probe scan -- check 3 self-probes unreliable (#519)"
+fi
 # Guarded count (#260, the #244 f W1 class): grep -c exits 1 on zero
 # matches (the scanner regressing to no rows). This suite runs without
 # set -e, so the zero path records rather than aborts today — guarded
@@ -582,6 +641,52 @@ if [ "$_tsg_rc" -ne 0 ] && printf '%s\n' "$_tsg_err" | grep -q 'trap floor outpu
     pass "self-probe: a trap_detect death fails loud (guard message + rc, #498)"
 else
     fail "self-probe: a trap_scan death must fail loud with the guard message (#498)"
+fi
+# detector-death guard arms for scan/sfx_scan (#519, the a A2
+# residual): one executed death each -- a scratch scan set holding an
+# unreadable suite file; the wrappers must fail loud (guard message on
+# stderr + nonzero rc) instead of letting the callers read green over
+# the missing rows (the old || true call sites did).
+# Root-context caveat (#520 a B4): these deaths are DAC-enforced
+# (chmod 000) -- as root awk/grep read through and these arms
+# false-red; no root invocation path exists for this suite today (CI
+# runner user, no e2e/kit-script call site; the vanished-dir arms
+# elsewhere in this suite are root-safe).
+_dg_dir="$(mktemp -d)"
+printf '#!/bin/sh\n# probe: unreadable file kills the scan detectors\n_dg="$(mktemp -d)"\n' \
+    >"$_dg_dir/test-probe-dying.sh"
+chmod 000 "$_dg_dir/test-probe-dying.sh"
+_dg_rc=0
+_dg_err="$( (scan "$_dg_dir") 2>&1 >/dev/null)" || _dg_rc=$?
+if [ "$_dg_rc" -ne 0 ] && printf '%s\n' "$_dg_err" | grep -q 'checks 1-2 output unreliable'; then
+    pass "self-probe: a scan detector death fails loud (#519)"
+else
+    fail "self-probe: a scan death must fail loud with the guard message (#519)"
+fi
+_dg_rc=0
+_dg_err="$( (sfx_scan "$_dg_dir") 2>&1 >/dev/null)" || _dg_rc=$?
+chmod 755 "$_dg_dir/test-probe-dying.sh"
+command rm -rf "${_dg_dir:?}"
+if [ "$_dg_rc" -ne 0 ] && printf '%s\n' "$_dg_err" | grep -q 'check 3 output unreliable'; then
+    pass "self-probe: an sfx_scan detector death fails loud (#519)"
+else
+    fail "self-probe: an sfx_scan death must fail loud with the guard message (#519)"
+fi
+# empty-scan-set legs: a vanished scan dir must fail loud too (zero
+# scanned suites must never read as a clean verdict)
+_dg_rc=0
+_dg_err="$( (scan "$PROBE_DIR/no-such-dir-$$") 2>&1 >/dev/null)" || _dg_rc=$?
+if [ "$_dg_rc" -ne 0 ] && printf '%s\n' "$_dg_err" | grep -q 'found no suites'; then
+    pass "self-probe: an empty scan set fails loud (#519)"
+else
+    fail "self-probe: an empty scan set must fail loud with the guard message (#519)"
+fi
+_dg_rc=0
+_dg_err="$( (sfx_scan "$PROBE_DIR/no-such-dir-$$") 2>&1 >/dev/null)" || _dg_rc=$?
+if [ "$_dg_rc" -ne 0 ] && printf '%s\n' "$_dg_err" | grep -q 'found no suites'; then
+    pass "self-probe: an empty sfx_scan set fails loud (#519)"
+else
+    fail "self-probe: an empty sfx_scan set must fail loud with the guard message (#519)"
 fi
 # scan-target assert must fail loudly on a vanished directory (#287 a S3)
 _ts_probe=0

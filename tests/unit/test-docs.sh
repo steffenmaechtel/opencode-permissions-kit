@@ -129,9 +129,40 @@ done
 # Docs scope (structure wave 2026-10): user docs stay under docs/, internal
 # areas live at agent/ and internal/ (process/records/reviews/reviews-meta),
 # agent skills at .agents/skills/ (issue #178).
-for dir in docs agent internal .agents; do
-    find "$dir" -name '*.md' -type f
-done | sort | while IFS= read -r f; do
+# Scope-collection guard (#519, from #516 a A5 -- the same class as the
+# #441 a B1 scratch guard above): the old inline `for dir ...; find ...
+# done | sort | while` shape swallowed find's rc in the pipe -- a find
+# death (vanished or unreadable scope dir) degraded the file list
+# silently: a SINGLE dead dir left the survivors' files flowing
+# (check_file green over missing coverage), all four dead read as
+# "docs link check: OK" with detection disabled. The collector guards
+# both legs (per-dir rc) and the empty-set leg (four checked-in scope
+# dirs hold hundreds of .md files -- zero means the scan never ran);
+# the guard arms at the bottom drive the death and empty paths
+# hermetically.
+_docs_collect() { # $@ = scope dirs -> file list on stdout; loud on death/empty
+    _dc_tmp="$(work_new_file)" || return 1
+    for _dc_dir; do
+        find "$_dc_dir" -name '*.md' -type f >>"$_dc_tmp" || {
+            echo "docs link check: scope scan died on '$_dc_dir' (rc=$?) -- link check output unreliable (#519)" >&2
+            return 1
+        }
+    done
+    if [ ! -s "$_dc_tmp" ]; then
+        echo "docs link check: empty scope scan -- link check output unreliable (#519)" >&2
+        return 1
+    fi
+    cat "$_dc_tmp"
+}
+_docs_list="$(work_new_file)" || {
+    echo "docs link check: FAILED - scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
+if ! _docs_collect docs agent internal .agents >"$_docs_list"; then
+    echo "docs link check: FAILED - scope collection unreliable (#519)" >&2
+    exit 1
+fi
+sort "$_docs_list" | while IFS= read -r f; do
     check_file "$f"
 done
 
@@ -386,6 +417,28 @@ if [ -z "${OPK_DOCS_B1_CHILD:-}" ]; then
         ! printf '%s' "$_b1_out" | grep -qF 'scratch creation failed'; then
         echo "FAIL test-docs itself: dead-TMPDIR run must abort loud, not pass silently (rc=$_b1_rc out=$_b1_out) (#441 a B1)" >>"$TMP"
     fi
+fi
+
+# --- #519 guard arms: executed death paths for the scope collector -------------
+# Death leg: the collector on a vanished scope dir must return nonzero
+# with the guard message on stderr, observed the way a failing
+# collection observes it (stdout discarded, stderr captured). Empty
+# leg: an existing but empty scope dir must fail loud too -- zero
+# collected files must never read as a clean check.
+_dr_rc=0
+_dr_err="$( (_docs_collect "$REPO_ROOT/.no-such-dir-opk-519") 2>&1 >/dev/null)" || _dr_rc=$?
+if [ "$_dr_rc" -ne 0 ] && printf '%s\n' "$_dr_err" | grep -q 'scope scan died'; then
+    :
+else
+    echo "FAIL test-docs itself: a scope-collection death must fail loud (rc=$_dr_rc err=$_dr_err) (#519)" >>"$TMP"
+fi
+_dr_empty="$(work_new)"
+_dr_rc=0
+_dr_err="$( (_docs_collect "$_dr_empty") 2>&1 >/dev/null)" || _dr_rc=$?
+if [ "$_dr_rc" -ne 0 ] && printf '%s\n' "$_dr_err" | grep -q 'empty scope scan'; then
+    :
+else
+    echo "FAIL test-docs itself: an empty scope scan must fail loud (rc=$_dr_rc err=$_dr_err) (#519)" >>"$TMP"
 fi
 
 if [ -s "$TMP" ]; then
