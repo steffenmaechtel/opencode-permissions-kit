@@ -265,8 +265,7 @@ case "$(printf '%s\n' "$_f1k" | head -1)" in
     *) fail "install.sh discriminator block extraction broke (got: $(printf '%s' "$_f1k" | head -c 40))" ;;
 esac
 _f1rc=0
-# Multiline body: the opener rides PATH so the line ends in plain
-# `bash -c`, and the opening quote opens the NEXT line.
+# The opener rides PATH so the line ends in plain `bash -c`.
 _f1out=$(cd "$WORK/clean" && PATH="$_FBBIN" bash -c \
     '
     set -eu

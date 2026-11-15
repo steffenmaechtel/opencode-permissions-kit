@@ -14,9 +14,10 @@
 #
 # Provides:
 #   pass / fail          the counted PASS/FAIL rows -- printf '%b' based,
-#                        byte-identical to the old echo definitions under
-#                        sh/dash (the suites' runtime) AND under bash,
-#                        whose echo does not interpret \033 (PR #397 CI
+#                        so the rows print identical bytes under sh/dash
+#                        (the suites' runtime) and under bash alike: the
+#                        old echo definitions matched only under sh/dash
+#                        -- bash echo does not interpret \033 (PR #397 CI
 #                        caught the echo form differing there)
 #   check <desc> cmd...  pass/fail around a command's rc
 #   assert_eq <desc> <expected> <actual>
