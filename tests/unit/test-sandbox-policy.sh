@@ -391,11 +391,15 @@ fi
 # (sq-blanked line, escaped \$( mangled, work_* call shapes) are
 # faithful ports -- their latent-shape documentation above carries
 # over unchanged. This wrapper is the fail-loud seam: a detector death
-# (unreadable file, an EMPTY scan set -- vanished dir, find error --
-# or a python start failure) returns nonzero with the guard message on
-# stderr, and the callers below fail the suite instead of scanning
-# green over missing rows (the #496 round-a B1 vacuity class; the
-# guard arm after the probe scans executes the death path).
+# (unreadable file, an EMPTY scan set -- a vanished start point or a
+# TOTAL find error, which both yield an empty file list -- or a python
+# start failure) returns nonzero with the guard message on stderr, and
+# the callers below fail the suite instead of scanning green over
+# missing rows (the #496 round-a B1 vacuity class; the guard arm after
+# the probe scans executes the death path). Scope note (a A4, #516): a
+# PARTIAL find failure (unreadable subtree mid-traversal) yields a
+# reduced list and a silent rc-0 scan -- pre-existing semantics, the
+# old find|sort|while pipeline behaved identically.
 trap_scan() {
     _ts_list="$(mktemp)"
     find "$1" \( -name "${2:-test-*.sh}" -o -path '*/lib/*.sh' \) ! -name 'test-sandbox-policy.sh' |

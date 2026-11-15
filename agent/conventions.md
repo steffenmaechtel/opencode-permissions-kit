@@ -340,7 +340,9 @@ tokenize with the commenter pass first, arms read as the tokens after
 the action word; the receiver regex and the own-call view stayed
 faithful ports — the shlex option does not fit them, they feed
 structural line views, not token walks); the adoption differential
-(old awk vs the port over tests/unit + the probe corpus) is the
+(old awk vs the port over tests/unit + the probe corpus: byte-identical
+rows on the whole corpus, the delta shapes measured on scratch torture
+files, none live — review a B3, #516) is the
 equivalence record, the suite's probe arms pin the four defect-round
 shapes. For
 any new parser need, evaluate the library option first (python3

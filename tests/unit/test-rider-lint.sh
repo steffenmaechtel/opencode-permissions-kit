@@ -397,10 +397,12 @@ _RULE1_OUT="$(work_new_file)" || {
 # Fail-loud (#498, the #496 round-a B1 shape): the sweep's verdict is
 # only as good as the detector output it reads -- an awk death (missing
 # or unreadable sweep file, a future program-text edit) leaves the
-# capture at ZERO bytes and the loop below would pass vacuously green.
-# The rc guard turns a detector death into a hard suite failure; the
-# arms under it execute the failure path through the guard message,
-# observed on stderr the way a real run observes it.
+# capture at zero bytes (death before any row) or PARTIAL (a mid-list
+# death keeps earlier files' rows), and the loop below would pass
+# green over whatever is missing. The rc guard turns either shape into
+# a hard suite failure; the arms under it execute the failure path
+# through the guard message, observed on stderr the way a real run
+# observes it.
 _rule1_batch() { # $@ = suite files -> $_RULE1_OUT; loud on death
     _rider_hits "$@" >"$_RULE1_OUT" || {
         echo "rider lint tests: rider-hits batch failed (rc=$?) -- rule 1 sweep output unreliable" >&2

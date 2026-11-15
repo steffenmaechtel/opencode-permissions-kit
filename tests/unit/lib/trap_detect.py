@@ -10,13 +10,17 @@ b C2 comment words satisfied the arms, c S1 escaped-quote miscount cut
 at a shell-internal #, d D1 unconditional backslash skip ate an
 sq-closing quote) -- now reads the arms from shlex tokens:
 rider_detect.tokenize with the COMMENTER PASS FIRST (the awk cut a
-trailing comment before reading the arms; the comment-disabled pass
-stays the fallback for shapes that only parse whole, e.g. an
-unbalanced apostrophe inside a real comment). The receiver regex and
-the own-call view (workline) are faithful ports -- they never had the
-defect history, and the shlex option does not fit them: the own-call
-view feeds a structural LINE regex over the sq-blanked view, not a
-token walk.
+trailing comment before reading the arms, so a comment naming arms
+must not parse as arm tokens; an apostrophe inside a trailing comment
+resolves in that first pass -- the comment is cut before its quote
+bytes can wedge the parse). The comment-disabled pass stays the
+structural fallback of rider's two-pass doctrine -- in THIS order it
+is the fail-still net for shapes the commenter pass cannot parse
+whole, not the apostrophe net it is for the rider order. The receiver
+regex and the own-call view (workline) are faithful ports -- they
+never had the defect history, and the shlex option does not fit them:
+the own-call view feeds a structural LINE regex over the sq-blanked
+view, not a token walk.
 
 Contract (row-compatible with the awk program it replaces): file
 arguments, stdout rows exactly
@@ -31,14 +35,29 @@ argument list exits nonzero -- the suite's fail-loud sweep guard (#498,
 the #496 round-a B1 shape): an empty or dead scan must never pass the
 floor vacuously.
 
-Documented deltas vs the awk analyzer (the #498 adoption differential
--- old awk vs this module over tests/unit + the full check-4 probe
-corpus -- found byte-identical rows everywhere except the first shape
-below):
+Documented deltas vs the awk analyzer (#498 adoption differential: old
+awk vs this module produced BYTE-IDENTICAL rows over the whole named
+corpus -- tests/unit (55 files) plus the suite's check-4 probe corpus,
+independently re-run by review round a; every delta below was measured
+on scratch torture shapes, none has a live instance at adoption):
+
   - an unquoted trap statement reads word 1 as the action now, where
     the awk scanned the whole quote-free line as arm text: `trap EXIT`
-    additionally flags no-EXIT (shell-true: EXIT is the action there,
-    not an arm). Fail-loud direction; no live instance at adoption.
+    (and the signals-only `trap EXIT INT TERM`) additionally flags
+    no-EXIT (shell-true: EXIT is the action there, not an arm;
+    a C4, #516). Fail-loud direction.
+  - a line no pass parses whole (unterminated quotes both ways) emits
+    NO arms row -- where the old awk still emitted rows for such lines
+    (it read arms off the broken line's last quote: `trap "x` flagged
+    all three arms missing). Fail-still, the #496 port doctrine --
+    the SILENCE direction, disclosed here exactly because the old
+    detector was loud on these shapes (a B1, #516); realistic only in
+    heredoc/fixture text, a documented latent gap of check 4.
+  - TWO trap statements on one physical line: the arms walk pools the
+    tokens after the FIRST trap's action, so the second statement's
+    words satisfy the first's arm check -- `trap 'rm' EXIT; trap 'rm'
+    INT TERM` passes where the awk emitted no-EXIT. No live instance;
+    shell-arguable (collectively armed) (a C1, #516).
   - the arms are the tokens after the ACTION token (index 1, past a
     `--` separator) instead of the bytes after the line's LAST quote
     character -- mechanism change, no verdict change on the corpus: a
@@ -46,9 +65,6 @@ below):
     (its boundary regex cannot match EXIT at the stripped text's
     start), and the token walk arrives at the same verdict because the
     concat word is action bytes.
-  - a line no pass parses whole (unterminated quotes both ways) emits
-    no arms row -- fail-still, the #496 port doctrine (the corpus's
-    unterminated row produced no row from either side).
 """
 
 import os
@@ -119,8 +135,11 @@ def trap_missing(line):
     whole. Arms = the tokens after the action token (index 1, past a
     `--` separator); the joined text is space-padded so the awk's
     word-boundary regex applies verbatim -- in-action arm words and
-    trailing-comment arm words cannot satisfy the check (the #287
-    b C2/S1 shapes), a bare-EOL action never swallows the arms."""
+    trailing-comment arm words cannot satisfy the check on the primary
+    (commenter) pass (the #287 b C2/S1 shapes); on lines only the
+    fallback pass parses, comment bytes can become tokens and satisfy
+    the regex -- verdict-identical to the replaced awk, which matched
+    arms in whole-line text on those shapes (a A3, #516)."""
     toks = tokenize(line, passes=('#', ''))
     if toks is None:
         return None
