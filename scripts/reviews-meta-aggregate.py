@@ -19,7 +19,9 @@ DATA = sys.argv[1] if len(sys.argv) > 1 else '.'
 RAW = sorted(glob.glob(DATA + '/b*.json'))
 snapshots, resolutions = [], []
 for f in RAW:
-    d = json.load(open(f))
+    # utf-8 pinned (#513 A3): batch JSON may carry raw non-ASCII
+    # (em-dash summaries); a 7-bit-locale host must not die at the read.
+    d = json.load(open(f, encoding='utf-8'))
     snapshots.extend(d.get('snapshots', []))
     resolutions.extend(d.get('resolutions', []))
 
@@ -158,7 +160,10 @@ for s in snaps:
                   'n': len(fs), 'hm': hm, 'stop': s.get('stop_rule')})
 out['trend'] = trend
 
-with open(DATA + '/stats.json', 'w') as fh:
+# utf-8 pinned on the write arm too (#513 A3): stats.json is ASCII
+# today (json.dump's ensure_ascii default), but the codec must not ride
+# the locale (same class as the read arm).
+with open(DATA + '/stats.json', 'w', encoding='utf-8') as fh:
     json.dump(out, fh, indent=1, default=list)
 
 # console summary

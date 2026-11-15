@@ -57,8 +57,9 @@ def load(path):
     # read_config): the platform default is locale-dependent, and a
     # 7-bit-locale host used to fail register/unregister with rc 1
     # whenever cli.json carried non-ASCII (an entry with a non-ASCII
-    # path). The write path needs no pin — json.dump's default
-    # ensure_ascii=True keeps the temp file pure ASCII.
+    # path). The write path pins its codec too now (#513 A4, the
+    # fdopen site below) — latent belt: json.dump's default
+    # ensure_ascii=True keeps the temp file pure ASCII today.
     with open(path, "r", encoding="utf-8") as f:
         raw = f.read()
     try:
@@ -168,7 +169,12 @@ def main(argv):
             prefix=os.path.basename(path) + ".opk.",
         )
         try:
-            with os.fdopen(fd, "w") as f:
+            # #513 A4: pin the temp-write codec — os.fdopen must not ride
+            # the locale codec. Latent belt today (json.dump's
+            # ensure_ascii=True keeps the file ASCII, matching the
+            # read-side pin at the top of this file); activates only if
+            # a future ensure_ascii=False wants human-readable output.
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
                 f.write("\n")
                 f.flush()
