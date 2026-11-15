@@ -664,9 +664,24 @@ for f in $SCOPE; do
         fail "pin10 lane a: scope file unreadable: $f (#519)"
         continue
     fi
-    sed 's/(RM-[0-9][0-9][0-9][0-9])//g' "$REPO_ROOT/$f" |
-        grep -n 'RM-[0-9][0-9][0-9][0-9]' |
-        sed "s|^|$f:|" >>"$WORK/p10a" || true
+    # #522 (from #520 review a A2): the bare || true swallowed the pipe
+    # rc wholesale -- sfx_scan's per-file capture instead, with grep
+    # ending the pipe so its rc is the observable one: rc 1 stays the
+    # normal empty contribution (no non-ref IDs), rc > 1 fails loud.
+    # The rc > 1 arm has no hermetic trigger (grep reads the pipe, not
+    # a file operand; the -r pre-check above owns the readable leg) --
+    # residual per #522: a scope file vanishing between the -r check
+    # and the open still reads as the empty contribution.
+    _pa_rc=0
+    _pa_hits="$(sed 's/(RM-[0-9][0-9][0-9][0-9])//g' "$REPO_ROOT/$f" |
+        grep -n 'RM-[0-9][0-9][0-9][0-9]')" || _pa_rc=$?
+    if [ "$_pa_rc" -gt 1 ]; then
+        fail "pin10 lane a: detector died on $f (rc=$_pa_rc) -- lane output unreliable (#522)"
+        continue
+    fi
+    if [ -n "$_pa_hits" ]; then
+        printf '%s\n' "$_pa_hits" | sed "s|^|$f:|" >>"$WORK/p10a"
+    fi
 done
 if [ -s "$WORK/p10a" ]; then
     fail "pin10 lane a, fake ID mention(s) in scope files:"
@@ -684,8 +699,13 @@ fi
 # so the fail rows sit in the main shell (the counter survives,
 # conventions.md "Script output style").
 p10b_scan() { # $1 = meta dir, $2 = dst list; loud on death/empty
-    if ! find "$1" -type f -name 'RM-*.md' >"$2"; then
-        echo "rules-meta pin10: lane b scan died on '$1' (rc=$?) -- lane output unreliable (#519)" >&2
+    # #522 (from #520 review a A1): the rc is captured beside the find
+    # -- inside `if ! find` the negation left $? at 0, so the death
+    # message always printed rc=0. Lane c's capture pattern (below).
+    _pb_rc=0
+    find "$1" -type f -name 'RM-*.md' >"$2" || _pb_rc=$?
+    if [ "$_pb_rc" -ne 0 ]; then
+        echo "rules-meta pin10: lane b scan died on '$1' (rc=$_pb_rc) -- lane output unreliable (#519)" >&2
         return 1
     fi
     if [ ! -s "$2" ]; then
@@ -839,10 +859,13 @@ esac
 # user, no e2e/kit-script call site).
 _gb_rc=0
 _gb_err="$( (p10b_scan "$WORK/no-such-metadir-$$" "$WORK/p10b.arm") 2>&1 >/dev/null)" || _gb_rc=$?
-if [ "$_gb_rc" -ne 0 ] && printf '%s\n' "$_gb_err" | grep -q 'lane b scan died'; then
-    pass "pin10 lane b guard: scan death fails loud (#519)"
+# The rc=0) veto pins the #522 a A1 capture: the old negated-if shape
+# printed rc=0 here (dying find -> negation -> $? 0)
+if [ "$_gb_rc" -ne 0 ] && printf '%s\n' "$_gb_err" | grep -q 'lane b scan died' &&
+    ! printf '%s\n' "$_gb_err" | grep -q 'rc=0)'; then
+    pass "pin10 lane b guard: scan death fails loud, rc reported (#519, #522)"
 else
-    fail "pin10 lane b guard: a scan death must fail loud (rc=$_gb_rc) (#519)"
+    fail "pin10 lane b guard: a scan death must fail loud with a real rc (rc=$_gb_rc) (#519, #522)"
 fi
 mkdir -p "$WORK/p10b-empty.$$"
 _gb_rc=0
