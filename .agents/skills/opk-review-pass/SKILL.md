@@ -67,10 +67,8 @@ session's commission, then gather:
 | Tree state | clean and committed — the comment posts before any fix ("The PR-native loop") |
 
 Loop position: confirm from the chain state WHICH round this session
-runs — the alternation (birth-PR → review a → comment → fix wave a →
-…) and the position table live in review-concept, "The PR-native
-loop"; a fix-wave re-review is itself a round (next letter, own
-comment, same seam before its own fixes).
+runs — the alternation, the position table and the fix-wave re-review
+shape live in review-concept, "The PR-native loop".
 
 ## 2. Classify the track and tier BEFORE staging
 
@@ -79,7 +77,7 @@ thresholds, escalation): review-concept, "Round typing and tiering";
 track selection, fresh-session entry, non-shipped budgets and
 disposition policy: "Review tracks: shipped and non-shipped" — and
 state track + tier + classification evidence in the loop status
-BEFORE the fan-out launches. Severity escalates, never downgrades.
+BEFORE the fan-out launches.
 
 ## 3. Pre-flight
 
@@ -144,16 +142,15 @@ BEFORE the fan-out launches. Severity escalates, never downgrades.
 Merge and de-duplicate the raw reviewer checkpoint files into the
 round's findings table — ID, severity, provenance, summary; merges
 named, drops with reasons, raw→curated counts; the accounting lives
-in the round comment (`Curated by: main`). Main curates at ANY
-volume — no curator subagent, no threshold, no digest file
-(review-concept, "Curation and verification").
+in the round comment (`Curated by: main`). The curation rules
+(who curates, at what volume, with which artifacts) live in
+review-concept, "Curation and verification".
 
 ## 6. Verification
 
-The sizing gate by curated count — ≤ 30 main-inline, above exactly
-ONE strong-tier verifier batch of 2–3 parallel sessions; skipping an
-owed batch needs maintainer disclosure, never a time-pressure call —
-lives in review-concept, "Curation and verification".
+The sizing gate (by curated count) lives in review-concept,
+"Curation and verification" — it decides main-inline vs verifier
+batch and is a hard gate.
 
 The deliverables: verdict files — every curated finding re-derived
 against the code, verdict CONFIRMED / REFUTED / UNVERIFIED with
