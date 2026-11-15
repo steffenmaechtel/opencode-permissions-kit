@@ -13,6 +13,10 @@ this repository — the router. Detail lives next to its audience:
   and e2e suites but still hit real terminals
 - [agent/review-concept.md](agent/review-concept.md) — the review
   process: loop, stop rule, verification duty, reviewer mechanics
+- [agent/docs-loop.md](agent/docs-loop.md) — the docs-improvement
+  loop: how `Docs:` reflection issues (from the `opk-improve-docs`
+  skill) are triaged, batched into waves and closed — the consumer
+  side of that skill
 - `.agents/skills/` — loadable procedures for on-demand workflows
   (opencode loads them by description match): the session EXECUTING a
   review pass loads the `opk-review-pass` skill first — rules stay in
@@ -59,7 +63,8 @@ expect the reported paths to exist locally.
   fixtures (`fixtures/`), Docker e2e suites (`e2e/`),
   UX demos (`ux/`)
 - `docs/` — user documentation only (concepts / how-to / reference)
-- `agent/` — agent working rules: conventions, learnings, test fidelity
+- `agent/` — agent working rules: conventions, learnings, test
+  fidelity, docs loop
 - `.agents/skills/` — loadable agent procedures for on-demand
   workflows (see the router entry above)
 - `internal/` — project memory: maintainer process (`process/`), design

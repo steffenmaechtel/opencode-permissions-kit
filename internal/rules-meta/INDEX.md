@@ -6,11 +6,11 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**140 metas · 137 active · 3 retired · 3 review-pending · next due 2026-11-14**
+**145 metas · 142 active · 3 retired · 8 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** none
+- **Review pending:** RM-0141, RM-0142, RM-0143, RM-0144, RM-0145
 - **Amended — pending:** RM-0025 (2026-11-15), RM-0127 (2026-11-15), RM-0136 (2026-11-15)
 
 ## AGENTS.md
@@ -89,6 +89,18 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0116](0/1/1/RM-0116.md) | Every RM key appears at exactly three sites | active | approved | 1m | 2026-11-24 |
+
+## agent/docs-loop.md
+
+### What doc waves owe beyond the ordinary loop
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0141](0/1/4/RM-0141.md) | New rule bullets in audit-scope | active | **pending** | 1m | 2026-12-15 |
+| [RM-0142](0/1/4/RM-0142.md) | The rules-meta suite joins the | active | **pending** | 1m | 2026-12-15 |
+| [RM-0143](0/1/4/RM-0143.md) | New text cites its source | active | **pending** | 1m | 2026-12-15 |
+| [RM-0144](0/1/4/RM-0144.md) | learnings.md additions carry era-marked | active | **pending** | 1m | 2026-12-15 |
+| [RM-0145](0/1/4/RM-0145.md) | Shipped content is English and | active | **pending** | 1m | 2026-12-15 |
 
 ## agent/review-concept.md
 

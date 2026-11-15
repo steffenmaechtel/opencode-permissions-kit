@@ -66,7 +66,7 @@ fi
 TODAY=${FORCE_TODAY:-$(date +%F)}
 METAS=internal/rules-meta
 
-SCOPE_FILES="AGENTS.md agent/conventions.md agent/test-fidelity.md agent/review-concept.md internal/records/rules-meta.md"
+SCOPE_FILES="AGENTS.md agent/conventions.md agent/test-fidelity.md agent/review-concept.md agent/docs-loop.md internal/records/rules-meta.md"
 ACTIVE_SECTIONS="AGENTS.md#rules"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#interactive-prompts-yn"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#script-output-style"
@@ -96,6 +96,7 @@ ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#verification-duty"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#suites-are-the-standing-review"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#parallel-reviewer-agents"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#release-gate"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/docs-loop.md#what-doc-waves-owe-beyond-the-ordinary-loop"
 
 WORK=$(mktemp -d /tmp/rules-audit.XXXXXX) || exit 1
 trap 'rm -rf "$WORK"' EXIT
