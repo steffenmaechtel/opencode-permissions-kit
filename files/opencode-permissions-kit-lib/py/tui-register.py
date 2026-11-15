@@ -168,7 +168,12 @@ def main(argv):
             prefix=os.path.basename(path) + ".opk.",
         )
         try:
-            with os.fdopen(fd, "w") as f:
+            # #513 A4: pin the temp-write codec — os.fdopen must not ride
+            # the locale codec. Latent belt today (json.dump's
+            # ensure_ascii=True keeps the file ASCII, matching the
+            # read-side pin at the top of this file); activates only if
+            # a future ensure_ascii=False wants human-readable output.
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
                 f.write("\n")
                 f.flush()
