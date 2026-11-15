@@ -604,6 +604,20 @@ new_scratch n7
 sed -i 's/^created: 2026-10-16/created: 2026-09-01/; s/^next-revisit: 2026-11-16/next-revisit: 2026-10-01/' "$(meta_file RM-9001)"
 expect_ok "inv7 overdue non-blocking" "overdue metas"
 
+# 7b. #527: an audit run over an overdue tree leaves the date-invariant
+#     INDEX — byte-identical to the bare generator output the parity
+#     gate pins. The audit's regen used to pass FORCE_TODAY, so the
+#     scratch INDEX carried the Overdue variant and the next make test
+#     rejected the tree with the misleading hand-edit message.
+cp "$SCRATCH/internal/rules-meta/INDEX.md" "$WORK/index7.audit"
+(cd "$SCRATCH" && python3 scripts/gen-rules-index.py) >/dev/null 2>&1 ||
+    fail "inv7b: bare regen exited non-zero -- pin exercised nothing (#529 a A1)"
+if cmp -s "$SCRATCH/internal/rules-meta/INDEX.md" "$WORK/index7.audit"; then
+    pass "inv7b audit leaves the date-invariant INDEX (#527)"
+else
+    fail "inv7b: audit wrote a date-dependent INDEX variant (#527)"
+fi
+
 # 8. stale INDEX regenerates without blocking
 new_scratch n8
 run_audit # first run regenerates the scratch INDEX

@@ -6,13 +6,12 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**140 metas · 137 active · 3 retired · 2 review-pending · next due 2026-11-14**
+**140 metas · 137 active · 3 retired · 3 review-pending · next due 2026-11-14**
 
 ## Actionable
 
 - **Review pending:** none
-- **Amended — pending:** RM-0127 (2026-11-15), RM-0136 (2026-11-15)
-- **Overdue:** none
+- **Amended — pending:** RM-0025 (2026-11-15), RM-0127 (2026-11-15), RM-0136 (2026-11-15)
 
 ## AGENTS.md
 
@@ -289,7 +288,7 @@
 | [RM-0022](0/0/2/RM-0022.md) | 4 digits zero-padded | active | approved | 1m | 2026-11-14 |
 | [RM-0023](0/0/2/RM-0023.md) | at the bullet's end | active | approved | 1m | 2026-11-14 |
 | [RM-0024](0/0/2/RM-0024.md) | three one-digit levels | active | approved | 1m | 2026-11-14 |
-| [RM-0025](0/0/2/RM-0025.md) | regenerated per audit run | active | approved | 1m | 2026-11-14 |
+| [RM-0025](0/0/2/RM-0025.md) | regenerated per audit run | active | **amended — pending** | 1m | 2026-11-14 |
 | [RM-0026](0/0/2/RM-0026.md) | all content is English | active | approved | 1m | 2026-11-14 |
 | [RM-0045](0/0/4/RM-0045.md) | rule-bearing paragraphs are rewritten as | active | approved | 1m | 2026-11-17 |
 | [RM-0046](0/0/4/RM-0046.md) | out of meta scope: rationale = | active | approved | 1m | 2026-11-17 |

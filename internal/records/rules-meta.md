@@ -146,7 +146,11 @@ a bulk session, not one-off touches).
 8. `INDEX.md` is regenerated on every run, except when the meta walk
    reported `[meta-tree]` errors (skip, so a blocked run never writes
    a truncated INDEX, #232) or python3/gen-rules-index.py is
-   unavailable (skip with a warning, non-blocking).
+   unavailable (skip with a warning, non-blocking). The regenerated
+   content is date-invariant (#527): a pure function of the meta
+   tree, byte-identical to the bare generator run the parity test
+   pins — overdue never enters the INDEX (it is stdout-only, inv 7
+   and `make rules-report`).
 9. Approval consistency: `reviewed:` is set exactly when the review
    log carries an `approved by maintainer` entry of the same date —
    absent field with approval line, or field without line, both fail
