@@ -6,12 +6,12 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**145 metas · 142 active · 3 retired · 8 review-pending · next due 2026-11-14**
+**153 metas · 150 active · 3 retired · 17 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0141, RM-0142, RM-0143, RM-0144, RM-0145
-- **Amended — pending:** RM-0025 (2026-11-15), RM-0127 (2026-11-15), RM-0136 (2026-11-15)
+- **Review pending:** RM-0141, RM-0142, RM-0143, RM-0144, RM-0145, RM-0146, RM-0147, RM-0148, RM-0149, RM-0150, RM-0151, RM-0152, RM-0153
+- **Amended — pending:** RM-0025 (2026-11-15), RM-0124 (2026-11-15), RM-0127 (2026-11-15), RM-0136 (2026-11-15)
 
 ## AGENTS.md
 
@@ -63,6 +63,16 @@
 | [RM-0040](0/0/4/RM-0040.md) | Fail loud vs. fail open. Maintainer | active | approved | 1m | 2026-11-17 |
 | [RM-0041](0/0/4/RM-0041.md) | Prove it in tests. Payload attempts | active | approved | 1m | 2026-11-17 |
 
+### Fail-loud detector sweeps
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0146](0/1/4/RM-0146.md) | The producer function dies loud | active | **pending** | 1m | 2026-12-15 |
+| [RM-0147](0/1/4/RM-0147.md) | Call sites consume the rc | active | **pending** | 1m | 2026-12-15 |
+| [RM-0148](0/1/4/RM-0148.md) | The death arm is EXECUTED | active | **pending** | 1m | 2026-12-15 |
+| [RM-0149](0/1/4/RM-0149.md) | The empty-scan-set leg fails | active | **pending** | 1m | 2026-12-15 |
+| [RM-0150](0/1/5/RM-0150.md) | Detector rc semantics are per-tool | active | **pending** | 1m | 2026-12-15 |
+
 ### Test sandbox (unit suites)
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
@@ -76,6 +86,7 @@
 | [RM-0043](0/0/4/RM-0043.md) | Real-tree ratchet — any path-shaped | active | approved | 1m | 2026-11-17 |
 | [RM-0044](0/0/4/RM-0044.md) | rm suffix guard — any rm invocation | active | approved | 1m | 2026-11-17 |
 | [RM-0137](0/1/3/RM-0137.md) | Scratch receivers in harness-sourcing suites… | active | approved | 1m | 2026-12-06 |
+| [RM-0151](0/1/5/RM-0151.md) | The decision rule for writing NEW | active | **pending** | 1m | 2026-12-15 |
 
 ### Referencing review findings
 
@@ -89,6 +100,12 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0116](0/1/1/RM-0116.md) | Every RM key appears at exactly three sites | active | approved | 1m | 2026-11-24 |
+
+### Rule-file markdown structure
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0152](0/1/5/RM-0152.md) | Markdown structure inside rule bullets | active | **pending** | 1m | 2026-12-15 |
 
 ## agent/docs-loop.md
 
@@ -144,7 +161,7 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0124](0/1/2/RM-0124.md) | Track selection is mechanical | active | approved | 1m | 2026-11-28 |
+| [RM-0124](0/1/2/RM-0124.md) | Track selection is mechanical | active | **amended — pending** | 1m | 2026-11-28 |
 | [RM-0125](0/1/2/RM-0125.md) | Round typing names what | active | approved | 1m | 2026-11-28 |
 
 ### Review tracks: shipped and non-shipped
@@ -178,6 +195,7 @@
 |---|---|---|---|---|---|
 | [RM-0128](0/1/2/RM-0128.md) | One comment per review | active | approved | 1m | 2026-11-28 |
 | [RM-0129](0/1/2/RM-0129.md) | Size guard: GitHub caps | active | approved | 1m | 2026-11-28 |
+| [RM-0153](0/1/5/RM-0153.md) | PR-body edits for wave-authored | active | **pending** | 1m | 2026-12-15 |
 
 ### Fixes close classes, not sites
 

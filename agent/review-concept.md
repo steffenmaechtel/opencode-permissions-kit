@@ -295,9 +295,10 @@ touches CI-gating semantics (`.github/`, `Makefile`) or ships
 root-running `scripts/` code.
 
 - Track selection is mechanical and checked, not taken on trust: the
-  implementing session states it in the PR body (`Track:
-  shipped|non-shipped (paths)`), the review session re-derives it
-  from the diff — a shipped path anywhere means shipped-track, mixed
+  implementing session states it in the PR body at PR creation
+  (`Track: shipped|non-shipped (paths)` — #516's body never carried
+  it, noticed mid-review, never retrofitted; #520 had it from the
+  start), the review session re-derives it from the diff — a shipped path anywhere means shipped-track, mixed
   diffs included (the heavier ladder rows are the price of touching
   shipped code) — and the marker records it
   (`"track":"shipped"|"non-shipped"`, a permanent field in every
@@ -521,6 +522,10 @@ Review-relevant code touched this round: yes/no → …
   own marker and a `"part":1|2` field) — content is NEVER trimmed to
   fit. Preferred over splitting: per-unit comments (one per
   file/round) when the process shape allows them. (RM-0129)
+- PR-body edits for wave-authored claims are bookkeeping and
+  sanctioned (#516 corrected body claims mid-loop per its round a A2);
+  the timeline record stays in the append-only comments — a body edit
+  never replaces a round-comment entry. (RM-0153)
 
 ## Fixes close classes, not sites
 

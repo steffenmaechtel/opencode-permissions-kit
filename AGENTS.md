@@ -183,6 +183,8 @@ review fan-out the tree is a shared read substrate: sabotage only (a)
 before the reviewers launch, (b) after all returned, or (c) in a scratch
 worktree — the window and screening rules live in
 [review-concept.md](agent/review-concept.md#parallel-reviewer-agents).
+A background e2e suite is the same class of reader (it installs from
+the checkout): sabotage must precede its start too (#524 §5).
 **Gate runs are one unbroken `&&` chain ending in the commit.** No
 `| tail` or any pipe on a gate command (the pipeline returns the last
 member's rc — a red gate goes green through it), no `;` separator after
@@ -199,11 +201,15 @@ suites (rules-meta, sandbox-policy, workflows, format-gate) redden on
 changes their own files never touched — #412's round-b B3 (bare
 rule-ID citations in new comment text) was locally invisible and red
 in CI exactly through that gap. A wave whose diff touches `files/`
-also owes `make sums` IN the chain, before the commit: the freshness
-pin inside `make test` reddens on a stale `SHA256SUMS` (issue #478),
-so the regeneration and its commit are part of the gate, not an
-afterthought — `make sums` itself is idempotent (no-op output when
-the manifest is already fresh).
+also owes `make sums` IN the chain, first — `make sums && make test &&
+git add && git commit`: the freshness pin inside `make test` reddens on
+a stale `SHA256SUMS` (issue #478), so the regeneration must land in
+the log before the suite reads it (#524 §1 paid one red gate for the
+order); `make sums` itself is idempotent (no-op output when the
+manifest is already fresh). While the maintainer co-edits the working
+tree (interactive iteration), stage explicitly by path — `git add -A`
+is for solo phases with a verified-clean tree (a `git add -A` chain
+once swept the maintainer's template file into a commit, #528 §2).
 
 Both e2e suites are part of the definition of done for changes to
 `install.sh`, `update.sh`, the wrapper, or backend provisioning — and for

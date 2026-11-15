@@ -67,7 +67,15 @@ invariant: a fix that adds a rejection/skip/failure cause sweeps every
 message that enumerates causes, not just the code and the docs. The sweep
 claim itself is a claim: twice this corpus a recorded sweep proved false
 (`pr-00211 c W1`, `pr-00222 b W1` — the sweep missed the site the fix wave
-itself had just added).
+itself had just added). Prose claims have sibling copies like code sites
+do: when a wave updates, invalidates or copies a claim (comment, PR body,
+commit message), grep the claim's distinctive text tree-wide (`#515 a Q1`
+MED — the write-path claim corrected at one of two sites, the shipped
+copy kept asserting the opposite of the code 115 lines below it); and when
+a claim asserts a host/interpreter mechanism the wave's own tooling can
+measure in one probe, measure instead of copying (`#521 a S1` — a
+PYTHONUTF8 mechanism claim copied from a harness comment, disproven on
+the very host it names).
 
 ### L3 — Claim audit per wave
 *Class: `claim-drift` — rank 1 by count in BOTH runs (77 and 89 findings;
@@ -83,7 +91,13 @@ the prose shape of this class: a resolution narrative about what shifted
 what is a claim like a SHA citation — verify each hop at its ref before
 writing it, and date line anchors by MEASURING at the named commit
 (`git show <ref>:<file> | grep -n`), never by restating an earlier review's
-numbers (those describe a different tree by definition).
+numbers (those describe a different tree by definition). Guard comments
+narrating the OLD failure mode are this class too: execute the old shape
+once with the realistic trigger (one dead dir, one unreadable file) and
+describe the mode that actually occurs — total vs partial death are
+different claims (`#516 a B3`, a differential claim refuted by its own
+log; `#520 a B2+B3`, "empty list" wording overstated a partial-list
+death that stayed green over missing coverage).
 
 ### L4 — Pins must discriminate, and sit before the summary gate
 *Class: `test-vacuous` — run 1: 37 findings; run 2: 45 findings, 4 MED/HIGH,
@@ -106,7 +120,13 @@ later pin and the suite still tallies); (b) environment-dependent pins are
 marked as such (vacuous on CI where no kit is deployed, `0.0.46a F2`). A
 sabotage pin that discriminates through the WRONG mechanism (rc-2
 fallthrough instead of the claimed blind probe, `pr-00198 a W3`) is
-vacuous too — the pin must fail for the reason it exists.
+vacuous too — the pin must fail for the reason it exists. And an arm's
+grep phrase must be leg-specific: it occurs in exactly ONE guard
+message of that producer — a phrase another guard message also carries
+reroutes the death through the wrong leg and the arm still passes
+(`#520 a B1`: a one-token readability change rerouted a death through
+the empty-set guard undetected; the discriminating phrase shape
+existed in the same wave).
 
 ### L5 — Root-operand inventory check
 *Classes: `perm-model` + `race-toctou` — run 1: 53 findings, 23 MED/HIGH,
@@ -230,6 +250,16 @@ empty-match greps (`grep … || true` where empty output is rc 1), `IFS= read
   too (the path substrings stay intact). Only executing old vs new and
   `cmp`-ing the output discriminated. Idiom matrix:
   [conventions.md](conventions.md#formatting-shfmt) "Formatting (shfmt)".
+- **Trust the file, not your memory of the edit** (2026-11-15, two
+  sessions) — re-grep the construct before building a sabotage patch:
+  shfmt had reformatted the anchor text the writer remembered typing
+  (`#519`, first-cycle assert-fail; a live instance of the PR #441
+  wipe class AGENTS.md names); and after a non-trivial edit to a
+  Python file, parse and read before trusting the edit rc
+  (`python3 -c "import ast; ast.parse(open(<f>).read())"` plus the
+  diff hunk — a lenient edit match mis-indented 8-vs-12 spaces in
+  tui-register.py and 12 test rows caught it immediately, `#513`
+  series).
 
 ## When a rule fails
 
