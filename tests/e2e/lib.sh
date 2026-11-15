@@ -215,10 +215,14 @@ skip() {
 #         is the channel the official v2 installer resolves through. The
 #         legacy `@opencode-ai` scope is the fallback for versions published
 #         before the scope migration.
-# $1 = version, $2 = destination binary path, $3 = temp tarball path.
+# $1 = version, $2 = destination binary path, $3 = temp tarball name BASE —
+#   the temp itself is mktemp-random off that base (issue #511, the #509 a S2
+#   class: curl -o writes through a symlink planted at a predictable name),
+#   and every failure edge removes it, so dead downloads leave no debris.
 e2e_fetch_opencode() {
-    local ver="$1" dest="$2" tmp="$3" xdir
+    local ver="$1" dest="$2" xdir tmp
     mkdir -p "$(dirname "$dest")"
+    tmp="$(mktemp "$3.tmp.XXXXXX")"
     case "$ver" in
         2.*)
             echo "  Downloading opencode $ver (npm @opencode/cli-$target) into cache..."
@@ -229,6 +233,7 @@ e2e_fetch_opencode() {
                     "https://registry.npmjs.org/@opencode-ai/cli-$target/-/cli-$target-$ver.tgz" \
                     -o "$tmp" ||
                     {
+                        rm -f "$tmp"
                         echo "  ${RED}FAIL${NC}  opencode $ver download failed (npm: @opencode/cli-$target, @opencode-ai/cli-$target)"
                         exit 1
                     }
@@ -238,11 +243,13 @@ e2e_fetch_opencode() {
             mkdir -p "$xdir"
             tar -xzf "$tmp" -C "$xdir" ||
                 {
+                    rm -rf "$xdir" "$tmp"
                     echo "  ${RED}FAIL${NC}  cannot extract opencode $ver npm tarball"
                     exit 1
                 }
             mv "$xdir/package/bin/opencode" "$dest" ||
                 {
+                    rm -rf "$xdir" "$tmp"
                     echo "  ${RED}FAIL${NC}  opencode $ver npm tarball has no package/bin/opencode"
                     exit 1
                 }
@@ -256,11 +263,13 @@ e2e_fetch_opencode() {
                 "https://github.com/anomalyco/opencode/releases/download/v$ver/opencode-$target.tar.gz" \
                 -o "$tmp" ||
                 {
+                    rm -f "$tmp"
                     echo "  ${RED}FAIL${NC}  opencode $ver download failed (GitHub)"
                     exit 1
                 }
             tar -xzf "$tmp" -C "$(dirname "$dest")" ||
                 {
+                    rm -f "$tmp"
                     echo "  ${RED}FAIL${NC}  cannot extract opencode $ver tarball"
                     exit 1
                 }
