@@ -55,14 +55,16 @@ into one coherent diff:
 - docs-only diffs are non-shipped track: autonomous mode default,
   tier by size (review.md).
 
-The founding backlog ran as two pilot batches (2026-11-15, PRs #544,
-#545, #547 and #548): four and five issues, two PRs each, loop wall
-times 27+8 and ~45+~7 minutes, triage gated before the waves.
-Calibrated: the review loop dominates wall time, not issue count —
-one session takes 4–5 issues as a batch, at most two PRs (a code
-item rides its own small one); both pilots ran their loops
-in-session (single-case shape — a batch commission may still split
-review into fresh sessions per review.md).
+The founding backlog — the seven issues above, joined by #540 and
+#546 while the loop already ran — was worked in two pilot sessions
+(2026-11-15, PRs #544, #545, #547 and #548): four and five issues,
+two PRs each, loop wall times 27+8 and ~45+~7 minutes, triage gated
+before the waves. Calibrated: the review loop dominates wall time,
+not issue count — one session takes 4–5 issues as a batch, at most
+two PRs (a code item rides its own small one). Each pilot session
+ran its PRs' loops in-session — stacked single-case commissions, not
+review.md's batch shape (a batch commission splits review into fresh
+sessions, one per PR).
 
 ## What doc waves owe beyond the ordinary loop
 
