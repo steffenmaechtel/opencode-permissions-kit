@@ -644,6 +644,12 @@ for f in $SCOPE; do
         fail "pin10 setup: scope file missing: $f"
         continue
     fi
+    # #519 (the lane-b class): an unreadable-but-present scope file
+    # made sed die silently inside the pipe -- the lane read clean.
+    if [ ! -r "$REPO_ROOT/$f" ]; then
+        fail "pin10 lane a: scope file unreadable: $f (#519)"
+        continue
+    fi
     sed 's/(RM-[0-9][0-9][0-9][0-9])//g' "$REPO_ROOT/$f" |
         grep -n 'RM-[0-9][0-9][0-9][0-9]' |
         sed "s|^|$f:|" >>"$WORK/p10a" || true
@@ -657,19 +663,43 @@ fi
 
 # lane b: meta files carry only their own id -- cross-references in
 # meta bodies name the rule text, never an ID
-: >"$WORK/p10b"
-find "$REPO_ROOT/internal/rules-meta" -type f -name 'RM-*.md' 2>/dev/null |
-    LC_ALL=C sort | while IFS= read -r m; do
-    own=$(basename "$m" .md)
-    sed "s/^id: $own\$//" "$m" |
-        grep -n 'RM-[0-9][0-9][0-9][0-9]' |
-        sed "s|^|${m#"$REPO_ROOT"/}:|" >>"$WORK/p10b"
-done
-if [ -s "$WORK/p10b" ]; then
-    fail "pin10 lane b, foreign ID mention(s) inside meta files:"
-    sed 's/^/         /' "$WORK/p10b"
+# #519 (from #516 a A5's class): the producer ran find behind
+# 2>/dev/null into a pipe -- a find death left the lane empty and read
+# as a clean pass. The scan is a guarded producer now (rc + non-empty
+# + per-file readability), and the loop feeds from a FILE, not a pipe,
+# so the fail rows sit in the main shell (the counter survives,
+# conventions.md "Script output style").
+p10b_scan() { # $1 = meta dir, $2 = dst list; loud on death/empty
+    if ! find "$1" -type f -name 'RM-*.md' >"$2"; then
+        echo "rules-meta pin10: lane b scan died on '$1' (rc=$?) -- lane output unreliable (#519)" >&2
+        return 1
+    fi
+    if [ ! -s "$2" ]; then
+        echo "rules-meta pin10: lane b scan empty on '$1' -- lane output unreliable (#519)" >&2
+        return 1
+    fi
+}
+if ! p10b_scan "$REPO_ROOT/internal/rules-meta" "$WORK/p10b.list"; then
+    fail "pin10 lane b: rules-meta scan unreliable (#519)"
 else
-    pass "pin10 lane b: meta files carry only their own id"
+    LC_ALL=C sort "$WORK/p10b.list" >"$WORK/p10b.sorted"
+    : >"$WORK/p10b"
+    while IFS= read -r m; do
+        own=$(basename "$m" .md)
+        if [ ! -r "$m" ]; then
+            fail "pin10 lane b: unreadable meta file: ${m#"$REPO_ROOT"/} (#519)"
+            continue
+        fi
+        sed "s/^id: $own\$//" "$m" |
+            grep -n 'RM-[0-9][0-9][0-9][0-9]' |
+            sed "s|^|${m#"$REPO_ROOT"/}:|" >>"$WORK/p10b"
+    done <"$WORK/p10b.sorted"
+    if [ -s "$WORK/p10b" ]; then
+        fail "pin10 lane b, foreign ID mention(s) inside meta files:"
+        sed 's/^/         /' "$WORK/p10b"
+    else
+        pass "pin10 lane b: meta files carry only their own id"
+    fi
 fi
 
 # lane c helper: greps <root> for real IDs with the frozen-corpus
@@ -688,12 +718,19 @@ fi
 #     verbatim; living files there (README.md at the root) stay
 #     covered. *.json is in the include list BECAUSE of this class:
 #     without it the whole .json world was invisible to the guard.
-p10_lane_c_hits() { # $1 root, $2 scope
+p10_lane_c_hits() { # $1 root, $2 scope; loud on scan death (#519:
+    # the raw grep ran behind 2>/dev/null -- a grep death read as a
+    # clean tree; rc 1 (no matches) stays the normal clean case)
+    _c_rc=0
     grep -rn "RM-[0-9][0-9][0-9][0-9]" \
         --include="*.md" --include="*.sh" --include="*.py" --include="*.yml" \
         --include="*.json" \
-        "$1" 2>/dev/null |
-        grep -v "/internal/rules-meta/" |
+        "$1" >"$WORK/p10c.raw" || _c_rc=$?
+    if [ "$_c_rc" -gt 1 ]; then
+        echo "rules-meta pin10: lane c scan died (rc=$_c_rc) -- lane output unreliable (#519)" >&2
+        return 1
+    fi
+    grep -v "/internal/rules-meta/" "$WORK/p10c.raw" |
         grep -v -E "/internal/reviews/legacy-index\.md" |
         grep -v -E "/internal/reviews/[0-9]/[0-9]/[0-9]/[0-9]/pr-[0-9]+/" |
         grep -v -E "/internal/reviews-meta/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/" |
@@ -713,8 +750,9 @@ p10_lane_c_hits() { # $1 root, $2 scope
 
 # lane c: the rest of the living tree carries no real ID at all
 : >"$WORK/p10c"
-p10_lane_c_hits "$REPO_ROOT" "$SCOPE" >"$WORK/p10c"
-if [ -s "$WORK/p10c" ]; then
+if ! p10_lane_c_hits "$REPO_ROOT" "$SCOPE" >"$WORK/p10c"; then
+    fail "pin10 lane c: tree scan died -- lane output unreliable (#519)"
+elif [ -s "$WORK/p10c" ]; then
     fail "pin10 lane c, real ID(s) outside refs and meta files:"
     sed 's/^/         /' "$WORK/p10c"
 else
@@ -771,6 +809,39 @@ case "$_hits" in
         ;;
     *) fail "pin10 lane c scratch: README citation not caught" ;;
 esac
+
+# --- #519 guard arms: executed death paths for the lane producers -------------
+# lane b death leg (vanished dir) and empty leg (existing, empty);
+# lane c death leg (unreadable file under the scan root -- grep rc 2).
+# All three must fail loud with their guard message on stderr and a
+# nonzero rc, observed the way a failing lane observes it (stdout
+# discarded, stderr captured).
+_gb_rc=0
+_gb_err="$( (p10b_scan "$WORK/no-such-metadir-$$" "$WORK/p10b.arm") 2>&1 >/dev/null)" || _gb_rc=$?
+if [ "$_gb_rc" -ne 0 ] && printf '%s\n' "$_gb_err" | grep -q 'lane b scan died'; then
+    pass "pin10 lane b guard: scan death fails loud (#519)"
+else
+    fail "pin10 lane b guard: a scan death must fail loud (rc=$_gb_rc) (#519)"
+fi
+mkdir -p "$WORK/p10b-empty.$$"
+_gb_rc=0
+_gb_err="$( (p10b_scan "$WORK/p10b-empty.$$" "$WORK/p10b.arm") 2>&1 >/dev/null)" || _gb_rc=$?
+if [ "$_gb_rc" -ne 0 ] && printf '%s\n' "$_gb_err" | grep -q 'lane b scan empty'; then
+    pass "pin10 lane b guard: empty scan fails loud (#519)"
+else
+    fail "pin10 lane b guard: an empty scan must fail loud (rc=$_gb_rc) (#519)"
+fi
+_gc_dir="$WORK/p10guard.$$"
+mkdir -p "$_gc_dir"
+printf 'unreadable\n' >"$_gc_dir/hidden.md"
+chmod 000 "$_gc_dir/hidden.md"
+_gc_rc=0
+_gc_err="$( (p10_lane_c_hits "$_gc_dir" "") 2>&1 >/dev/null)" || _gc_rc=$?
+if [ "$_gc_rc" -ne 0 ] && printf '%s\n' "$_gc_err" | grep -q 'lane c scan died'; then
+    pass "pin10 lane c guard: scan death fails loud (#519)"
+else
+    fail "pin10 lane c guard: an unreadable scan root must fail loud (rc=$_gc_rc) (#519)"
+fi
 
 # ------------------------------------------------------------- summary
 suite_done "rules-meta audit pins"
