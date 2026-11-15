@@ -551,9 +551,12 @@ work_new_file() {
 # effective on distro builds that force UTF-8 mode (e.g. Ubuntu
 # 24.04's python3.12 ignores PYTHONUTF8=0, and UTF-8 mode ignores
 # PYTHONIOENCODING) — there -X utf8=0 is the only honored switch, so
-# the wrapper execs the ambient interpreter with it; on unpatched
-# interpreters the wrapper is a no-op (the env alone reaches the same
-# 7-bit state). -I NUANCE: the shipped embedded sites run `python3 -I`
+# the wrapper execs the ambient interpreter with it. For non-I sites
+# the env alone reaches the same 7-bit state on honoring builds (the
+# wrapper is a compatible belt there); for -I sites it does NOT -- -E
+# strips PYTHONIOENCODING, so only the wrapper's -X utf8=0 forces the
+# 7-bit stdio (load-bearing on every build, not just forcing ones).
+# -I NUANCE: the shipped embedded sites run `python3 -I`
 # (#249) and -I implies -E, which strips PYTHONIOENCODING — an -I site
 # under this env gets surrogateescape on BOTH stdio streams: a plain
 # stdin decode does NOT die, and surrogate-poisoned values encode back

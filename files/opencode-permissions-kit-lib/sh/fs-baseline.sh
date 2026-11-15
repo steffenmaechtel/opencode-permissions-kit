@@ -197,6 +197,10 @@ _fsb_count_tee() {
     fi
     python3 -I -c '
 import os, sys
+# Keep this -c source pure ASCII (#510): a 7-bit locale refuses
+# non-ASCII command bytes at decode ("Unable to decode the command
+# from the command line"), before any code runs. Comments stay "--";
+# the rendered em-dash rides \u2014 (identical stderr).
 label = sys.argv[1]
 counted = 0
 shown = 0

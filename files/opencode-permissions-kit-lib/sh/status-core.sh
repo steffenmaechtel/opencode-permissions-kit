@@ -78,9 +78,10 @@ _st_progress_tee() {
     python3 -I -c '
 import sys, threading, time
 # Keep this -c source pure ASCII (#510): the command text reaches the
-# interpreter as ARGV (locale codec + surrogateescape) -- non-ASCII
-# bytes die at compile under a 7-bit locale, before any IO code runs.
-# The display glyphs ride \u escapes (byte-identical stderr output).
+# interpreter as ARGV, decoded with the locale codec + surrogateescape
+# -- a 7-bit locale refuses the non-ASCII bytes at command decode
+# ("Unable to decode the command from the command line"), before any
+# code runs. The display glyphs ride \u escapes (identical output).
 label = sys.argv[1]
 count = 0
 start = time.monotonic()
@@ -605,8 +606,9 @@ EOF
 # summary anywhere in the feed) would kill the parse and render the
 # row "unavailable". Buffer read, same pin as the jsonc parser (#485
 # F22); the guarded stdout reconfigure covers the id print (#485 F23).
-# Keep this -c source pure ASCII (#510 compile-death class): non-ASCII
-# argv bytes die at compile under a 7-bit locale.
+# Keep this -c source pure ASCII (#510, the argv-decode class): a
+# 7-bit locale refuses non-ASCII command bytes at decode, before any
+# code runs.
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 try:

@@ -264,23 +264,25 @@ fi
 rm -rf "${WORK:?}/advbin510" "${WORK:?}/adv-feed-nb.json"
 rm -f "${ADV:?}/bin/opencode"
 
-# -c source purity (#510 compile-death class): the -c command text
+# -c source purity (#510, the argv-decode class): the -c command text
 # reaches the interpreter as ARGV (locale codec + surrogateescape) --
-# non-ASCII bytes die at compile under a 7-bit locale, before any IO
-# code runs. The ticker's display glyphs ride \u escapes, comments stay
-# "--"; ui text OUTSIDE the two -c regions is deliberately UTF-8 and
+# a 7-bit locale refuses non-ASCII command bytes at decode, before any
+# code runs. The ticker's display glyphs ride \u escapes, comments
+# stay "--"; all THREE -c regions are scanned (ticker, advisory ids,
+# capability probe); ui text OUTSIDE them is deliberately UTF-8 and
 # not scanned (doctor prefilter idiom: any 8th-bit byte).
 for _510_range in \
     "/^    python3 -I -c '\$/,/^' \"\\\$1\"\$/p" \
-    "/python3 -I -c 'import json,sys/,/ghsa_id\") or \"\"))'); then/p"; do
+    "/python3 -I -c 'import json,sys/,/ghsa_id\") or \"\"))'); then/p" \
+    "/python3 -I -c 'import sys, threading, time'/p"; do
     if sed -n "$_510_range" "$LIB" |
         LC_ALL=C grep -q "$(printf '[\200-\377]')"; then
-        fail "-c source must stay pure ASCII (range $_510_range) (#510 compile-death class)"
+        fail "-c source must stay pure ASCII (range $_510_range) (#510 argv-decode class)"
         _510_bad=1
     fi
 done
 if [ "${_510_bad:-0}" = 0 ]; then
-    pass "ticker + advisory ids -c sources are pure ASCII (#510 compile-death class)"
+    pass "all three -c sources (ticker, advisory ids, capability probe) stay pure ASCII (#510 argv-decode class)"
 else
     : # the per-range fail rows above carry the detail
 fi
