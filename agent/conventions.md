@@ -90,8 +90,10 @@ kit's own test scripts. Style is not a review topic: the gate
   today v3.14.1): formatting output drifts between shfmt versions
   (3.7.0/3.12.0 reformat lines 3.14.1 leaves alone), and the dash
   variant needs 3.14.x. Install via `make install-shfmt`.
-- Run `make fmt` before committing when the gate flags your edits;
-  hand-formatting against the canon does not stick.
+- Run `make fmt` between edit and first suite run — a green suite
+  followed by a shfmt red-list forces a full re-verify cycle after
+  `shfmt -w` (two files red-listed mid-#519-wave); hand-formatting
+  against the canon does not stick.
 - Wrapping a long line is a measured decision, not a guess: under the
   pinned shfmt the **dq splice** (frag2's opener at EOL, the
   backslash-newline INSIDE the double quotes — the form shfmt itself
@@ -194,6 +196,13 @@ never proceed silently. Two tiers with DIFFERENT pinning sets
   (wrapper-side shell hooks like `ddev()` live in the same directory).
 
 ## Source-counting pins (unit suites)
+
+The decision rule for a PRESENCE grep over a live source file: go
+through `check_live` / `live_src` — never a direct `check` + `grep`
+pair over a registered source variable (rider-lint rule 2 reddens
+exactly that shape, #524 §2). The section's sanctioned raw shapes —
+markdown docs pins, absence pins, behavioral probes, captured-output
+pins — stay raw by design (below).
 
 Any unit-test pin that COUNTS a literal in a shipped or repo-internal
 source file to assert its PRESENCE or a count floor (`grep -c …
@@ -363,6 +372,34 @@ the guard or the planted row in a sabotage run and observe the red)
 — count pins alone stayed green through three rounds' sabotage
 candidates.
 
+## Fail-loud detector sweeps
+
+The fail-loud detector-sweep pattern — a scan/producer function whose
+death must fail the suite, and the pins proving it — exists across
+waves (#496 a B1, #498, #519: `_rule2_batch`, `_rule1_batch`,
+`trap_scan`, `_docs_collect`, `p10b_scan`, `p10_lane_c_hits`,
+`scan`/`sfx_scan`) and lived only in round comments until this section
+(issue #523 §1).
+
+- The producer function dies loud: nonzero rc on death, guard message
+  on **stderr** — stdout is the data channel. (RM-0146)
+- Call sites consume the rc with `if ! producer …; then` (fail/exit) —
+  never `|| true`. (RM-0147)
+- The death arm is EXECUTED, not inferred: `( producer <dying input> )
+  2>&1 >/dev/null` captured, asserting rc ≠ 0 AND the guard message —
+  an arm that pins the message only stays green through an rc
+  regression (#496 b D3), and the redirection ORDER is load-bearing
+  (swap it and the arm goes vacuous, #523 §1). Sabotage cycles follow
+  AGENTS.md Testing (secured tree, content-verified restore). (RM-0148)
+- The empty-scan-set leg fails loud too: zero scanned files is not a
+  clean verdict — `trap_detect`'s "no files given" rc 1 is the
+  reference shape. (RM-0149)
+- Detector rc semantics are per-tool, and rc diagnostics capture with
+  `cmd || rc=$?` BEFORE branching — never read `$?` inside an `if !`
+  branch: dash's negation clobbers it (#520 a A1, a death diagnostic
+  that always said rc=0). `grep` rc 1 = no match (normal) vs rc ≥ 2 =
+  death; awk rc ≠ 0 = death. (RM-0150)
+
 ## Unit-suite path variables (entry scripts and their phase libs)
 
 Suites that reference a management entry script together with its
@@ -450,6 +487,13 @@ review host):
   sandbox floor flags that mix. Suites not yet converted keep their
   local trap unchanged until their conversion wave.
   (RM-0137)
+- The decision rule for writing NEW scratch: a suite that sources
+  `lib/harness.sh` takes scratch from `work_new` (dir) /
+  `work_new_file` (file) — never a raw `$(mktemp …)` receiver, which
+  registers nothing and tempts a local trap that would disarm the
+  registry (the trap floor flags the mix mid-wave, #523 §4);
+  standalone
+  suites keep their own mktemp + trap idiom. (RM-0151)
 - Code extracted from shipped scripts and eval'd or run by a test
   executes under a **controlled PATH**, never the inherited host PATH:
   any `command -v` inside the extracted block must not see tools that
@@ -555,6 +599,15 @@ duplication is retired in passing when a site is touched anyway —
 no mass pass. (Maintainer directive 2026-11-15, the opk-improve-docs
 wave — its first draft restated one skill's contract in four
 documents.)
+
+## Rule-file markdown structure
+
+- Markdown structure inside rule bullets — an indented fence, an
+  indented table — is invisible to the rules-audit unit parser (its
+  fence regex anchors at column 0): structural damage there has no
+  gate (#526's fix wave deleted an indented fence's opening line;
+  every suite stayed green). Hand-edits to such blocks owe a manual
+  render/balance check in the diff review. (RM-0152)
 
 ## Language
 
