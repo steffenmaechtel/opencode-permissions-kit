@@ -901,6 +901,12 @@ _active_sections_list() { # $1: audit script -> entries on stdout, dies loud
         echo "active-sections extract died: unreadable $1" >&2
         return 1
     fi
+    # Residual (round a D2, strictly narrower than pin 10 lane a's
+    # disclosed #522 sibling): the || observes the LAST sed only; a
+    # mid-stream death of the first sed could emit a partial list --
+    # hard deaths and the unreadable case are caught (-r pre-check,
+    # the empty assertion in _active_check), an exotic partial emit
+    # is not.
     sed -n 's/^ACTIVE_SECTIONS=//p' "$1" |
         sed 's/^"\$ACTIVE_SECTIONS //; s/^"//; s/"$//' || {
         echo "active-sections extract died: sed rc=$? on $1" >&2
@@ -951,6 +957,11 @@ _active_check() { # $1: audit script, $2: findings out-file
 }
 
 : >"$WORK/p11"
+# Boundary (round a D3): the pin reads entry files directly; the audit
+# slugs headings only inside its SCOPE_FILES loop -- an entry whose
+# file left SCOPE_FILES but kept a valid heading stays pin-green yet
+# audit-inert. 33/33 entries sit in SCOPE_FILES today (no live
+# divergence); disclosed here so the next reader does not re-derive it.
 _active_check "$REPO_ROOT/scripts/rules-audit.sh" "$WORK/p11"
 if [ -s "$WORK/p11" ]; then
     fail "pin11: ACTIVE_SECTIONS entr(ies) resolving to no real heading:"
