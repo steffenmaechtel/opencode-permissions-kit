@@ -288,14 +288,24 @@ check "first-run cli.json parses and carries the plugin entry" \
 # ensure_ascii=True keeps the temp file ASCII, which is also why the
 # parse probes below are locale-independent). Octal fixture
 # escapes: dash printf does not interpret \xHH.
+# #514: the two hostile arms below run under the #510 wrapper
+# treatment now — the bare env was insufficient: stdio rides the
+# C-locale surrogateescape handler (an unpinned decode survives), and
+# on builds that ignore PYTHONUTF8=0 it reaches no 7-bit state at
+# all. Wrapper bin + PYTHONIOENCODING=ascii (strict stdio; honored:
+# register runs WITHOUT -I) + control arm first, the jsonc §28 shape.
+F23_HSP="$(hostile_stdio_python)"
+check "control arm: 7-bit hostility effective (#514)" hostile_stdio_control "$F23_HSP"
 printf '{"plugins": ["pkg-\303\274"], "label": "gr\303\274n"}\n' >"$T2X/utf8-cli.json"
-check "register: non-ASCII cli.json under a 7-bit locale (F23)" \
-    env LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 \
+check "register: non-ASCII cli.json under a 7-bit locale (F23, #514 wrapper)" \
+    env PATH="$F23_HSP:$PATH" LC_ALL=C LANG=C PYTHONUTF8=0 \
+    PYTHONCOERCECLOCALE=0 PYTHONIOENCODING=ascii \
     python3 "$REGISTER" "$T2X/utf8-cli.json" register /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx
 check "register: the non-ASCII user entry survives the round-trip (F23)" \
     python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert 'pkg-'+chr(0xfc) in d['plugins']; assert any(isinstance(e,dict) and e['package'].endswith('kit-mode-2x.tsx') for e in d['plugins'])" "$T2X/utf8-cli.json"
-check "unregister: non-ASCII cli.json under a 7-bit locale (F23)" \
-    env LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 \
+check "unregister: non-ASCII cli.json under a 7-bit locale (F23, #514 wrapper)" \
+    env PATH="$F23_HSP:$PATH" LC_ALL=C LANG=C PYTHONUTF8=0 \
+    PYTHONCOERCECLOCALE=0 PYTHONIOENCODING=ascii \
     python3 "$REGISTER" "$T2X/utf8-cli.json" unregister /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx
 check "unregister: the non-ASCII user entry still intact (F23)" \
     python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert 'pkg-'+chr(0xfc) in d['plugins']; assert not any(isinstance(e,dict) and e.get('package','').endswith('kit-mode-2x.tsx') for e in d['plugins'])" "$T2X/utf8-cli.json"

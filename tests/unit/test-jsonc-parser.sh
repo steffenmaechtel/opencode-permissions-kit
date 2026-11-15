@@ -332,7 +332,7 @@ _nd_err=$(python3 "$PARSER" "$TMP/nondict.jsonc" 2>&1 >/dev/null || true)
 assert_contains "non-dict stderr carries the clean note (W12)" "top-level config is not an object" "$_nd_err"
 assert_not_contains "non-dict stderr carries no traceback (W12)" "Traceback" "$_nd_err"
 
-# --- 28. locale hardening (#485 F22) -----------------------------------------
+# --- 28. locale hardening (#485 F22, #514 wrapper treatment) -------------------
 # The hostile-locale reproduction from the finding: without the UTF-8
 # pins, open()/sys.stdin.read() decode with the 7-bit C codec
 # (PYTHONUTF8=0 AND PYTHONCOERCECLOCALE=0 kill both PEP escapes) and any
@@ -340,26 +340,41 @@ assert_not_contains "non-dict stderr carries no traceback (W12)" "Traceback" "$_
 # traceback (escaping load_config's except arms), stdout mode even after
 # the read pin (strict stdout). The doctor-core.sh embedded python
 # already pinned encoding="utf-8"; the parser matches it now.
+# #514: the bare trigger env (the #485 shape this section ran before)
+# is insufficient: on this host (Ubuntu 24.04, python3.12.3 — the
+# distro the #510 finding named) PYTHONUTF8=0 IS honored, but stdio
+# rides the C-locale surrogateescape handler — an unpinned stdin
+# decode SURVIVES non-ASCII bytes, so the stdin/stdout arms passed
+# vacuously (the file-mode arms were not vacuous here: the bare env's
+# file codec is strict ascii). #510 also measured builds that ignore
+# PYTHONUTF8=0 entirely (forced UTF-8 mode) — there no 7-bit state is
+# reached at all. The wrapper treatment covers both:
+# PYTHONIOENCODING=ascii makes stdio strict (honored — the parser
+# runs WITHOUT -I), the bin's -X utf8=0 restores the 7-bit state on
+# forcing builds, control arm FIRST and fail-loud, per the 8-suite
+# pattern from PR #512.
 # NB: the fixtures are written with OCTAL escapes (\303\274 = UTF-8
 # "ü", \377\376 = invalid UTF-8 bytes) — dash's printf does not
 # interpret \xHH and would write the literal backslash text.
-F22_ENV="LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0"
+P514="$(hostile_stdio_python)"
+check "control arm: 7-bit hostility effective (#514)" hostile_stdio_control "$P514"
+F22_ENV="LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 PYTHONIOENCODING=ascii"
 printf '{"permission": {"read": {"/var/www/\303\274bung/**": "deny"}}}\n' >"$TMP/nonascii.json"
 # shellcheck disable=SC2086  # F22_ENV is a fixed word list, set above
-OUT=$(env $F22_ENV python3 "$PARSER" "$TMP/nonascii.json" 2>/dev/null || true)
+OUT=$(env PATH="$P514:$PATH" $F22_ENV python3 "$PARSER" "$TMP/nonascii.json" 2>/dev/null || true)
 assert_contains "locale: non-ASCII config decoded, pattern emitted (F22)" "/var/www/übung/**" "$OUT"
 assert_exitcode "locale: non-ASCII config exits 0 (F22)" 0 \
-    env $F22_ENV python3 "$PARSER" "$TMP/nonascii.json"
+    env PATH="$P514:$PATH" $F22_ENV python3 "$PARSER" "$TMP/nonascii.json"
 # stdin path of the same pin (the wrapper pipes `opencode debug config`)
 # shellcheck disable=SC2086
-OUT=$(env $F22_ENV python3 "$PARSER" - <"$TMP/nonascii.json" 2>/dev/null || true)
+OUT=$(env PATH="$P514:$PATH" $F22_ENV python3 "$PARSER" - <"$TMP/nonascii.json" 2>/dev/null || true)
 assert_contains "locale: non-ASCII stdin decoded, pattern emitted (F22)" "/var/www/übung/**" "$OUT"
 # undecodable bytes: the old code escaped as a raw UnicodeDecodeError
 # traceback; the diagnostic + clean rc 1 discriminate the except arm.
 printf '{"permission": {"read": "/var/\377\376/**": "deny"}}\n' >"$TMP/badutf8.json"
 assert_exitcode "locale: invalid UTF-8 exits 1 (F22)" 1 \
-    env $F22_ENV python3 "$PARSER" "$TMP/badutf8.json"
-_f22_err=$(env $F22_ENV python3 "$PARSER" "$TMP/badutf8.json" 2>&1 >/dev/null || true)
+    env PATH="$P514:$PATH" $F22_ENV python3 "$PARSER" "$TMP/badutf8.json"
+_f22_err=$(env PATH="$P514:$PATH" $F22_ENV python3 "$PARSER" "$TMP/badutf8.json" 2>&1 >/dev/null || true)
 assert_contains "locale: invalid UTF-8 carries the decode diagnostic (F22)" "Error decoding" "$_f22_err"
 assert_not_contains "locale: invalid UTF-8 carries no traceback (F22)" "Traceback" "$_f22_err"
 

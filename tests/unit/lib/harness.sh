@@ -547,12 +547,16 @@ work_new_file() {
 # yields 7-bit stdio: strict stdout kills every non-ASCII write
 # (UnicodeEncodeError), and stdin kills plain text decodes where the
 # interpreter honors PYTHONIOENCODING (UnicodeDecodeError). The bare
-# trigger env (LC_ALL=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0) is not
-# effective on distro builds that force UTF-8 mode (e.g. Ubuntu
-# 24.04's python3.12 ignores PYTHONUTF8=0, and UTF-8 mode ignores
-# PYTHONIOENCODING) — there -X utf8=0 is the only honored switch, so
-# the wrapper execs the ambient interpreter with it. For non-I sites
-# the env alone reaches the same 7-bit state on honoring builds (the
+# trigger env (LC_ALL=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0) is
+# insufficient wherever stdio rides the C-locale surrogateescape
+# handler — an unpinned decode survives there (measured on Ubuntu
+# 24.04 python3.12.3, where PYTHONUTF8=0 IS honored: utf8_mode 0,
+# stdio ascii+surrogateescape) — and not effective at all on builds
+# that force UTF-8 mode (they ignore PYTHONUTF8=0, and UTF-8 mode
+# ignores PYTHONIOENCODING); there -X utf8=0 is the only honored
+# switch, so the wrapper execs the ambient interpreter with it. For
+# non-I sites the env alone reaches the same 7-bit state on honoring
+# builds (the
 # wrapper is a compatible belt there); for -I sites it does NOT -- -E
 # strips PYTHONIOENCODING, so only the wrapper's -X utf8=0 forces the
 # 7-bit stdio (load-bearing on every build, not just forcing ones).
