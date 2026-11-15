@@ -719,8 +719,11 @@ fi
 #     covered. *.json is in the include list BECAUSE of this class:
 #     without it the whole .json world was invisible to the guard.
 p10_lane_c_hits() { # $1 root, $2 scope; loud on scan death (#519:
-    # the raw grep ran behind 2>/dev/null -- a grep death read as a
-    # clean tree; rc 1 (no matches) stays the normal clean case)
+    # the raw grep ran behind 2>/dev/null -- a grep death degraded
+    # silently: a death mid-traversal left partial rows flowing (the
+    # lane read green over missing coverage), a death before any rows
+    # read as a clean tree; rc 1 = no matches stays the normal clean
+    # case, rc >= 2 is the loud path now)
     _c_rc=0
     grep -rn "RM-[0-9][0-9][0-9][0-9]" \
         --include="*.md" --include="*.sh" --include="*.py" --include="*.yml" \
@@ -816,6 +819,10 @@ esac
 # All three must fail loud with their guard message on stderr and a
 # nonzero rc, observed the way a failing lane observes it (stdout
 # discarded, stderr captured).
+# Root-context caveat (#520 a B4): the lane c death is DAC-enforced
+# (chmod 000) -- as root grep reads through and this arm false-reds;
+# no root invocation path exists for this suite today (CI runner
+# user, no e2e/kit-script call site).
 _gb_rc=0
 _gb_err="$( (p10b_scan "$WORK/no-such-metadir-$$" "$WORK/p10b.arm") 2>&1 >/dev/null)" || _gb_rc=$?
 if [ "$_gb_rc" -ne 0 ] && printf '%s\n' "$_gb_err" | grep -q 'lane b scan died'; then

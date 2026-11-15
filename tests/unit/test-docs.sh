@@ -132,12 +132,14 @@ done
 # Scope-collection guard (#519, from #516 a A5 -- the same class as the
 # #441 a B1 scratch guard above): the old inline `for dir ...; find ...
 # done | sort | while` shape swallowed find's rc in the pipe -- a find
-# death (vanished or unreadable scope dir) produced an empty file list,
-# check_file ran zero times and the [ -s "$TMP" ] gate read false:
+# death (vanished or unreadable scope dir) degraded the file list
+# silently: a SINGLE dead dir left the survivors' files flowing
+# (check_file green over missing coverage), all four dead read as
 # "docs link check: OK" with detection disabled. The collector guards
-# both death legs (per-dir rc) and the empty-set leg (four checked-in
-# scope dirs hold hundreds of .md files -- zero means the scan never
-# ran); the guard arms at the bottom drive both paths hermetically.
+# both legs (per-dir rc) and the empty-set leg (four checked-in scope
+# dirs hold hundreds of .md files -- zero means the scan never ran);
+# the guard arms at the bottom drive the death and empty paths
+# hermetically.
 _docs_collect() { # $@ = scope dirs -> file list on stdout; loud on death/empty
     _dc_tmp="$(work_new_file)" || return 1
     for _dc_dir; do

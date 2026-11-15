@@ -647,6 +647,11 @@ fi
 # unreadable suite file; the wrappers must fail loud (guard message on
 # stderr + nonzero rc) instead of letting the callers read green over
 # the missing rows (the old || true call sites did).
+# Root-context caveat (#520 a B4): these deaths are DAC-enforced
+# (chmod 000) -- as root awk/grep read through and these arms
+# false-red; no root invocation path exists for this suite today (CI
+# runner user, no e2e/kit-script call site; the vanished-dir arms
+# elsewhere in this suite are root-safe).
 _dg_dir="$(mktemp -d)"
 printf '#!/bin/sh\n# probe: unreadable file kills the scan detectors\n_dg="$(mktemp -d)"\n' \
     >"$_dg_dir/test-probe-dying.sh"
