@@ -221,9 +221,10 @@ manifest is already fresh). The same ordering duty holds for the
 rules-meta INDEX: a wave that adds or amends metas regenerates
 `internal/rules-meta/INDEX.md` inside the chain BEFORE the suite
 reads it (`sh scripts/rules-audit.sh`, or
-`python3 scripts/gen-rules-index.py`) — the freshness pins redden on
-a stale INDEX otherwise, and the red is self-healing but costs the
-cycle (issue #549 §1: a fix wave paid one red gate for the order).
+`python3 scripts/gen-rules-index.py`) — the parity suite's freshness
+pin reds on a stale INDEX AND restores the stale bytes on red, so the
+red persists until the explicit regen runs (issue #549 §1: a fix wave
+paid one red gate for the order).
 While the maintainer co-edits the working
 tree (interactive iteration), stage explicitly by path — `git add -A`
 is for solo phases with a verified-clean tree (a `git add -A` chain
