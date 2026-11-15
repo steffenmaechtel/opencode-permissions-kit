@@ -224,11 +224,15 @@ check_live "recipe: rounds write pins utf-8 (#517 S2)" "$EXTRACT" \
 check_live "recipe: subagents write pins utf-8 (#517 S2)" "$EXTRACT" \
     -qF 'open("subagents.jsonl", "w", encoding="utf-8")'
 # #518 a S1: the five rows above guard the constructs; this absence
-# leg guards the CLASS — the recipe is the file future runs copy, and
-# a new unpinned write or a text=True reintroduction must redden
-# here, not survive five green presence rows.
+# leg guards two SHAPES — text=True and w/a-mode opens without
+# encoding — the realistic reintroduction paths of the #517 class in
+# a recipe copy (#518 b S1: the label claims exactly that, no more).
+# Deliberately not covered (speculative growth — the next copy's own
+# reviewed case owns them): plus-modes, read-mode opens, pathlib
+# read_text/write_text, universal_newlines, a second text-mode
+# subprocess, variable-mode opens.
 _UNPINNED="$(live_src "$EXTRACT" | grep -cE 'text=True|open\([^)]*"[wa]"\)')"
-check "recipe: no unpinned text-IO shape remains (#518 a S1)" \
+check "recipe: no unpinned w/a-mode open or text=True remains (#518 a S1, #518 b S1)" \
     [ "$_UNPINNED" -eq 0 ]
 
 # --- summary gate --------------------------------------------------------------
