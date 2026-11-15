@@ -234,6 +234,20 @@ nothing to review.
   as deliberately not done, and the closing summary lists the created
   issues and folds alongside the recorded declines. Either way the
   round comments' work-order records remain the ledger. (RM-0136)
+- After the work-order gate settles (every YES filed or folded, every
+  NO recorded, the closing summary's list posted), the loop's chat
+  duties extend exactly once more: the disposition report ends by
+  ASKING the maintainer — plain markdown, yes/no — "run the
+  `opk-improve-docs` skill now?" (`.agents/skills/`), so the
+  maintainer never has to remember the skill exists; the ask rides
+  the LATER disposition report, it is never appended to the
+  work-order ask itself (the work-order ask keeps its last-block
+  position, its own rule above).
+  What the skill then does lives in the skill alone and is never
+  restated here (the skill stays freely editable without this file
+  co-moving). The session never runs the reflection uncommissioned —
+  the skill invocation is the commission, exactly like a review
+  round. (RM-0140)
 
 ## Round typing and tiering
 

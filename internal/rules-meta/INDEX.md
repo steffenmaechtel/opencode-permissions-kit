@@ -6,7 +6,7 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**139 metas · 136 active · 3 retired · 0 review-pending · next due 2026-11-14**
+**140 metas · 137 active · 3 retired · 0 review-pending · next due 2026-11-14**
 
 ## Actionable
 
@@ -127,6 +127,7 @@
 | [RM-0118](0/1/1/RM-0118.md) | Closure is a recorded step | active | approved | 1m | 2026-11-28 |
 | [RM-0134](0/1/3/RM-0134.md) | On the non-shipped track, a | active | approved | 1m | 2026-11-30 |
 | [RM-0136](0/1/3/RM-0136.md) | Deferred work orders collected during | active | approved | 1m | 2026-12-01 |
+| [RM-0140](0/1/4/RM-0140.md) | After the work-order gate settles | active | approved | 1m | 2026-12-15 |
 
 ### Round typing and tiering
 
