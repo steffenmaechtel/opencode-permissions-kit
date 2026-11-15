@@ -2,12 +2,17 @@
 
 Implementation sessions may end with the `opk-improve-docs` skill —
 its contract lives in the skill alone; what lands on the tracker is
-`Docs:` reflection issues. That is the PRODUCER side. This page is
-the CONSUMER side: how the open `Docs:` backlog is triaged, batched
-into waves and closed with every item dispositioned — nothing rots,
-nothing lands twice. The founding backlog: the seven issues #523,
-#524, #528, #530, #534, #535, #538, filed 2026-11-15 by the first
-seven reflections.
+`Docs:` reflection issues carrying the `from-reflection` label. That
+is the PRODUCER side. This page is the CONSUMER side: how the open
+`Docs:` backlog is triaged, batched into waves and closed with every
+item dispositioned — nothing rots, nothing lands twice. The label is
+the corpus's query key: `label:"from-reflection"` finds every issue
+born of a reflection — the `Docs:` issues plus the work orders refiled
+out of their triage (class extract, #541–#543), the whole population
+retro-labeled 2026-11-16 when the label was introduced. The `Docs:`
+title prefix stays the docs-class discriminator inside that query. The
+founding backlog: the seven issues #523, #524, #528, #530, #534, #535,
+#538, filed 2026-11-15 by the first seven reflections.
 
 ## When a docs wave runs
 
@@ -31,7 +36,7 @@ classifies each:
 | apply   | prose lands in the named target file |
 | code    | a script/test change — rides its own small PR; generated output stays with its code wave |
 | dedup   | same fix already open or already in text — lands once, both issues cited |
-| extract | not documentation — refiled as its own work order with proper labels |
+| extract | not documentation — refiled as its own work order with proper labels (`from-reflection` stays on) |
 | covered | existing text already says it — close citing the ref |
 | reject  | deliberately not adopted — rationale recorded |
 
