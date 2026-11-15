@@ -253,10 +253,7 @@ fi
 # the || fallback landed (#479 a F1). Drive the REAL block from
 # install.sh under bash with the entry's own option discipline and the
 # proc path swapped for a missing file: the run must reach a verdict,
-# not exit silently mid-assignment. The body's first line is the kcov
-# PS4 shield (kcov-coverage.md #4, #369): the bash -c body sets -u, and
-# kcov's PS4 ${BASH_SOURCE} expansion would abort the child before the
-# first traced command without it.
+# not exit silently mid-assignment.
 command -v bash >/dev/null 2>&1 ||
     fail "1d needs bash on PATH (the set -eu entries' documented runner)"
 _BASH_BIN="$(command -v bash)"
@@ -268,14 +265,10 @@ case "$(printf '%s\n' "$_f1k" | head -1)" in
     *) fail "install.sh discriminator block extraction broke (got: $(printf '%s' "$_f1k" | head -c 40))" ;;
 esac
 _f1rc=0
-# Scanner-readable multiline body (the coverage shield contract in
-# test-coverage.sh): the opener rides PATH so the line ends in plain
-# `bash -c`, the opening quote opens the NEXT line, and the shield is
-# the first body line — kcov's PS4 ${BASH_SOURCE} expansion would abort
-# the set -eu child without it (kcov-coverage.md #4, #369).
+# Multiline body: the opener rides PATH so the line ends in plain
+# `bash -c`, and the opening quote opens the NEXT line.
 _f1out=$(cd "$WORK/clean" && PATH="$_FBBIN" bash -c \
     '
-    PS4="+ " # kcov shield: PS4 ${BASH_SOURCE} vs set -u (internal/records/kcov-coverage.md)
     set -eu
     (set -o pipefail) 2>/dev/null && set -o pipefail || true
     eval "$1"
