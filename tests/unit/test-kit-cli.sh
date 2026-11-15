@@ -868,6 +868,45 @@ else
     pass "root re-entry does not repeat the warning (#356 a A9)"
 fi
 
+# hostile-locale stdout pin (#510 M2): declared tree paths tolerate
+# non-ASCII (only control characters are gated), and under a 7-bit
+# locale the unpinned heredoc write used to raise UnicodeEncodeError --
+# rc non-zero, and the wrapper misreads that as "opk.json is unreadable
+# -- declared-tree warning skipped" (2>/dev/null hides the traceback).
+# The heredoc reconfigures stdout to utf-8 (#485 F23 shape), so the
+# warning must fire with the path intact. The fixture carries the
+# non-ASCII as a JSON \u escape: it is ASCII on the wire (printf octal
+# is only needed for raw-byte decode fixtures) and decodes to "ü"
+# inside python -- the strict-stdout write of the DECODED path is this
+# pin's subject. The heredoc runs python3 -I (-E strips
+# PYTHONIOENCODING), so hostility comes from the wrapper (-X utf8=0) +
+# LC_ALL=C; the control arm proves it before the pin runs.
+P510="$(hostile_stdio_python)"
+if hostile_stdio_control "$P510"; then
+    pass "control arm: strict 7-bit stdout kills the -I non-ASCII write (#510)"
+else
+    fail "control arm: hostile stdio not effective -- the #510 pins would pass vacuously"
+fi
+printf '{"version":1,"containerTrees":["Pr\\u00fcfbau"]}\n' >"$HO_PROJ/opk.json"
+_hw_rc=0
+out="$(
+    PATH="$P510:$PATH"
+    export PATH
+    LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 PYTHONIOENCODING=ascii
+    export LC_ALL LANG PYTHONUTF8 PYTHONCOERCECLOCALE PYTHONIOENCODING
+    _ho_warn_run "$HO_PROJ" me . --dry-run
+)" || _hw_rc=$?
+if [ "$_hw_rc" = 0 ] &&
+    printf '%s' "$out" | grep -qF "takes back the declared container tree 'Prüfbau'" &&
+    ! printf '%s' "$out" | grep -qF "is unreadable"; then
+    pass "handover: non-ASCII declared path warns under the 7-bit locale (#510 M2)"
+else
+    fail "handover must survive a non-ASCII declared path under LC_ALL=C (rc=$_hw_rc out=$(printf '%s' "$out" | head -3)) (#510 M2)"
+fi
+# restore the ASCII fixture -- the warning pins below re-declare their
+# own shapes, the policy file must not leak the non-ASCII path into them
+printf '{"containerTrees":["tree"]}\n' >"$HO_PROJ/opk.json"
+
 # --- sudo-elevation loop guards (#479 a F24) --------------------------------------
 # handover-core refuses "sudo did not elevate — giving up" via
 # OPK_HANDOVER_ROOT; the four sibling re-exec arms (config|update,

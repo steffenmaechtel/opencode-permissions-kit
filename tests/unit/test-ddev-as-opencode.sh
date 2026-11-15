@@ -419,6 +419,40 @@ else
     fail "_opk_json_get: absent python3 must stay silent (err=$(cat "$TMPDIR/gj-abs.err"))"
 fi
 
+# --- 2c. hostile-locale IO pins (#510 M4) --------------------------------------
+# A 7-bit locale makes the unpinned embedded python die into the silent
+# except arm: the whole-document json.load decode on strict-stdin hosts
+# (exotic locales), or the print of a selected non-ASCII value where
+# stdout is strict. Both degraded to empty output and the callers
+# silently fell back. Buffer read + guarded stdout reconfigure (#485
+# F22/F23 shapes); the silent-empty MISS contract is untouched.
+# CANARY note (honesty): _opk_json_get runs python3 -I (#249), whose -E
+# strips PYTHONIOENCODING, and under LC_ALL=C BOTH stdio streams use
+# surrogateescape — the unpinned shape byte-round-trips non-ASCII
+# values losslessly there, so these pins discriminate only on
+# strict-stdio hosts; the control arm proves the env's stdout
+# strictness. The unread-field and silence pins assert the fixed code's
+# contract under the hostile env.
+P510="$(hostile_stdio_python)"
+if hostile_stdio_control "$P510"; then
+    pass "control arm: strict 7-bit stdout kills the -I non-ASCII write (#510)"
+else
+    fail "control arm: hostile stdio not effective -- the #510 pins would pass vacuously"
+fi
+GJ_OUT=$(LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 PYTHONIOENCODING=ascii \
+    PATH="$P510:$PATH" sh -c ". '$FUNC' && _opk_json_get '{\"raw\":{\"primary_url\":\"https://x.y\",\"notes\":\"Prüfung\"}}' primary_url" 2>"$TMPDIR/gj-lc.err") || true
+assert_eq "_opk_json_get: unread non-ASCII field does not kill the decode (#510 M4)" \
+    "https://x.y" "$GJ_OUT"
+GJ_OUT=$(LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 PYTHONIOENCODING=ascii \
+    PATH="$P510:$PATH" sh -c ". '$FUNC' && _opk_json_get '{\"raw\":{\"approot\":\"/var/Prüfung/web\"}}' approot" 2>>"$TMPDIR/gj-lc.err") || true
+assert_eq "_opk_json_get: non-ASCII value round-trips under the 7-bit locale (#510 M4)" \
+    "/var/Prüfung/web" "$GJ_OUT"
+if [ ! -s "$TMPDIR/gj-lc.err" ]; then
+    pass "_opk_json_get stays silent under the hostile locale (#510 M4)"
+else
+    fail "_opk_json_get must stay silent under LC_ALL=C (err=$(cat "$TMPDIR/gj-lc.err")) (#510 M4)"
+fi
+
 check_live "function execs the kit's sudoers helper for the developer" \
     "$FUNC" \
     -q 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode'

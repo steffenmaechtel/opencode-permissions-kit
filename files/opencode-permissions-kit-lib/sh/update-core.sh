@@ -916,7 +916,12 @@ resolve_latest_opencode_version() {
             _rlov_ver=$(curl -fsSL --max-time 10 "https://registry.npmjs.org/@opencode/cli-$_rlov_target" 2>/dev/null |
                 python3 -I -c 'import json,sys
 try:
-    dist = json.load(sys.stdin)["dist-tags"]
+    # Locale-independent decode (#510 M4): a 7-bit host locale decodes
+    # the whole packument with the C codec -- unread non-ASCII fields
+    # (a description anywhere in the document) would kill the resolve.
+    # Buffer read, same pin as the jsonc parser (#485 F22); the printed
+    # dist-tag is a version string (ASCII by format).
+    dist = json.loads(sys.stdin.buffer.read().decode("utf-8"))["dist-tags"]
     print(dist["latest"])
 except Exception:
     sys.exit(1)

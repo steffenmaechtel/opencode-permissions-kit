@@ -807,6 +807,41 @@ if PYTHONHOME="$_RES/nonexistent-py-home" python3 -c 'import json' 2>/dev/null; 
 else
     pass "control arm: bare python3 breaks under the hostile PYTHONHOME (#249)"
 fi
+
+# --- resolve under the hostile locale (#510 M4) ------------------------------------
+# The packument decode pins to utf-8 buffer reads (#485 F22 shape): on
+# strict-stdin 7-bit hosts an unread non-ASCII description anywhere in
+# the document used to kill the whole-document decode (warn "cannot
+# determine"). The printed dist-tag is a version string (ASCII by
+# format). CANARY note (honesty): the resolver runs python3 -I (#249),
+# whose -E strips PYTHONIOENCODING — under LC_ALL=C the stdin decode is
+# surrogateescape, so the unpinned shape survives on C-locale hosts and
+# the pin discriminates only where stdin is strict (exotic locales);
+# the control arm proves the env's strict stdout. Control arm first
+# (harness #510).
+P510="$(hostile_stdio_python)"
+if hostile_stdio_control "$P510"; then
+    pass "control arm: strict 7-bit stdout kills the -I non-ASCII write (#510)"
+else
+    fail "control arm: hostile stdio not effective -- the #510 pins would pass vacuously"
+fi
+# wrapper python3 into the stub bin dir: the resolver's PATH finds it
+# before the ambient interpreter (-X utf8=0, see harness #510)
+cp "$P510/python3" "$_RES/bin/python3"
+chmod 755 "$_RES/bin/python3"
+cat >"$_RES/bin/curl" <<'EOF'
+#!/bin/sh
+# non-ASCII field NEXT to dist-tags: the whole-document decode class
+printf '{"dist-tags":{"latest":"2.9.9"},"description":"Pr\303\274fung"}\n'
+EOF
+_res_lc_rc=0
+_res_lc_out=$(PATH="$_RES/bin:/usr/bin:/bin" LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 \
+    sh -c '. "$1"; resolve_latest_opencode_version 2' _ "$LIB" 2>/dev/null) || _res_lc_rc=$?
+if [ "$_res_lc_out" = "2.9.9" ]; then
+    pass "resolve: non-ASCII packument decodes under the 7-bit locale (#510 M4)"
+else
+    fail "resolve must survive a non-ASCII packument under LC_ALL=C (rc=$_res_lc_rc got [$_res_lc_out]) (#510 M4)"
+fi
 # Sweep floor: update-core's own site runs isolated (floor — the
 # tree-wide absence pin below is the ceiling).
 _pc=$(live_src "$LIB" | grep -c 'python3 -I' || true)

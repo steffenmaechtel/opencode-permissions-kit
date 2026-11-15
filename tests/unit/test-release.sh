@@ -241,6 +241,47 @@ grep -q 'actions/runs?branch=master' "$RELEASE" &&
     pass "CI gate has the curl+python3 fallback (no gh needed on the host)" ||
     fail "CI gate has the curl+python3 fallback (no gh needed on the host)"
 
+# hostile-locale pin (#510 M4): the fallback decodes the whole runs list;
+# under a 7-bit locale the unpinned json.load used to die on an unread
+# non-ASCII field (a run display title ANYWHERE in the list) and the
+# release reported "cannot verify CI status". Buffer read pin (#485 F22
+# shape): the rows for the matching sha must still come out. The
+# shipped parser invokes python3 WITHOUT -I, so PYTHONIOENCODING=ascii
+# is honored here (strict stdin — the full decode kill); the extracted
+# parser below runs under the same shape. Control arm first (harness
+# #510).
+P510="$(hostile_stdio_python)"
+if printf '{"k":"Pr\303\274fung"}' | PATH="$P510:$PATH" LC_ALL=C LANG=C PYTHONUTF8=0 \
+    PYTHONCOERCECLOCALE=0 PYTHONIOENCODING=ascii \
+    python3 -c 'import json,sys; json.load(sys.stdin)' >/dev/null 2>&1; then
+    fail "control arm: hostile stdio not effective -- the #510 pins would pass vacuously"
+else
+    pass "control arm: strict 7-bit stdin kills the unpinned decode (#510)"
+fi
+CI_PY="$(work_new_file)"
+sed -n "/python3 -c '/,/2>\/dev\/null)\"; then/p" "$RELEASE" |
+    sed -e "1s/^.*python3 -c '//" -e '$d' >"$CI_PY"
+if [ -s "$CI_PY" ] && grep -q '^import json, os, sys' "$CI_PY" &&
+    ! grep -q '2>/dev/null' "$CI_PY"; then
+    pass "release.sh: CI gate parser extractable"
+else
+    fail "release.sh: CI gate parser extractable"
+fi
+cat >"${WORK:?}/ci-runs-nb.json" <<'EOF'
+{"workflow_runs":[{"head_sha":"other","status":"completed","conclusion":"success","display_title":"Prüfung: nicht-ASCII Titel"},
+ {"head_sha":"abc123","status":"completed","conclusion":"success","display_title":"release prep"}]}
+EOF
+CI_RUNS_RC=0
+CI_RUNS_OUT="$(PATH="$P510:$PATH" LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 \
+    PYTHONIOENCODING=ascii HEAD_SHA=abc123 python3 "$CI_PY" <"${WORK:?}/ci-runs-nb.json" 2>/dev/null)" || CI_RUNS_RC=$?
+if [ "$CI_RUNS_RC" = 0 ] &&
+    [ "$CI_RUNS_OUT" = "$(printf 'completed\tsuccess')" ]; then
+    pass "release.sh: non-ASCII runs list decodes under the 7-bit locale (#510 M4)"
+else
+    fail "release.sh CI parse must survive a non-ASCII runs list under LC_ALL=C (rc=$CI_RUNS_RC out=[$CI_RUNS_OUT]) (#510 M4)"
+fi
+rm -f "$CI_PY" "${WORK:?}/ci-runs-nb.json"
+
 # --- 6c. SHA256SUMS freshness pre-flight (issue #478) -----------------------------
 # A release must not be cut from a stale integrity manifest: streamed
 # installs verify every fetched file against it. A committed files/

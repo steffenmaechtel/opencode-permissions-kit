@@ -769,6 +769,14 @@ doctor_load_policy() {
 import json
 import sys
 
+# Locale-independent stdout (#510, the #485 F23 class beyond the two py
+# files): paths and notes tolerate non-ASCII (only control characters
+# are gated below), and a 7-bit host locale (LC_ALL=C with the PEP
+# 538/540 escapes disabled) makes the TSV write raise
+# UnicodeEncodeError -- a VALID policy would surface as "rejected".
+# Same pin as the jsonc parser (#485 F23).
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 try:
     with open(sys.argv[1], "r", encoding="utf-8") as f:
         doc = json.load(f)

@@ -234,6 +234,14 @@ handover_core() {
 import json
 import sys
 
+# Locale-independent stdout (#510 M2): declared tree paths tolerate
+# non-ASCII (only control characters are gated below), and a 7-bit host
+# locale (LC_ALL=C with the PEP 538/540 escapes disabled) makes a plain
+# sys.stdout.write raise UnicodeEncodeError -- the surrounding shell
+# misreads the rc as an unreadable opk.json. Same pin as the jsonc
+# parser (#485 F23).
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 try:
     with open(sys.argv[1], "r", encoding="utf-8") as f:
         doc = json.load(f)

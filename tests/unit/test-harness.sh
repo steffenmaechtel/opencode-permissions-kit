@@ -330,6 +330,40 @@ rc_is 0 "set -e suite with an unremovable receiver keeps rc 0 (A2)"
 has "could not remove [/proc/version]" "the unremovable receiver is reported loud, skipped (A2)"
 recv_gone "the removable receiver is still collected (A2)"
 
+# --- 8d. hostile_stdio_python (#510): the 7-bit-stdio wrapper bin ---------------
+# The wrapper must exist, be executable and carry -X utf8=0, and under
+# the pin env deliver the hostile state. Three arms pin the matrix:
+#   DECODE_DIED — non-I python: PYTHONIOENCODING=ascii makes stdin
+#       strict, the unpinned decode dies (issue failure mode).
+#   WRITE_DIED — -I python (the shipped embedded shape, -E strips
+#       PYTHONIOENCODING): stdin is surrogateescape there, the strict
+#       STDOUT still kills the non-ASCII write — the universal control
+#       shape the per-suite control arms reuse.
+#   RECONF_LIVED — the reconfigure fix survives under the same env
+#       (the state the pins assert against).
+# Any arm missing its marker reds here instead of letting consumer
+# pins pass vacuously on a build that refuses the 7-bit state.
+arm 'D="$(hostile_stdio_python)"; echo "DIR=$D"
+     test -x "$D/python3" && grep -q "utf8=0" "$D/python3" && echo WRAPPER_OK
+     suite_done demo'
+rc_is 0 "hostile_stdio_python suite exits green"
+has WRAPPER_OK "hostile_stdio_python writes an executable -X utf8=0 wrapper"
+arm 'D="$(hostile_stdio_python)"
+     printf "{\"k\":\"Pr\303\274fung\"}" | PATH="$D:$PATH" LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 PYTHONIOENCODING=ascii \
+         python3 -c "import json,sys; json.load(sys.stdin)" >/dev/null 2>&1 && echo DECODE_LIVED || echo DECODE_DIED
+     printf "Pr\303\274fung\n" | PATH="$D:$PATH" LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 PYTHONIOENCODING=ascii \
+         python3 -I -c "import sys; sys.stdout.write(sys.stdin.buffer.read().decode(\"utf-8\"))" >/dev/null 2>&1 && echo WRITE_LIVED || echo WRITE_DIED
+     printf "Pr\303\274fung\n" | PATH="$D:$PATH" LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 PYTHONIOENCODING=ascii \
+         python3 -I -c "import sys; sys.stdout.reconfigure(encoding=\"utf-8\"); sys.stdout.write(sys.stdin.buffer.read().decode(\"utf-8\"))" >/dev/null 2>&1 && echo RECONF_LIVED || echo RECONF_DIED
+     suite_done demo'
+has DECODE_DIED "hostile_stdio_python: strict stdin kills the unpinned non-I decode"
+has WRITE_DIED "hostile_stdio_python: strict stdout kills the -I non-ASCII write (control shape)"
+has RECONF_LIVED "hostile_stdio_python: the reconfigure shape survives under the hostile env"
+arm 'D="$(hostile_stdio_python)"; hostile_stdio_control "$D" && echo CTRL_OK; suite_done demo'
+has CTRL_OK "hostile_stdio_control reports hostility under the wrapper bin"
+arm 'hostile_stdio_control /nonexistent-dir-510 && echo CTRL_BAD_OK || echo CTRL_BAD_GONE; suite_done demo'
+has CTRL_BAD_GONE "hostile_stdio_control reports not-effective without the wrapper (vacuity detector)"
+
 # Leak-shaped pin (acceptance of #395): the #283 form executing the
 # failure path -- isolated TMPDIR, receiver created, set -e abort inside
 # the window. Zero entries may remain (receiver AND registry file). The

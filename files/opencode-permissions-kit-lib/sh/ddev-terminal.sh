@@ -85,8 +85,16 @@ _opk_json_get() {
     command -v python3 >/dev/null 2>&1 || return 0
     printf '%s' "$_opk_gj" | python3 -I -c '
 import json, sys
+# Locale-independent IO (#510 M4): a 7-bit host locale decodes the
+# whole describe document with the C codec and the print of a selected
+# value (an approot path can carry non-ASCII) raises -- both die into
+# the except arm and the callers silently fall back. Buffer read +
+# guarded stdout reconfigure, same pins as the jsonc parser (#485
+# F22/F23). The silent-empty miss contract is untouched.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 try:
-    d = json.load(sys.stdin)["raw"]
+    d = json.loads(sys.stdin.buffer.read().decode("utf-8"))["raw"]
     for k in ".".join(sys.argv[1:]).split("."):
         d = d[k]
     if isinstance(d, str):

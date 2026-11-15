@@ -123,6 +123,17 @@
 #   work_new / work_new_file / work_register / work_register_var
 #                        the scratch-receiver registry + central EXIT
 #                        INT TERM cleanup (issue #395; own section below)
+#   hostile_stdio_python #510: writes the 7-bit-stdio `python3` wrapper
+#                        (exec ambient interpreter with -X utf8=0) into a
+#                        registered scratch dir, prints the dir; run pins
+#                        under it with PATH=<dir>:$PATH LC_ALL=C LANG=C
+#                        PYTHONUTF8=0 PYTHONCOERCECLOCALE=0
+#                        PYTHONIOENCODING=ascii (ascii:strict stdio;
+#                        detail at the function)
+#   hostile_stdio_control #510: the vacuity detector for those pins —
+#                        rc 0 = the hostile stdio killed the -I
+#                        non-ASCII write probe (pins discriminate),
+#                        rc 1 = not effective (pins would be vacuous)
 #
 # Deliberately NOT provided: mocking, setup/teardown hooks, filters,
 # parallelism -- that is framework territory and was rejected in #255
@@ -526,6 +537,76 @@ work_new_file() {
     local _wn
     _wn="$(mktemp "$@")" || return 1
     _work_emit work_new_file "$_wn"
+}
+
+# hostile_stdio_python — the #510 hostile-locale reproduction bin.
+# Writes a `python3` wrapper into a fresh scratch dir and prints the
+# dir. The pin env
+#   PATH="<dir>:$PATH" LC_ALL=C LANG=C PYTHONUTF8=0 \
+#       PYTHONCOERCECLOCALE=0 PYTHONIOENCODING=ascii
+# yields 7-bit stdio: strict stdout kills every non-ASCII write
+# (UnicodeEncodeError), and stdin kills plain text decodes where the
+# interpreter honors PYTHONIOENCODING (UnicodeDecodeError). The bare
+# trigger env (LC_ALL=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0) is not
+# effective on distro builds that force UTF-8 mode (e.g. Ubuntu
+# 24.04's python3.12 ignores PYTHONUTF8=0, and UTF-8 mode ignores
+# PYTHONIOENCODING) — there -X utf8=0 is the only honored switch, so
+# the wrapper execs the ambient interpreter with it. For non-I sites
+# the env alone reaches the same 7-bit state on honoring builds (the
+# wrapper is a compatible belt there); for -I sites it does NOT -- -E
+# strips PYTHONIOENCODING, so only the wrapper's -X utf8=0 forces the
+# 7-bit stdio (load-bearing on every build, not just forcing ones).
+# -I NUANCE: the shipped embedded sites run `python3 -I`
+# (#249) and -I implies -E, which strips PYTHONIOENCODING — an -I site
+# under this env gets surrogateescape on BOTH stdio streams: a plain
+# stdin decode does NOT die, and surrogate-poisoned values encode back
+# to their raw bytes losslessly (the C-locale round-trip). Only REAL
+# non-ASCII characters (from strict utf-8 file reads, or decoded from
+# buffer) die at the strict stdout write; non-I sites (advisory-watch,
+# release.sh feed parses) get the full strict decode. Pins must carry
+# RAW UTF-8 bytes in their
+# fixtures (octal printf escapes or literal bytes — a JSON \u escape
+# is ASCII on the wire and never exercises the decode). Every pin run
+# under this bin needs a control arm proving the hostility (the
+# unpinned shape must fail), or the pin passes vacuously on a build
+# that refuses to go 7-bit.
+hostile_stdio_python() {
+    local _hsp _hsp_real
+    # mktemp + _work_emit, NOT work_new: this lib carries the central
+    # registry trap itself, and a work_* call here would trip the
+    # sandbox-policy mix check (work_* call + local trap in one file,
+    # #395) — _work_emit registers the dir into the same registry the
+    # trap iterates, with no work_* call shape.
+    _hsp="$(mktemp -d)" || return 1
+    _hsp_real="$(command -v python3)" || {
+        echo "hostile_stdio_python: no python3 on PATH" >&2
+        rm -rf -- "$_hsp"
+        return 1
+    }
+    printf '#!/bin/sh\nexec "%s" -X utf8=0 "$@"\n' "$_hsp_real" \
+        >"$_hsp/python3" && chmod 755 "$_hsp/python3" || {
+        rm -rf -- "$_hsp"
+        return 1
+    }
+    # LAST statement: _work_emit registers AND prints the dir (a second
+    # print would make the captured value two-line)
+    _work_emit hostile_stdio_python "$_hsp"
+}
+
+# hostile_stdio_control — the vacuity detector for #510 hostile-locale
+# pins. Runs the failure probe the shipped -I embedded shape runs
+# (stdout write of a non-ASCII string) under the pin env + wrapper dir.
+# rc 0 = hostility effective (the write died; the consumer pins can
+# discriminate), rc 1 = NOT effective (the pins would pass vacuously —
+# e.g. the wrapper dir is missing from PATH or the build refuses the
+# 7-bit state). Every suite carrying a #510 pin runs this as its
+# control arm FIRST; without it the pin is only a canary.
+hostile_stdio_control() {
+    printf 'Pr\303\274fung\n' | PATH="$1:$PATH" LC_ALL=C LANG=C \
+        PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 PYTHONIOENCODING=ascii \
+        python3 -I -c 'import sys; sys.stdout.write(sys.stdin.buffer.read().decode("utf-8"))' \
+        >/dev/null 2>&1 && return 1
+    return 0
 }
 
 work_register() {

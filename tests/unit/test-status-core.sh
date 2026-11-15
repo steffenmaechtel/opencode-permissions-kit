@@ -212,6 +212,81 @@ else
     fail "advisories: missing-binary gate broken (out=$(printf '%s' "$_out" | head -5))"
 fi
 
+# --- 6b. advisory feed parse under the hostile locale (#510 M4) ---------------------
+# The freshness check decodes the whole advisory feed document; under a
+# 7-bit locale the unpinned json.load used to degrade the row to "live
+# check unavailable" when the decode died (an unread non-ASCII field on
+# strict-stdin hosts) or when the id print died. Buffer read + guarded
+# stdout reconfigure (#485 F22/F23 shapes). CANARY note (honesty): the
+# shipped parser runs python3 -I (#249), whose -E strips
+# PYTHONIOENCODING — under LC_ALL=C the stdin decode is surrogateescape,
+# so with the ASCII ghsa_id the unpinned shape survives on C-locale
+# hosts; the write side and the decode kill still discriminate on
+# strict-stdin (exotic-locale) hosts, and the control arm proves the
+# env's strict stdout. Control arm first (harness #510).
+P510="$(hostile_stdio_python)"
+if hostile_stdio_control "$P510"; then
+    pass "control arm: strict 7-bit stdout kills the -I non-ASCII write (#510)"
+else
+    fail "control arm: hostile stdio not effective -- the #510 pins would pass vacuously"
+fi
+mkdir -p "$WORK/advbin510"
+for _t in stat grep sed head cat python3; do
+    ln -s "$(command -v "$_t")" "$WORK/advbin510/$_t" 2>/dev/null || true
+done
+printf '#!/bin/sh\ncat "%s"\n' "$WORK/adv-feed-nb.json" >"$WORK/advbin510/curl"
+chmod 755 "$WORK/advbin510/curl"
+cat >"$WORK/adv-feed-nb.json" <<'EOF'
+[{"ghsa_id":"GHSA-9999-9999-9999","severity":"medium","html_url":"https://example/9",
+  "summary":"Prüfung: nicht-ASCII Zusammenfassung",
+  "vulnerabilities":[]}]
+EOF
+printf '#!/bin/sh\necho "opencode version 9.9.9"\n' >"$ADV/bin/opencode"
+chmod 755 "$ADV/bin/opencode"
+_adv_nb_rc=0
+_out=$(
+    export LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 PYTHONIOENCODING=ascii
+    PATH="$P510:$WORK/advbin510" # wrapper python3 + stub curl + externals
+    export PATH NO_COLOR=1
+    . "$UI_LIB"
+    . "$LIB"
+    LIBDIR="$ADV"
+    VERSION=0.0.0
+    OPENCODE_USER=opencode-no-such-user-424242
+    status_section_advisories
+) 2>&1 || _adv_nb_rc=$?
+if printf '%s' "$_out" | grep -qF 'new advisory(ies) upstream, not yet in this kit: GHSA-9999-9999-9999' &&
+    ! printf '%s' "$_out" | grep -qF 'live check unavailable'; then
+    pass "advisories: non-ASCII feed parses under the 7-bit locale, freshness row renders (#510 M4)"
+else
+    fail "advisories feed parse must survive a non-ASCII summary under LC_ALL=C (rc=$_adv_nb_rc out=$(printf '%s' "$_out" | head -5)) (#510 M4)"
+fi
+rm -rf "${WORK:?}/advbin510" "${WORK:?}/adv-feed-nb.json"
+rm -f "${ADV:?}/bin/opencode"
+
+# -c source purity (#510, the argv-decode class): the -c command text
+# reaches the interpreter as ARGV (locale codec + surrogateescape) --
+# a 7-bit locale refuses non-ASCII command bytes at decode, before any
+# code runs. The ticker's display glyphs ride \u escapes, comments
+# stay "--"; all THREE -c regions are scanned (ticker, advisory ids,
+# capability probe); ui text OUTSIDE them is deliberately UTF-8 and
+# not scanned (doctor prefilter idiom: any 8th-bit byte).
+for _510_range in \
+    "/^    python3 -I -c '\$/,/^' \"\\\$1\"\$/p" \
+    "/python3 -I -c 'import json,sys/,/ghsa_id\") or \"\"))'); then/p" \
+    "/python3 -I -c 'import sys, threading, time'/p"; do
+    if sed -n "$_510_range" "$LIB" |
+        LC_ALL=C grep -q "$(printf '[\200-\377]')"; then
+        fail "-c source must stay pure ASCII (range $_510_range) (#510 argv-decode class)"
+        _510_bad=1
+    fi
+done
+if [ "${_510_bad:-0}" = 0 ]; then
+    pass "all three -c sources (ticker, advisory ids, capability probe) stay pure ASCII (#510 argv-decode class)"
+else
+    : # the per-range fail rows above carry the detail
+fi
+
 # --- 7. pairing guard (#413): a version-skewed entry/lib pairing dies loud -----------
 # status is deliberately fail-soft (set -u only) — an undefined call
 # does NOT abort, the report silently loses the section while the
