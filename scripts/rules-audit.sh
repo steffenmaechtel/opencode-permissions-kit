@@ -38,7 +38,8 @@
 #
 # Report-only (non-blocking -- overdue is a maintenance signal):
 # 7. overdue list sorted by lateness; 8. INDEX.md regenerated on every
-#    audit run (python3 + gen-rules-index.py present)
+#    audit run (python3 + gen-rules-index.py present) -- the bare,
+#    date-invariant variant (#527; overdue is stdout-only)
 # The Phase-2 pending-unit parking valve (prefix-matched ref-less
 # units reported non-blocking) was retired 2026-10-17 when its five
 # occupants received metas -- a ref-less unit in an ACTIVE section
@@ -449,11 +450,16 @@ fi
 # rc, inv blocks) -- the INDEX walk is independent of the worklist;
 # a regen WRITE failure (e.g. ENOSPC) is warned about but restores
 # nothing, so a truncated INDEX can remain (pre-existing shape).
+# (#527): the regen runs BARE, no FORCE_TODAY -- the committed INDEX
+# is the date-invariant variant the parity gate pins (bare generator
+# run). Passing TODAY here wrote the Overdue variant whenever metas
+# were overdue, and the next make test rejected the tree with a
+# misleading hand-edit message. Overdue stays stdout-only (inv 7).
 if [ -s "$WORK/finderr" ]; then
     echo "INDEX not regenerated (meta-tree walk reported errors)"
 elif [ -x "$(command -v python3)" ] && [ -f "$ROOT/scripts/gen-rules-index.py" ]; then
     cp "$ROOT/$METAS/INDEX.md" "$WORK/index.before" 2>/dev/null || : >"$WORK/index.before"
-    FORCE_TODAY=$TODAY python3 "$ROOT/scripts/gen-rules-index.py" >/dev/null 2>&1 ||
+    python3 "$ROOT/scripts/gen-rules-index.py" >/dev/null 2>&1 ||
         echo "warning: INDEX regeneration failed (structural meta errors or write failure)" >&2
     if ! cmp -s "$ROOT/$METAS/INDEX.md" "$WORK/index.before"; then
         echo "INDEX regenerated (was stale)"

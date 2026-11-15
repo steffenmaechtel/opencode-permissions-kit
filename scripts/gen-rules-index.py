@@ -4,9 +4,16 @@
 One table row per meta (RM-NNNN), grouped by source file + section —
 both derived from each meta's `rule:` back-reference; the section
 title is resolved from the target file's heading. Leads with an
-Actionable section (review-pending, amended-pending, overdue). An
+Actionable section (review-pending, amended-pending). An
 approved meta carrying `amended:` renders **amended — pending** and
 counts toward review-pending (#333). Stdlib only.
+
+The output is date-invariant by design (#527): a pure function of the
+meta tree, byte-identical on every run on the same tree. The overdue
+lane is deliberately absent — "today" has no place in a committed,
+parity-pinned artifact (the audit's regen used to pass FORCE_TODAY
+and wrote a variant the parity gate rejects). Overdue is report-only:
+rules-audit.sh stdout and rules-report.sh.
 
 Structural sanity is fail-loud: a meta with missing frontmatter
 fields, duplicate frontmatter keys (#321), a filename that disagrees
@@ -27,7 +34,6 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RMROOT = os.path.join(ROOT, 'internal', 'rules-meta')
 REQUIRED = ('id', 'rule', 'quote', 'created', 'status',
             'revisit-interval', 'next-revisit')
-TODAY = os.environ.get('FORCE_TODAY', '') or None  # tests may pin the date
 MAXDESC = 48
 
 
@@ -143,7 +149,6 @@ def iter_metas():
 
 
 def main():
-    today = TODAY
     metas = []
     for path in sorted(iter_metas()):
         fm = parse_meta(path)
@@ -189,9 +194,9 @@ def main():
                      if fm.get('reviewed') and fm.get('amended'))
     dates = sorted(fm['next-revisit'] for _, fm in metas
                    if fm['status'] == 'active' and fm['next-revisit'])
-    overdue = sorted((d, fm['id']) for _, fm in metas
-                     for d in [fm['next-revisit']]
-                     if fm['status'] == 'active' and d and today and d < today)
+    # No overdue lane here: the INDEX is date-invariant (#527) -- the
+    # overdue enumeration lives in rules-audit.sh stdout (inv 7) and
+    # rules-report.sh.
 
     lines = [
         '# Rule-Meta Index',
@@ -211,9 +216,6 @@ def main():
         '- **Review pending:** %s' % (', '.join(pending) if pending else 'none'),
         '- **Amended — pending:** %s'
         % (', '.join('%s (%s)' % (rid, d) for d, rid in amended) if amended
-           else 'none'),
-        '- **Overdue:** %s'
-        % (', '.join('%s (%s)' % (rid, d) for d, rid in overdue) if overdue
            else 'none'),
         '',
     ]

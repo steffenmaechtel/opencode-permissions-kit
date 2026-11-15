@@ -4,6 +4,9 @@
 #   1. regenerating internal/rules-meta/INDEX.md reproduces the file
 #      byte-for-byte — a hand edit drifts and fails
 #   2. every meta file has exactly one INDEX row and vice versa
+#   3. the output is date-invariant — FORCE_TODAY must not change
+#      one byte (#527: a date-honoring generator writes a variant
+#      the parity gate rejects on every audit run over due metas)
 #
 # Run: sh tests/unit/test-rules-index-parity.sh
 
@@ -21,7 +24,7 @@ TMP="$(work_new_file)" || {
     echo "rules index parity: FAILED - scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
     exit 1
 }
-work_register "${TMP}.gen" "${TMP}.files" "${TMP}.rows"
+work_register "${TMP}.gen" "${TMP}.files" "${TMP}.rows" "${TMP}.in" "${TMP}.bare"
 
 INDEX=internal/rules-meta/INDEX.md
 
@@ -44,6 +47,28 @@ done
 for k in $(comm -13 "$TMP.files" "$TMP.rows"); do
     echo "FAIL $k: INDEX row without meta file" >>"$TMP"
 done
+
+# 3. date-invariance (#527): the INDEX is a pure function of the meta
+#    tree — a pinned date must not change one byte. The parity gate
+#    compares the bare run, while the audit's regen used to pass
+#    FORCE_TODAY: on an overdue tree every audit run then wrote the
+#    Overdue variant, and the next make test rejected the tree as a
+#    hand edit. The far-future date maximizes the arm — under a
+#    date-honoring generator every active meta goes overdue at once.
+#    Purely observational: the incoming file state is restored
+#    unconditionally, red or green.
+cp "$INDEX" "$TMP.in"
+python3 scripts/gen-rules-index.py >/dev/null 2>&1 || {
+    echo "FAIL generator exited non-zero (bare run)" >>"$TMP"
+}
+cp "$INDEX" "$TMP.bare"
+FORCE_TODAY=2099-01-01 python3 scripts/gen-rules-index.py >/dev/null 2>&1 || {
+    echo "FAIL generator exited non-zero with FORCE_TODAY set" >>"$TMP"
+}
+if ! cmp -s "$INDEX" "$TMP.bare"; then
+    echo "FAIL INDEX.md output depends on FORCE_TODAY (date-variant, #527)" >>"$TMP"
+fi
+cp "$TMP.in" "$INDEX"
 
 if [ -s "$TMP" ]; then
     echo "rules index parity: FAILED"
