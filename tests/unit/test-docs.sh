@@ -502,9 +502,12 @@ fi
 cat "$_fp_rows" >>"$TMP"
 
 # Discrimination arms (a pin that cannot red is decoration): the
-# exact #526 shape reds, balanced indented and col-0 fences (with an
-# info-string marker inside an open fence) stay clean, and an empty
-# scope aborts loud.
+# exact #526 shape reds, balanced indented and col-0 fences stay
+# clean, and an empty scope aborts loud. Fixture markers use the
+# corpus conventions only (openers may carry info strings, closers
+# bare) -- no marker-as-content shape exists in the corpus, so none
+# is fixture-tested; the strict-vs-absorbing-stray distinction rides
+# on the wired real-tree scan over agent/*.md.
 _fp_dir="$(work_new)" || {
     echo "docs link check: FAILED - scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
     exit 1
