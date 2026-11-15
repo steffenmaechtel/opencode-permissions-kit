@@ -252,11 +252,11 @@ done
 
 # banner: drive the moved wrapper_banner and compare its banner line
 # against the replica (the section prints blank, banner, blank; the
-# replica prints the banner line only). Shell-fidelity (#255 kcov
-# class): the replica renders colors via printf '%b', the moved code
+# replica prints the banner line only). Shell-fidelity (#255): the
+# replica renders colors via printf '%b', the moved code
 # via echo -- dash's echo interprets the escapes, bash's does not, so
 # the REAL output is %b-normalized before the compare (the harness
-# pass()/fail() idiom; identical bytes under sh and the coverage bash).
+# pass()/fail() idiom; identical bytes under sh and bash).
 _bnr="$(
     . "$CORE_LIB"
     HEADLESS=false
@@ -732,13 +732,9 @@ $1"; fi; }
         # (extraction drift) never defines the function, and the
         # unguarded call killed the whole suite rc 127 mid-run — no
         # tally, downstream pins unseen. The guard reads the EXTRACTION
-        # (the drift path empties exactly this variable). command -v
-        # was avoided on the maintainer's suspicion that an eval-
-        # defined symbol is invisible to it under the kcov coverage
-        # shell — an UNVERIFIED suspicion, no in-repo record
-        # substantiates the mechanism (#497 f R2); the extraction
-        # rationale stands alone. Under extraction drift every
-        # warning-expectation arm reds on its own; the clean-home arm
+        # (the drift path empties exactly this variable). Under
+        # extraction drift every warning-expectation arm reds on its
+        # own; the clean-home arm
         # alone passes vacuously — its expectation IS the empty output
         # (#497 f R5) — so suite-level red rides the upstream fails
         # and the other arms.

@@ -1282,20 +1282,14 @@ assert_eq "#265 cat arm: SIGPIPE (141) maps to the consumer-EPIPE 0" "0" "$W65C1
 # clear an inherited ignore via shell trap — POSIX forbids
 # re-enabling it), and under SIG_IGN cat exits 1 (write error) instead
 # of dying by signal; the disposition reset must happen in a real
-# process before exec. Under kcov BOTH riders are SKIPPED via the
-# OPK_KCOV_RUN marker (#418 b C2): kcov's engine turns cat's signal
-# death into rc 1 regardless of the disposition — an instrumentation
-# property (the documented-conflict class scripts/coverage.sh's header
-# carries, like the PS4 shields), carried by the skip note below. The
-# SIG_IGN leg (#419) runs the SAME pipeline with the inherited-ignore
+# process before exec.
+# The SIG_IGN leg (#419) runs the SAME pipeline with the inherited-ignore
 # disposition instead of the reset: cat ends in write-error rc 1, the
 # cat arm propagates it (only 141 maps to 0) and the pipeline fails
 # LOUD rc 1 — the safe direction pinned where fs-baseline.sh's cat-arm
 # comment previously claimed it only ("documented, not pinned", the
 # #418 b R3 residual). Skipped with a note where bash/python3 absent.
-if [ "${OPK_KCOV_RUN:-0}" = 1 ]; then
-    echo "  note: under kcov — cat-arm pipefail riders skipped (kcov's engine turns cat's SIGPIPE death into rc 1 either way; the stub pins above carry the rc contract) (#418 b C2)"
-elif command -v bash >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+if command -v bash >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
     W65BIG="$WORK/issue265-big"
     python3 -c 'import sys; sys.stdout.buffer.write(b"e\0" * 524288)' >"$W65BIG"
     W65PF=0

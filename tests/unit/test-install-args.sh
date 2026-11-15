@@ -746,7 +746,6 @@ _dg_eval_reads() {
     # bash, not the suite's sh: pipefail (the abort mechanism under
     # test) is a bash option — args: id-line, fixture path, ver-line
     bash -c '
-        PS4="+ " # kcov shield: PS4 ${BASH_SOURCE} vs set -u (internal/records/kcov-coverage.md)
         set -eu
         (set -o pipefail) 2>/dev/null && set -o pipefail || true
         _dg_rw_id="$(printf "%s\n" "$1" | sed "s|/etc/os-release|$2|g")"
@@ -810,7 +809,6 @@ if command -v bash >/dev/null 2>&1 && command -v timeout >/dev/null 2>&1 &&
     [ -n "$_pb_pf" ] && [ -n "$_pb_st" ]; then
     _pb_rc=0
     _pb_out=$(bash -c '
-        PS4="+ " # kcov shield: PS4 ${BASH_SOURCE} vs set -u (internal/records/kcov-coverage.md)
         set -eu
         (set -o pipefail) 2>/dev/null && set -o pipefail || true
         _pf_oc_bin="$2"
@@ -824,7 +822,6 @@ if command -v bash >/dev/null 2>&1 && command -v timeout >/dev/null 2>&1 &&
     fi
     _pb_rc=0
     _pb_out=$(bash -c '
-        PS4="+ " # kcov shield: PS4 ${BASH_SOURCE} vs set -u (internal/records/kcov-coverage.md)
         set -eu
         (set -o pipefail) 2>/dev/null && set -o pipefail || true
         SYSTEM_BIN="$2"

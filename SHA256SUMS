@@ -25,7 +25,7 @@ dcb8b17188cab386608f95f5e4b2fe3ae0a0cf87e624c4661be08074f32fa1e8  files/opencode
 753802cf9756227c2bd541f88e0bc44444507efe2332c00e9a537ca17e032286  files/opencode-permissions-kit-lib/sh/ddev-terminal.sh
 b80b674296f3a66bbf208b249447bb0aeb7c8dc524708d33e387f2471669b969  files/opencode-permissions-kit-lib/sh/deploy-lib.sh
 ef3f732fa80b7a5a6df8b627038c75aadc22f059d6451c46b92097640975ce1a  files/opencode-permissions-kit-lib/sh/doctor-core.sh
-e815324335cc0f55dcb542645dff0684d4781f3a4c9a4e046b10637057eb73e6  files/opencode-permissions-kit-lib/sh/fs-baseline.sh
+6f1e9754eccbd14f6f56a34ad211d903ea20cf870f5ef4382842f5eee84b9a59  files/opencode-permissions-kit-lib/sh/fs-baseline.sh
 80579d6005c882c689086a3af913ccdf686059905451f43b496aa74005fd0b41  files/opencode-permissions-kit-lib/sh/git-check.sh
 6b0f24f63611d62aa97e81d6c836b04217e7ac142ca034cff86959097c4a7caf  files/opencode-permissions-kit-lib/sh/handover-core.sh
 fabc43e4a235673430e011307e687e8189e141b39dae1681a567ff7536d1e815  files/opencode-permissions-kit-lib/sh/install-core.sh
