@@ -138,6 +138,17 @@ make e2e-rootless      # docker-rootless daemon suite (needs systemd-in-containe
   reader), and e2e debt owed by the wave discharges inside the wave's
   wall-clock.
 
+- A red e2e lane that fails in a **build step** (`[N/M] RUN` while the
+  Docker image builds, before any repo content executes) is an upstream
+  transient until proven otherwise: the git-core PPA has failed image
+  builds with Launchpad's `GPGKeyTemporarilyNotFoundError` from
+  `add-apt-repository -y ppa:git-core/ppa`, and apt `Err:`/hash-sum
+  classes fail the same way (PR #531: a red `e2e-2x-git-latest` lane on
+  a comment-only push; the job re-run went green with near-identical
+  runtime). Re-run the failed job — CI lanes and local `make e2e` runs
+  alike. Suspect the diff only when the failure sits in a test step or
+  reproduces across re-runs.
+
 - Same-suite runs from **two worktrees of one workspace** are hermetic at
   the container-name level (issue #366): every runner suffixes the
   container-name base with a slug of the checkout's absolute path

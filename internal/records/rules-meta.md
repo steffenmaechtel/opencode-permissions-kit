@@ -65,6 +65,13 @@ Source: <one line finding/directive/issue — only if one exists.>
 - 2026-10-20 amended — wording fix; maintainer review pending.
 ```
 
+The `quote:` needle is the bullet's literal bytes: write the rule
+bullet first, then take its joined first five words — parentheticals
+and backtick content are part of the needle, so a parenthetical
+between the intended words makes the quote unfindable (PR #539's
+first audit run failed invariant 5 exactly that way; rewording the
+bullet made the needle words contiguous).
+
 Body rules:
 
 - **The review log names the true author** ("agent draft" vs. "from

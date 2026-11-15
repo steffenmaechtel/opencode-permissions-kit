@@ -400,6 +400,22 @@ waves (#496 a B1, #498, #519: `_rule2_batch`, `_rule1_batch`,
   that always said rc=0). `grep` rc 1 = no match (normal) vs rc ≥ 2 =
   death; awk rc ≠ 0 = death. (RM-0150)
 
+## Named-cause failure guards (shipped runners)
+
+Every `mktemp` on a runner-visible path in shipped code fails with a
+named cause — the `#364 class` shape, three live sites: the SHA256SUMS
+fetches in `files/install.sh` and `management/update.sh`, and the
+get.docker.com fetch in `bin/setup-container-backend`.
+
+- A `mktemp` receiver in shipped code carries a named-cause guard:
+  `tmp=$(mktemp) || { echo "… mktemp failed (is \$TMPDIR writable?) —
+  <what cannot proceed now>" >&2; return 1; }` — the message names the
+  consequence for the user, never the bare call. The scope boundary
+  rides the same rule: e2e/test scaffolding keeps its lighter sibling
+  shape (PR #532 round a S1, disposition deliberately-not-done —
+  sanctioned in writing here; the shipped-code class work stays with
+  issues #431/#376). (RM-0155)
+
 ## Unit-suite path variables (entry scripts and their phase libs)
 
 Suites that reference a management entry script together with its
@@ -442,6 +458,11 @@ defect surface, reviewed by waves f/g over the PR's own pins.
   reviewer rounds alike: a reviewer proposing an over-budget LOW/INFO
   pin gets the accepted-residual disposition with this rule cited,
   not the fixture.
+- An issue or fix shape that explicitly prescribes the fixture class
+  overrides the bound for that pin: the prescription names its model,
+  and the breach is disclosed in the wave's records (issue #511's
+  F30-class pins — a ~50-line fake-curl fixture after its ~70-line
+  model — rode PR #532 on exactly this override).
 
 ## Test sandbox (unit suites)
 
@@ -599,6 +620,13 @@ duplication is retired in passing when a site is touched anyway —
 no mass pass. (Maintainer directive 2026-11-15, the opk-improve-docs
 wave — its first draft restated one skill's contract in four
 documents.)
+
+A page that references a skill checks its OPENING paragraph against
+the skill's own file before committing — first drafts drift toward
+restating the contract (2 instances, 2026-11-15: the review-concept
+meta log's first draft restated the skill's question and contract;
+docs-loop.md's opening copied the opk-improve-docs contract facts
+until round a B2, fixed in 6e13493b).
 
 ## Rule-file markdown structure
 

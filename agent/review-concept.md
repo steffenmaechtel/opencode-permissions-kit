@@ -523,6 +523,14 @@ Review-relevant code touched this round: yes/no → …
   disposition ledger table and the stop-rule check visible at top
   level (the one-view chain record) and nests only per-finding
   evidence. (RM-0128)
+- The CI status fields assert only **completed** runs — the headline's
+  `CI <status>` and the metadata's `CI on last push:` alike: while a
+  push's run is still in progress the line says so (`CI: push 2 run in
+  progress`), and closure/merge waits for the finished state — a
+  "green" claim over a running check is true of nothing (PR #531's
+  closing summary claimed both pushes green while push 2 still ran;
+  the correction comment followed when the lane failed).
+  (RM-0154)
 - Size guard: GitHub caps one comment at ~64k characters; a comment
   that would exceed ~60k is SPLIT into part 1/2 (each part with its
   own marker and a `"part":1|2` field) — content is NEVER trimmed to
