@@ -525,3 +525,21 @@ OPK_BROWSER_BRIDGE_DEBUG=1 xdg-open https://opencode.ai
 
 **Fix:** open a fresh terminal (or re-login). Check with `id` — the
 `opencode` group must appear.
+
+## Agent shell command fails with "Portable shell scanner cannot analyze command"
+
+**Cause:** before opencode runs any shell command, a static analyzer
+decomposes it into permission rules (the patterns the "always allow"
+prompts save). A command the analyzer cannot decompose is rejected
+without running — the tool named in the command never sees it. The
+suffix names the construct: `heredoc` or `unterminated-quote`
+usually means a missing closing delimiter in an inline heredoc or a
+quote; `command-substitution` means an unterminated `$(…` or
+backtick (a closed, plain `$(…)` passes); `dynamic-execution` means
+the command builds code at runtime (eval-like shapes).
+
+**Fix:** re-issue the command in a statically simple shape. For long
+bodies (issues, PRs, comments) write the text to a file first and
+pass `--body-file <path>` instead of a heredoc. Well-formed heredocs
+with a closing delimiter pass the analyzer; an unterminated one is
+rejected by design.

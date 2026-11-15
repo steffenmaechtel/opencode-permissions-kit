@@ -54,6 +54,23 @@ code blocks. A clipboard round-trip (`wl-paste | fmt -w 78 |
 wl-copy`) mangles indentation on WSL hosts whose IDE runs on
 Windows — use the scratch-file route there.
 
+### Composing long gh bodies (issues, PRs, comments)
+
+Long bodies for `gh issue create`, `gh pr create` or `gh pr comment`
+go through a file: write the body with the write tool, then pass
+`--body-file <path>` — never inline it as a heredoc
+(`gh … <<EOF`). Every shell command passes opencode's fail-loud
+pre-flight analyzer before it runs, and a command the analyzer
+cannot statically decompose — an accidentally unterminated heredoc
+or quote being the real-world case — is rejected outright with
+`Portable shell scanner cannot analyze command: …`; the call never
+executes. The file route sidesteps that entire class. Well-formed
+heredocs (closing delimiter present) do pass the analyzer, so a
+short inline heredoc is fine when it is actually the clearest shape.
+Shipped scripts follow the same file-not-argv pattern for a
+different reason (injection surface, argv steering) — see "Shell
+security (untrusted input)" in `agent/conventions.md`.
+
 ## Tests
 
 First make sure your host has everything installed (shellcheck and
