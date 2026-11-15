@@ -8,11 +8,12 @@ is the PRODUCER side. This page is the CONSUMER side: how the open
 item dispositioned — nothing rots, nothing lands twice. The label is
 the corpus's query key: `label:"from-reflection"` finds every issue
 born of a reflection — the `Docs:` issues plus the work orders refiled
-out of their triage (class extract, #541–#543), the whole population
-retro-labeled 2026-11-16 when the label was introduced. The `Docs:`
-title prefix stays the docs-class discriminator inside that query. The
-founding backlog: the seven issues #523, #524, #528, #530, #534, #535,
-#538, filed 2026-11-15 by the first seven reflections.
+out of their triage (class extract; the first three were #541–#543),
+the whole population retro-labeled 2026-11-16 when the label was
+introduced. The `Docs:` title prefix stays the docs-class
+discriminator inside that query. The founding backlog: the seven
+issues #523, #524, #528, #530, #534, #535, #538, filed 2026-11-15 by
+the first seven reflections.
 
 ## When a docs wave runs
 
