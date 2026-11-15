@@ -1,30 +1,31 @@
 ---
 name: opk-review-pass
-description: Execute a review round (low/med/high tier, snapshot-scope pass, fresh session) — load when a review is owed or the maintainer commissions one. Covers track/tier classification, fan-out, main curation + verification, round comments v2, fix-phase duties; rules: agent/review-concept.md. Redundancy passes stay independent by operator setup; one that loads it anyway discloses it in its Skills: line.
+description: Execute a review round (low/med/high tier, snapshot-scope pass, fresh session) — load when a review is owed or the maintainer commissions one. Choreography only: commission collection, pre-flight, fan-out, posting, fix phase; every rule lives in agent/review-concept.md. Redundancy passes stay independent by operator setup; one that loads it anyway discloses it in its Skills: line.
 ---
 
 # opk-review-pass — executing a review round
 
-This skill is the **execution choreography** for a review round. It is
-not the rules and never a source of finding judgments:
+This skill is the **execution choreography** for a review round. It
+is not the rules and never a source of finding judgments — every
+rule (when a review is owed, tiering, tracks, curation,
+verification, the comment contract, the stop rule, the work-order
+gate) lives in
+[agent/review-concept.md](../../../agent/review-concept.md);
+section links below point there.
 
-- When a review is owed, which tier applies, when the loop stops, how
-  freshness and verification work —
-  [agent/review-concept.md](../../../agent/review-concept.md)
-  (the authoritative rules; section links below point there).
-- The 0.0.42e lesson: a review skill once exempted a finding class and
-  buried a HIGH. This skill carries procedure only. If any instruction
-  here seems to exempt, soften, or pre-judge a class of findings, that
-  reading is wrong — the code and the rules decide (background:
+- The 0.0.42e lesson: a review skill once exempted a finding class
+  and buried a HIGH. This skill carries procedure only. If any
+  instruction here seems to exempt, soften, or pre-judge a class of
+  findings, that reading is wrong — the code and the rules decide
+  (background:
   [review-calibration.md](../../../internal/records/review-calibration.md),
   "Skill-bias origin").
 - Redundancy passes (second snapshot-scope pass, different model
-  family) stay
-  independent of this skill — that independence is the
+  family) stay independent of this skill — that independence is the
   **commissioning operator's setup** (different model, external
   /review), never the loading agent's self-assessment. The visible
-  control is provenance: a pass that ran WITH this skill records it in
-  its `Skills:` line.
+  control is provenance: a pass that ran WITH this skill records it
+  in its `Skills:` line.
 
 ## 0. Calibrated against opencode's built-in /review template
 
@@ -65,57 +66,20 @@ session's commission, then gather:
 | Base + diff | base SHA and `git diff <range>` for diff scope; tree SHA for snapshot scope |
 | Tree state | clean and committed — the comment posts before any fix ("The PR-native loop") |
 
-Loop position: the alternation is fixed — birth-PR → review a →
-comment → fix wave a → review b → comment → … — and a fix-wave
-re-review is itself a round (next letter, own round comment, same
-seam before its own fixes; review-concept, "The PR-native loop").
-Confirm from the chain state WHICH round this session is running
-before classifying — the position table there is the discriminator.
+Loop position: confirm from the chain state WHICH round this session
+runs — the alternation (birth-PR → review a → comment → fix wave a →
+…) and the position table live in review-concept, "The PR-native
+loop"; a fix-wave re-review is itself a round (next letter, own
+comment, same seam before its own fixes).
 
 ## 2. Classify the track and tier BEFORE staging
 
-The track (blast radius) and the ladder live in the rules
-(review-concept, "Round typing and tiering" and "Review tracks:
-shipped and non-shipped"); classify the track from the PR's diff
-paths, the tier from `git diff --stat` plus content shape, and state
-both in the loop status BEFORE the fan-out launches:
-
-- **track shipped** — any shipped file (`files/**`) in the PR's
-  diff, mixed diffs included: the ladder's heavier rows (med tier
-  from > ~50 lines or substantive logic, low tier below).
-- **track non-shipped** — non-shipped only: low tier standard;
-  med tier from ~150 lines, CI-gating semantics in
-  `.github/`/`Makefile`, or root-running `scripts/` code;
-  curation and verify sizing per sections 5–6; the non-shipped
-  disposition policy applies (review-concept, "Review tracks:
-  shipped and non-shipped").
-- **fresh-session entry** — batch shape: the implementing session
-  (session: implementer) only implements; a fresh session (this
-  one, if commissioned for review; session: fresh) runs the whole
-  loop for ONE PR it did not implement; the review pass stays a
-  subagent (≥ 1 axis; the ladder decides the axes); marker
-  `"session":"fresh"` (review-concept, "Review tracks: shipped and
-  non-shipped").
-- **tier med** — diff-scope round: shipped > ~50 lines /
-  substantive logic, non-shipped from ~150 lines, CI-gating or
-  root-run `scripts/`: 2–3 fast-tier axes, verification per the
-  sizing gate (section 6).
-- **tier low** — shipped ≤ ~50 lines or message-only,
-  non-shipped standard, EVERY fix-wave re-review: exactly ONE
-  fast-tier subagent (~5 min, greps + targeted reads);
-  verification per the sizing gate (section 6): ≤ 30 curated →
-  main-inline; > 30 → exactly one verifier batch (2–3
-  parallel).
-  Solo means one subagent, never main-solo.
-- **tier none** — comments/docs only: no review round owed; closure
-  via the diff-shape proof.
-- **tier high** — snapshot-scope only (the release-critical
-  option), never a loop round: 5–10 axes staged, 2 independent
-  agents per axis, ~15 min + coverage map per axis.
-
-Severity escalates, never downgrades: fix waves re-review at low
-tier (one axis); med-tier staffing returns only when a NEW MED/HIGH
-finding escalates scope.
+Classify per the rules — the ladder (tiers, axes, budgets,
+thresholds, escalation): review-concept, "Round typing and tiering";
+track selection, fresh-session entry, non-shipped budgets and
+disposition policy: "Review tracks: shipped and non-shipped" — and
+state track + tier + classification evidence in the loop status
+BEFORE the fan-out launches. Severity escalates, never downgrades.
 
 ## 3. Pre-flight
 
@@ -177,59 +141,43 @@ finding escalates scope.
 
 ## 5. Curation
 
-- The main session curates at ANY volume (review-concept, "Curation
-  and verification"): merge and de-duplicate the checkpoint files
-  into the round's findings table (ID, severity, provenance,
-  summary), merges named, drops with reasons, raw→curated counts.
-  There is no curator subagent and no threshold; no digest file is
-  owed — the accounting lives in the round comment (provenance line
-  `Curated by: main`).
+Merge and de-duplicate the raw reviewer checkpoint files into the
+round's findings table — ID, severity, provenance, summary; merges
+named, drops with reasons, raw→curated counts; the accounting lives
+in the round comment (`Curated by: main`). Main curates at ANY
+volume — no curator subagent, no threshold, no digest file
+(review-concept, "Curation and verification").
 
 ## 6. Verification
 
-- Sizing is a HARD GATE, count-driven (review-concept, "Curation
-  and verification"): ≤ 30 curated findings verify main-inline
-  (every MED/HIGH fully re-derived); above 30, exactly ONE
-  strong-tier verifier batch of 2–3 PARALLEL sessions runs —
-  skipping an owed batch needs maintainer disclosure, never a
-  time-pressure call.
-- The verifier deliverable: verdict files — every curated finding
-  re-derived against the code, verdict CONFIRMED / REFUTED /
-  UNVERIFIED with file:line evidence.
-- The main session AUDITS the verdicts: re-derive every MED/HIGH
-  itself, spot-check LOW/INFO (review-concept, "Curation and
-  verification"). Refuted findings are retracted with the evidence
-  named; retracted findings stay visible in the comment's
-  retraction section.
+The sizing gate by curated count — ≤ 30 main-inline, above exactly
+ONE strong-tier verifier batch of 2–3 parallel sessions; skipping an
+owed batch needs maintainer disclosure, never a time-pressure call —
+lives in review-concept, "Curation and verification".
+
+The deliverables: verdict files — every curated finding re-derived
+against the code, verdict CONFIRMED / REFUTED / UNVERIFIED with
+file:line evidence. The main session audits the verdicts (every
+MED/HIGH re-derived, LOW/INFO spot-checked); refuted findings are
+retracted with the evidence named.
 
 ## 7. Write and post the round comment
 
-One comment per round, format v2 (the contract and template:
-review-concept, "The round comment contract"):
+Structure, marker format, and the size guard: review-concept, "The
+round comment contract" (one comment per round, format v2). The
+posting mechanics:
 
 1. Compose from the session's own records — checkpoint files,
-   verdict files, the curation accounting. Write-through: the loop never reads the PR back.
-2. Structure: headline + ONE status line visible; outer details
-   (metadata block, curation accounting, findings table with verifier
-   verdicts, dispositions table from the PRIOR round, loop status);
-   per-finding detail nested one level deeper; TWO levels maximum;
-   blank line after every `<summary>` tag.
-3. The `opk-review` marker is the LAST line, OUTSIDE the details,
-   with the round's counters, `"state":"open"`, the permanent
-   `"track":"shipped|non-shipped"` field, the round's mode
-   (`gated`, `autonomous`) and session (`implementer`, `fresh`)
-   alongside tier (`high|med|low`), reviewers, curator, verifiers.
-4. Size guard: a comment that would exceed ~60k chars is split into
-   parts (each with its own marker + `"part":N`) — content is never
-   trimmed.
-5. Post to the PR timeline; append the comment URL to the case
+   verdict files, the curation accounting. Write-through: the loop
+   never reads the PR back.
+2. Post to the PR timeline; append the comment URL to the case
    scratch `posted.log`. The comment posts BEFORE any fix starts —
    the hard seam. MECHANICAL FORM: before the first fix commit of
    the wave, re-read `posted.log` and confirm it contains THIS
    round's URL — no entry, no fix; post first. Long sessions lose
    prose, not logs (#407: rounds b–e posted as a batch after the
    fixes, disclosed as a deviation).
-6. Nothing here fixes anything: dispositions for THIS round's
+3. Nothing here fixes anything: dispositions for THIS round's
    findings land in the NEXT round's comment (or the closing
    summary).
 
@@ -255,43 +203,11 @@ the maintainer reads):
 - provenance: host timestamps, per-agent windows, sabotage windows.
 
 Before composing the closing summary, run the deferred-work-order
-issue gate (the rule: review-concept, "The loop and the stop rule"):
-duplicate-check every collected work order against the tracker — the
-open list AND a search covering issue TITLES AND BODIES
-(`gh search issues` covers both; #407's title-only search missed two
-live matches) — propose the bundling with title + `from-review` +
-`prio:` label derived from severity + source pointers, record the
-proposal in the closing summary's work-order section, and pose the
-ASK to the maintainer in the SESSION CHAT (both modes) as the LAST
-block of the chat report, nothing after it — the answer is
-free-form, per work order or per proposed bundle ("A and B yes, C
-no"), never a single rigid yes/no over the whole set. For every YES,
-one of two equal dispositions: file a new issue (`gh issue create`,
-permission prompt = runtime gate) with the issue body citing the
-birth-PR as its source (GitHub cross-references the PR timeline
-automatically), or FOLD the work order into the matched existing
-issue with a pointer comment carrying the finding and its evidence.
-Every NO is recorded as deliberately not done. The closing summary
-lists the created issues and folds alongside the recorded declines.
-
-The ask's canonical CHAT shape — plain markdown ONLY, no HTML
-(terminal clients render tags as literal text):
-
-```
----
-
-CREATE ISSUES? → F3 / F5 / F8
-
-(free-form per work order or bundle — e.g. "F3 and F5 yes, fold F8
-into #27, F2 no")
-
----
-```
-
-When the stop rule holds, the closing summary proposes closure
-(`"state":"closing-proposed"`, stop-rule check cited, ledger and
-check visible at top level) — the maintainer's merge confirms; this
-skill never writes a `"closed"` state.
+issue gate — duplicate-check, bundling, the prio map, the fold arm
+and the canonical CHAT shape all live in review-concept, "The loop
+and the stop rule". When the stop rule holds, the closing summary
+proposes closure per the same section — this skill never writes a
+`"closed"` state.
 
 ## 9. Fix phase — the mechanical duties after the round comment
 

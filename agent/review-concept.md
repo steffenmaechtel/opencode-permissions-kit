@@ -232,8 +232,25 @@ nothing to review.
   comment carrying the finding and its evidence — folding is an equal
   disposition next to creating, not a fallback. Every NO is recorded
   as deliberately not done, and the closing summary lists the created
-  issues and folds alongside the recorded declines. Either way the
-  round comments' work-order records remain the ledger. (RM-0136)
+  issues and folds alongside the recorded declines. The ask's
+  canonical CHAT shape — plain markdown ONLY, no HTML (terminal
+  clients render tags as literal text):
+
+  ```
+
+  ---
+
+  CREATE ISSUES? → F3 / F5 / F8
+
+  (free-form per work order or bundle — e.g. "F3 and F5 yes, fold F8
+  into #27, F2 no")
+
+  ---
+
+  ```
+
+  Either way the round comments' work-order records remain the
+  ledger. (RM-0136)
 - After the work-order gate settles (every YES filed or folded, every
   NO recorded, the closing summary's list posted), the loop's chat
   duties extend exactly once more: the disposition report ends by
