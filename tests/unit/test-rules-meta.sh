@@ -888,5 +888,119 @@ else
     fail "pin10 lane c guard: an unreadable scan root must fail loud (rc=$_gc_rc) (#519)"
 fi
 
+# 11. ACTIVE_SECTIONS anchors resolve to real headings (#540 §4): a
+#     typo'd or stale entry is silently inert -- the audit attributes
+#     no units to it, inv1 never fires for it, and the only coverage
+#     is incidental (inv5 back-refs lapse if the referencing metas
+#     retire). The pin extracts the audit's own ACTIVE_SECTIONS list
+#     and asserts every entry's file exists and its anchor equals the
+#     audit's slugging of a real heading in that file (fences skipped,
+#     same transform as rules-audit.sh's awk).
+_active_sections_list() { # $1: audit script -> entries on stdout, dies loud
+    if [ ! -r "$1" ]; then
+        echo "active-sections extract died: unreadable $1" >&2
+        return 1
+    fi
+    # Residual (round a D2, strictly narrower than pin 10 lane a's
+    # disclosed #522 sibling): the || observes the LAST sed only; a
+    # mid-stream death of the first sed could emit a partial list --
+    # hard deaths and the unreadable case are caught (-r pre-check,
+    # the empty assertion in _active_check), an exotic partial emit
+    # is not.
+    sed -n 's/^ACTIVE_SECTIONS=//p' "$1" |
+        sed 's/^"\$ACTIVE_SECTIONS //; s/^"//; s/"$//' || {
+        echo "active-sections extract died: sed rc=$? on $1" >&2
+        return 1
+    }
+}
+
+_active_headings() { # $1: markdown file -> slugged headings, dies loud
+    if [ ! -r "$1" ]; then
+        echo "active-headings scan died: unreadable $1" >&2
+        return 1
+    fi
+    awk '
+        /^```/ { fence = !fence; next }
+        fence { next }
+        /^#{1,6}[ \t]/ {
+            h = $0; sub(/^#+[ \t]+/, "", h); sub(/[ \t]*#*$/, "", h)
+            tmp = tolower(h)
+            gsub(/[^a-z0-9 -]/, "", tmp)
+            gsub(/^ +| +$/, "", tmp); gsub(/ +/, " ", tmp); gsub(/ /, "-", tmp)
+            print tmp
+        }
+    ' "$1" || {
+        echo "active-headings scan died: awk rc=$? on $1" >&2
+        return 1
+    }
+}
+
+_active_check() { # $1: audit script, $2: findings out-file
+    _ac_list=$WORK/active-sections.$$.tmp
+    if ! _active_sections_list "$1" >"$_ac_list" || [ ! -s "$_ac_list" ]; then
+        printf '%s\n' "extraction died or empty (audit: $1)" >>"$2"
+        return 1
+    fi
+    while IFS= read -r _ac_e; do
+        [ -n "$_ac_e" ] || continue
+        _ac_f=${_ac_e%#*}
+        _ac_a=${_ac_e#*#}
+        if [ ! -f "$REPO_ROOT/$_ac_f" ]; then
+            printf '%s\n' "$_ac_e (file missing: $_ac_f)" >>"$2"
+            continue
+        fi
+        if ! _active_headings "$REPO_ROOT/$_ac_f" | grep -qxF "$_ac_a"; then
+            printf '%s\n' "$_ac_e (anchor '$_ac_a' not a heading in $_ac_f)" >>"$2"
+        fi
+    done <"$_ac_list"
+    return 0
+}
+
+: >"$WORK/p11"
+# Boundary (round a D3): the pin reads entry files directly; the audit
+# slugs headings only inside its SCOPE_FILES loop -- an entry whose
+# file left SCOPE_FILES but kept a valid heading stays pin-green yet
+# audit-inert. 33/33 entries sit in SCOPE_FILES today (no live
+# divergence); disclosed here so the next reader does not re-derive it.
+_active_check "$REPO_ROOT/scripts/rules-audit.sh" "$WORK/p11"
+if [ -s "$WORK/p11" ]; then
+    fail "pin11: ACTIVE_SECTIONS entr(ies) resolving to no real heading:"
+    sed 's/^/         /' "$WORK/p11"
+else
+    _n11=$(_active_sections_list "$REPO_ROOT/scripts/rules-audit.sh" | grep -c .)
+    pass "pin11: every ACTIVE_SECTIONS entry resolves to a real heading ($_n11 checked)"
+fi
+
+# executed mismatch arm: a scratch extraction carrying one bogus entry
+# must land exactly that row in the findings file -- the failure path
+# runs, it does not merely exist (hermetic: the real audit is read-only).
+P11S="$WORK/p11scratch.$$"
+grep '^ACTIVE_SECTIONS=' "$REPO_ROOT/scripts/rules-audit.sh" >"$P11S"
+printf '%s\n' 'ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#no-such-heading-pin11"' >>"$P11S"
+: >"$WORK/p11arm"
+_active_check "$P11S" "$WORK/p11arm"
+if grep -q 'no-such-heading-pin11' "$WORK/p11arm" &&
+    [ "$(grep -c . "$WORK/p11arm")" -eq 1 ]; then
+    pass "pin11 mismatch arm: bogus entry flagged, real entries clean"
+else
+    fail "pin11 mismatch arm: the bogus scratch entry must be the one flagged row"
+fi
+
+# --- guard arms: executed death paths for the two producers (#519 class) -------
+_ga_rc=0
+_ga_err="$( (_active_sections_list "$WORK/no-such-audit-$$") 2>&1 >/dev/null)" || _ga_rc=$?
+if [ "$_ga_rc" -ne 0 ] && printf '%s\n' "$_ga_err" | grep -q 'active-sections extract died'; then
+    pass "pin11 extract guard: unreadable audit fails loud"
+else
+    fail "pin11 extract guard: an unreadable audit must fail loud (rc=$_ga_rc)"
+fi
+_ga_rc=0
+_ga_err="$( (_active_headings "$WORK/no-such-headings-$$") 2>&1 >/dev/null)" || _ga_rc=$?
+if [ "$_ga_rc" -ne 0 ] && printf '%s\n' "$_ga_err" | grep -q 'active-headings scan died'; then
+    pass "pin11 headings guard: unreadable file fails loud"
+else
+    fail "pin11 headings guard: an unreadable file must fail loud (rc=$_ga_rc)"
+fi
+
 # ------------------------------------------------------------- summary
 suite_done "rules-meta audit pins"
