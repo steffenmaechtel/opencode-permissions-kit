@@ -55,10 +55,11 @@ amended: 2026-10-31       # optional: APPROVED meta changed after that
 revisit-interval: 1m      # ladder: 1m 6m 1y 2y — always starts at 1m
 next-revisit: 2026-11-14
 ---
-<3-6 plain sentences: the external, checkable fact that makes the
-rule necessary — not a paraphrase of the rule.>
-Check: <optional: one sentence — how a revisit verifies the fact still holds.>
-Source: <one line finding/directive/issue — only if one exists.>
+<!-- 3-6 plain sentences, an approximate guide: the external,
+     checkable fact that makes the rule necessary — not a paraphrase
+     of the rule. -->
+Check: <!-- optional: one sentence — how a revisit verifies the fact still holds. -->
+Source: <!-- one line finding/directive/issue — only if one exists. -->
 
 ## Review log
 - 2026-10-14 created — agent draft; maintainer review pending.
