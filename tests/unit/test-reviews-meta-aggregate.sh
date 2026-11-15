@@ -1,13 +1,16 @@
 #!/bin/sh
 # Unit tests for scripts/reviews-meta-aggregate.py: the aggregator behind
-# the reviews-meta runs. Three pins: (1) COMPAT — regenerating the frozen
+# the reviews-meta runs. Five pins: (1) COMPAT — regenerating the frozen
 # 2026-10-10 extraction data must reproduce its committed stats.json
 # byte-for-byte (a schema/ordering drift in the aggregator would corrupt
 # every future run's comparability); (2) PR-STEM ERA — the 2026-10-22
 # corpus added pr-NNNNN stems (cases pr-00179+); grouping, ordering
 # (version groups before PR groups, PR groups by number), and crossref
 # edges must handle both eras; (3) LOCALE — batch IO pins utf-8, so a
-# 7-bit-locale host survives a batch with raw non-ASCII (#513 A3).
+# 7-bit-locale host survives a batch with raw non-ASCII (#513 A3);
+# (4) PRINT — the console summary survives a non-ASCII PRINTED field
+# under the same locale (#517 S1); (5) RECIPE — the reusable extract.py
+# pins its text IO (#517 S2, source pins).
 # Run: sh tests/unit/test-reviews-meta-aggregate.sh
 set -u
 
@@ -159,6 +162,67 @@ check "aggregator reads the em-dash batch and writes stats under the hostile loc
     [ "$_A3_RC" -eq 0 ]
 check "hostile-locale stats.json groups the batch stem (#513 A3)" \
     grep -q '"0.0.47"' "$WORK/loc/stats.json"
+
+# --- #517 S1: locale-hardened console summary -----------------------------------
+# PR #515 round a S1 (deferred to #517): the console summary printed
+# batch-derived values (areas, class names, reviewer keys) with no
+# stdout pin — a 7-bit-locale host died at the print AFTER writing a
+# correct stats.json (rc!=0 despite correct output). The guard now
+# reconfigures stdout like jsonc-parser.py. The stdout death control is
+# hostile_stdio_control above (it IS the non-ASCII stdout write probe).
+# Fixture: the em-dash rides a PRINTED field (area) — the #513 A3
+# fixture deliberately keeps printed fields ASCII, so only this
+# fixture drives the print arm.
+mkdir -p "$WORK/pr"
+python3 - "$WORK/pr/b1.json" <<'PY'
+import json, sys
+em = chr(0x2014)  # em-dash in a PRINTED field (area) — raw UTF-8 below
+batch = {
+    "batch": "b1",
+    "snapshots": [{
+        "stem": "0.0.47a", "file": "synthetic", "date": "2026-10-10",
+        "scope": "wave", "reviewer": "GLM-5.3",
+        "subject": "print-arm run", "stop_rule": "met",
+        "stated_counts": {"HIGH": 0, "MED": 0, "LOW": 0, "INFO": 1},
+        "findings": [{
+            "id": "P1", "severity": "INFO", "severity_inferred": False,
+            "class": "claim-drift", "secondary_class": None,
+            "area": "docs" + em + "internal", "provenance": None,
+            "summary": "print arm", "cross_refs": [],
+            "status": "reported"}],
+        "process_notes": []}],
+    "resolutions": [],
+}
+with open(sys.argv[1], "w", encoding="utf-8") as f:
+    json.dump(batch, f, ensure_ascii=False, indent=1)
+    f.write("\n")
+PY
+_S1_RC=0
+PATH="$HSP:$PATH" LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 \
+    PYTHONIOENCODING=ascii python3 "$SCRIPT" "$WORK/pr" >/dev/null 2>&1 || _S1_RC=$?
+check "aggregator prints a non-ASCII area under the hostile locale (#517 S1)" \
+    [ "$_S1_RC" -eq 0 ]
+check "print-arm run wrote stats.json with the area escaped (#517 S1)" \
+    grep -q 'docs\\u2014internal' "$WORK/pr/stats.json"
+
+# --- #517 S2: the reusable extraction recipe pins its text IO -------------------
+# The 2026-11-07 recipe is what the next run copies (reviews-meta
+# README); the pins landed in place via #517 (post-run — the 2026-11-07
+# run itself executed unpinned, recorded in the recipe's docstring).
+# Source pins: the recipe runs against live gh + the session db, so no
+# unit execution exists — check_live guards the constructs in
+# comment-stripped live source.
+EXTRACT="$REPO/internal/reviews-meta/2026-11-07/data/extract.py"
+check_live "recipe: gh call decodes utf-8, not locale (#517 S2)" "$EXTRACT" \
+    -qF 'capture_output=True, encoding="utf-8", check=True'
+check_live "recipe: marker-comments write pins utf-8 (#517 S2)" "$EXTRACT" \
+    -qF 'open("marker-comments.jsonl", "w", encoding="utf-8")'
+check_live "recipe: markers-parsed write pins utf-8 (#517 S2)" "$EXTRACT" \
+    -qF 'open("markers-parsed.jsonl", "w", encoding="utf-8")'
+check_live "recipe: rounds write pins utf-8 (#517 S2)" "$EXTRACT" \
+    -qF 'open("rounds.jsonl", "w", encoding="utf-8")'
+check_live "recipe: subagents write pins utf-8 (#517 S2)" "$EXTRACT" \
+    -qF 'open("subagents.jsonl", "w", encoding="utf-8")'
 
 # --- summary gate --------------------------------------------------------------
 echo

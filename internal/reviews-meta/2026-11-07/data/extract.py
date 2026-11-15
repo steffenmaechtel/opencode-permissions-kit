@@ -16,6 +16,12 @@ Outputs into the current directory:
   rounds.jsonl           one row per review round (deduped, closings out)
   subagents.jsonl        one row per subagent session (role, tier, minutes)
 
+Locale pins added post-run via #517 (the 2026-11-07 run itself
+executed unpinned): this file is the recipe future runs copy
+(reviews-meta README), and gh comment bodies carry raw em-dashes —
+the gh call and all four writes pin utf-8 so a 7-bit-locale host
+cannot die mid-extraction.
+
 Usage:  python3 extract.py [corpus-start-date ISO, default 2026-10-26]
 
 Requires: gh (authenticated), python3, read access to
@@ -49,9 +55,9 @@ def fetch_marker_comments():
          "--jq", '.[] | select(.body | contains("opk-review"))'
                  ' | {id: .id, created: .created_at,'
                  ' issue: (.issue_url | split("/") | last), body: .body}'],
-        capture_output=True, text=True, check=True)
+        capture_output=True, encoding="utf-8", check=True)
     lines = [l for l in out.stdout.splitlines() if l.strip()]
-    with open("marker-comments.jsonl", "w") as f:
+    with open("marker-comments.jsonl", "w", encoding="utf-8") as f:
         for l in lines:
             f.write(l + "\n")
     return [json.loads(l) for l in lines]
@@ -77,7 +83,7 @@ def parse_markers(comments):
                 data["_handfixed"] = True
             rows.append({"comment_id": c["id"], "created": c["created"],
                          "issue": c["issue"], **data})
-    with open("markers-parsed.jsonl", "w") as f:
+    with open("markers-parsed.jsonl", "w", encoding="utf-8") as f:
         for r in rows:
             f.write(json.dumps(r) + "\n")
     return rows
@@ -122,7 +128,7 @@ def round_rows(markers):
             "tier": r.get("tier"), "track": r.get("track"),
             "mode": r.get("mode"), "session": r.get("session"),
             "state": r.get("state")})
-    with open("rounds.jsonl", "w") as f:
+    with open("rounds.jsonl", "w", encoding="utf-8") as f:
         for r in out:
             f.write(json.dumps(r) + "\n")
     return out
@@ -169,7 +175,7 @@ def fetch_subagents():
             "minutes": round((tu - tc) / 60000, 1),
             "tok_in": tin, "tok_out": tout, "directory": directory})
     con.close()
-    with open("subagents.jsonl", "w") as f:
+    with open("subagents.jsonl", "w", encoding="utf-8") as f:
         for r in rows:
             f.write(json.dumps(r) + "\n")
     return rows
