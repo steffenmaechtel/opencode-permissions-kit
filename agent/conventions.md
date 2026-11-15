@@ -408,10 +408,10 @@ user cannot tell what stopped. Every shipped fetcher already guards
 its mktemp with a named cause (the `#364` class): the SHA256SUMS
 fetches in `files/install.sh` and `management/update.sh`, and the
 get.docker.com fetch in `bin/setup-container-backend`. This section
-prescribes the standard for new and touched shipped code — existing
-unguarded receivers (the `sh/ddev-migrate.sh` bare `|| return 1`
-shape) are the class debt named in the rule below, not a state the
-tree already holds.
+prescribes the standard for new and touched shipped code; the tree
+does not hold it universally yet — existing unguarded receivers (the
+`sh/ddev-migrate.sh` bare `|| return 1` shape) are the class debt
+named in the rule below.
 
 - A `mktemp` receiver in shipped code carries a named-cause guard:
   `tmp=$(mktemp) || { echo "… mktemp failed (is \$TMPDIR writable?) —
