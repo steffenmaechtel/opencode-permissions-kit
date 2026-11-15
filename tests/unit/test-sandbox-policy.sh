@@ -650,10 +650,13 @@ fi
 # The greps are leg-specific (#522, from #520 review a B1): both guard
 # messages share their "output unreliable" suffix with the empty-set
 # message, so the old suffix greps stayed green when a one-token
-# refactor rerouted the death scenario into the empty guard (the
-# round-a B-axis -readable patch did exactly that). The death arms
-# grep 'died on', the empty arms 'found no suites' -- the phrase pair
-# the wave's sibling suites use (test-docs.sh, test-rules-meta.sh).
+# refactor rerouted the death scenario into the empty guard (the #520
+# review-a B-axis ran exactly that -readable patch as an executed
+# false-pass proof -- PR #520 timeline, finding a B1). The death arms
+# grep 'died on', the empty arms 'found no suites' -- one phrase per
+# leg, the discrimination convention the wave's sibling suites follow
+# with their own pairs (test-docs.sh: 'scope scan died' / 'empty scope
+# scan'; test-rules-meta.sh: 'lane b scan died' / 'lane b scan empty').
 # Root-context caveat (#520 a B4): these deaths are DAC-enforced
 # (chmod 000) -- as root awk/grep read through and these arms
 # false-red; no root invocation path exists for this suite today (CI
