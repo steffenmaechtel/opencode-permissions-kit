@@ -26,6 +26,13 @@
 # Usage: run-ddev.sh [--debug] [--fresh]
 #   --debug   on failure: keep the container alive for inspection
 #   --fresh   rebuild the golden image (new ddev version, recipe bump, TTL)
+#
+# Environment knobs (operator-set only — nothing in the repo or CI sets
+# these; issue #533):
+#   E2E_DDEV_SKIP_CREATE=1  skip the DD14 create-project arm (slow network
+#                           composer run — manual operator convenience)
+#   E2E_DDEV_IMAGE=<name>   golden-image cache tag (default:
+#                           opencode-e2e-ddev:cached)
 set -e
 
 E2E_DEBUG="${E2E_DEBUG:-0}"
