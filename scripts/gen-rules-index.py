@@ -206,6 +206,8 @@ def main():
         '> (tests/unit/test-rules-index-parity.sh) regenerates and',
         '> compares. Grouped by source file + section, derived from',
         "> each meta's `rule:` back-reference.",
+        '> Overdue is report-only: `make rules-report` · rules-audit.sh',
+        '> stdout (inv 7) — no date-dependent lane here by design (#527).',
         '',
         '**%d metas · %d active · %d retired · %d review-pending · next due %s**'
         % (len(metas), len(active), len(retired), len(pending) + len(amended),

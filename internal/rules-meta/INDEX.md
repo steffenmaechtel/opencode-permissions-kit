@@ -5,6 +5,8 @@
 > (tests/unit/test-rules-index-parity.sh) regenerates and
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
+> Overdue is report-only: `make rules-report` · rules-audit.sh
+> stdout (inv 7) — no date-dependent lane here by design (#527).
 
 **153 metas · 150 active · 3 retired · 17 review-pending · next due 2026-11-14**
 

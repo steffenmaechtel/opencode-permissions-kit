@@ -70,6 +70,18 @@ if ! cmp -s "$INDEX" "$TMP.bare"; then
 fi
 cp "$TMP.in" "$INDEX"
 
+# 4. the header points to the report-only overdue lane (#530): the
+#    lane moved out of the INDEX with the date-invariance redesign
+#    (#527) and a browsing maintainer lands here first — the header
+#    pointer is the only trace of where overdue lives now. Pinned on
+#    the COMMITTED INDEX, not the generator source: removing the line
+#    from the generator and regenerating keeps both parity sides
+#    matching — only this presence pin holds the pointer. Raw un-ridden
+#    grep by design (markdown source, the #472 docs-pin shape).
+grep -qF -- 'Overdue is report-only' "$INDEX" || {
+    echo "FAIL INDEX header lost the report-only overdue pointer (#530)" >>"$TMP"
+}
+
 if [ -s "$TMP" ]; then
     echo "rules index parity: FAILED"
     cat "$TMP"
