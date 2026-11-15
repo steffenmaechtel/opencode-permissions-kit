@@ -8,12 +8,12 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**153 metas · 150 active · 3 retired · 17 review-pending · next due 2026-11-14**
+**156 metas · 153 active · 3 retired · 21 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0141, RM-0142, RM-0143, RM-0144, RM-0145, RM-0146, RM-0147, RM-0148, RM-0149, RM-0150, RM-0151, RM-0152, RM-0153
-- **Amended — pending:** RM-0025 (2026-11-15), RM-0124 (2026-11-15), RM-0127 (2026-11-15), RM-0136 (2026-11-15)
+- **Review pending:** RM-0141, RM-0142, RM-0143, RM-0144, RM-0145, RM-0146, RM-0147, RM-0148, RM-0149, RM-0150, RM-0151, RM-0152, RM-0153, RM-0154, RM-0155, RM-0156
+- **Amended — pending:** RM-0025 (2026-11-15), RM-0097 (2026-11-15), RM-0124 (2026-11-15), RM-0127 (2026-11-15), RM-0136 (2026-11-15)
 
 ## AGENTS.md
 
@@ -21,7 +21,7 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0097](0/0/9/RM-0097.md) | Never commit on master | active | approved | 1m | 2026-11-28 |
+| [RM-0097](0/0/9/RM-0097.md) | Never commit on master | active | **amended — pending** | 1m | 2026-11-28 |
 | [RM-0098](0/0/9/RM-0098.md) | All shipped content is English | active | approved | 1m | 2026-11-20 |
 | [RM-0099](0/0/9/RM-0099.md) | Follow agent/conventions.md for interactive… | active | approved | 1m | 2026-11-20 |
 | [RM-0100](0/1/0/RM-0100.md) | Docs change with the code | active | approved | 1m | 2026-11-20 |
@@ -74,6 +74,12 @@
 | [RM-0148](0/1/4/RM-0148.md) | The death arm is EXECUTED | active | **pending** | 1m | 2026-12-15 |
 | [RM-0149](0/1/4/RM-0149.md) | The empty-scan-set leg fails | active | **pending** | 1m | 2026-12-15 |
 | [RM-0150](0/1/5/RM-0150.md) | Detector rc semantics are per-tool | active | **pending** | 1m | 2026-12-15 |
+
+### Named-cause failure guards (shipped runners)
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0155](0/1/5/RM-0155.md) | A mktemp receiver in shipped | active | **pending** | 1m | 2026-12-15 |
 
 ### Test sandbox (unit suites)
 
@@ -198,6 +204,7 @@
 | [RM-0128](0/1/2/RM-0128.md) | One comment per review | active | approved | 1m | 2026-11-28 |
 | [RM-0129](0/1/2/RM-0129.md) | Size guard: GitHub caps | active | approved | 1m | 2026-11-28 |
 | [RM-0153](0/1/5/RM-0153.md) | PR-body edits for wave-authored | active | **pending** | 1m | 2026-12-15 |
+| [RM-0154](0/1/5/RM-0154.md) | The CI status fields assert | active | **pending** | 1m | 2026-12-15 |
 
 ### Fixes close classes, not sites
 
@@ -335,6 +342,7 @@
 | [RM-0093](0/0/9/RM-0093.md) | In meta bodies, cross-references | active | approved | 1m | 2026-11-19 |
 | [RM-0094](0/0/9/RM-0094.md) | The review log names the | active | approved | 1m | 2026-11-19 |
 | [RM-0135](0/1/3/RM-0135.md) | Post-approval changes set | active | approved | 1m | 2026-11-30 |
+| [RM-0156](0/1/5/RM-0156.md) | The quote: needle is the | active | **pending** | 1m | 2026-12-15 |
 
 ### Quality bar for rationales
 

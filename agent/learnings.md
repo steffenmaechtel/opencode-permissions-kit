@@ -97,7 +97,14 @@ once with the realistic trigger (one dead dir, one unreadable file) and
 describe the mode that actually occurs — total vs partial death are
 different claims (`#516 a B3`, a differential claim refuted by its own
 log; `#520 a B2+B3`, "empty list" wording overstated a partial-list
-death that stayed green over missing coverage).
+death that stayed green over missing coverage). Review-history claims
+are the invisible variant: sabotage proofs, round dispositions and
+B-axis executed proofs never enter git history by design (AGENTS.md
+Testing), so the prose itself must carry the citation — PR + round +
+finding ID — or every fresh reader hits a `git log -S` dead end
+(pr-00537 round a A2's sandbox-policy comment read `unverified` until
+main resolved it at PR #520 a B1; the carried-ref shape is fix commit
+ad93f5cf).
 
 ### L4 — Pins must discriminate, and sit before the summary gate
 *Class: `test-vacuous` — run 1: 37 findings; run 2: 45 findings, 4 MED/HIGH,
@@ -157,9 +164,10 @@ class's ceiling (keep the snapshot-scope-pass rule below).
 findings fix-induced; run 2: 9 findings, 2 MED/HIGH, fix-induced share
 halved to 9.3 %. The discipline measurably works; the class remains.*
 
-Every fix wave gets its low-tier re-review before the PR (binding
-since 0.0.42 — keep it), and fixes bring **their own pins**: "the
-wave's own mechanisms
+Every fix wave gets its low-tier re-review before the PR merges
+(binding since 0.0.42 — keep it; the birth-PR exists before round a,
+and re-reviews run as rounds on the PR timeline — "The PR-native
+loop"), and fixes bring **their own pins**: "the wave's own mechanisms
 unpinned" was repeatedly its own finding (`0.0.44d F4`). A fix to a
 root/symlink class also re-runs the L5 inventory check. The stop rule
 agrees since 2026-10-11 ([review-concept.md](review-concept.md),
@@ -260,6 +268,14 @@ empty-match greps (`grep … || true` where empty output is rc 1), `IFS= read
   diff hunk — a lenient edit match mis-indented 8-vs-12 spaces in
   tui-register.py and 12 test rows caught it immediately, `#513`
   series).
+- **Trust the recorded result, not reconstructed order** (2026-11-15;
+  the command-RESULTS arm of the family above, whose file-edit arm is
+  "trust the file, not your memory of the edit") — numbers returned by
+  parallel tracker calls (`gh issue create`) land next to their
+  subject AT creation time, read from each call's own output;
+  reconstructing the mapping afterward from assumed launch sequence
+  crossed the work-order mapping — all three of #541/#542/#543 vs the
+  PR-body table (PR #544 round a A3 MED).
 
 ## When a rule fails
 

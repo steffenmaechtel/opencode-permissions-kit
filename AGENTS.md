@@ -87,8 +87,11 @@ expect the reported paths to exist locally.
   GitHub with permission denied (workflow files need elevated rights) —
   then the agent hands the maintainer the exact initial push command and
   re-pushes follow-ups itself, so the last push is the agent's again
-  before approvals. Merging the PR and closing the review loop stay with
-  the maintainer. (RM-0097)
+  before approvals. The PR body carries the `Track:` line at PR
+  creation (review-concept.md, "Round typing and tiering") — the
+  review re-derives it; a missing line is a disclosed deviation.
+  Merging the PR and closing the review loop stay with the
+  maintainer. (RM-0097)
 - **All shipped content is English** — scripts, docs, prompts, messages. (RM-0098)
 - **Follow `agent/conventions.md`** for interactive prompts, output
   style, shell security (untrusted input), and other shipped-code
@@ -202,7 +205,13 @@ gate (`make test`), never only the touched suites: tree-wide invariant
 suites (rules-meta, sandbox-policy, workflows, format-gate) redden on
 changes their own files never touched — #412's round-b B3 (bare
 rule-ID citations in new comment text) was locally invisible and red
-in CI exactly through that gap. A wave whose diff touches `files/`
+in CI exactly through that gap. A change to a shared list consumed by
+tests (the rules audit's `SCOPE_FILES`, `KIT_FILES`, suite
+inventories) greps every consumer suite BEFORE the gate run — the
+gate stops at the first red and masks later same-cause suites behind
+it (issue #540 §1: the rules-meta fixture mirror surfaced only after
+rules-revisit's was fixed and the chain re-ran, in PR #539's session).
+A wave whose diff touches `files/`
 also owes `make sums` IN the chain, first — `make sums && make test &&
 git add && git commit`: the freshness pin inside `make test` reddens on
 a stale `SHA256SUMS` (issue #478), so the regeneration must land in

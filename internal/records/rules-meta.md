@@ -84,6 +84,12 @@ Body rules:
   meta appends an amendment log line and sets `amended:` to its date;
   the meta re-joins the approval queue (rendered *amended — pending*)
   until a fresh maintainer approval drops the field. (RM-0135)
+- **The `quote:` needle is the bullet's literal bytes** — write the
+  rule bullet first, then take its joined first five words:
+  parentheticals and backtick content are part of the needle, so a
+  parenthetical between the intended words makes the quote unfindable
+  (an invariant-5 failure whose record is issue #540 §2; rewording
+  the bullet made the needle words contiguous). (RM-0156)
 
 ## Quality bar for rationales
 
