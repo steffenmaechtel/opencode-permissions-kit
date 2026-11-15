@@ -448,12 +448,18 @@ fi
 # parser) anchors at column 0 and never sees an indented fence. This
 # pin is the structural version of the manual render/balance check
 # (agent/conventions.md "Rule-file markdown structure"): every fence
-# marker line -- column 0 or indented -- must pair per file. The
-# toggle is CommonMark-shaped: a marker with an info string only
-# OPENS, a bare marker closes, and an info-string marker inside an
-# open fence is content, not a toggle (corpus simplifications: only
-# three-backtick markers exist in agent/, and the closing fence's
-# indent is not compared to the opener's).
+# marker line -- column 0 or indented -- must strictly pair per file.
+# Strict pairing, not a CommonMark renderer emulation: a stray marker
+# must red even when a later block's fences would "absorb" it into a
+# giant mis-paired fence (the #526 damage rendered as one huge code
+# block -- a toggle that treats an info-string marker inside an open
+# fence as content silently re-pairs the stray and stays green, the
+# exact blindness this pin exists to remove). Corpus conventions the
+# invariant encodes: openers may carry info strings, closers are
+# bare, and no fence-marker-as-content inside a fence -- showing a
+# fence inside a fence needs a ~~~ or 4+-backtick block instead
+# (none exist in agent/ today). Simplification: only three-backtick
+# markers, the closing fence's indent is not compared to the opener's.
 _fence_pairing_rows() { # $@ = md files -> FAIL rows on stdout, loud on death
     [ $# -gt 0 ] || {
         echo "fence pairing: empty agent/*.md scope -- the check never ran (#542)" >&2
@@ -470,13 +476,9 @@ _fence_pairing_rows() { # $@ = md files -> FAIL rows on stdout, loud on death
                 if (!open) {
                     open = 1
                     oline = NR
-                    next
-                }
-                if ($0 ~ /^[[:space:]]*```[[:space:]]*$/) {
+                } else {
                     open = 0
-                    next
                 }
-                # info string on a marker inside an open fence: content
             }
             END {
                 if (open)
@@ -523,7 +525,6 @@ printf '%s\n' \
     '- bullet with a balanced indented fence' \
     '  ```sh' \
     '  run $(true)' \
-    '  ```inner-marker-is-content' \
     '  ```' \
     '' \
     '```markdown' \
