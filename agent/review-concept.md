@@ -232,8 +232,23 @@ nothing to review.
   comment carrying the finding and its evidence — folding is an equal
   disposition next to creating, not a fallback. Every NO is recorded
   as deliberately not done, and the closing summary lists the created
-  issues and folds alongside the recorded declines. Either way the
-  round comments' work-order records remain the ledger. (RM-0136)
+  issues and folds alongside the recorded declines. The ask's
+  canonical CHAT shape — plain markdown ONLY, no HTML (terminal
+  clients render tags as literal text):
+
+  ```
+  ---
+
+  CREATE ISSUES? → F3 / F5 / F8
+
+  (free-form per work order or bundle — e.g. "F3 and F5 yes, fold F8
+  into #27, F2 no")
+
+  ---
+  ```
+
+  Either way the round comments' work-order records remain the
+  ledger. (RM-0136)
 - After the work-order gate settles (every YES filed or folded, every
   NO recorded, the closing summary's list posted), the loop's chat
   duties extend exactly once more: the disposition report ends by
@@ -268,7 +283,7 @@ decides material (scope), findings policy (track) or verification
 | **high** | 5–10 staged — 2 independent per axis | ~15 min + coverage map | snapshot-scope only; never a loop round |
 | **med** | 2–3 | ~8 min | shipped > ~50 lines / substantive logic; non-shipped per the triggers below |
 | **low** | 1 | ~5 min | shipped ≤ ~50 lines; non-shipped standard; EVERY fix-wave re-review |
-| **none** | 0 | — | no round owed (comments / docs only) |
+| **none** | 0 | — | no round owed (comments / docs only; closure via the diff-shape proof) |
 
 High tier runs its 5–10 axes never more than 5 concurrent (staged,
 backfilled — the account-wide burst cap); the second independent
@@ -394,7 +409,10 @@ works.
   measured (issue #423). The main session audits the verdicts —
   re-deriving every MED/HIGH itself, spot-checking LOW/INFO; at
   inline size that audit IS the verification. Refuted findings are
-  retracted with the refuting evidence named. Fresh context is the
+  retracted with the refuting evidence named and STAY VISIBLE in the
+  round comment (verdict column and `"retracted":N` counter) — a bare
+  counter drop without the findings visible is a deviation. Fresh
+  context is the
   bias-reduction mechanism where it is load-bearing — the REVIEW
   pass, never main-solo at any size; the verifier batch's value is
   context economy and parallel re-derivation at volume, not a second
