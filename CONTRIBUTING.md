@@ -60,7 +60,7 @@ Long bodies for `gh issue create`, `gh pr create` or `gh pr comment`
 go through a file: write the body with the write tool, then pass
 `--body-file <path>` — never inline it as a heredoc
 (`gh … <<EOF`). Every shell command passes opencode's fail-loud
-pre-flight analyzer before it runs, and a command that analyzer
+pre-flight analyzer before it runs, and a command the analyzer
 cannot statically decompose — an accidentally unterminated heredoc
 or quote being the real-world case — is rejected outright with
 `Portable shell scanner cannot analyze command: …`; the call never
