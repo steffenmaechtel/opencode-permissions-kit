@@ -647,6 +647,16 @@ fi
 # unreadable suite file; the wrappers must fail loud (guard message on
 # stderr + nonzero rc) instead of letting the callers read green over
 # the missing rows (the old || true call sites did).
+# The greps are leg-specific (#522, from #520 review a B1): both guard
+# messages share their "output unreliable" suffix with the empty-set
+# message, so the old suffix greps stayed green when a one-token
+# refactor rerouted the death scenario into the empty guard (the #520
+# review-a B-axis ran exactly that -readable patch as an executed
+# false-pass proof -- PR #520 timeline, finding a B1). The death arms
+# grep 'died on', the empty arms 'found no suites' -- one phrase per
+# leg, the discrimination convention the wave's sibling suites follow
+# with their own pairs (test-docs.sh: 'scope scan died' / 'empty scope
+# scan'; test-rules-meta.sh: 'lane b scan died' / 'lane b scan empty').
 # Root-context caveat (#520 a B4): these deaths are DAC-enforced
 # (chmod 000) -- as root awk/grep read through and these arms
 # false-red; no root invocation path exists for this suite today (CI
@@ -658,7 +668,7 @@ printf '#!/bin/sh\n# probe: unreadable file kills the scan detectors\n_dg="$(mkt
 chmod 000 "$_dg_dir/test-probe-dying.sh"
 _dg_rc=0
 _dg_err="$( (scan "$_dg_dir") 2>&1 >/dev/null)" || _dg_rc=$?
-if [ "$_dg_rc" -ne 0 ] && printf '%s\n' "$_dg_err" | grep -q 'checks 1-2 output unreliable'; then
+if [ "$_dg_rc" -ne 0 ] && printf '%s\n' "$_dg_err" | grep -q 'scan died on'; then
     pass "self-probe: a scan detector death fails loud (#519)"
 else
     fail "self-probe: a scan death must fail loud with the guard message (#519)"
@@ -667,7 +677,7 @@ _dg_rc=0
 _dg_err="$( (sfx_scan "$_dg_dir") 2>&1 >/dev/null)" || _dg_rc=$?
 chmod 755 "$_dg_dir/test-probe-dying.sh"
 command rm -rf "${_dg_dir:?}"
-if [ "$_dg_rc" -ne 0 ] && printf '%s\n' "$_dg_err" | grep -q 'check 3 output unreliable'; then
+if [ "$_dg_rc" -ne 0 ] && printf '%s\n' "$_dg_err" | grep -q 'sfx_scan died on'; then
     pass "self-probe: an sfx_scan detector death fails loud (#519)"
 else
     fail "self-probe: an sfx_scan death must fail loud with the guard message (#519)"
