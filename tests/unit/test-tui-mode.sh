@@ -289,10 +289,11 @@ check "first-run cli.json parses and carries the plugin entry" \
 # parse probes below are locale-independent). Octal fixture
 # escapes: dash printf does not interpret \xHH.
 # #514: the two hostile arms below run under the #510 wrapper
-# treatment now — the bare env passed vacuously on UTF-8-mode-forced
-# builds (Ubuntu 24.04's python3.12 ignores PYTHONUTF8=0). Wrapper bin
-# + PYTHONIOENCODING=ascii (honored: register runs WITHOUT -I) +
-# control arm first, the jsonc §28 shape.
+# treatment now — the bare env was insufficient: stdio rides the
+# C-locale surrogateescape handler (an unpinned decode survives), and
+# on builds that ignore PYTHONUTF8=0 it reaches no 7-bit state at
+# all. Wrapper bin + PYTHONIOENCODING=ascii (strict stdio; honored:
+# register runs WITHOUT -I) + control arm first, the jsonc §28 shape.
 F23_HSP="$(hostile_stdio_python)"
 check "control arm: 7-bit hostility effective (#514)" hostile_stdio_control "$F23_HSP"
 printf '{"plugins": ["pkg-\303\274"], "label": "gr\303\274n"}\n' >"$T2X/utf8-cli.json"

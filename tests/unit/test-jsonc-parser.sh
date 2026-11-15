@@ -341,12 +341,17 @@ assert_not_contains "non-dict stderr carries no traceback (W12)" "Traceback" "$_
 # the read pin (strict stdout). The doctor-core.sh embedded python
 # already pinned encoding="utf-8"; the parser matches it now.
 # #514: the bare trigger env (the #485 shape this section ran before)
-# is NOT effective on distro builds that force UTF-8 mode — Ubuntu
-# 24.04's python3.12 ignores PYTHONUTF8=0 — so the pins passed
-# vacuously there. The #510 wrapper treatment now: harness
-# hostile_stdio_python bin (-X utf8=0, the only honored switch on
-# forcing builds), PYTHONIOENCODING=ascii (honored — the parser runs
-# WITHOUT -I), control arm FIRST and fail-loud, per the 8-suite
+# is insufficient: on this host (Ubuntu 24.04, python3.12.3 — the
+# distro the #510 finding named) PYTHONUTF8=0 IS honored, but stdio
+# rides the C-locale surrogateescape handler — an unpinned stdin
+# decode SURVIVES non-ASCII bytes, so the stdin/stdout arms passed
+# vacuously (the file-mode arms were not vacuous here: the bare env's
+# file codec is strict ascii). #510 also measured builds that ignore
+# PYTHONUTF8=0 entirely (forced UTF-8 mode) — there no 7-bit state is
+# reached at all. The wrapper treatment covers both:
+# PYTHONIOENCODING=ascii makes stdio strict (honored — the parser
+# runs WITHOUT -I), the bin's -X utf8=0 restores the 7-bit state on
+# forcing builds, control arm FIRST and fail-loud, per the 8-suite
 # pattern from PR #512.
 # NB: the fixtures are written with OCTAL escapes (\303\274 = UTF-8
 # "ü", \377\376 = invalid UTF-8 bytes) — dash's printf does not
