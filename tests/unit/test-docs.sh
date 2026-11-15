@@ -441,6 +441,110 @@ else
     echo "FAIL test-docs itself: an empty scope scan must fail loud (rc=$_dr_rc err=$_dr_err) (#519)" >>"$TMP"
 fi
 
+# --- #542: indented fence pairing in agent/*.md rule files --------------------
+# The #526 class: a fix wave deleted an indented fence's OPENING
+# line inside a rule bullet; every suite stayed green because all
+# fence-aware tooling (strip_fences above, the rules-audit unit
+# parser) anchors at column 0 and never sees an indented fence. This
+# pin is the structural version of the manual render/balance check
+# (agent/conventions.md "Rule-file markdown structure"): every fence
+# marker line -- column 0 or indented -- must strictly pair per file.
+# Strict pairing, not a CommonMark renderer emulation: a stray marker
+# must red even when a later block's fences would "absorb" it into a
+# giant mis-paired fence (the #526 damage rendered as one huge code
+# block -- a toggle that treats an info-string marker inside an open
+# fence as content silently re-pairs the stray and stays green, the
+# exact blindness this pin exists to remove). Corpus conventions the
+# invariant encodes: openers may carry info strings, closers are
+# bare, and no fence-marker-as-content inside a fence -- showing a
+# fence inside a fence needs a ~~~ or 4+-backtick block instead
+# (none exist in agent/ today). Simplification: only three-backtick
+# markers, the closing fence's indent is not compared to the opener's.
+_fence_pairing_rows() { # $@ = md files -> FAIL rows on stdout, loud on death
+    [ $# -gt 0 ] || {
+        echo "fence pairing: empty agent/*.md scope -- the check never ran (#542)" >&2
+        return 1
+    }
+    for _fp_f; do
+        [ -r "$_fp_f" ] || {
+            echo "fence pairing: cannot read '$_fp_f' -- scope glob or tree broken (#542)" >&2
+            return 1
+        }
+        _fp_rc=0
+        awk -v f="$_fp_f" '
+            /^[[:space:]]*```/ {
+                if (!open) {
+                    open = 1
+                    oline = NR
+                } else {
+                    open = 0
+                }
+            }
+            END {
+                if (open)
+                    printf "FAIL %s: fence marker at line %d has no partner (#542)\n", f, oline
+            }
+        ' "$_fp_f" || _fp_rc=$?
+        if [ "$_fp_rc" -ne 0 ]; then
+            echo "fence pairing: awk died on '$_fp_f' (rc=$_fp_rc) -- output unreliable (#542)" >&2
+            return 1
+        fi
+    done
+}
+_fp_rows="$(work_new_file)" || {
+    echo "docs link check: FAILED - scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
+if ! _fence_pairing_rows agent/*.md >"$_fp_rows"; then
+    echo "docs link check: FAILED - fence pairing scan unreliable (#542)" >&2
+    exit 1
+fi
+cat "$_fp_rows" >>"$TMP"
+
+# Discrimination arms (a pin that cannot red is decoration): the
+# exact #526 shape reds, balanced indented and col-0 fences stay
+# clean, and an empty scope aborts loud. Fixture markers use the
+# corpus conventions only (openers may carry info strings, closers
+# bare) -- no marker-as-content shape exists in the corpus, so none
+# is fixture-tested; the strict-vs-absorbing-stray distinction rides
+# on the wired real-tree scan over agent/*.md.
+_fp_dir="$(work_new)" || {
+    echo "docs link check: FAILED - scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
+printf '%s\n' \
+    '- rule bullet with a fence whose opening line got deleted' \
+    '  fence body line' \
+    '  ```' \
+    '- trailing bullet' >"$_fp_dir/unbalanced.md"
+_fp_arm="$(_fence_pairing_rows "$_fp_dir/unbalanced.md")"
+case "$_fp_arm" in
+    *"FAIL $_fp_dir/unbalanced.md: fence marker at line 3"*) ;;
+    *)
+        echo "FAIL test-docs itself: the #526 deleted-opening fixture must red (got: $_fp_arm) (#542)" >>"$TMP"
+        ;;
+esac
+printf '%s\n' \
+    '- bullet with a balanced indented fence' \
+    '  ```sh' \
+    '  run $(true)' \
+    '  ```' \
+    '' \
+    '```markdown' \
+    'col-0 pair content' \
+    '```' >"$_fp_dir/balanced.md"
+_fp_arm="$(_fence_pairing_rows "$_fp_dir/balanced.md")"
+if [ -n "$_fp_arm" ]; then
+    echo "FAIL test-docs itself: balanced fixtures must stay clean (got: $_fp_arm) (#542)" >>"$TMP"
+fi
+_fp_rc=0
+_fp_err="$(_fence_pairing_rows 2>&1 >/dev/null)" || _fp_rc=$?
+if [ "$_fp_rc" -ne 0 ] && printf '%s\n' "$_fp_err" | grep -q 'empty agent'; then
+    :
+else
+    echo "FAIL test-docs itself: an empty fence scope must fail loud (rc=$_fp_rc err=$_fp_err) (#542)" >>"$TMP"
+fi
+
 if [ -s "$TMP" ]; then
     echo "docs link check: FAILED"
     cat "$TMP"

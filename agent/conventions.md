@@ -638,10 +638,11 @@ until round a B2, fixed in 6e13493b).
 
 - Markdown structure inside rule bullets — an indented fence, an
   indented table — is invisible to the rules-audit unit parser (its
-  fence regex anchors at column 0): structural damage there has no
-  gate (#526's fix wave deleted an indented fence's opening line;
-  every suite stayed green). Hand-edits to such blocks owe a manual
-  render/balance check in the diff review. (RM-0152)
+  fence regex anchors at column 0). Indented-fence pairing has a
+  structural gate since #542 (tests/unit/test-docs.sh — the #526
+  deleted-opening shape reds); damage that gate cannot see —
+  indented tables, fence content, deeper fence-shape drift — still
+  owes a manual render/balance check in the diff review. (RM-0152)
 
 ## Language
 
