@@ -13,3 +13,6 @@ If yes, create a GitHub issue with title prefix "Docs: " and labels
 
 If the reflection finds nothing real, say exactly that in chat and
 create nothing.
+
+The consuming side — how open `Docs:` issues are triaged and turned
+into merged waves — lives in agent/docs-loop.md.

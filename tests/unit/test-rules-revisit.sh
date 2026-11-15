@@ -541,6 +541,9 @@ EOF
 cat >"$GSCRATCH/agent/review-concept.md" <<'EOF'
 # Review
 EOF
+cat >"$GSCRATCH/agent/docs-loop.md" <<'EOF'
+# Docs loop
+EOF
 cat >"$GSCRATCH/internal/records/rules-meta.md" <<'EOF'
 # Record
 
@@ -738,6 +741,7 @@ cat >"$BSCRATCH/agent/conventions.md" <<'EOF'
 EOF
 : >"$BSCRATCH/agent/test-fidelity.md"
 : >"$BSCRATCH/agent/review-concept.md"
+: >"$BSCRATCH/agent/docs-loop.md"
 : >"$BSCRATCH/AGENTS.md"
 cat >"$BSCRATCH/internal/records/rules-meta.md" <<'EOF'
 # Record
@@ -799,6 +803,7 @@ cat >"$QSCRATCH/agent/conventions.md" <<'EOF'
 EOF
 : >"$QSCRATCH/agent/test-fidelity.md"
 : >"$QSCRATCH/agent/review-concept.md"
+: >"$QSCRATCH/agent/docs-loop.md"
 : >"$QSCRATCH/AGENTS.md"
 cat >"$QSCRATCH/internal/records/rules-meta.md" <<'EOF'
 # Record
@@ -981,6 +986,7 @@ cat >"$ASCRATCH/agent/conventions.md" <<'EOF'
 EOF
 : >"$ASCRATCH/agent/test-fidelity.md"
 : >"$ASCRATCH/agent/review-concept.md"
+: >"$ASCRATCH/agent/docs-loop.md"
 : >"$ASCRATCH/AGENTS.md"
 cat >"$ASCRATCH/internal/records/rules-meta.md" <<'EOF'
 # Record
