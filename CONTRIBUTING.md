@@ -131,11 +131,12 @@ make e2e-rootless      # docker-rootless daemon suite (needs systemd-in-containe
   ```
 
 - Background e2e during a review fan-out is a sanctioned combination
-  (validated in PR #515): the suites write only untracked
-  `tests/e2e/cache/`, the reviewers read tracked files — start them
-  after the fan-out's sabotage window closes (AGENTS.md Testing names
-  the e2e suite a same-class tree reader), and e2e debt owed by the
-  wave discharges inside the wave's wall-clock.
+  (validated in PR #515): the suites write only untracked paths
+  (`tests/e2e/cache/`, `tests/e2e/dumps/`), the reviewers read tracked
+  files — start them after the fan-out's checkout-sabotage window
+  closes (AGENTS.md Testing names the e2e suite a same-class tree
+  reader), and e2e debt owed by the wave discharges inside the wave's
+  wall-clock.
 
 - Same-suite runs from **two worktrees of one workspace** are hermetic at
   the container-name level (issue #366): every runner suffixes the

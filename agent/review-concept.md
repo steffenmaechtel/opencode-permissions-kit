@@ -224,7 +224,13 @@ nothing to review.
   answers (#407 buried the ask inside the comment body — retired).
   The answer is free-form, decided per work order or per proposed
   bundle ("A and B yes, C no") — never a single rigid yes/no over the
-  whole set. For every YES the agent either files a new issue itself
+  whole set. An answer arriving in a LATER turn (the report must end
+  the turn to receive it) records as a follow-up PR comment —
+  append-only, naming the resolution per work order or bundle (YES
+  filed/folded with issue links, NO recorded), citing the closing
+  summary's work-order section; from that comment on, it — not the
+  closing summary's snapshot — is the gate's record (the PR #515
+  shape). For every YES the agent either files a new issue itself
   (`gh issue create` — the opencode permission prompt stays the
   runtime gate), each issue body citing the birth-PR as its source
   (GitHub cross-references the PR timeline automatically), or FOLDS
@@ -297,8 +303,8 @@ root-running `scripts/` code.
 - Track selection is mechanical and checked, not taken on trust: the
   implementing session states it in the PR body at PR creation
   (`Track: shipped|non-shipped (paths)` — #516's body never carried
-  it, noticed mid-review, never retrofitted; #520 had it from the
-  start), the review session re-derives it from the diff — a shipped path anywhere means shipped-track, mixed
+  it, noticed mid-review; #520 had it from the start), the review
+  session re-derives it from the diff — a shipped path anywhere means shipped-track, mixed
   diffs included (the heavier ladder rows are the price of touching
   shipped code) — and the marker records it
   (`"track":"shipped"|"non-shipped"`, a permanent field in every
@@ -523,9 +529,10 @@ Review-relevant code touched this round: yes/no → …
   fit. Preferred over splitting: per-unit comments (one per
   file/round) when the process shape allows them. (RM-0129)
 - PR-body edits for wave-authored claims are bookkeeping and
-  sanctioned (#516 corrected body claims mid-loop per its round a A2);
-  the timeline record stays in the append-only comments — a body edit
-  never replaces a round-comment entry. (RM-0153)
+  sanctioned (#516 corrected body claims mid-loop per its round a A2;
+  adding a missing `Track:` line at discovery is exactly this
+  bookkeeping); the timeline record stays in the append-only comments
+  — a body edit never replaces a round-comment entry. (RM-0153)
 
 ## Fixes close classes, not sites
 

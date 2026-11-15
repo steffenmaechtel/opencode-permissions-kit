@@ -206,9 +206,9 @@ and the stop rule". When the stop rule holds, the closing summary
 proposes closure per the same section — this skill never writes a
 `"closed"` state. When the ask is answered in a later turn (the
 report must end the turn to receive the answer), record the gate's
-resolution — YES/NO per bundle, created issue links — as a follow-up
-PR comment: append-only, citing the closing summary's work-order
-section (the PR #515 shape).
+resolution as a follow-up PR comment — the record rule lives in
+review-concept, "The loop and the stop rule" (the work-order gate
+bullet).
 
 ## 9. Fix phase — the mechanical duties after the round comment
 

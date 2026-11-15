@@ -197,10 +197,12 @@ never proceed silently. Two tiers with DIFFERENT pinning sets
 
 ## Source-counting pins (unit suites)
 
-The decision rule for any grep over a source file inside a suite: it
-goes through `check_live` / `live_src` — never a direct `check` +
-`grep` pair over a source path (rider-lint rule 2 reddens the direct
-shape on sight, #524 §2).
+The decision rule for a PRESENCE grep over a live source file: go
+through `check_live` / `live_src` — never a direct `check` + `grep`
+pair over a registered source variable (rider-lint rule 2 reddens
+exactly that shape, #524 §2). The section's sanctioned raw shapes —
+markdown docs pins, absence pins, behavioral probes, captured-output
+pins — stay raw by design (below).
 
 Any unit-test pin that COUNTS a literal in a shipped or repo-internal
 source file to assert its PRESENCE or a count floor (`grep -c …
@@ -385,9 +387,10 @@ waves (#496 a B1, #498, #519: `_rule2_batch`, `_rule1_batch`,
   never `|| true`. (RM-0147)
 - The death arm is EXECUTED, not inferred: `( producer <dying input> )
   2>&1 >/dev/null` captured, asserting rc ≠ 0 AND the guard message —
-  the redirection ORDER is load-bearing (swap it and the arm goes
-  vacuous, #520 b D3). Sabotage cycles follow AGENTS.md Testing
-  (secured tree, content-verified restore). (RM-0148)
+  an arm that pins the message only stays green through an rc
+  regression (#496 b D3), and the redirection ORDER is load-bearing
+  (swap it and the arm goes vacuous, #523 §1). Sabotage cycles follow
+  AGENTS.md Testing (secured tree, content-verified restore). (RM-0148)
 - The empty-scan-set leg fails loud too: zero scanned files is not a
   clean verdict — `trap_detect`'s "no files given" rc 1 is the
   reference shape. (RM-0149)
@@ -488,7 +491,8 @@ review host):
   `lib/harness.sh` takes scratch from `work_new` (dir) /
   `work_new_file` (file) — never a raw `$(mktemp …)` receiver, which
   registers nothing and tempts a local trap that would disarm the
-  registry (the trap floor flags the mix mid-wave, #520); standalone
+  registry (the trap floor flags the mix mid-wave, #523 §4);
+  standalone
   suites keep their own mktemp + trap idiom. (RM-0151)
 - Code extracted from shipped scripts and eval'd or run by a test
   executes under a **controlled PATH**, never the inherited host PATH:
@@ -581,15 +585,6 @@ Citations in new text name the file and section, never the bare ID:
   `internal/reviews/`, the README is covered while the
   machine-generated legacy-index is exempt. (RM-0116)
 
-## Rule-file markdown structure
-
-- Markdown structure inside rule bullets — an indented fence, an
-  indented table — is invisible to col-0-anchored tooling (the
-  rules-audit unit parser, the line-length ratchet): structural damage
-  there has no gate (#526's fix wave deleted an indented fence's
-  opening line; every suite stayed green). Hand-edits to such blocks
-  owe a manual render/balance check in the diff review. (RM-0152)
-
 ## Referencing, not restating
 
 Content (a contract, question, label list, command shape) should
@@ -604,6 +599,15 @@ duplication is retired in passing when a site is touched anyway —
 no mass pass. (Maintainer directive 2026-11-15, the opk-improve-docs
 wave — its first draft restated one skill's contract in four
 documents.)
+
+## Rule-file markdown structure
+
+- Markdown structure inside rule bullets — an indented fence, an
+  indented table — is invisible to the rules-audit unit parser (its
+  fence regex anchors at column 0): structural damage there has no
+  gate (#526's fix wave deleted an indented fence's opening line;
+  every suite stayed green). Hand-edits to such blocks owe a manual
+  render/balance check in the diff review. (RM-0152)
 
 ## Language
 

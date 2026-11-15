@@ -184,7 +184,9 @@ before the reviewers launch, (b) after all returned, or (c) in a scratch
 worktree — the window and screening rules live in
 [review-concept.md](agent/review-concept.md#parallel-reviewer-agents).
 A background e2e suite is the same class of reader (it installs from
-the checkout): sabotage must precede its start too (#524 §5).
+the checkout): sabotage on the CHECKOUT must precede its start too —
+a scratch-worktree cycle (arm c above) stays sanctioned alongside a
+running suite (#524 §5).
 **Gate runs are one unbroken `&&` chain ending in the commit.** No
 `| tail` or any pipe on a gate command (the pipeline returns the last
 member's rc — a red gate goes green through it), no `;` separator after
