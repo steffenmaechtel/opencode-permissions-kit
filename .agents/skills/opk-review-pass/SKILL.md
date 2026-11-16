@@ -61,6 +61,7 @@ session's commission, then gather:
 | Case key (`pr-ABCDE`) | birth-PR number — the PR timeline IS the case record |
 | Chain state | session records (commission, scratch: posted.log, verdicts) — never read the PR back |
 | Track | PR body (`Track: shipped\|non-shipped (paths)`); any `files/**` path ⇒ shipped (re-derive, section 2) |
+| Closes/Ref | PR body closing keyword: `Closes` final wave / `Ref` intermediate — rule in agent/review-concept.md |
 | Mode + session | commission — mode `gated\|autonomous`, session `implementer\|fresh` (provenance) |
 | Tier | classified from the round's diff BEFORE staging (section 2) |
 | Base + diff | base SHA and `git diff <range>` for diff scope; tree SHA for snapshot scope |

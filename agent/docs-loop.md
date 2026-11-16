@@ -44,7 +44,8 @@ classifies each:
 The ledger posts as one append-only comment per issue BEFORE waves
 open, so the maintainer can veto class assignments cheaply. An issue
 closes only when every item has a final disposition (the `Closes`/
-`Ref` discipline is the birth-PR rule, review.md).
+`Ref` discipline is the birth-PR rule, review.md — the agent-side
+bullet lives in review-concept, "Round typing and tiering").
 
 ## Batching — the commission names the batch
 

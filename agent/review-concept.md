@@ -321,6 +321,16 @@ root-running `scripts/` code.
   MED/HIGH finding escalates scope beyond the fix. Tier and track
   travel in the marker (`"tier":"high"|"med"|"low"`) and in the loop
   status prose. (RM-0124)
+- The PR body's closing keyword is the issue-closure selector,
+  stated at PR creation like the Track line: a wave that fully
+  dispositions its case issue writes `Closes #<issue>`, an
+  intermediate wave writes `Ref #<issue>` — GitHub auto-closes
+  everything a closing keyword names, so only the final wave closes
+  (the commissioning-side rule, process/review.md "Commissioning a
+  case (the PR-native loop)"). Two live misses drove this, both
+  2026-11-16: PR #557's merge left #556 open (closed by hand), and
+  PR #559's body lacked its `Closes` until the maintainer edited it
+  in. (RM-0160)
 - Round typing names what a round's findings say about the loop: a
   round whose findings are predominantly fix-induced is BUILDING, not
   converging — new defects in the case's own fixes mean the built
