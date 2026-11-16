@@ -208,10 +208,10 @@ a bulk session, not one-off touches).
 
 CI blocks on 1–6, 9 and 10, and on `[meta-tree]` scope errors (find
 failures under the meta tree — #232); an overdue meta is a maintenance
-signal, not a broken build. (RM-0030) The Phase-2 pending-unit
-parking valve (prefix-matched ref-less units reported non-blocking)
-was retired 2026-10-17 when its five occupants received metas — a
-ref-less unit in an active section now always blocks.
+signal, not a broken build. The Phase-2 pending-unit parking valve
+(prefix-matched ref-less units reported non-blocking) was retired
+2026-10-17 when its five occupants received metas — a ref-less unit
+in an active section now always blocks. (RM-0030)
 
 ## Retire
 
