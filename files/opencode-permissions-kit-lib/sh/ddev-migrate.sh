@@ -450,7 +450,18 @@ ddev_migrate_export() {
         printf '%s\n' "$1" >>"$DM_STAGE/manifest.auth"
         _dma_pub="$DM_STAGE/manifest.$$"
         cat "$DM_STAGE/manifest.auth" >"$_dma_pub"
-        mv -f "$_dma_pub" "$DD_MIG_DUMP_DIR/manifest.conf"
+        # Directory-destination guard (#568 c U1, class sweep with the
+        # import side's _dmi_drop_publish): mv -f into an existing
+        # DIRECTORY absorbs the temp silently (rc 0) — warn instead,
+        # never publish into the swap; the next run's seed refuses an
+        # agent-owned manifest path loudly either way.
+        if [ -d "$DD_MIG_DUMP_DIR/manifest.conf" ]; then
+            rm -f "$_dma_pub" 2>/dev/null || true
+            echo "  warn: dump manifest path is a directory — could not republish""\
+ the export manifest (the stage copy stays authoritative)" >&2
+        else
+            mv -f "$_dma_pub" "$DD_MIG_DUMP_DIR/manifest.conf"
+        fi
     }
     # _dm_manifest_drop <project>: remove this project's OK/FAIL/SKIP
     # lines from the authoritative copy and publish the rewrite (same
@@ -466,7 +477,15 @@ ddev_migrate_export() {
         mv -f "$DM_STAGE/manifest.next" "$DM_STAGE/manifest.auth"
         _dma_pub="$DM_STAGE/manifest.$$"
         cat "$DM_STAGE/manifest.auth" >"$_dma_pub"
-        mv -f "$_dma_pub" "$DD_MIG_DUMP_DIR/manifest.conf"
+        # Directory-destination guard (#568 c U1): same class as the
+        # add arm above — never publish into a directory swap.
+        if [ -d "$DD_MIG_DUMP_DIR/manifest.conf" ]; then
+            rm -f "$_dma_pub" 2>/dev/null || true
+            echo "  warn: dump manifest path is a directory — could not republish""\
+ the export manifest (the stage copy stays authoritative)" >&2
+        else
+            mv -f "$_dma_pub" "$DD_MIG_DUMP_DIR/manifest.conf"
+        fi
     }
 
     # NOTE on loop hygiene: this loop's stdin IS the project list (the
@@ -727,8 +746,11 @@ ddev_migrate_import() {
     # the staged manifest — the loop's drops edit IT, never a path in
     # the dump dir. The dump dir is agent-owned 750/no-sticky (the
     # operand gate's own words below), and root must never open a path
-    # inside it for reading OR writing (0.0.44a V3 / 0.0.45c S6 in
-    # this file): the wave-a drop shape (grep from + redirect into the
+    # inside it for reading OR writing — the one sanctioned exception
+    # is the gated staging read below (regular-file gate + bounded
+    # cat, S6: never through a name that can be a link)
+    # (0.0.44a V3 / 0.0.45c S6 in this file): the wave-a drop shape
+    # (grep from + redirect into the
     # dump dir) re-opened both symlink holes those invariants ban.
     # Publication goes through cat-into-root-temp + mv only — rename
     # replaces a planted link, never follows it (V3 layer 2, the
@@ -764,6 +786,7 @@ ddev_migrate_import() {
  a re-run will re-import it" >&2
             return 0
         }
+        command -v _tmp_track >/dev/null 2>&1 && _tmp_track "$_ddp_g"
         _ddp_rc=0
         grep -v -F "OK|$_ddp_n|" "$dm_resid" >"$_ddp_g" 2>/dev/null || _ddp_rc=$?
         if [ "$_ddp_rc" -ge 2 ]; then
@@ -783,12 +806,23 @@ ddev_migrate_import() {
  a re-run will re-import it" >&2
             return 0
         }
+        command -v _tmp_track >/dev/null 2>&1 && _tmp_track "$_ddp_p"
         cat "$dm_resid" >"$_ddp_p" 2>/dev/null || {
             rm -f "$_ddp_p" 2>/dev/null || true
             echo "    warn: could not copy the residual manifest for $_ddp_n —""\
  a re-run will re-import it" >&2
             return 0
         }
+        # Directory-destination guard (#568 c U1): mv -f into an
+        # existing DIRECTORY moves the temp INTO it (rc 0, silent) —
+        # an agent-owned dir swap mid-run must not turn the publish
+        # into a silent no-op plus a stray root file in the dump dir.
+        if [ -d "${dm_dir:?}/manifest.conf" ]; then
+            rm -f "$_ddp_p" 2>/dev/null || true
+            echo "    warn: dump manifest path is a directory — could not republish""\
+ after dropping $_ddp_n — a re-run will re-import it" >&2
+            return 0
+        fi
         # Rename-only publish: replaces a planted manifest.conf link
         # itself, never opens its target (V3 layer 2). dm_dir rides :?
         # (L5 belt — this runs as root).
@@ -812,10 +846,12 @@ ddev_migrate_import() {
     dm_dh="${OPENCODE_DOCKER_HOST:-$dm_dh}"
     dm_ps="${OPENCODE_PODMAN_SOCKET:-$dm_ps}"
     id "$dm_oc" >/dev/null 2>&1 || {
+        rm -f "$dm_manifest" "$dm_finderr" "$dm_resid" 2>/dev/null || true
         echo "ddev-migrate: user '$dm_oc' does not exist"
         return 1
     }
     dm_bin=$(_ddev_migrate_bin "$dm_oc") || {
+        rm -f "$dm_manifest" "$dm_finderr" "$dm_resid" 2>/dev/null || true
         echo "ddev-migrate: ddev is not installed"
         return 1
     }
@@ -860,9 +896,10 @@ ddev_migrate_import() {
                 continue
             }
         echo "  importing $dm_n ($dm_ar) ..."
-        # </dev/null: this loop's stdin IS manifest.conf — ddev reads
-        # stdin and would consume the manifest mid-iteration (same class
-        # as the export-loop finding).
+        # </dev/null: this loop's stdin IS the staged manifest copy
+        # ($dm_manifest, the root temp — S6) — ddev reads stdin and
+        # would consume it mid-iteration (same class as the
+        # export-loop finding).
         if sudo -u "$dm_oc" env "HOME=$dm_oc_h" "XDG_RUNTIME_DIR=/run/user/$dm_oc_i" \
             ${dm_extra:+"$dm_extra"} sh -c 'cd / && exec "$@"' migrate-import "$dm_bin" start "$dm_n" </dev/null >/dev/null 2>&1 &&
             sudo -u "$dm_oc" env "HOME=$dm_oc_h" "XDG_RUNTIME_DIR=/run/user/$dm_oc_i" \

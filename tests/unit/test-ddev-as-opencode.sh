@@ -2143,6 +2143,14 @@ if [ "$D2_Y2B_RC" -eq 0 ] &&
 else
     fail "Y2/bash: re-source failure must not stamp under sh=bash (rc=$D2_Y2B_RC out=$(head -4 "$D2_dir/y2b.out" 2>/dev/null))"
 fi
+# c V1: static presence for the re-source arm — the arm is dead code
+# in every kit shell shape (the abort dominates), so no functional pin
+# can discriminate an exit-0 revert; presence pins at least keep the
+# warn text and the arm from silently disappearing.
+check_live "Y2: re-source arm warn text present (static; dead-code defense)" \
+    "$HANDOVERSH" -qF 'skipped (no stamp'
+check_absent "Y2: wave-a one-line arm text gone (static)" \
+    "$HANDOVERSH" -qF '.ddev entry skipped" >&2'
 rm -rf "$D2_dir"
 
 # Wiring: update.sh skips via the stamps (plain update only — --refresh

@@ -750,6 +750,21 @@ check_absent "D3/Y1: the drop never reads the dump-dir manifest directly" \
     "$MIG" -qF 'grep -v -F "OK|$dm_n|" "${dm_dir:?}/manifest.conf"'
 check_absent "D3/Y1: the drop never redirects into the dump dir" \
     "$MIG" -q '>"\$[{]dm_dir'
+# c V2 (learnings L1 — fail-loud pins for fail-soft arms): every warn
+# arm of the drop helper gets a static presence pin, so deleting an
+# arm back to silent fail-soft reds; the functional legs below drive
+# the reachable arms (grep-rc2 via 5c, publish-mv and mktemp here,
+# the dir-guard via the U1 leg).
+check_live "X3: mktemp-drop arm warns (static presence)" "$MIG" -qF 'cannot stage the manifest drop for'
+check_live "X3: grep-rc2 arm warns (static presence)" "$MIG" -qF 'could not drop $_ddp_n from the dump manifest'
+check_live "X3: residual-mv arm warns (static presence)" "$MIG" -qF 'could not update the residual manifest for'
+check_live "X3: mktemp-publish arm warns (static presence)" "$MIG" -qF 'cannot stage the manifest republish for'
+check_live "X3: copy arm warns (static presence)" "$MIG" -qF 'could not copy the residual manifest for'
+check_live "X3: publish-mv arm warns (static presence)" "$MIG" -qF 'could not republish the dump manifest after'
+check_live "c U1: directory-destination guard warns, import side (static presence)" \
+    "$MIG" -qF 'dump manifest path is a directory'
+check_live "c U1: export-side add arm carries the same guard (class sweep)" \
+    "$MIG" -qF 'the stage copy stays authoritative'
 check_live "D4: import hint is placeholder-shaped (0.0.39a S5 rule)" \
     "$MIG" -qF 'import manually: ddev start <project> && ddev import-db <project>'
 check_absent "D4: no interpolated paste-me hint left" "$MIG" -q 'import manually: ddev start \$'
@@ -836,17 +851,103 @@ printf 'A\n' >"$_w5x2/dumps/a.sql.gz"
     printf 'rm -f "$dm_manifest" "$dm_resid"\n'
 } >"$_w5x2/run.sh"
 _w5x2_out="$(TMPDIR="$_w5x2/tmp" sh "$_w5x2/run.sh" "$_w5x2/dumps" 2>&1)" || true
-if [ ! -s "$_w5x2/dumps/manifest.conf" ] &&
+if [ -f "$_w5x2/dumps/manifest.conf" ] && [ ! -s "$_w5x2/dumps/manifest.conf" ] &&
     ! printf '%s\n' "$_w5x2_out" | grep -q 'could not drop'; then
     pass "D3/X2: the last OK line publishes the empty manifest (full drop is no failure)"
 else
-    fail "D3/X2: full drop must publish the empty manifest, no warn (out=$(printf '%s\n' "$_w5x2_out" | head -3))"
+    fail "D3/X2: full drop must publish the empty manifest present-and-empty, no warn (out=$(printf '%s\n' "$_w5x2_out" | head -3))"
+fi
+# c V3: present-AND-empty — a deleted manifest must NOT pass (the
+# resume contract is a published empty file, not a missing one).
+if [ ! -f "$_w5x2/dumps/manifest.conf" ]; then
+    fail "D3/X2: the published manifest vanished (must be present-and-empty)"
+fi
+# c V2 functional: the publish-mv failure arm — a read-only dump dir
+# makes the final rename fail (EACCES on the dest dir); the drop must
+# WARN (b X3's whole point), never silently keep.
+_w5v2="$(work_new)"
+mkdir -p "$_w5v2/dumps" "$_w5v2/tmp"
+printf 'OK|projA|127.0.0.1|a.sql.gz\n' >"$_w5v2/dumps/manifest.conf"
+printf 'A\n' >"$_w5v2/dumps/a.sql.gz"
+{
+    printf '%s\n' \
+        'dm_dir=$1' 'dm_bin=ddev' 'dm_oc=x' 'dm_oc_h=/h' 'dm_oc_i=1' '' \
+        'dm_extra=' 'dm_ok=0' 'dm_failed=""' \
+        'sudo() { return 0; }' \
+        'dm_manifest=$(mktemp)' \
+        'dm_resid=$(mktemp)'
+    printf 'cat "$1/manifest.conf" >"$dm_manifest" && cat "$dm_manifest" >"$dm_resid"\n'
+    sed -n '/^    _dmi_drop_publish()/,/^    }/p' "$MIG"
+    sed -n "/while IFS='|' read -r dm_st dm_n dm_ar dm_f; do/,/done <\"\$dm_manifest\"/p" "$MIG"
+    printf 'rm -f "$dm_manifest" "$dm_resid"\n'
+} >"$_w5v2/run.sh"
+chmod 555 "$_w5v2/dumps"
+_w5v2_out="$(TMPDIR="$_w5v2/tmp" sh "$_w5v2/run.sh" "$_w5v2/dumps" 2>&1)" || true
+chmod 755 "$_w5v2/dumps"
+if printf '%s\n' "$_w5v2_out" | grep -q 'could not republish the dump manifest' &&
+    grep -q '^OK|projA|' "$_w5v2/dumps/manifest.conf"; then
+    pass "X3: failed publish warns and keeps the line (publish-mv arm executed)"
+else
+    fail "X3: publish failure must warn and keep (out=$(printf '%s\n' "$_w5v2_out" | head -4))"
+fi
+# c U1 functional: a directory swapped over manifest.conf trips the
+# guard — warn, and NOTHING is published into the swap (without the
+# guard, mv -f absorbs the temp into the directory, rc 0, silent).
+_w5u1="$(work_new)"
+mkdir -p "$_w5u1/dumps/manifest.conf" "$_w5u1/tmp"
+printf 'OK|projA|127.0.0.1|a.sql.gz\n' >"$_w5u1/dumps/manifest.staged"
+printf 'A\n' >"$_w5u1/dumps/a.sql.gz"
+{
+    printf '%s\n' \
+        'dm_dir=$1' 'dm_bin=ddev' 'dm_oc=x' 'dm_oc_h=/h' 'dm_oc_i=1' '' \
+        'dm_extra=' 'dm_ok=0' 'dm_failed=""' \
+        'sudo() { return 0; }' \
+        'dm_manifest=$1/manifest.staged' \
+        'dm_resid=$(mktemp)'
+    printf 'cat "$dm_manifest" >"$dm_resid"\n'
+    sed -n '/^    _dmi_drop_publish()/,/^    }/p' "$MIG"
+    sed -n "/while IFS='|' read -r dm_st dm_n dm_ar dm_f; do/,/done <\"\$dm_manifest\"/p" "$MIG"
+    printf 'rm -f "$dm_resid"\n'
+} >"$_w5u1/run.sh"
+_w5u1_out="$(TMPDIR="$_w5u1/tmp" sh "$_w5u1/run.sh" "$_w5u1/dumps" 2>&1)" || true
+if printf '%s\n' "$_w5u1_out" | grep -q 'dump manifest path is a directory' &&
+    [ -z "$(ls -A "$_w5u1/dumps/manifest.conf")" ]; then
+    pass "U1: directory-shaped manifest trips the guard, nothing absorbed into it"
+else
+    fail "U1: dir swap must warn and absorb nothing (out=$(printf '%s\n' "$_w5u1_out" | head -3))"
+fi
+# c V2 functional: the mktemp failure arm — a dead TMPDIR fails the
+# helper's staging mktemp; warn and keep (never a silent skip).
+_w5v3="$(work_new)"
+mkdir -p "$_w5v3/dumps"
+printf 'OK|projA|127.0.0.1|a.sql.gz\n' >"$_w5v3/dumps/manifest.staged"
+printf 'A\n' >"$_w5v3/dumps/a.sql.gz"
+{
+    printf '%s\n' \
+        'dm_dir=$1' 'dm_bin=ddev' 'dm_oc=x' 'dm_oc_h=/h' 'dm_oc_i=1' '' \
+        'dm_extra=' 'dm_ok=0' 'dm_failed=""' \
+        'sudo() { return 0; }' \
+        'dm_manifest=$1/manifest.staged' \
+        'dm_resid=$1/resid'
+    printf 'cat "$dm_manifest" >"$dm_resid"\n'
+    sed -n '/^    _dmi_drop_publish()/,/^    }/p' "$MIG"
+    sed -n "/while IFS='|' read -r dm_st dm_n dm_ar dm_f; do/,/done <\"\$dm_manifest\"/p" "$MIG"
+} >"$_w5v3/run.sh"
+_w5v3_out="$(TMPDIR="$_w5v3/no-such-dir" sh "$_w5v3/run.sh" "$_w5v3/dumps" 2>&1)" || true
+if printf '%s\n' "$_w5v3_out" | grep -q 'cannot stage the manifest drop' &&
+    grep -q '^OK|projA|' "$_w5v3/dumps/manifest.staged"; then
+    pass "X3: mktemp failure warns and keeps the line (staging arm executed)"
+else
+    fail "X3: mktemp failure must warn and keep (out=$(printf '%s\n' "$_w5v3_out" | head -4))"
 fi
 # L1 failure-path pin (reworked b Y1): a read error on the RESIDUAL
 # (the drop's only manifest operand now — the dump-dir file is never
 # opened) must take the rc >= 2 arm — warn on stderr (the way an
 # operator sees it) and keep the line, never silently skip the resume
 # bookkeeping. The dump-dir manifest stays untouched by construction.
+# User-run by policy: under root, grep reads through the 000 mode via
+# CAP_DAC_OVERRIDE and this leg reds spuriously (same caveat as the
+# Y2 legs in the sibling suite).
 _w5c="$(work_new)"
 mkdir -p "$_w5c/dumps"
 printf 'OK|projA|127.0.0.1|a.sql.gz\n' >"$_w5c/dumps/manifest.conf"
