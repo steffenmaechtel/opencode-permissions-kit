@@ -8,11 +8,11 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**159 metas · 156 active · 3 retired · 24 review-pending · next due 2026-11-14**
+**160 metas · 157 active · 3 retired · 25 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0141, RM-0142, RM-0143, RM-0144, RM-0145, RM-0146, RM-0147, RM-0148, RM-0149, RM-0150, RM-0151, RM-0152, RM-0153, RM-0154, RM-0155, RM-0156, RM-0157, RM-0158, RM-0159
+- **Review pending:** RM-0141, RM-0142, RM-0143, RM-0144, RM-0145, RM-0146, RM-0147, RM-0148, RM-0149, RM-0150, RM-0151, RM-0152, RM-0153, RM-0154, RM-0155, RM-0156, RM-0157, RM-0158, RM-0159, RM-0160
 - **Amended — pending:** RM-0025 (2026-11-15), RM-0097 (2026-11-15), RM-0124 (2026-11-15), RM-0127 (2026-11-15), RM-0136 (2026-11-15)
 
 ## AGENTS.md
@@ -177,6 +177,7 @@
 |---|---|---|---|---|---|
 | [RM-0124](0/1/2/RM-0124.md) | Track selection is mechanical | active | **amended — pending** | 1m | 2026-11-28 |
 | [RM-0125](0/1/2/RM-0125.md) | Round typing names what | active | approved | 1m | 2026-11-28 |
+| [RM-0160](0/1/6/RM-0160.md) | The PR body's closing keyword | active | **pending** | 1m | 2026-12-16 |
 
 ### Review tracks: shipped and non-shipped
 
