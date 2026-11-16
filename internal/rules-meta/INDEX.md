@@ -8,11 +8,11 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**160 metas · 157 active · 3 retired · 34 review-pending · next due 2026-11-14**
+**160 metas · 157 active · 3 retired · 14 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0141, RM-0142, RM-0143, RM-0144, RM-0145, RM-0146, RM-0147, RM-0148, RM-0149, RM-0150, RM-0151, RM-0152, RM-0153, RM-0154, RM-0155, RM-0156, RM-0157, RM-0158, RM-0159, RM-0160
+- **Review pending:** none
 - **Amended — pending:** RM-0025 (2026-11-15), RM-0097 (2026-11-15), RM-0124 (2026-11-15), RM-0127 (2026-11-15), RM-0136 (2026-11-15), RM-0060 (2026-11-16), RM-0063 (2026-11-16), RM-0065 (2026-11-16), RM-0066 (2026-11-16), RM-0067 (2026-11-16), RM-0070 (2026-11-16), RM-0073 (2026-11-16), RM-0078 (2026-11-16), RM-0091 (2026-11-16)
 
 ## AGENTS.md
@@ -69,17 +69,17 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0146](0/1/4/RM-0146.md) | The producer function dies loud | active | **pending** | 1m | 2026-12-15 |
-| [RM-0147](0/1/4/RM-0147.md) | Call sites consume the rc | active | **pending** | 1m | 2026-12-15 |
-| [RM-0148](0/1/4/RM-0148.md) | The death arm is EXECUTED | active | **pending** | 1m | 2026-12-15 |
-| [RM-0149](0/1/4/RM-0149.md) | The empty-scan-set leg fails | active | **pending** | 1m | 2026-12-15 |
-| [RM-0150](0/1/5/RM-0150.md) | Detector rc semantics are per-tool | active | **pending** | 1m | 2026-12-15 |
+| [RM-0146](0/1/4/RM-0146.md) | The producer function dies loud | active | approved | 1m | 2026-12-15 |
+| [RM-0147](0/1/4/RM-0147.md) | Call sites consume the rc | active | approved | 1m | 2026-12-15 |
+| [RM-0148](0/1/4/RM-0148.md) | The death arm is EXECUTED | active | approved | 1m | 2026-12-15 |
+| [RM-0149](0/1/4/RM-0149.md) | The empty-scan-set leg fails | active | approved | 1m | 2026-12-15 |
+| [RM-0150](0/1/5/RM-0150.md) | Detector rc semantics are per-tool | active | approved | 1m | 2026-12-15 |
 
 ### Named-cause failure guards (shipped runners)
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0155](0/1/5/RM-0155.md) | A mktemp receiver in shipped | active | **pending** | 1m | 2026-12-15 |
+| [RM-0155](0/1/5/RM-0155.md) | A mktemp receiver in shipped | active | approved | 1m | 2026-12-15 |
 
 ### Test sandbox (unit suites)
 
@@ -94,7 +94,7 @@
 | [RM-0043](0/0/4/RM-0043.md) | Real-tree ratchet — any path-shaped | active | approved | 1m | 2026-11-17 |
 | [RM-0044](0/0/4/RM-0044.md) | rm suffix guard — any rm invocation | active | approved | 1m | 2026-11-17 |
 | [RM-0137](0/1/3/RM-0137.md) | Scratch receivers in harness-sourcing suites… | active | approved | 1m | 2026-12-06 |
-| [RM-0151](0/1/5/RM-0151.md) | The decision rule for writing NEW | active | **pending** | 1m | 2026-12-15 |
+| [RM-0151](0/1/5/RM-0151.md) | The decision rule for writing NEW | active | approved | 1m | 2026-12-15 |
 
 ### Referencing review findings
 
@@ -113,13 +113,13 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0157](0/1/5/RM-0157.md) | enumerates them as history | active | **pending** | 1m | 2026-12-16 |
+| [RM-0157](0/1/5/RM-0157.md) | enumerates them as history | active | approved | 1m | 2026-12-16 |
 
 ### Rule-file markdown structure
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0152](0/1/5/RM-0152.md) | Markdown structure inside rule bullets | active | **pending** | 1m | 2026-12-15 |
+| [RM-0152](0/1/5/RM-0152.md) | Markdown structure inside rule bullets | active | approved | 1m | 2026-12-15 |
 
 ## agent/docs-loop.md
 
@@ -127,11 +127,11 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0141](0/1/4/RM-0141.md) | New rule bullets in audit-scope | active | **pending** | 1m | 2026-12-15 |
-| [RM-0142](0/1/4/RM-0142.md) | Run the rules-meta suite while | active | **pending** | 1m | 2026-12-15 |
-| [RM-0143](0/1/4/RM-0143.md) | New text cites its source | active | **pending** | 1m | 2026-12-15 |
-| [RM-0144](0/1/4/RM-0144.md) | learnings.md additions carry era-marked | active | **pending** | 1m | 2026-12-15 |
-| [RM-0145](0/1/4/RM-0145.md) | Shipped content is English and | active | **pending** | 1m | 2026-12-15 |
+| [RM-0141](0/1/4/RM-0141.md) | New rule bullets in audit-scope | active | approved | 1m | 2026-12-15 |
+| [RM-0142](0/1/4/RM-0142.md) | Run the rules-meta suite while | active | approved | 1m | 2026-12-15 |
+| [RM-0143](0/1/4/RM-0143.md) | New text cites its source | active | approved | 1m | 2026-12-15 |
+| [RM-0144](0/1/4/RM-0144.md) | learnings.md additions carry era-marked | active | approved | 1m | 2026-12-15 |
+| [RM-0145](0/1/4/RM-0145.md) | Shipped content is English and | active | approved | 1m | 2026-12-15 |
 
 ## agent/review-concept.md
 
@@ -177,7 +177,7 @@
 |---|---|---|---|---|---|
 | [RM-0124](0/1/2/RM-0124.md) | Track selection is mechanical | active | **amended — pending** | 1m | 2026-11-28 |
 | [RM-0125](0/1/2/RM-0125.md) | Round typing names what | active | approved | 1m | 2026-11-28 |
-| [RM-0160](0/1/6/RM-0160.md) | The PR body's closing keyword | active | **pending** | 1m | 2026-12-16 |
+| [RM-0160](0/1/6/RM-0160.md) | The PR body's closing keyword | active | approved | 1m | 2026-12-16 |
 
 ### Review tracks: shipped and non-shipped
 
@@ -210,9 +210,9 @@
 |---|---|---|---|---|---|
 | [RM-0128](0/1/2/RM-0128.md) | One comment per review | active | approved | 1m | 2026-11-28 |
 | [RM-0129](0/1/2/RM-0129.md) | Size guard: GitHub caps | active | approved | 1m | 2026-11-28 |
-| [RM-0153](0/1/5/RM-0153.md) | PR-body edits for wave-authored | active | **pending** | 1m | 2026-12-15 |
-| [RM-0154](0/1/5/RM-0154.md) | The CI status fields assert | active | **pending** | 1m | 2026-12-15 |
-| [RM-0158](0/1/5/RM-0158.md) | names its observation scope | active | **pending** | 1m | 2026-12-16 |
+| [RM-0153](0/1/5/RM-0153.md) | PR-body edits for wave-authored | active | approved | 1m | 2026-12-15 |
+| [RM-0154](0/1/5/RM-0154.md) | The CI status fields assert | active | approved | 1m | 2026-12-15 |
+| [RM-0158](0/1/5/RM-0158.md) | names its observation scope | active | approved | 1m | 2026-12-16 |
 
 ### Fixes close classes, not sites
 
@@ -350,8 +350,8 @@
 | [RM-0093](0/0/9/RM-0093.md) | In meta bodies, cross-references | active | approved | 1m | 2026-11-19 |
 | [RM-0094](0/0/9/RM-0094.md) | The review log names the | active | approved | 1m | 2026-11-19 |
 | [RM-0135](0/1/3/RM-0135.md) | Post-approval changes set | active | approved | 1m | 2026-11-30 |
-| [RM-0156](0/1/5/RM-0156.md) | The quote: needle is the | active | **pending** | 1m | 2026-12-15 |
-| [RM-0159](0/1/5/RM-0159.md) | Quoted strings in meta bodies | active | **pending** | 1m | 2026-12-16 |
+| [RM-0156](0/1/5/RM-0156.md) | The quote: needle is the | active | approved | 1m | 2026-12-15 |
+| [RM-0159](0/1/5/RM-0159.md) | Quoted strings in meta bodies | active | approved | 1m | 2026-12-16 |
 
 ### Quality bar for rationales
 

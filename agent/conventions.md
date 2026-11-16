@@ -519,8 +519,7 @@ review host):
   `work_new_file` (file) — never a raw `$(mktemp …)` receiver, which
   registers nothing and tempts a local trap that would disarm the
   registry (the trap floor flags the mix mid-wave, #523 §4);
-  standalone
-  suites keep their own mktemp + trap idiom. (RM-0151)
+  standalone suites keep their own mktemp + trap idiom. (RM-0151)
 - Code extracted from shipped scripts and eval'd or run by a test
   executes under a **controlled PATH**, never the inherited host PATH:
   any `command -v` inside the extracted block must not see tools that
