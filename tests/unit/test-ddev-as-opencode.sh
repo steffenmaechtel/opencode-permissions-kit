@@ -786,11 +786,13 @@ check "root-file types: flagged project gets the root back (handback)" \
 
 # --- 7c-3. dev-owned boolean casing (#568 a D1) ----------------------------------
 # ddev parses config.yaml with gopkg.in/yaml.v3, which resolves
-# true/True/TRUE as booleans — the flagged check must recognize exactly
-# those spellings or a hand-edited `True` project silently flips into
+# true/True/TRUE as booleans — the flagged check must recognize those
+# spellings or a hand-edited `True` project silently flips into
 # permanent forward handover. yes/no/on/off are PLAIN STRINGS under
 # YAML 1.2 (ddev does not resolve them either) — they must stay
-# unflagged.
+# unflagged. Superset note (#568 b Z2): the check's tr quote-strip
+# also accepts quoted spellings ("true" — a plain string to yaml.v3);
+# deliberate hand-edit tolerance, not part of the boolean set.
 check "flagged: True casing recognized (yaml.v3 boolean)" \
     sh -c "printf 'type: typo3\ndisable_settings_management: True\n' > \"\$2/.ddev/config.yaml\" && . \"\$1\" && ddev_devowned_flagged \"\$2\"" _ "$HANDOVER" "$HWORK/proj"
 check "flagged: TRUE casing recognized (yaml.v3 boolean)" \
@@ -2097,6 +2099,49 @@ if [ "$D2_PART_RC" -eq 0 ] &&
     pass "D2: partial pass warns and stays unstamped (next update rescans)"
 else
     fail "D2: partial pass must not carry a completed stamp (rc=$D2_PART_RC out=$(cat "$D2_dir/part.out" 2>/dev/null | head -3))"
+fi
+# b Y2 leg: a worker re-source failure must cost the STAMP too (the
+# completed-pass contract): drive ddev_handover_root with a lib that
+# passes the -f guard but cannot be sourced (a chmod-000 scratch copy)
+# — the worker exits non-zero, xargs folds 123, the gate withholds the
+# stamp and the warns name the rescan. User-run by policy (root would
+# source through the 000 mode, same class as the partial leg).
+mkdir -p "$D2_dir/y2/proj/.ddev" "$D2_dir/y2/proj/config/system" "$D2_dir/y2lib"
+printf 'type: typo3\n' >"$D2_dir/y2/proj/.ddev/config.yaml"
+cp "$HANDOVER" "$D2_dir/y2lib/lib.sh"
+chmod 000 "$D2_dir/y2lib/lib.sh"
+D2_Y2_RC=0
+OPK_HANDOVER_STAMP_DIR="$D2_dir/stamps" OPK_DDEV_HANDOVER_LIB="$D2_dir/y2lib/lib.sh" \
+    sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\"" \
+    _ "$HANDOVER" "$D2_dir/y2" >"$D2_dir/y2.out" 2>&1 || D2_Y2_RC=$?
+if [ "$D2_Y2_RC" -eq 0 ] &&
+    grep -q 'stamp NOT written' "$D2_dir/y2.out" &&
+    ! (. "$HANDOVER" && OPK_HANDOVER_STAMP_DIR="$D2_dir/stamps" &&
+        ddev_handover_stamp_valid "$D2_dir/y2" "$(id -un)" "$(id -gn)" "$(id -un)"); then
+    pass "Y2: a skipped entry (re-source failure) withholds the stamp (next update rescans)"
+else
+    fail "Y2: re-source failure must not stamp a completed pass (rc=$D2_Y2_RC out=$(head -3 "$D2_dir/y2.out" 2>/dev/null))"
+fi
+# Y2 bash leg: under dash the failed special builtin aborts the worker
+# BEFORE the || arm (no-stamp by accident); bash-as-sh aborts the same
+# way (verified empirically, ENOENT and EACCES both — the arm is dead
+# code in every kit shape, kept honest + defensive). This leg pins the
+# CONTRACT under the second shell family: whatever the failure mode, a
+# re-source failure must never end in a completed-pass stamp.
+mkdir -p "$D2_dir/shbash"
+ln -s "$(command -v bash)" "$D2_dir/shbash/sh"
+D2_Y2B_RC=0
+OPK_HANDOVER_STAMP_DIR="$D2_dir/stamps" OPK_DDEV_HANDOVER_LIB="$D2_dir/y2lib/lib.sh" \
+    PATH="$D2_dir/shbash:$PATH" \
+    sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\"" \
+    _ "$HANDOVER" "$D2_dir/y2" >"$D2_dir/y2b.out" 2>&1 || D2_Y2B_RC=$?
+if [ "$D2_Y2B_RC" -eq 0 ] &&
+    grep -q 'stamp NOT written' "$D2_dir/y2b.out" &&
+    ! (. "$HANDOVER" && OPK_HANDOVER_STAMP_DIR="$D2_dir/stamps" &&
+        ddev_handover_stamp_valid "$D2_dir/y2" "$(id -un)" "$(id -gn)" "$(id -un)"); then
+    pass "Y2/bash: re-source failure withholds the stamp under sh=bash too (abort rc path)"
+else
+    fail "Y2/bash: re-source failure must not stamp under sh=bash (rc=$D2_Y2B_RC out=$(head -4 "$D2_dir/y2b.out" 2>/dev/null))"
 fi
 rm -rf "$D2_dir"
 

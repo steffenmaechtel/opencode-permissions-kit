@@ -10,7 +10,7 @@ faf1193e92d7e4fc6755f00bb458ea0e4cd0c026e0b17218df03209796f4c112  files/opencode
 0ccdc3dcd152ecc845f8045c71a515d48e5929bfb0318a3c133db28060ca7977  files/opencode-permissions-kit-lib/bin/setup-container-backend
 72e2b48893c03886b5ba0680cf6b419d7185e84cf2cbe6b12df536652d25db1f  files/opencode-permissions-kit-lib/bin/socket-check
 9f21f5a57ff8c03d0aa913753530a53eb8bdbfd956371d941e6431a2a7dc2913  files/opencode-permissions-kit-lib/bin/xdg-open
-e1ae2f99b5a2b870909bc375fce073f18e94dc254355bff9df1cc2d0ab37a096  files/opencode-permissions-kit-lib/management/config.sh
+46b2c64ed38bd866fca0bbcf51b6a09ec0474c29da62a490a22a0769f4bb9770  files/opencode-permissions-kit-lib/management/config.sh
 7bb80e3e1220c5df12a284c8fe5ed38d14c2cc641d5003537401809d9b0129fd  files/opencode-permissions-kit-lib/management/doctor.sh
 15b14d82f6da5159f0882b021a4a6992f061f6b585e249ceba9ef8fa21ba78e0  files/opencode-permissions-kit-lib/management/status.sh
 546d3819cb32b608b6d712466c67e9da2aec5d934b2dc3e5b09712fedb62be44  files/opencode-permissions-kit-lib/management/uninstall.sh
@@ -19,9 +19,9 @@ c353a6ddf9b1e34bfcb70b9b41bce0fde53654e0b7045dd90f090e5fe4f9a1fc  files/opencode
 fe73733c1e47f72d4477d3dbcacacfbbee195aaca281f892d171871e4ff82e05  files/opencode-permissions-kit-lib/py/tui-register.py
 dcb8b17188cab386608f95f5e4b2fe3ae0a0cf87e624c4661be08074f32fa1e8  files/opencode-permissions-kit-lib/sh/advisories.sh
 9cb195dde3c284914c8bea7f39fcddc405d4e57141c3e3b953d858fce42b3e99  files/opencode-permissions-kit-lib/sh/as-opencode-core.sh
-4cfbdd66dc2eb8f0351f99470963870486ce7d524fb0e5ec695311627526e3a1  files/opencode-permissions-kit-lib/sh/ddev-handover.sh
+bcaef1e87969e3475ce4c1c683af3bef6a33a017587f20f49b94c6d7e2be09dc  files/opencode-permissions-kit-lib/sh/ddev-handover.sh
 2b6e687d11d2b3b623799eef7a67c4a6356e4ac692649b5782cb18da947ba3c9  files/opencode-permissions-kit-lib/sh/ddev-hosts.sh
-43e1a7ea77ed9073ac183380eaceac3db974528561c686fd32ee6a701a6d87a3  files/opencode-permissions-kit-lib/sh/ddev-migrate.sh
+74dedb642f781234692ded9bf3e7ee565a0a31a77e7a7416d3aeadb65b1195e0  files/opencode-permissions-kit-lib/sh/ddev-migrate.sh
 753802cf9756227c2bd541f88e0bc44444507efe2332c00e9a537ca17e032286  files/opencode-permissions-kit-lib/sh/ddev-terminal.sh
 b80b674296f3a66bbf208b249447bb0aeb7c8dc524708d33e387f2471669b969  files/opencode-permissions-kit-lib/sh/deploy-lib.sh
 ef3f732fa80b7a5a6df8b627038c75aadc22f059d6451c46b92097640975ce1a  files/opencode-permissions-kit-lib/sh/doctor-core.sh

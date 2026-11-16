@@ -729,21 +729,32 @@ fi
 check_absent "import never deletes dumps on failure" "$MIG" -q 'rm -rf.*DDEV_MIG_BACKUP_ROOT'
 check_live "standalone list mode exists (bin dispatcher)" "$BIN_MIG" -q 'list)'
 
-# --- 5b. import resume + placeholder hint (#568 a D3/D4) ----------------------------
+# --- 5b. import resume + placeholder hint (#568 a D3/D4, reworked b Y1/X2/X3) -------
 # D3: a successfully imported project's OK line must leave the dump-dir
 # manifest (re-run after partial failure retries only the remainder —
 # the export loop's resume-skip, mirrored); a FAILED project's line
 # stays. D4: the paste-me hint uses placeholders, never manifest-
 # derived values (the ddev-hosts 0.0.39a S5 house rule). Functional:
-# the import loop body extracted and driven with a sudo stub that
-# succeeds for projA only.
-check_live "D3: imported project's line dropped from the dump manifest" \
+# the import loop body plus the drop helper (_dmi_drop_publish) are
+# extracted and driven with a sudo stub that succeeds for projA only.
+# b Y1: root never opens a dump-dir path for reading or writing — the
+# drop runs on root-owned temps and publishes by rename only; b X2: an
+# empty remainder (the last OK line) publishes the EMPTY manifest
+# instead of failing; b Z3: the child cleans its temps (TMPDIR is
+# scoped, asserted empty after the run).
+check_live "D3: the drop helper is called per imported project (b Y1)" \
+    "$MIG" -qF '_dmi_drop_publish "$dm_n"'
+check_absent "D3/Y1: no write-through temp inside the dump dir (manifest.opk.\$\$)" \
+    "$MIG" -q 'manifest\.opk\.'
+check_absent "D3/Y1: the drop never reads the dump-dir manifest directly" \
     "$MIG" -qF 'grep -v -F "OK|$dm_n|" "${dm_dir:?}/manifest.conf"'
+check_absent "D3/Y1: the drop never redirects into the dump dir" \
+    "$MIG" -q '>"\$[{]dm_dir'
 check_live "D4: import hint is placeholder-shaped (0.0.39a S5 rule)" \
     "$MIG" -qF 'import manually: ddev start <project> && ddev import-db <project>'
 check_absent "D4: no interpolated paste-me hint left" "$MIG" -q 'import manually: ddev start \$'
 _w5b="$(work_new)"
-mkdir -p "$_w5b/dumps"
+mkdir -p "$_w5b/dumps" "$_w5b/tmp"
 printf 'OK|projA|127.0.0.1|a.sql.gz\nOK|projB|127.0.0.1|b.sql.gz\n' >"$_w5b/dumps/manifest.conf"
 printf 'A\n' >"$_w5b/dumps/a.sql.gz"
 printf 'B\n' >"$_w5b/dumps/b.sql.gz"
@@ -752,11 +763,14 @@ printf 'B\n' >"$_w5b/dumps/b.sql.gz"
         'dm_dir=$1' 'dm_bin=ddev' 'dm_oc=x' 'dm_oc_h=/h' 'dm_oc_i=1' '' \
         'dm_extra=' 'dm_ok=0' 'dm_failed=""' \
         'sudo() { case "$*" in *projA*) return 0 ;; *) return 1 ;; esac; }' \
-        'dm_manifest=$(mktemp)'
-    printf 'cat "$1/manifest.conf" >"$dm_manifest"\n'
+        'dm_manifest=$(mktemp)' \
+        'dm_resid=$(mktemp)'
+    printf 'cat "$1/manifest.conf" >"$dm_manifest" && cat "$dm_manifest" >"$dm_resid"\n'
+    sed -n '/^    _dmi_drop_publish()/,/^    }/p' "$MIG"
     sed -n "/while IFS='|' read -r dm_st dm_n dm_ar dm_f; do/,/done <\"\$dm_manifest\"/p" "$MIG"
+    printf 'rm -f "$dm_manifest" "$dm_resid"\n'
 } >"$_w5b/run.sh"
-_w5b_out="$(sh "$_w5b/run.sh" "$_w5b/dumps" 2>&1)" || true
+_w5b_out="$(TMPDIR="$_w5b/tmp" sh "$_w5b/run.sh" "$_w5b/dumps" 2>&1)" || true
 if grep -q '^OK|projB|' "$_w5b/dumps/manifest.conf" &&
     ! grep -q '^OK|projA|' "$_w5b/dumps/manifest.conf"; then
     pass "D3: imported line dropped, failed line kept for the retry (functional)"
@@ -775,30 +789,86 @@ if live_src "$MIG" | grep -q 'retry anytime' &&
 else
     fail "D3: retry hint must name the resume semantics"
 fi
-# L1 failure-path pin: an UNREADABLE manifest must take the else arm —
-# warn on stderr (the way an operator sees it) and keep the line, never
-# silently skip the resume bookkeeping (the rm -f || true rides this arm).
-_w5c="$(work_new)"
-mkdir -p "$_w5c/dumps"
-printf 'OK|projA|127.0.0.1|a.sql.gz\n' >"$_w5c/dumps/manifest.conf"
-printf 'A\n' >"$_w5c/dumps/a.sql.gz"
-# staging copy (readable) mirrors the function's find+cat staging; the
-# SOURCE goes unreadable afterwards so only the drop-grep fails
-cp "$_w5c/dumps/manifest.conf" "$_w5c/dumps/manifest.staged"
-chmod 000 "$_w5c/dumps/manifest.conf"
+check_absent "D3: operator output carries no internal review tag (b X4)" \
+    "$MIG" -q 'already-imported projects are skipped — a D3'
+# b Z3: the child (loop + helper) leaves NO temp behind — every mktemp
+# is consumed by a mv or removed; TMPDIR is scoped so this is exact.
+if [ -z "$(ls -A "$_w5b/tmp")" ]; then
+    pass "D3/Z3: harness child leaves no temp file behind (TMPDIR empty)"
+else
+    fail "D3/Z3: harness child leaked a temp (found: $(ls -A "$_w5b/tmp"))"
+fi
+# b Y1 write leg, executed: a pre-planted manifest.opk.$$ symlink (the
+# wave-a redirect shape wrote THROUGH such a link as root) must stay
+# untouched — the new drop never opens a dump-dir path, the publish is
+# a rename. The plant rides the child's own $$ (same shell); the
+# canary lives beside the link in the dump dir.
+printf 'PRECIOUS\n' >"$_w5b/dumps/canary.txt"
+printf 'OK|projA|127.0.0.1|a.sql.gz\nOK|projB|127.0.0.1|b.sql.gz\n' >"$_w5b/dumps/manifest.conf"
+{
+    printf 'ln -s "$1/canary.txt" "$1/manifest.opk.$$"\n'
+    cat "$_w5b/run.sh"
+} >"$_w5b/run-y1.sh"
+TMPDIR="$_w5b/tmp" sh "$_w5b/run-y1.sh" "$_w5b/dumps" >/dev/null 2>&1 || true
+if [ "$(cat "$_w5b/dumps/canary.txt")" = "PRECIOUS" ]; then
+    pass "D3/Y1: planted manifest.opk.\$\$ symlink never written through (rename-only publish)"
+else
+    fail "D3/Y1: the drop opened a dump-dir path through the planted link (canary=$(cat "$_w5b/dumps/canary.txt"))"
+fi
+# b X2: the FULL drop — the last remaining OK line selects nothing,
+# grep -v exits 1 — must publish the EMPTY manifest (the correct
+# resume state: the next run imports nothing), not warn-and-keep (the
+# wave-a shape re-imported and reset exactly this project).
+_w5x2="$(work_new)"
+mkdir -p "$_w5x2/dumps" "$_w5x2/tmp"
+printf 'OK|projA|127.0.0.1|a.sql.gz\n' >"$_w5x2/dumps/manifest.conf"
+printf 'A\n' >"$_w5x2/dumps/a.sql.gz"
 {
     printf '%s\n' \
         'dm_dir=$1' 'dm_bin=ddev' 'dm_oc=x' 'dm_oc_h=/h' 'dm_oc_i=1' '' \
         'dm_extra=' 'dm_ok=0' 'dm_failed=""' \
         'sudo() { return 0; }' \
-        'dm_manifest=$1/manifest.staged'
+        'dm_manifest=$(mktemp)' \
+        'dm_resid=$(mktemp)'
+    printf 'cat "$1/manifest.conf" >"$dm_manifest" && cat "$dm_manifest" >"$dm_resid"\n'
+    sed -n '/^    _dmi_drop_publish()/,/^    }/p' "$MIG"
+    sed -n "/while IFS='|' read -r dm_st dm_n dm_ar dm_f; do/,/done <\"\$dm_manifest\"/p" "$MIG"
+    printf 'rm -f "$dm_manifest" "$dm_resid"\n'
+} >"$_w5x2/run.sh"
+_w5x2_out="$(TMPDIR="$_w5x2/tmp" sh "$_w5x2/run.sh" "$_w5x2/dumps" 2>&1)" || true
+if [ ! -s "$_w5x2/dumps/manifest.conf" ] &&
+    ! printf '%s\n' "$_w5x2_out" | grep -q 'could not drop'; then
+    pass "D3/X2: the last OK line publishes the empty manifest (full drop is no failure)"
+else
+    fail "D3/X2: full drop must publish the empty manifest, no warn (out=$(printf '%s\n' "$_w5x2_out" | head -3))"
+fi
+# L1 failure-path pin (reworked b Y1): a read error on the RESIDUAL
+# (the drop's only manifest operand now — the dump-dir file is never
+# opened) must take the rc >= 2 arm — warn on stderr (the way an
+# operator sees it) and keep the line, never silently skip the resume
+# bookkeeping. The dump-dir manifest stays untouched by construction.
+_w5c="$(work_new)"
+mkdir -p "$_w5c/dumps"
+printf 'OK|projA|127.0.0.1|a.sql.gz\n' >"$_w5c/dumps/manifest.conf"
+printf 'A\n' >"$_w5c/dumps/a.sql.gz"
+# staging copy (readable) mirrors the function's find+cat staging; the
+# residual goes unreadable after seeding so only the drop-grep fails
+cp "$_w5c/dumps/manifest.conf" "$_w5c/dumps/manifest.staged"
+{
+    printf '%s\n' \
+        'dm_dir=$1' 'dm_bin=ddev' 'dm_oc=x' 'dm_oc_h=/h' 'dm_oc_i=1' '' \
+        'dm_extra=' 'dm_ok=0' 'dm_failed=""' \
+        'sudo() { return 0; }' \
+        'dm_manifest=$1/manifest.staged' \
+        'dm_resid=$1/resid.unreadable'
+    printf 'cat "$dm_manifest" >"$dm_resid" && chmod 000 "$dm_resid"\n'
+    sed -n '/^    _dmi_drop_publish()/,/^    }/p' "$MIG"
     sed -n "/while IFS='|' read -r dm_st dm_n dm_ar dm_f; do/,/done <\"\$dm_manifest\"/p" "$MIG"
 } >"$_w5c/run.sh"
 _w5c_out="$(sh "$_w5c/run.sh" "$_w5c/dumps" 2>&1)" || true
-chmod 644 "$_w5c/dumps/manifest.conf"
 if printf '%s\n' "$_w5c_out" | grep -q 'could not drop projA from the dump manifest' &&
     grep -q '^OK|projA|' "$_w5c/dumps/manifest.conf"; then
-    pass "D3: unreadable manifest warns and keeps the line (drop failure path executed)"
+    pass "D3: unreadable residual warns and keeps the line (drop failure path executed)"
 else
     fail "D3: drop failure must warn and keep the line (out=$(printf '%s\n' "$_w5c_out" | head -4))"
 fi

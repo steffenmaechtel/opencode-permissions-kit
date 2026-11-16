@@ -490,6 +490,16 @@ else
     fail "guard probe armed on tty stdin — interactive menus would abort (a M1)"
 fi
 
+# 8c. Hint truth (#568 b X1): the abort hint must name REAL subcommands
+# only — `backend` was not one (the action is container-backend) and an
+# operator following the hint verbatim hit "Unknown action".
+if printf '%s' "$_menu_body" | grep -q 'handover|container-backend|ddev-settings' &&
+    ! printf '%s' "$_menu_body" | grep -q 'handover|backend|ddev-settings'; then
+    pass "menu(): abort hint names real subcommands (b X1)"
+else
+    fail "menu(): abort hint names a subcommand that does not exist (b X1)"
+fi
+
 # --- Summary ---
 echo ""
 echo "===================================="

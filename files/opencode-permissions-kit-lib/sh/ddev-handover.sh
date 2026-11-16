@@ -82,7 +82,10 @@ ddev_devowned_flagged() {
     # flipped a hand-edited `True` project into permanent forward
     # handover. yes/no/on/off stay OUT on purpose: yaml.v3 is YAML 1.2
     # and treats those as plain strings, so ddev does not resolve them
-    # to booleans either.
+    # to booleans either. Honest scope (#568 b Z2): the tr quote-strip
+    # below ALSO accepts quoted spellings ("true"), which yaml.v3
+    # resolves as plain strings — a deliberate hand-edit tolerance; the
+    # check is a superset of ddev's boolean set, never exactly it.
     sed -n 's/^disable_settings_management:[[:space:]]*//p' "$1/.ddev/config.yaml" |
         head -1 | tr -d ' \t\r"'"'" | grep -qxE 'true|True|TRUE'
 }
@@ -828,10 +831,22 @@ ddev_handover_root() {
     xargs -0 -r -n1 sh -c '
         # $1..$4: root, user, group, dev; $5: one NUL-delimited entry.
         # Re-source fails only for a lib vanishing mid-run (guarded
-        # above) — announce, do not fail the batch (best-effort).
+        # above). (#568 b Y2): exit NON-zero — the stamp contract
+        # (#568 a D2) records only a COMPLETED pass, and an entry
+        # skipped here makes the pass incomplete: the rc folds into
+        # xargs 123, the stamp gate below withholds the stamp, and the
+        # next update rescans this root. Shell truth (verified for
+        # this fix): `.` is a special builtin, and a failed source
+        # ABORTS the worker shell before this arm — dash AND bash-as-
+        # sh, ENOENT and EACCES both — so the non-zero abort rc
+        # withholds the stamp everywhere already; this arm is the
+        # defensive path for a shell that continues instead, kept
+        # honest with the non-zero exit (a wave-a exit 0 here would
+        # have stamped a skip green on such a shell).
         . "$OPK_DDEV_HANDOVER_LIB" || {
-            echo "  warn: cannot re-source $OPK_DDEV_HANDOVER_LIB — .ddev entry skipped" >&2
-            exit 0
+            echo "  warn: cannot re-source $OPK_DDEV_HANDOVER_LIB — .ddev entry""\
+ skipped (no stamp — the next update rescans)" >&2
+            exit 1
         }
         _dhr_entry_one "$1" "$2" "$3" "$4" "$5"
     ' _ "$dhr_root" "$dhr_user" "$dhr_group" "$dhr_dev" <"$_dhr_nul" || _dhr_xrc=$?

@@ -1174,7 +1174,7 @@ menu() {
     # failure is just a non-zero rc the condition inverts.
     if [ ! -t 0 ] && ! (: </dev/tty) 2>/dev/null; then
         ui_error "config menu needs a terminal — run from an interactive shell ""\
-or use a subcommand (projects|git-config|refresh|handover|backend|ddev-settings)"
+or use a subcommand (projects|git-config|refresh|handover|container-backend|ddev-settings)"
         exit 1
     fi
     while true; do

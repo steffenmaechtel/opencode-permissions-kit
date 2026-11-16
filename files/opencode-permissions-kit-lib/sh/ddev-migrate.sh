@@ -723,6 +723,84 @@ ddev_migrate_import() {
         return 1
     fi
 
+    # The residual manifest (#568 b Y1): a root-owned working copy of
+    # the staged manifest — the loop's drops edit IT, never a path in
+    # the dump dir. The dump dir is agent-owned 750/no-sticky (the
+    # operand gate's own words below), and root must never open a path
+    # inside it for reading OR writing (0.0.44a V3 / 0.0.45c S6 in
+    # this file): the wave-a drop shape (grep from + redirect into the
+    # dump dir) re-opened both symlink holes those invariants ban.
+    # Publication goes through cat-into-root-temp + mv only — rename
+    # replaces a planted link, never follows it (V3 layer 2, the
+    # export side's _dma_pub discipline).
+    dm_resid=$(mktemp) || {
+        rm -f "$dm_manifest" "$dm_finderr" 2>/dev/null || true
+        echo "ddev-migrate: cannot create a residual manifest temp (disk full?)"
+        return 1
+    }
+    command -v _tmp_track >/dev/null 2>&1 && _tmp_track "$dm_resid"
+    cat "$dm_manifest" >"$dm_resid" 2>/dev/null || {
+        rm -f "$dm_manifest" "$dm_finderr" "$dm_resid" 2>/dev/null || true
+        echo "ddev-migrate: cannot seed the residual manifest (disk full?)"
+        return 1
+    }
+    # _dmi_drop_publish <project> (#568 b Y1/X2/X3): drop <project>'s
+    # OK line from the residual and republish the residual into the
+    # dump dir — every operand below is a root-owned temp except the
+    # final mv's destination. grep rc 1 (empty selection) is the
+    # LEGITIMATE full drop — the last OK line — and publishes the
+    # empty manifest: an empty manifest is the correct resume state
+    # (the next run imports nothing); the wave-a shape lost exactly
+    # that line (#568 b X2). Only rc >= 2 (a real read error) warns
+    # and keeps. Every failure arm warns and keeps the line — a failed
+    # update costs a re-import on the next run (warned at each arm),
+    # never a wrong skip (#568 b X3: the publish mv warns too).
+    # Best-effort on purpose: never fails the loop, the import itself
+    # already succeeded.
+    _dmi_drop_publish() {
+        _ddp_n=$1
+        _ddp_g=$(mktemp 2>/dev/null) || {
+            echo "    warn: cannot stage the manifest drop for $_ddp_n —""\
+ a re-run will re-import it" >&2
+            return 0
+        }
+        _ddp_rc=0
+        grep -v -F "OK|$_ddp_n|" "$dm_resid" >"$_ddp_g" 2>/dev/null || _ddp_rc=$?
+        if [ "$_ddp_rc" -ge 2 ]; then
+            rm -f "$_ddp_g" 2>/dev/null || true
+            echo "    warn: could not drop $_ddp_n from the dump manifest —""\
+ a re-run will re-import it" >&2
+            return 0
+        fi
+        mv -f "$_ddp_g" "$dm_resid" 2>/dev/null || {
+            rm -f "$_ddp_g" 2>/dev/null || true
+            echo "    warn: could not update the residual manifest for $_ddp_n —""\
+ a re-run will re-import it" >&2
+            return 0
+        }
+        _ddp_p=$(mktemp 2>/dev/null) || {
+            echo "    warn: cannot stage the manifest republish for $_ddp_n —""\
+ a re-run will re-import it" >&2
+            return 0
+        }
+        cat "$dm_resid" >"$_ddp_p" 2>/dev/null || {
+            rm -f "$_ddp_p" 2>/dev/null || true
+            echo "    warn: could not copy the residual manifest for $_ddp_n —""\
+ a re-run will re-import it" >&2
+            return 0
+        }
+        # Rename-only publish: replaces a planted manifest.conf link
+        # itself, never opens its target (V3 layer 2). dm_dir rides :?
+        # (L5 belt — this runs as root).
+        mv -f "$_ddp_p" "${dm_dir:?}/manifest.conf" 2>/dev/null || {
+            rm -f "$_ddp_p" 2>/dev/null || true
+            echo "    warn: could not republish the dump manifest after""\
+ dropping $_ddp_n — a re-run will re-import it" >&2
+            return 0
+        }
+        return 0
+    }
+
     dm_conf="/etc/opencode-permissions-kit/install.conf"
     dm_oc="opencode"
     dm_be=""
@@ -791,25 +869,12 @@ ddev_migrate_import() {
                 ${dm_extra:+"$dm_extra"} sh -c 'cd / && exec "$@"' migrate-import "$dm_bin" import-db "$dm_n" --file="$dm_dir/$dm_f" \
                 </dev/null >/dev/null 2>&1; then
             echo "    imported: $dm_f"
-            # Resume discipline (#568 a D3, the export loop's mirror at
-            # the OK-line skip): drop the imported project's line from
-            # the dump-dir manifest — a re-run after partial failure
-            # must retry only the FAILED remainder, never re-import
-            # (and reset) an already-imported database. Published
-            # beside the old inode like the export side's _dma_pub
-            # republish; a failed update only costs a re-import on the
-            # next run (warned below), never a wrong skip. dm_dir rides
-            # :? on every write operand (L5 belt — this loop runs as
-            # root): an empty expansion must abort, never resolve to
-            # /manifest.conf at the filesystem root.
-            if grep -v -F "OK|$dm_n|" "${dm_dir:?}/manifest.conf" \
-                >"${dm_dir:?}/manifest.opk.$$" 2>/dev/null; then
-                mv -f "${dm_dir:?}/manifest.opk.$$" "${dm_dir:?}/manifest.conf"
-            else
-                rm -f "${dm_dir:?}/manifest.opk.$$" 2>/dev/null || true
-                echo "    warn: could not drop $dm_n from the dump manifest —""\
- a re-run will re-import it" >&2
-            fi
+            # Resume discipline (#568 a D3, reworked #568 b Y1/X2/X3):
+            # drop the imported project's line via the root-staged
+            # helper above — a re-run after partial failure must retry
+            # only the FAILED remainder, never re-import (and reset)
+            # an already-imported database.
+            _dmi_drop_publish "$dm_n"
             dm_ok=$((dm_ok + 1))
         else
             # Placeholder, never the interpolated names (#568 a D4, the
@@ -825,12 +890,12 @@ ddev_migrate_import() {
             dm_failed="$dm_failed $dm_n"
         fi
     done <"$dm_manifest"
-    rm -f "$dm_manifest" "$dm_finderr" 2>/dev/null || true
+    rm -f "$dm_manifest" "$dm_finderr" "$dm_resid" 2>/dev/null || true
 
     echo ""
     echo "  imported $dm_ok database(s) from $dm_dir"
     [ -n "$dm_failed" ] && echo "  failed:$dm_failed — dumps stay in $dm_dir (retry anytime;""\
- already-imported projects are skipped — a D3)"
+ already-imported projects are skipped)"
     echo "  old containers/volumes remain in the dev daemon; remove them with:"
     echo "    sudo -u <dev-user> $dm_bin delete --omit-snapshot <project>"
     [ -z "$dm_failed" ]
