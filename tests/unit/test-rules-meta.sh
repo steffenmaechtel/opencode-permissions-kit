@@ -1,5 +1,5 @@
 #!/bin/sh
-# test-rules-meta.sh -- pins scripts/rules-audit.sh (invariants 1-9)
+# test-rules-meta.sh -- pins scripts/rules-audit.sh (invariants 1-10)
 # plus the no-fake-findings pin 10: outside the trailing (RM-NNNN)
 # ref form, no real ID may appear in any scope file.
 #
@@ -233,6 +233,53 @@ sed -i 's/^status: active/status: retired/;
         s/^quote: "Second demo rule"/quote: "Words absent from target"/' \
     "$(meta_file RM-9002)"
 expect_ok "inv5 retired exempt" "0 blocking"
+
+# 10a. inv 10 -- composite body quote not in the Source-named file
+#      nor the rule file (#561, the body-quote discipline)
+new_scratch n10a
+sed -i 's|^Body of RM-9002\.$|Source: agent/conventions.md, demo section.\n\nThe bad "composite quote nowhere" arm.|' \
+    "$(meta_file RM-9002)"
+expect_block "inv10 body quote not in source" "[inv10]"
+
+# 10b. inv 10 -- external source (no in-repo path) is exempt: the
+#      #561 spec constraint (issue/PR/chat/man-page quotes are not
+#      greppable in-tree)
+new_scratch n10b
+sed -i 's|^Body of RM-9002\.$|Source: issue #9 (chat quote).\n\nThe bad "composite quote nowhere" arm.|' \
+    "$(meta_file RM-9002)"
+expect_ok "inv10 external source exempt" "0 blocking"
+
+# 10c. inv 10 -- case normalization: a sentence-initial caps
+#      difference stays green (the #561 spec constraint; the fixture
+#      rule text carries "First demo rule")
+new_scratch n10c
+sed -i 's|^Body of RM-9002\.$|Source: agent/conventions.md, demo section.\n\nThe rule "first demo rule" quoted.|' \
+    "$(meta_file RM-9002)"
+expect_ok "inv10 case-folded quote green" "0 blocking"
+
+# 10d. inv 10 -- the rule file is a haystack on its own: the quote
+#      sits in the rule back-ref file, NOT in the Source-named file
+#      (metas quote both their source record and the rule text)
+new_scratch n10d
+sed -i 's|^Body of RM-9002\.$|Source: internal/records/rules-meta.md, demo section.\n\nThe rule "First demo rule" via rule file.|' \
+    "$(meta_file RM-9002)"
+expect_ok "inv10 rule-file haystack green" "0 blocking"
+
+# 10e. inv 10 -- code is not quotation (a corpus case from the #561
+#      survey): the same composite inside an inline code span stays
+#      green
+new_scratch n10e
+sed -i 's|^Body of RM-9002\.$|Source: agent/conventions.md, demo section.\n\nThe marker `"composite quote nowhere"` arm.|' \
+    "$(meta_file RM-9002)"
+expect_ok "inv10 code span is not a quote" "0 blocking"
+
+# 10f. inv 10 -- retired metas are exempt (the inv5 retire class)
+new_scratch n10f
+sed -i '/^- Second demo rule\. (RM-9002)$/d' "$SCRATCH/agent/conventions.md"
+sed -i 's/^status: active/status: retired/;
+    s|^Body of RM-9002\.$|Source: agent/conventions.md, demo section.\n\nThe bad "composite quote nowhere" arm.|' \
+    "$(meta_file RM-9002)"
+expect_ok "inv10 retired exempt" "0 blocking"
 
 # 6a. inv 6 -- next-revisit before created
 new_scratch n6a

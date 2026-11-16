@@ -186,8 +186,18 @@ a bulk session, not one-off touches).
    amendment events. Log ORDER decides same-day ties:
    approve-then-amend re-queues, amend-then-approve is the fresh
    approval.
+10. Body-quote parity (#561, the body-rules quote discipline): every
+   double-quoted string in a meta's body — frontmatter and review log
+   excluded, fenced blocks and inline code spans are code, not
+   quotations — is findable (case-folded, inv5 normalization) in the
+   union of the in-repo file the `Source:` line names and the `rule:`
+   back-ref file: metas quote both their source record and the rule
+   text itself. A `Source:` line naming no in-repo file is an
+   external source (issue, PR body, chat, man page, named git
+   commit) — exempt. Retired metas are exempt (the inv5 retire
+   class).
 
-CI blocks on 1–6 and 9, and on `[meta-tree]` scope errors (find
+CI blocks on 1–6, 9 and 10, and on `[meta-tree]` scope errors (find
 failures under the meta tree — #232); an overdue meta is a maintenance
 signal, not a broken build. (RM-0030) The Phase-2 pending-unit
 parking valve (prefix-matched ref-less units reported non-blocking)

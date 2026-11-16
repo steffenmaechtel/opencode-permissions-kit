@@ -180,7 +180,7 @@ nothing to review.
   file (a citation fix in a test file, #412 b B3) close the loop as
   comments/bookkeeping; "touch code" means source bytes changed
   (executable logic, pins, manifest lines). There is deliberately no
-  "trivial" carve-out. (RM-0065)
+  trivial carve-out. (RM-0065)
 - A round whose fixes stay in comments/docs/bookkeeping closes the
   loop. (RM-0066)
 - On the non-shipped track, a deliberate-not-done disposition of a

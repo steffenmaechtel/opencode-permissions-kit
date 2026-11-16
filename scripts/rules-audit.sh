@@ -35,6 +35,16 @@
 #      word "amended" -- subject prefixes ("rationale amended") count,
 #      glued tokens ("amendedness") and lines opening with another
 #      event keyword (approved/revisit/created) do not (#337 a A1).
+#  10. body-quote parity (#561, the body-rules quote discipline): every
+#      double-quoted string in a meta's body (frontmatter and review
+#      log excluded; fenced blocks and inline code spans are code,
+#      not quotations) is findable -- case-folded, inv5-normalized --
+#      in the union of the in-repo file the Source line names and the
+#      rule: back-ref file (metas quote both their source record and
+#      the rule text itself). A Source line naming no in-repo file is
+#      an external source (issue, PR body, chat, man page, named git
+#      commit) -- exempt (the #561 spec constraint). Retired metas
+#      are exempt (the inv5 retire class).
 #
 # Report-only (non-blocking -- overdue is a maintenance signal):
 # 7. overdue list sorted by lateness; 8. INDEX.md regenerated on every
@@ -345,6 +355,52 @@ while IFS= read -r m; do
                 *"$needle"*) ;;
                 *) block 5 "$rel -- quote prefix not findable (normalized): '$needle'" ;;
             esac
+        fi
+    fi
+
+    # 10 (#561): body-quote parity, the body-rules quote
+    # discipline -- quoted
+    # strings in meta bodies exist verbatim somewhere nameable. Code
+    # is not quotation (fences + inline spans dropped before quote
+    # extraction); haystack = the Source line's in-repo file plus the
+    # rule back-ref file, both inv5-normalized and case-folded (the
+    # #561 spec constraint: sentence-initial caps differ corpus-wide);
+    # a Source line without an in-repo file is external -- exempt; a
+    # meta without a Source line at all rides the same exemption;
+    # retired metas exempt (the inv5 retire class).
+    if [ "$st" != retired ]; then
+        bj=$WORK/body.join
+        awk '
+            function emit(l) { gsub(/`/, "", l); gsub(/\*/, "", l); printf "%s ", l }
+            BEGIN { fm = 0; fence = 0; stop = 0 }
+            /^---$/ { fm++; next }
+            fm < 2 { next }
+            /^```/ { fence = !fence; next }
+            fence { next }
+            /^## Review log/ { stop = 1 }
+            stop { next }
+            {
+                l = $0
+                while (match(l, /`[^`]*`/))
+                    l = substr(l, 1, RSTART - 1) substr(l, RSTART + RLENGTH)
+                emit(l)
+            }
+        ' "$m" | tr -s ' \t' ' ' >"$bj"
+        sfile=$(sed -n 's/.*Source://p' "$bj" |
+            grep -o '[A-Za-z0-9_./-]*/[A-Za-z0-9_./-]*[A-Za-z0-9]' | head -1)
+        if [ -n "$sfile" ] && [ -f "$ROOT/$sfile" ]; then
+            hay=$(norm_join "$ROOT/$sfile")
+            [ -f "$ROOT/$tpath" ] && hay=$hay$(norm_join "$ROOT/$tpath")
+            hay=$(printf '%s' "$hay" | tr '[:upper:]' '[:lower:]')
+            grep -o '"[^"]*"' "$bj" | sed 's/^"//; s/"$//' |
+                while IFS= read -r bq; do
+                    [ -n "$bq" ] || continue
+                    nq=$(printf '%s' "$bq" | tr '[:upper:]' '[:lower:]')
+                    case $hay in
+                        *"$nq"*) ;;
+                        *) block 10 "$rel -- body quote not in '$sfile' or rule file: \"$bq\"" ;;
+                    esac
+                done
         fi
     fi
 
