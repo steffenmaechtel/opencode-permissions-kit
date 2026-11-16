@@ -791,9 +791,37 @@ ddev_migrate_import() {
                 ${dm_extra:+"$dm_extra"} sh -c 'cd / && exec "$@"' migrate-import "$dm_bin" import-db "$dm_n" --file="$dm_dir/$dm_f" \
                 </dev/null >/dev/null 2>&1; then
             echo "    imported: $dm_f"
+            # Resume discipline (#568 a D3, the export loop's mirror at
+            # the OK-line skip): drop the imported project's line from
+            # the dump-dir manifest — a re-run after partial failure
+            # must retry only the FAILED remainder, never re-import
+            # (and reset) an already-imported database. Published
+            # beside the old inode like the export side's _dma_pub
+            # republish; a failed update only costs a re-import on the
+            # next run (warned below), never a wrong skip. dm_dir rides
+            # :? on every write operand (L5 belt — this loop runs as
+            # root): an empty expansion must abort, never resolve to
+            # /manifest.conf at the filesystem root.
+            if grep -v -F "OK|$dm_n|" "${dm_dir:?}/manifest.conf" \
+                >"${dm_dir:?}/manifest.opk.$$" 2>/dev/null; then
+                mv -f "${dm_dir:?}/manifest.opk.$$" "${dm_dir:?}/manifest.conf"
+            else
+                rm -f "${dm_dir:?}/manifest.opk.$$" 2>/dev/null || true
+                echo "    warn: could not drop $dm_n from the dump manifest —""\
+ a re-run will re-import it" >&2
+            fi
             dm_ok=$((dm_ok + 1))
         else
-            echo "    FAILED — import manually: ddev start $dm_n && ddev import-db $dm_n --file=$dm_dir/$dm_f"
+            # Placeholder, never the interpolated names (#568 a D4, the
+            # ddev-hosts.sh 0.0.39a S5 house rule): the manifest is
+            # agent-ownable content and this line is the suggested next
+            # step for a ROOT shell — manifest-derived fields must not
+            # land inside a command the operator is invited to paste.
+            # The failed project's name is printed by the status lines
+            # above; the dump file by the loop's import row.
+            echo "    FAILED — import manually: ddev start <project> && ddev import-db <project>""\
+ --file=<dump-dir>/<file>"
+            echo "    (project and dump names of this run are printed above)"
             dm_failed="$dm_failed $dm_n"
         fi
     done <"$dm_manifest"
@@ -801,7 +829,8 @@ ddev_migrate_import() {
 
     echo ""
     echo "  imported $dm_ok database(s) from $dm_dir"
-    [ -n "$dm_failed" ] && echo "  failed:$dm_failed — dumps stay in $dm_dir (retry anytime)"
+    [ -n "$dm_failed" ] && echo "  failed:$dm_failed — dumps stay in $dm_dir (retry anytime;""\
+ already-imported projects are skipped — a D3)"
     echo "  old containers/volumes remain in the dev daemon; remove them with:"
     echo "    sudo -u <dev-user> $dm_bin delete --omit-snapshot <project>"
     [ -z "$dm_failed" ]

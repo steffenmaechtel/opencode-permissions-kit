@@ -729,6 +729,80 @@ fi
 check_absent "import never deletes dumps on failure" "$MIG" -q 'rm -rf.*DDEV_MIG_BACKUP_ROOT'
 check_live "standalone list mode exists (bin dispatcher)" "$BIN_MIG" -q 'list)'
 
+# --- 5b. import resume + placeholder hint (#568 a D3/D4) ----------------------------
+# D3: a successfully imported project's OK line must leave the dump-dir
+# manifest (re-run after partial failure retries only the remainder —
+# the export loop's resume-skip, mirrored); a FAILED project's line
+# stays. D4: the paste-me hint uses placeholders, never manifest-
+# derived values (the ddev-hosts 0.0.39a S5 house rule). Functional:
+# the import loop body extracted and driven with a sudo stub that
+# succeeds for projA only.
+check_live "D3: imported project's line dropped from the dump manifest" \
+    "$MIG" -qF 'grep -v -F "OK|$dm_n|" "${dm_dir:?}/manifest.conf"'
+check_live "D4: import hint is placeholder-shaped (0.0.39a S5 rule)" \
+    "$MIG" -qF 'import manually: ddev start <project> && ddev import-db <project>'
+check_absent "D4: no interpolated paste-me hint left" "$MIG" -q 'import manually: ddev start \$'
+_w5b="$(work_new)"
+mkdir -p "$_w5b/dumps"
+printf 'OK|projA|127.0.0.1|a.sql.gz\nOK|projB|127.0.0.1|b.sql.gz\n' >"$_w5b/dumps/manifest.conf"
+printf 'A\n' >"$_w5b/dumps/a.sql.gz"
+printf 'B\n' >"$_w5b/dumps/b.sql.gz"
+{
+    printf '%s\n' \
+        'dm_dir=$1' 'dm_bin=ddev' 'dm_oc=x' 'dm_oc_h=/h' 'dm_oc_i=1' '' \
+        'dm_extra=' 'dm_ok=0' 'dm_failed=""' \
+        'sudo() { case "$*" in *projA*) return 0 ;; *) return 1 ;; esac; }' \
+        'dm_manifest=$(mktemp)'
+    printf 'cat "$1/manifest.conf" >"$dm_manifest"\n'
+    sed -n "/while IFS='|' read -r dm_st dm_n dm_ar dm_f; do/,/done <\"\$dm_manifest\"/p" "$MIG"
+} >"$_w5b/run.sh"
+_w5b_out="$(sh "$_w5b/run.sh" "$_w5b/dumps" 2>&1)" || true
+if grep -q '^OK|projB|' "$_w5b/dumps/manifest.conf" &&
+    ! grep -q '^OK|projA|' "$_w5b/dumps/manifest.conf"; then
+    pass "D3: imported line dropped, failed line kept for the retry (functional)"
+else
+    fail "D3: dump manifest after partial import is wrong (=$(cat "$_w5b/dumps/manifest.conf"))"
+fi
+if printf '%s\n' "$_w5b_out" | grep 'import manually' | grep -qF 'ddev start <project>' &&
+    ! printf '%s\n' "$_w5b_out" | grep 'import manually' | grep -qF 'projB'; then
+    pass "D4: FAILED hint carries placeholders, not the manifest values (functional)"
+else
+    fail "D4: FAILED hint interpolated manifest values (out=$(printf '%s\n' "$_w5b_out" | grep 'import manually'))"
+fi
+if live_src "$MIG" | grep -q 'retry anytime' &&
+    live_src "$MIG" | grep -qF 'already-imported projects are skipped'; then
+    pass "D3: retry hint names the resume semantics"
+else
+    fail "D3: retry hint must name the resume semantics"
+fi
+# L1 failure-path pin: an UNREADABLE manifest must take the else arm —
+# warn on stderr (the way an operator sees it) and keep the line, never
+# silently skip the resume bookkeeping (the rm -f || true rides this arm).
+_w5c="$(work_new)"
+mkdir -p "$_w5c/dumps"
+printf 'OK|projA|127.0.0.1|a.sql.gz\n' >"$_w5c/dumps/manifest.conf"
+printf 'A\n' >"$_w5c/dumps/a.sql.gz"
+# staging copy (readable) mirrors the function's find+cat staging; the
+# SOURCE goes unreadable afterwards so only the drop-grep fails
+cp "$_w5c/dumps/manifest.conf" "$_w5c/dumps/manifest.staged"
+chmod 000 "$_w5c/dumps/manifest.conf"
+{
+    printf '%s\n' \
+        'dm_dir=$1' 'dm_bin=ddev' 'dm_oc=x' 'dm_oc_h=/h' 'dm_oc_i=1' '' \
+        'dm_extra=' 'dm_ok=0' 'dm_failed=""' \
+        'sudo() { return 0; }' \
+        'dm_manifest=$1/manifest.staged'
+    sed -n "/while IFS='|' read -r dm_st dm_n dm_ar dm_f; do/,/done <\"\$dm_manifest\"/p" "$MIG"
+} >"$_w5c/run.sh"
+_w5c_out="$(sh "$_w5c/run.sh" "$_w5c/dumps" 2>&1)" || true
+chmod 644 "$_w5c/dumps/manifest.conf"
+if printf '%s\n' "$_w5c_out" | grep -q 'could not drop projA from the dump manifest' &&
+    grep -q '^OK|projA|' "$_w5c/dumps/manifest.conf"; then
+    pass "D3: unreadable manifest warns and keeps the line (drop failure path executed)"
+else
+    fail "D3: drop failure must warn and keep the line (out=$(printf '%s\n' "$_w5c_out" | head -4))"
+fi
+
 # --- 6. install.sh wiring ----------------------------------------------------------
 
 check_live "install.sh documents --skip-ddev-migration in the header" "$INSTALL" -q -- '--skip-ddev-migration'
