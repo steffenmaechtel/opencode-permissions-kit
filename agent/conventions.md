@@ -634,6 +634,16 @@ meta log's first draft restated the skill's question and contract;
 docs-loop.md's opening copied the opk-improve-docs contract facts
 until round a B2, fixed in 6e13493b).
 
+## Standing prose: history, not rosters
+
+- Standing text (agent/, docs/, skills) that names the members of a
+  GROWING set enumerates them as history — "the first three were
+  #541–#543" — never as an exhaustive roster, and carries no unscoped
+  count of the set: the next member silently falsifies both. A
+  roster's job belongs to a query mechanism (a label, a search); the
+  prose POINTS at the mechanism instead of duplicating its current
+  result. (RM-0157)
+
 ## Rule-file markdown structure
 
 - Markdown structure inside rule bullets — an indented fence, an
