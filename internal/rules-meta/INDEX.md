@@ -8,12 +8,12 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**160 metas · 157 active · 3 retired · 14 review-pending · next due 2026-11-14**
+**160 metas · 157 active · 3 retired · 0 review-pending · next due 2026-11-14**
 
 ## Actionable
 
 - **Review pending:** none
-- **Amended — pending:** RM-0025 (2026-11-15), RM-0097 (2026-11-15), RM-0124 (2026-11-15), RM-0127 (2026-11-15), RM-0136 (2026-11-15), RM-0060 (2026-11-16), RM-0063 (2026-11-16), RM-0065 (2026-11-16), RM-0066 (2026-11-16), RM-0067 (2026-11-16), RM-0070 (2026-11-16), RM-0073 (2026-11-16), RM-0078 (2026-11-16), RM-0091 (2026-11-16)
+- **Amended — pending:** none
 
 ## AGENTS.md
 
@@ -21,7 +21,7 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0097](0/0/9/RM-0097.md) | Never commit on master | active | **amended — pending** | 1m | 2026-11-28 |
+| [RM-0097](0/0/9/RM-0097.md) | Never commit on master | active | approved | 1m | 2026-12-17 |
 | [RM-0098](0/0/9/RM-0098.md) | All shipped content is English | active | approved | 1m | 2026-11-20 |
 | [RM-0099](0/0/9/RM-0099.md) | Follow agent/conventions.md for interactive… | active | approved | 1m | 2026-11-20 |
 | [RM-0100](0/1/0/RM-0100.md) | Docs change with the code | active | approved | 1m | 2026-11-20 |
@@ -159,23 +159,23 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0064](0/0/6/RM-0064.md) | Stop when a round leaves | active | approved | 1m | 2026-11-19 |
-| [RM-0065](0/0/6/RM-0065.md) | Review-relevant is everything that has | active | **amended — pending** | 1m | 2026-11-19 |
-| [RM-0066](0/0/6/RM-0066.md) | A round whose fixes stay | active | **amended — pending** | 1m | 2026-11-19 |
-| [RM-0067](0/0/6/RM-0067.md) | Any round whose fixes touch | active | **amended — pending** | 1m | 2026-11-19 |
+| [RM-0065](0/0/6/RM-0065.md) | Review-relevant is everything that has | active | approved | 1m | 2026-12-17 |
+| [RM-0066](0/0/6/RM-0066.md) | A round whose fixes stay | active | approved | 1m | 2026-12-17 |
+| [RM-0067](0/0/6/RM-0067.md) | Any round whose fixes touch | active | approved | 1m | 2026-12-17 |
 | [RM-0068](0/0/6/RM-0068.md) | If a chain has not converged | retired | approved | 1m | 2026-11-19 |
 | [RM-0106](0/1/0/RM-0106.md) | A round's disposition covers ALL | active | approved | 1m | 2026-11-22 |
 | [RM-0107](0/1/0/RM-0107.md) | The cadence authority is | active | approved | 1m | 2026-11-28 |
 | [RM-0115](0/1/1/RM-0115.md) | A round never declares the | active | approved | 1m | 2026-11-28 |
 | [RM-0118](0/1/1/RM-0118.md) | Closure is a recorded step | active | approved | 1m | 2026-11-28 |
 | [RM-0134](0/1/3/RM-0134.md) | On the non-shipped track, a | active | approved | 1m | 2026-11-30 |
-| [RM-0136](0/1/3/RM-0136.md) | Deferred work orders collected during | active | **amended — pending** | 1m | 2026-12-01 |
+| [RM-0136](0/1/3/RM-0136.md) | Deferred work orders collected during | active | approved | 1m | 2026-12-17 |
 | [RM-0140](0/1/4/RM-0140.md) | After the work-order gate settles | active | approved | 1m | 2026-12-15 |
 
 ### Round typing and tiering
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0124](0/1/2/RM-0124.md) | Track selection is mechanical | active | **amended — pending** | 1m | 2026-11-28 |
+| [RM-0124](0/1/2/RM-0124.md) | Track selection is mechanical | active | approved | 1m | 2026-12-17 |
 | [RM-0125](0/1/2/RM-0125.md) | Round typing names what | active | approved | 1m | 2026-11-28 |
 | [RM-0160](0/1/6/RM-0160.md) | The PR body's closing keyword | active | approved | 1m | 2026-12-16 |
 
@@ -192,15 +192,15 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0126](0/1/2/RM-0126.md) | Curation: the MAIN | active | approved | 1m | 2026-11-28 |
-| [RM-0127](0/1/2/RM-0127.md) | Verification: every curated | active | **amended — pending** | 1m | 2026-11-28 |
+| [RM-0127](0/1/2/RM-0127.md) | Verification: every curated | active | approved | 1m | 2026-12-17 |
 
 ### Reviewer freshness
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0060](0/0/6/RM-0060.md) | The session that runs | active | **amended — pending** | 1m | 2026-11-28 |
+| [RM-0060](0/0/6/RM-0060.md) | The session that runs | active | approved | 1m | 2026-12-17 |
 | [RM-0061](0/0/6/RM-0061.md) | Rounds chain inside Session | active | approved | 1m | 2026-11-28 |
-| [RM-0063](0/0/6/RM-0063.md) | The round comment's metadata records | active | **amended — pending** | 1m | 2026-11-28 |
+| [RM-0063](0/0/6/RM-0063.md) | The round comment's metadata records | active | approved | 1m | 2026-12-17 |
 | [RM-0109](0/1/0/RM-0109.md) | Freshness is measured in | active | approved | 1m | 2026-11-28 |
 | [RM-0110](0/1/1/RM-0110.md) | A freshness violation anyway | active | approved | 1m | 2026-11-28 |
 
@@ -219,7 +219,7 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0069](0/0/6/RM-0069.md) | A fix wave owes a class | active | approved | 1m | 2026-11-19 |
-| [RM-0070](0/0/7/RM-0070.md) | The sweep result is recorded | active | **amended — pending** | 1m | 2026-11-19 |
+| [RM-0070](0/0/7/RM-0070.md) | The sweep result is recorded | active | approved | 1m | 2026-12-17 |
 
 ### Who records what
 
@@ -233,7 +233,7 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0072](0/0/7/RM-0072.md) | Every snapshot-scope review records | active | approved | 1m | 2026-11-28 |
-| [RM-0073](0/0/7/RM-0073.md) | Distinguish two dates in | active | **amended — pending** | 1m | 2026-11-19 |
+| [RM-0073](0/0/7/RM-0073.md) | Distinguish two dates in | active | approved | 1m | 2026-12-17 |
 
 ### Verification duty
 
@@ -250,7 +250,7 @@
 |---|---|---|---|---|---|
 | [RM-0076](0/0/7/RM-0076.md) | Every finding class that can | active | approved | 1m | 2026-11-19 |
 | [RM-0077](0/0/7/RM-0077.md) | Root-script behavior changes owe | active | approved | 1m | 2026-11-19 |
-| [RM-0078](0/0/7/RM-0078.md) | Record the environment in | active | **amended — pending** | 1m | 2026-11-19 |
+| [RM-0078](0/0/7/RM-0078.md) | Record the environment in | active | approved | 1m | 2026-12-17 |
 | [RM-0079](0/0/7/RM-0079.md) | A disposition claim | active | approved | 1m | 2026-11-19 |
 | [RM-0113](0/1/1/RM-0113.md) | The debt's due date splits | active | approved | 1m | 2026-11-22 |
 
@@ -284,7 +284,7 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0091](0/0/9/RM-0091.md) | Before cutting a release: | active | **amended — pending** | 1m | 2026-11-19 |
+| [RM-0091](0/0/9/RM-0091.md) | Before cutting a release: | active | approved | 1m | 2026-12-17 |
 
 ### (unresolved section: session-rotation)
 
@@ -335,7 +335,7 @@
 | [RM-0022](0/0/2/RM-0022.md) | 4 digits zero-padded | active | approved | 1m | 2026-11-14 |
 | [RM-0023](0/0/2/RM-0023.md) | at the bullet's end | active | approved | 1m | 2026-11-14 |
 | [RM-0024](0/0/2/RM-0024.md) | three one-digit levels | active | approved | 1m | 2026-11-14 |
-| [RM-0025](0/0/2/RM-0025.md) | regenerated per audit run | active | **amended — pending** | 1m | 2026-11-14 |
+| [RM-0025](0/0/2/RM-0025.md) | regenerated per audit run | active | approved | 1m | 2026-12-17 |
 | [RM-0026](0/0/2/RM-0026.md) | all content is English | active | approved | 1m | 2026-11-14 |
 | [RM-0045](0/0/4/RM-0045.md) | rule-bearing paragraphs are rewritten as | active | approved | 1m | 2026-11-17 |
 | [RM-0046](0/0/4/RM-0046.md) | out of meta scope: rationale = | active | approved | 1m | 2026-11-17 |

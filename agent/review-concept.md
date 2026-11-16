@@ -429,11 +429,10 @@ works.
   retracted with the refuting evidence named and STAY VISIBLE in the
   round comment (verdict column and `"retracted":N` counter) — a bare
   counter drop without the findings visible is a deviation. Fresh
-  context is the
-  bias-reduction mechanism where it is load-bearing — the REVIEW
-  pass, never main-solo at any size; the verifier batch's value is
-  context economy and parallel re-derivation at volume, not a second
-  independent judgment. (RM-0127)
+  context is the bias-reduction mechanism where it is load-bearing —
+  the REVIEW pass, never main-solo at any size; the verifier batch's
+  value is context economy and parallel re-derivation at volume,
+  not a second independent judgment. (RM-0127)
 
 ## Reviewer freshness
 
