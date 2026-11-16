@@ -480,6 +480,7 @@ Base: <tag> @ <sha> · Diff: <range>
 Reviewers: N × <fast-tier model> (axes) · Curated by: main
 Verified by: main-inline | N × <strong-tier model> + main audit (MED/HIGH all, LOW/INFO spot)
 CI on last push: <status + check names>
+Environment: <opencode version · host layout>
 Curation accounting: raw N → curated N (merges named) · dropped 0
 
 ### Findings
@@ -541,6 +542,14 @@ Review-relevant code touched this round: yes/no → …
   adding a missing `Track:` line at discovery is exactly this
   bookkeeping); the timeline record stays in the append-only comments
   — a body edit never replaces a round-comment entry. (RM-0153)
+- PR-body prose that asserts live tracker state — an issue's
+  open/closed, a label's population count — names its observation
+  scope ("open at PR creation", "…by 2026-11-16") or is dropped:
+  tracker state mutates in seconds (the maintainer closed #542 37 s
+  after PR #555's creation, staling its body's "open" claim before CI
+  finished), and the round comments, not body prose, are the durable
+  record. Correcting such a claim afterwards is the body-edit
+  bookkeeping this section sanctions. (RM-0158)
 
 ## Fixes close classes, not sites
 
