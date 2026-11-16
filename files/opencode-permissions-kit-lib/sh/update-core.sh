@@ -449,17 +449,17 @@ update_redeploy_project_roots() {
             return 1
         }
         command -v ddev_handover_stamp_valid >/dev/null 2>&1 || ddev_handover_stamp_valid() { return 1; }
-        command -v ddev_handover_stamp_write >/dev/null 2>&1 || ddev_handover_stamp_write() { :; }
         # Single project-root pass (issue #219): --refresh used to pay a
         # second full scan — this loop (stamp-skip opened under REFRESH)
         # already ran ddev_handover_root over every root, then a separate
         # end-of-run block re-scanned the same roots for the group baseline
-        # AND the handover again. The baseline arm now rides this loop;
-        # per-root order matches the old refresh block (baseline first,
-        # handover second, stamp last — the stamp records a completed
-        # pass). .ddev ownership comes from the handover's chown alone
-        # (ddev-handover.sh) — the baseline's chgrp never re-owns, so the
-        # per-root end state does not depend on this order.
+        # AND the handover again. The baseline arm now rides this loop.
+        # The stamp rides INSIDE ddev_handover_root (#568 a D2): written
+        # only when the pass completed (find rc 0, every worker rc 0) —
+        # this loop no longer stamps on its own. .ddev ownership comes
+        # from the handover's chown alone (ddev-handover.sh) — the
+        # baseline's chgrp never re-owns, so the per-root end state does
+        # not depend on this order.
         if [ "$REFRESH" = true ]; then
             ui_section "Refreshing group baseline"
             # Shared helper with live per-pass progress (issue #14 — large trees
@@ -605,8 +605,7 @@ update_redeploy_project_roots() {
                 fs_baseline_root "$root" "$NEW_OPENCODE_GROUP" "$OPENCODE_USER"
             fi
             ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
-            ddev_handover_stamp_write "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
-            log "ddev handover pass completed under $root"
+            log "ddev handover pass ran under $root (stamp only on a completed pass)"
         done <"$PROJECTS_CONF"
         if [ "$_ho_skip" -gt 0 ]; then
             ui_detail "skipped the ddev handover rescan for $_ho_skip root(s) — nothing changed since the last pass"

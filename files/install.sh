@@ -453,7 +453,6 @@ command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() {
     echo "error: ddev_handover_root unavailable (ddev-handover.sh incomplete) — the handover is not optional" >&2
     return 1
 }
-command -v ddev_handover_stamp_write >/dev/null 2>&1 || ddev_handover_stamp_write() { :; }
 # Core-called sibling (#456 stub sweep): install-core's ddev phase calls
 # this helper directly, not just through ddev_handover_root. rc 2 is the
 # callsite's "could not set" arm (warn + manual-fix hint) — the honest

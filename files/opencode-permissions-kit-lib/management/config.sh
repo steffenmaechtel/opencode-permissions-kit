@@ -354,9 +354,9 @@ done
 # ddev-handover.sh): the MUTATING helper fails loud like the write
 # helpers below (#211 a F2) — a silent no-op let projects add / refresh
 # / handover print success ("setgid, default-acl", "baseline refreshed")
-# over a baseline that never ran. The stamp helpers stay fail-safe:
-# stamp_valid rc 1 = "stamp unknown" forces the full scan, stamp_write
-# no-ops (unreachable once ddev_handover_root aborts under set -e).
+# over a baseline that never ran. (a D2: the stamp stubs are gone with
+# their callers — config.sh no longer stamps, ddev_handover_root owns
+# the completed-pass stamp itself.)
 [ -n "$_handover" ] || ddev_handover_root() {
     echo "error: ddev_handover_root unavailable (ddev-handover.sh missing)" >&2
     return 1
@@ -367,10 +367,6 @@ done
     # with the manual fix instead of reporting an unevaluated gate as
     # success.
     return 2
-}
-[ -n "$_handover" ] || {
-    ddev_handover_stamp_valid() { return 1; }
-    ddev_handover_stamp_write() { :; }
 }
 # (#370 a D3R): the mode probe needs its stub too -- its only call
 # site sits in an if-condition (ddev_settings_status), where a MISSING
@@ -536,7 +532,6 @@ projects_add() {
         # with "operation not permitted". The registered path may be a
         # parent of several projects.
         ddev_handover_root "$p" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
-        ddev_handover_stamp_write "$p" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
         ui_success "added $p (group=$OPENCODE_GROUP, setgid, default-acl)"
         log "project added: $p"
     done
@@ -1032,7 +1027,6 @@ refresh() {
             # Shared helper with live per-pass progress (issue #14).
             fs_baseline_root "$p" "$OPENCODE_GROUP" "$OPENCODE_USER"
             ddev_handover_root "$p" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
-            ddev_handover_stamp_write "$p" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
         done <"$PROJECTS_CONF"
     fi
     ui_success "group baseline refreshed."
@@ -1099,7 +1093,6 @@ handover() {
         fi
         ui_info "ddev handover on $p (.ddev + settings dirs + typo3 bootstrap root) ..."
         ddev_handover_root "$p" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
-        ddev_handover_stamp_write "$p" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
         ui_success "handover applied to $p"
         log "ddev handover: $p"
     done

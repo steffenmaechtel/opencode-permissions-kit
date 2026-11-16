@@ -75,7 +75,7 @@ _trap_cleanup() {
         "${RACESTUB:-}" "${RACESP:-}" "${RACESPS:-}" "${RACEC:-}" \
         "${RACECT:-}" "${RACEF:-}" "${RACEFT:-}" "${_112_dir:-}" \
         "${CB285:-}" "${SWAPF:-}" "${SWAPB:-}" "${SWAPR:-}" \
-        "${SWAPRB:-}"
+        "${SWAPRB:-}" "${D2_dir:-}"
 }
 trap _trap_cleanup EXIT INT TERM
 
@@ -2058,12 +2058,56 @@ fi
 rm -rf "$_112_dir"
 unset OPK_HANDOVER_STAMP_DIR
 
+# --- stamp completeness gate (#568 a D2) -------------------------------------
+# ddev_handover_root owns the stamp: a COMPLETED pass writes it, a
+# partial pass must NOT (per-entry chmod/chown failures surface as the
+# worker's exit code, xargs aggregates rc, the stamp gate refuses) —
+# the "the next update rescans and heals" warn lines are only true
+# without a stamp over a partial pass. Both legs functional, sandboxed
+# stamp dir, stderr captured the way an operator sees it.
+D2_dir=$(mktemp -d)
+mkdir -p "$D2_dir/stamps" "$D2_dir/ok/proj/.ddev" "$D2_dir/ok/proj/config/system" \
+    "$D2_dir/part/proj/.ddev" "$D2_dir/part/proj/config/system"
+printf 'type: typo3\n' >"$D2_dir/ok/proj/.ddev/config.yaml"
+printf 'type: typo3\n' >"$D2_dir/part/proj/.ddev/config.yaml"
+# Complete leg: same-owner chown is a permitted no-op even
+# unprivileged, so every arm succeeds and the pass is complete.
+D2_OK_RC=0
+OPK_HANDOVER_STAMP_DIR="$D2_dir/stamps" OPK_DDEV_HANDOVER_LIB="$HANDOVER" \
+    sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\"" \
+    _ "$HANDOVER" "$D2_dir/ok" >/dev/null 2>&1 || D2_OK_RC=$?
+if [ "$D2_OK_RC" -eq 0 ] &&
+    (. "$HANDOVER" && OPK_HANDOVER_STAMP_DIR="$D2_dir/stamps" &&
+        ddev_handover_stamp_valid "$D2_dir/ok" "$(id -un)" "$(id -gn)" "$(id -un)"); then
+    pass "D2: completed pass writes the stamp (best-effort rc kept 0)"
+else
+    fail "D2: completed pass must write the stamp (rc=$D2_OK_RC)"
+fi
+# Partial leg: a group the test user cannot chown to makes the pair
+# arm fail (the warn arm), the worker exits 1, xargs aggregates —
+# rc stays 0 (best-effort continues) but NO stamp may exist.
+D2_PART_RC=0
+OPK_HANDOVER_STAMP_DIR="$D2_dir/stamps" OPK_DDEV_HANDOVER_LIB="$HANDOVER" \
+    sh -c ". \"\$1\" && ddev_handover_root \"\$2\" ocuser ocgroup devuser" \
+    _ "$HANDOVER" "$D2_dir/part" >"$D2_dir/part.out" 2>&1 || D2_PART_RC=$?
+if [ "$D2_PART_RC" -eq 0 ] &&
+    grep -q 'stamp NOT written' "$D2_dir/part.out" &&
+    ! (. "$HANDOVER" && OPK_HANDOVER_STAMP_DIR="$D2_dir/stamps" &&
+        ddev_handover_stamp_valid "$D2_dir/part" ocuser ocgroup devuser); then
+    pass "D2: partial pass warns and stays unstamped (next update rescans)"
+else
+    fail "D2: partial pass must not carry a completed stamp (rc=$D2_PART_RC out=$(cat "$D2_dir/part.out" 2>/dev/null | head -3))"
+fi
+rm -rf "$D2_dir"
+
 # Wiring: update.sh skips via the stamps (plain update only — --refresh
-# forces), re-stamps after every full pass, and says how to force;
-# install.sh + config.sh stamp their explicit passes too.
-# issue #219: --refresh rides the SAME loop (baseline arm loop-local) —
-# update.sh keeps exactly one project-root loop and one handover call
-# per root; comment-strip riders (#261) guard the counts.
+# forces) and says how to force; the STAMP ITSELF is written inside
+# ddev_handover_root at the end of a completed pass (#568 a D2) — no
+# caller stamps on its own anymore (install.sh, config.sh and the
+# update loop all carried unconditional stamp writes, the lie D2
+# removed). issue #219: --refresh rides the SAME loop (baseline arm
+# loop-local) — update.sh keeps exactly one project-root loop and one
+# handover call per root; comment-strip riders (#261) guard the counts.
 if live_src "$UPDATE_CORE" | grep -qF '[ "$REFRESH" != true ]' &&
     live_src "$UPDATE_CORE" |
     grep -qF 'ddev_handover_stamp_valid "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"; then'; then
@@ -2071,9 +2115,6 @@ if live_src "$UPDATE_CORE" | grep -qF '[ "$REFRESH" != true ]' &&
 else
     fail "update.sh: plain-update loop gates the skip on REFRESH + stamp_valid"
 fi
-check_live "update.sh: stamps the root after the handover" \
-    "$UPDATE_CORE" \
-    -qF 'ddev_handover_stamp_write "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP"'
 if live_src "$UPDATE_CORE" | grep -qF '_ho_announced=false' &&
     live_src "$UPDATE_CORE" | grep -qF 'if [ "$_ho_announced" = false ]'; then
     pass "update.sh: the scanning detail is printed only for roots actually scanned"
@@ -2086,29 +2127,30 @@ if live_src "$UPDATE_CORE" | grep -q 'opk update --refresh' &&
 else
     fail "update.sh: skip message names both force paths"
 fi
-# pr-00381 a1/a2/a7 + b1/b2: the file-global presence/order pins were
-# comment-blind and position-free — hoisting the arm out of the loop,
-# dropping its REFRESH wrapper or commenting it out all stayed green.
-# The loop-body range pin below is comment-stripped (#261) and asserts
-# the arm's REFRESH gate, the arm itself and the stamp write INSIDE the
-# single loop, each EXACTLY ONCE, in order arm < handover < stamp (the
-# stamp records a completed pass). The awk end pattern is deliberately
-# UNANCHORED (b1: an indent-anchored one silently captured the file
-# tail after a re-nest, all pins green). A stray done-text occurrence
-# is loud in EVERY placement (c1): anywhere it reds the loops==1 pin,
-# and inside the range it additionally shortens this capture, which
-# reds the in-body counts.
+# pr-00381 a1/a2/a7 + b1/b2 (reworked for #568 a D2): the file-global
+# presence/order pins were comment-blind and position-free — hoisting
+# the arm out of the loop, dropping its REFRESH wrapper or commenting
+# it out all stayed green. The loop-body range pin below is
+# comment-stripped (#261) and asserts the arm's REFRESH gate, the arm
+# itself and the handover call INSIDE the single loop, each EXACTLY
+# ONCE, in order arm < handover, plus ZERO stamp writes (the stamp
+# moved inside ddev_handover_root; a caller-side stamp write is
+# exactly the regression this pin exists for). The awk end pattern is
+# deliberately UNANCHORED (b1: an indent-anchored one silently
+# captured the file tail after a re-nest, all pins green). A stray
+# done-text occurrence is loud in EVERY placement (c1): anywhere it
+# reds the loops==1 pin, and inside the range it additionally shortens
+# this capture, which reds the in-body counts.
 _upd_loop="$(live_src "$UPDATE_CORE" | awk '/while IFS= read -r root; do/,/done <"\$PROJECTS_CONF"/')"
 _upd_gate_n="$(printf '%s\n' "$_upd_loop" | grep -c 'if \[ "\$REFRESH" = true \]; then' || true)"
 _upd_arm_n="$(printf '%s\n' "$_upd_loop" | grep -c 'fs_baseline_root "\$root"' || true)"
-_upd_stmp_n="$(printf '%s\n' "$_upd_loop" | grep -c 'ddev_handover_stamp_write "\$root"' || true)"
-check "update.sh: loop body = 1× REFRESH gate + arm + stamp (${_upd_gate_n}/${_upd_arm_n}/${_upd_stmp_n} — pr-00381 a1/a2/a7/b2)" \
-    sh -c '[ "$1" -eq 1 ] && [ "$2" -eq 1 ] && [ "$3" -eq 1 ]' _ "$_upd_gate_n" "$_upd_arm_n" "$_upd_stmp_n"
+_upd_stmp_n="$(printf '%s\n' "$_upd_loop" | grep -c 'ddev_handover_stamp_write' || true)"
+check "update.sh: loop body = 1× REFRESH gate + arm + handover, 0 stamp writes (${_upd_gate_n}/${_upd_arm_n}/${_upd_stmp_n} — pr-00381, a D2)" \
+    sh -c '[ "$1" -eq 1 ] && [ "$2" -eq 1 ] && [ "$3" -eq 0 ]' _ "$_upd_gate_n" "$_upd_arm_n" "$_upd_stmp_n"
 _upd_arm_ln="$(printf '%s\n' "$_upd_loop" | grep -n 'fs_baseline_root "\$root"' | head -1 | cut -d: -f1)"
 _upd_ho_ln="$(printf '%s\n' "$_upd_loop" | grep -n 'ddev_handover_root "\$root"' | head -1 | cut -d: -f1)"
-_upd_stamp_ln="$(printf '%s\n' "$_upd_loop" | grep -n 'ddev_handover_stamp_write "\$root"' | head -1 | cut -d: -f1)"
-check "update.sh: in-loop order arm < handover < stamp (${_upd_arm_ln}<${_upd_ho_ln}<${_upd_stamp_ln} — pr-00381 a7)" \
-    sh -c '[ -n "$1" ] && [ -n "$2" ] && [ -n "$3" ] && [ "$1" -lt "$2" ] && [ "$2" -lt "$3" ]' _ "$_upd_arm_ln" "$_upd_ho_ln" "$_upd_stamp_ln"
+check "update.sh: in-loop order arm < handover (${_upd_arm_ln}<${_upd_ho_ln} — pr-00381 a7)" \
+    sh -c '[ -n "$1" ] && [ -n "$2" ] && [ "$1" -lt "$2" ]' _ "$_upd_arm_ln" "$_upd_ho_ln"
 _upd_loops_n="$(live_src "$UPDATE_CORE" | grep -c 'done <"$PROJECTS_CONF"' || true)"
 check "update.sh: exactly one project-root loop (loops: $_upd_loops_n, need 1 — issue #219)" \
     [ "$_upd_loops_n" -eq 1 ]
@@ -2121,28 +2163,39 @@ check_live "update.sh: refresh section header kept (issue #219 move)" "$UPDATE_C
     -qF 'ui_section "Refreshing group baseline"'
 check_live "update.sh: routine skip hint kept verbatim (issue #219 move)" "$UPDATE_CORE" \
     -qF 'skipped group-baseline refresh (use --refresh to re-apply chgrp/setgid/default ACLs)'
-check_live "install.sh: stamps after the install-time handover" \
-    "$INSTALL_CORE" \
-    -qF 'ddev_handover_stamp_write "$root" "$OPENCODE_USER" "$OPENCODE_GROUP"'
+# a D2 wiring: the stamp call lives ONLY inside ddev_handover_root's
+# completed-pass gate — no shipped caller stamps on its own anymore
+# (if-found-then-fail absence shapes, comment-stripped).
+if live_src "$INSTALL_CORE" | grep -q 'ddev_handover_stamp_write'; then
+    fail "install-core: no caller-side stamp write (a D2)"
+else
+    pass "install-core: no caller-side stamp write (a D2)"
+fi
+if live_src "$UPDATE_CORE" | grep -q 'ddev_handover_stamp_write'; then
+    fail "update-core: no caller-side stamp write (a D2)"
+else
+    pass "update-core: no caller-side stamp write (a D2)"
+fi
 # Comment-strip riders (#261, the #244 g W1 class): commented-out lines
 # stop counting; full-line comments only (#244 h W6 residual). The count
-# binds the CALL FORM — the opening quote of the first argument, the
-# fs_baseline_root/ddev_handover_root discipline from PR #407 (#408):
-# the bare name also matched the fail-open stub definer, so deleting one
-# of the three real sites left count 3 >= 3 green while the wiring was
-# broken; the call form matches only real invocations (definers, error
-# echoes and comments cannot match) and the floor becomes exact.
+# binds the CALL FORM — the fs_baseline_root/ddev_handover_root
+# discipline from PR #407 (#408): the bare name also matched the
+# fail-open stub definer, so deleting one of the three real sites left
+# count 3 >= 3 green while the wiring was broken; the call form matches
+# only real invocations (definers, error echoes and comments cannot
+# match). Since a D2 config.sh has no stamp sites at all — the exact
+# count 0 replaces the old exactly-3.
 _stampw_n="$(live_src "$CONFIG" | grep -c 'ddev_handover_stamp_write "' || true)"
-check "config.sh: refresh + projects add + handover re-stamp (call sites: $_stampw_n, need exactly 3 — #408)" \
-    [ "$_stampw_n" -eq 3 ]
+check "config.sh: zero stamp call sites (a D2; was exactly 3 pre-D2 — #408)" \
+    [ "$_stampw_n" -eq 0 ]
 check_live "handover.sh: stamp dir defaults to /etc/opencode-permissions-kit/handover" \
     "$HANDOVER" \
     -qF 'OPK_HANDOVER_STAMP_DIR:-/etc/opencode-permissions-kit/handover'
 if live_src "$UPDATE_CORE" | grep -qF 'ddev_handover_stamp_valid() { return 1; }' &&
-    live_src "$UPDATE_CORE" | grep -qF 'ddev_handover_stamp_write() { :; }'; then
-    pass "handover.sh: stamp stubs fail open (valid=1) when the lib is missing"
+    ! live_src "$UPDATE_CORE" | grep -q 'ddev_handover_stamp_write'; then
+    pass "handover.sh: stamp_valid stub fails open when the lib is missing; write stub gone with its caller (a D2)"
 else
-    fail "handover.sh: stamp stubs fail open (valid=1) when the lib is missing"
+    fail "handover.sh: stamp_valid stub fail-open; no write stub/call left in update-core (a D2)"
 fi
 
 # wiring: config.sh / install.sh / status.sh / hook / kit CLI

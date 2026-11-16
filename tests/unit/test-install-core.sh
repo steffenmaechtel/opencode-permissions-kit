@@ -404,16 +404,15 @@ if [ "$_stb_rc" -eq 1 ] &&
 else
     fail "ddev_migrate stub contract broken (rc=$_stb_rc out=$_stb_out) (#250 sweep)"
 fi
-# The two DELIBERATE silent stubs, pinned as such (comment-stripped
-# presence, #407 a P4): the stamp writer is a rescan optimization (a
-# missing stamp costs the next update a scan, never a skipped action —
-# the update-core twin's documented contract), and the done probe's
-# rc 1 = "not migrated" keeps the flow on the migration path where the
-# loud action stubs catch a truncated lib anyway.
-if live_src "$INSTALL" | grep -qF 'ddev_handover_stamp_write() { :; }'; then
-    pass "stamp-write stub stays deliberately silent (documented exception)"
+# The DELIBERATE silent done-probe stub, pinned as such
+# (comment-stripped presence, #407 a P4): its rc 1 = "not migrated"
+# keeps the flow on the migration path where the loud action stubs
+# catch a truncated lib anyway. (a D2: the stamp-write stub is gone
+# with its caller — the stamp lives inside ddev_handover_root now.)
+if live_src "$INSTALL" | grep -q 'ddev_handover_stamp_write'; then
+    fail "install.sh: stamp-write stub gone with its caller (a D2)"
 else
-    fail "stamp-write stub must stay the documented silent exception"
+    pass "install.sh: no stamp-write stub or call left (a D2)"
 fi
 if live_src "$INSTALL" | grep -qF 'ddev_migrate_done() { return 1; }'; then
     pass "done-probe stub stays deliberately fail-safe (documented exception)"

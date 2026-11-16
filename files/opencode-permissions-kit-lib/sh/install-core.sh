@@ -1461,8 +1461,7 @@ do_deploy_phase() {
             fi
             [ -d "$root" ] || continue
             ddev_handover_root "$root" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
-            ddev_handover_stamp_write "$root" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
-            log "ddev handover applied under $root"
+            log "ddev handover ran under $root (stamp only on a completed pass)"
         done
     fi
 
