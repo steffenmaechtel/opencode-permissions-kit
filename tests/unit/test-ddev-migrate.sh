@@ -765,6 +765,22 @@ check_live "c U1: directory-destination guard warns, import side (static presenc
     "$MIG" -qF 'dump manifest path is a directory'
 check_live "c U1: export-side add arm carries the same guard (class sweep)" \
     "$MIG" -qF 'the stage copy stays authoritative'
+# d W2 (maintainer steer, 2026-11-16): the two export guards share
+# their warn text byte-for-byte, so the statics above are union-shaped
+# — per-arm pins scope the grep to each function body, and reverting
+# ONE arm reds its own pin.
+if live_src "$MIG" | awk '/^    _dm_manifest_add\(\)/,/^    }/' |
+    grep -qF 'dump manifest path is a directory'; then
+    pass "c U1: export add arm carries the dir guard (per-arm)"
+else
+    fail "c U1: export add arm lost the dir guard (per-arm)"
+fi
+if live_src "$MIG" | awk '/^    _dm_manifest_drop\(\)/,/^    }/' |
+    grep -qF 'dump manifest path is a directory'; then
+    pass "c U1: export drop arm carries the dir guard (per-arm)"
+else
+    fail "c U1: export drop arm lost the dir guard (per-arm)"
+fi
 check_live "D4: import hint is placeholder-shaped (0.0.39a S5 rule)" \
     "$MIG" -qF 'import manually: ddev start <project> && ddev import-db <project>'
 check_absent "D4: no interpolated paste-me hint left" "$MIG" -q 'import manually: ddev start \$'
