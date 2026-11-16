@@ -8,7 +8,7 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**160 metas · 157 active · 3 retired · 0 review-pending · next due 2026-11-14**
+**160 metas · 157 active · 3 retired · 0 review-pending · next due 2026-11-16**
 
 ## Actionable
 
@@ -37,7 +37,7 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0002](0/0/0/RM-0002.md) | Default choice: n for anything that changes the… | active | approved | 1m | 2026-11-14 |
+| [RM-0002](0/0/0/RM-0002.md) | Default choice: n for anything that changes the… | active | approved | 6m | 2027-05-17 |
 | [RM-0004](0/0/0/RM-0004.md) | Format: <question> [Y/n] or <question> [y/N] | active | approved | 1m | 2026-11-16 |
 | [RM-0005](0/0/0/RM-0005.md) | Enter accepts the default (empty answer =… | active | approved | 1m | 2026-11-16 |
 | [RM-0006](0/0/0/RM-0006.md) | Accepted input: y, yes, n, no — case-insensitive | active | approved | 1m | 2026-11-16 |
@@ -85,7 +85,7 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0003](0/0/0/RM-0003.md) | An rm — any flag form, on a variable with a… | active | approved | 1m | 2026-11-14 |
+| [RM-0003](0/0/0/RM-0003.md) | An rm — any flag form, on a variable with a… | active | approved | 6m | 2027-05-17 |
 | [RM-0014](0/0/1/RM-0014.md) | Operate only on the suite's scratch | active | approved | 1m | 2026-11-16 |
 | [RM-0015](0/0/1/RM-0015.md) | Never touch real project or system trees | active | approved | 1m | 2026-11-16 |
 | [RM-0016](0/0/1/RM-0016.md) | Fixture data is written sandboxed at the source | active | approved | 1m | 2026-11-16 |
@@ -330,13 +330,13 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0020](0/0/2/RM-0020.md) | every rule carries a rationale | active | approved | 1m | 2026-11-14 |
-| [RM-0021](0/0/2/RM-0021.md) | one bullet / list item | active | approved | 1m | 2026-11-14 |
-| [RM-0022](0/0/2/RM-0022.md) | 4 digits zero-padded | active | approved | 1m | 2026-11-14 |
-| [RM-0023](0/0/2/RM-0023.md) | at the bullet's end | active | approved | 1m | 2026-11-14 |
-| [RM-0024](0/0/2/RM-0024.md) | three one-digit levels | active | approved | 1m | 2026-11-14 |
+| [RM-0020](0/0/2/RM-0020.md) | every rule carries a rationale | active | approved | 6m | 2027-05-17 |
+| [RM-0021](0/0/2/RM-0021.md) | one bullet / list item | active | approved | 6m | 2027-05-17 |
+| [RM-0022](0/0/2/RM-0022.md) | 4 digits zero-padded | active | approved | 6m | 2027-05-17 |
+| [RM-0023](0/0/2/RM-0023.md) | at the bullet's end | active | approved | 1m | 2026-12-17 |
+| [RM-0024](0/0/2/RM-0024.md) | three one-digit levels | active | approved | 6m | 2027-05-17 |
 | [RM-0025](0/0/2/RM-0025.md) | regenerated per audit run | active | approved | 1m | 2026-12-17 |
-| [RM-0026](0/0/2/RM-0026.md) | all content is English | active | approved | 1m | 2026-11-14 |
+| [RM-0026](0/0/2/RM-0026.md) | all content is English | active | approved | 6m | 2027-05-17 |
 | [RM-0045](0/0/4/RM-0045.md) | rule-bearing paragraphs are rewritten as | active | approved | 1m | 2026-11-17 |
 | [RM-0046](0/0/4/RM-0046.md) | out of meta scope: rationale = | active | approved | 1m | 2026-11-17 |
 | [RM-0056](0/0/5/RM-0056.md) | the rule plus a one-line why; | active | approved | 1m | 2026-11-18 |
@@ -345,8 +345,8 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0034](0/0/3/RM-0034.md) | only where load-bearing | active | approved | 1m | 2026-11-15 |
-| [RM-0035](0/0/3/RM-0035.md) | Examples use the abstract token | active | approved | 1m | 2026-11-15 |
+| [RM-0034](0/0/3/RM-0034.md) | only where load-bearing | active | approved | 6m | 2027-05-17 |
+| [RM-0035](0/0/3/RM-0035.md) | Examples use the abstract token | active | approved | 6m | 2027-05-17 |
 | [RM-0093](0/0/9/RM-0093.md) | In meta bodies, cross-references | active | approved | 1m | 2026-11-19 |
 | [RM-0094](0/0/9/RM-0094.md) | The review log names the | active | approved | 1m | 2026-11-19 |
 | [RM-0135](0/1/3/RM-0135.md) | Post-approval changes set | active | approved | 1m | 2026-11-30 |
@@ -357,28 +357,28 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0027](0/0/2/RM-0027.md) | falsifiable claim about the world | active | approved | 1m | 2026-11-14 |
+| [RM-0027](0/0/2/RM-0027.md) | falsifiable claim about the world | active | approved | 6m | 2027-05-17 |
 
 ### Revisit ladder
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0028](0/0/2/RM-0028.md) | Clean revisit → up one step | active | approved | 1m | 2026-11-14 |
-| [RM-0031](0/0/3/RM-0031.md) | Every new meta starts at | active | approved | 1m | 2026-11-14 |
-| [RM-0032](0/0/3/RM-0032.md) | Revisit with findings or changes | active | approved | 1m | 2026-11-14 |
-| [RM-0033](0/0/3/RM-0033.md) | revisit date + new interval | active | approved | 1m | 2026-11-14 |
+| [RM-0028](0/0/2/RM-0028.md) | Clean revisit → up one step | active | approved | 6m | 2027-05-17 |
+| [RM-0031](0/0/3/RM-0031.md) | Every new meta starts at | active | approved | 6m | 2027-05-17 |
+| [RM-0032](0/0/3/RM-0032.md) | Revisit with findings or changes | active | approved | 6m | 2027-05-17 |
+| [RM-0033](0/0/3/RM-0033.md) | revisit date + new interval | active | approved | 6m | 2027-05-17 |
 
 ### Audit invariants (deterministic, CI)
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0030](0/0/3/RM-0030.md) | an overdue meta is a maintenance signal | active | approved | 1m | 2026-11-14 |
+| [RM-0030](0/0/3/RM-0030.md) | an overdue meta is a maintenance signal | active | approved | 1m | 2026-12-17 |
 
 ### Retire
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0029](0/0/2/RM-0029.md) | Metas are never deleted | active | approved | 1m | 2026-11-14 |
+| [RM-0029](0/0/2/RM-0029.md) | Metas are never deleted | active | approved | 6m | 2027-05-17 |
 
 ### Open defaults (the pilot validates them)
 
