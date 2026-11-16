@@ -30,7 +30,7 @@ holds.
 | 1 | Main rule | every rule carries a rationale, externalized into a meta file referenced from the rule (RM-0020) |
 | 2 | Rule unit | one bullet / list item (not file, not section) — an estimated 100+ metas at full rollout (RM-0021) |
 | 3 | ID format | `RM-NNNN` — 4 digits zero-padded, globally sequential, never recycled or renumbered (RM-0022) |
-| 4 | Reference syntax | `(RM-NNNN)` at the bullet's end; no dates or history inline in rule files (RM-0023) |
+| 4 | Reference syntax | `(RM-NNNN)` at the bullet's end; short bullets, mini-why ok, history in the meta (RM-0023) |
 | 5 | Storage | `internal/rules-meta/N/N/N/` — three one-digit levels, 10 entries max per node (RM-0024) |
 | 6 | Index & report | **both**: `INDEX.md` regenerated per audit run (inv 8 skips) + audit stdout report (RM-0025) |
 | 7 | Pilot scope | `agent/` (4 files) + `AGENTS.md ## Rules` from the start |
