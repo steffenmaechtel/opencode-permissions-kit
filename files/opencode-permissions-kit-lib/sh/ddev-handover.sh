@@ -76,8 +76,18 @@ ddev_devowned_flagged() {
     [ -f "${1:-}/.ddev/config.yaml" ] || return 1
     # tr also strips \r: a Windows-edited config.yaml carries CRLF line
     # endings and "true\r" would miss the grep (issue #46 class of bugs).
+    # Boolean spellings (#568 a D1): ddev parses config.yaml with
+    # gopkg.in/yaml.v3, which resolves true/True/TRUE (and their false
+    # variants) as booleans — matching only lowercase `true` silently
+    # flipped a hand-edited `True` project into permanent forward
+    # handover. yes/no/on/off stay OUT on purpose: yaml.v3 is YAML 1.2
+    # and treats those as plain strings, so ddev does not resolve them
+    # to booleans either. Honest scope (#568 b Z2): the tr quote-strip
+    # below ALSO accepts quoted spellings ("true"), which yaml.v3
+    # resolves as plain strings — a deliberate hand-edit tolerance; the
+    # check is a superset of ddev's boolean set, never exactly it.
     sed -n 's/^disable_settings_management:[[:space:]]*//p' "$1/.ddev/config.yaml" |
-        head -1 | tr -d ' \t\r"'"'" | grep -qx true
+        head -1 | tr -d ' \t\r"'"'" | grep -qxE 'true|True|TRUE'
 }
 
 # ddev_devowned_flag <project-dir>: insert the top-level key into
@@ -264,6 +274,10 @@ ddev_handover_stamp_valid() {
 # ddev_handover_stamp_write <root> <user> <group> [dev-user]: records a
 # completed full pass. Best-effort — callers run as root (plain writes
 # work); a failed write only costs one extra scan on the next update.
+# The only shipped caller is ddev_handover_root itself, at the end of
+# a pass whose find and every worker exited 0 (#568 a D2) — the stamp
+# is the pass-completeness record, callers stopped stamping on their
+# own.
 ddev_handover_stamp_write() {
     dhw_root="${1:-}"
     dhw_user="${2:-}"
@@ -479,6 +493,7 @@ ddev_handover_project_root() {
                     else
                         echo "  warn: project-root handback incomplete for $dhq_proj""\
  (chown/chmod errors — the next update rescans and heals)" >&2
+                        _dhr_partial=1
                     fi
                 fi
             else
@@ -490,6 +505,7 @@ ddev_handover_project_root() {
                 else
                     echo "  warn: project-root handover incomplete for $dhq_proj""\
  (chown/chmod errors — the next update rescans and heals)" >&2
+                    _dhr_partial=1
                 fi
             fi
             ;;
@@ -506,6 +522,7 @@ ddev_handover_project_root() {
             else
                 echo "  warn: project-root handover incomplete for $dhq_proj""\
  (chown/chmod errors — the next update rescans and heals)" >&2
+                _dhr_partial=1
             fi
             ;;
     esac
@@ -606,6 +623,13 @@ _dhr_entry_one() {
     dhr_group="${3:-}"
     dhr_dev="${4:-}"
     dhr_d="${5:-}"
+    # Partial-pass propagation (#568 a D2): every incomplete arm below
+    # (and in the handover helpers, which set the same shared flag —
+    # same worker process) bumps this to 1; the worker then exits
+    # non-zero, xargs aggregates rc 123, and ddev_handover_root
+    # refuses to write the "completed" stamp. Best-effort itself is
+    # unchanged: all work still runs, skip arms still return 0.
+    _dhr_partial=0
     # Consume-time leaf gate (roles split by the 0.0.45e W1 order
     # swap; wording corrected for #215 / pr-00234 a W8 — it claimed
     # to catch statically planted links at SCAN time): find's
@@ -684,6 +708,7 @@ _dhr_entry_one() {
             # handover (#211 a F14).
             echo "  warn: .ddev handover incomplete for $dhr_d (chmod/chown errors —""\
  the next update rescans and heals)" >&2
+            _dhr_partial=1
         fi
     fi
     dhr_p="$(dirname "$dhr_d")"
@@ -693,21 +718,24 @@ _dhr_entry_one() {
         ddev_devowned_flag "$dhr_p"
     fi
     if ddev_devowned_flagged "$dhr_p"; then
-        ddev_handover_project_back "$dhr_p" "$dhr_user" "$dhr_group" "$dhr_dev" "$dhr_root"
+        ddev_handover_project_back "$dhr_p" "$dhr_user" "$dhr_group" "$dhr_dev" "$dhr_root" || _dhr_partial=1
     else
         # The scan root rides along as the optional last argument
         # (#266): the settings pairs AND the single-inode root ops
         # re-run the component walk per operand against it — see
         # their gates (#420 a A2 closed the root ops' gap).
-        ddev_handover_project "$dhr_p" "$dhr_user" "$dhr_group" "$dhr_root"
-        ddev_handover_project_root "$dhr_p" "$dhr_user" "$dhr_group" "$dhr_dev" "$dhr_root"
+        ddev_handover_project "$dhr_p" "$dhr_user" "$dhr_group" "$dhr_root" || _dhr_partial=1
+        ddev_handover_project_root "$dhr_p" "$dhr_user" "$dhr_group" "$dhr_dev" "$dhr_root" || _dhr_partial=1
     fi
-    return 0
+    return "$_dhr_partial"
 }
 
 # ddev_handover_root <root> <user> <group> [dev-user]
 # Hands every .ddev tree under <root> (any depth) plus the owning
 # project's ddev settings directories over to <user>:<group> with g+w.
+# Writes the rescan-skip stamp itself, but ONLY for a completed pass
+# (find rc 0 and every worker rc 0, #568 a D2); a partial pass warns
+# and stays unstamped so the next update rescans.
 ddev_handover_root() {
     dhr_root="${1:-}"
     dhr_user="${2:-}"
@@ -803,10 +831,22 @@ ddev_handover_root() {
     xargs -0 -r -n1 sh -c '
         # $1..$4: root, user, group, dev; $5: one NUL-delimited entry.
         # Re-source fails only for a lib vanishing mid-run (guarded
-        # above) — announce, do not fail the batch (best-effort).
+        # above). (#568 b Y2): exit NON-zero — the stamp contract
+        # (#568 a D2) records only a COMPLETED pass, and an entry
+        # skipped here makes the pass incomplete: the rc folds into
+        # xargs 123, the stamp gate below withholds the stamp, and the
+        # next update rescans this root. Shell truth (verified for
+        # this fix): `.` is a special builtin, and a failed source
+        # ABORTS the worker shell before this arm — dash AND bash-as-
+        # sh, ENOENT and EACCES both — so the non-zero abort rc
+        # withholds the stamp everywhere already; this arm is the
+        # defensive path for a shell that continues instead, kept
+        # honest with the non-zero exit (a wave-a exit 0 here would
+        # have stamped a skip green on such a shell).
         . "$OPK_DDEV_HANDOVER_LIB" || {
-            echo "  warn: cannot re-source $OPK_DDEV_HANDOVER_LIB — .ddev entry skipped" >&2
-            exit 0
+            echo "  warn: cannot re-source $OPK_DDEV_HANDOVER_LIB — .ddev entry""\
+ skipped (no stamp — the next update rescans)" >&2
+            exit 1
         }
         _dhr_entry_one "$1" "$2" "$3" "$4" "$5"
     ' _ "$dhr_root" "$dhr_user" "$dhr_group" "$dhr_dev" <"$_dhr_nul" || _dhr_xrc=$?
@@ -814,6 +854,21 @@ ddev_handover_root() {
     if [ "$_dhr_xrc" -ne 0 ]; then
         printf '%s\n' "  warn: a .ddev scan worker exited rc=$_dhr_xrc — the pass may""\
  be incomplete (the next update rescans and heals)" >&2
+    fi
+    # Stamp contract (#568 a D2): the stamp records a COMPLETED pass,
+    # so it is written HERE — inside the one function that owns pass
+    # completeness — and only when the find and every worker exited 0.
+    # A partial pass (find rc, worker rc incl. xargs 123 over per-entry
+    # chmod/chown failures) leaves NO stamp: the next plain update
+    # rescans this root, which is exactly what the warn lines above
+    # promise. Callers no longer stamp on their own (sweep: install-
+    # core, update-core and config carried their own unconditional
+    # stamp_write — the lie this gate removes).
+    if [ "$_dhr_frc" -eq 0 ] && [ "$_dhr_xrc" -eq 0 ]; then
+        ddev_handover_stamp_write "$dhr_root" "$dhr_user" "$dhr_group" "$dhr_dev"
+    else
+        printf '%s\n' "  warn: handover stamp NOT written for $dhr_root (incomplete""\
+ pass) — the next update rescans this root" >&2
     fi
     return 0
 }
@@ -901,6 +956,7 @@ ddev_handover_project_back() {
             else
                 echo "  warn: dev-owned handback incomplete for $dhb_proj/$dhb_d""\
  (chown/chmod errors — the next update rescans and heals)" >&2
+                _dhr_partial=1
             fi
         fi
     done
@@ -925,6 +981,7 @@ ddev_handover_project_back() {
         else
             echo "  warn: dev-owned handback incomplete for $dhb_proj (root inode""\
  — chown/chmod errors, the next update rescans and heals)" >&2
+            _dhr_partial=1
         fi
     fi
     return 0
@@ -1004,6 +1061,7 @@ ddev_handover_project() {
             else
                 echo "  warn: ddev settings handover incomplete for $dhp_proj/$dhp_d""\
  (chmod/chown errors — the next update rescans and heals)" >&2
+                _dhr_partial=1
             fi
         fi
     done

@@ -1237,14 +1237,13 @@ fi
 } >"$S245/run-install-handover.sh"
 S245H_OUT=$(sh "$S245/run-install-handover.sh" 2>&1)
 if [ "$(printf '%s\n' "$S245H_OUT" | grep -c '^HO: ')" -eq 1 ] &&
-    [ "$(printf '%s\n' "$S245H_OUT" | grep -c '^STAMP: ')" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245H_OUT" | grep -c '^STAMP: ')" -eq 0 ] &&
     printf '%s\n' "$S245H_OUT" | grep -qF "HO: $S245/real" &&
-    printf '%s\n' "$S245H_OUT" | grep -qF "STAMP: $S245/real" &&
     ! printf '%s\n' "$S245H_OUT" | grep -q '^HO: .*/link' &&
     ! printf '%s\n' "$S245H_OUT" | grep -q '^HO: .*dangling' &&
     [ "$(printf '%s\n' "$S245H_OUT" | grep -cF "ui_warn: skip $S245/link (symlink")" -eq 1 ] &&
     [ "$(printf '%s\n' "$S245H_OUT" | grep -cF "ui_warn: skip $S245/dangling (symlink")" -eq 1 ]; then
-    pass "install.sh handover loop: no stamp/op for link or dangling root, loud skip (a X1/S3)"
+    pass "install.sh handover loop: no stamp/op for link or dangling root, loud skip (a X1/S3; stamp lives in ddev_handover_root since a D2)"
 else
     fail "install.sh handover loop must refuse symlinked roots (out=$(printf '%s\n' "$S245H_OUT" | head -6)) (a X1)"
 fi

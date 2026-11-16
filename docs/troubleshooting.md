@@ -174,6 +174,21 @@ hash -r
 export PATH="/usr/local/bin:$PATH"
 ```
 
+## `opk update` aborts with "fetched kit tree failed the SHA256SUMS verification"
+
+**Cause:** every fetched kit file is verified against the `SHA256SUMS`
+manifest before anything is deployed. This abort means file bytes and
+manifest disagreed mid-fetch — most plausibly the channel moved while
+the update was running (`stable` fast-forwards the moment a release is
+cut).
+
+**Fix:** re-run the update. A sibling abort, "cannot establish the
+SHA256SUMS verification context", means the pinned ref carries no
+manifest at all: tags up to and including `0.0.60` predate the
+mechanism (it first ships with `0.0.61`) — pin a newer tag or a
+branch. The full trust model and the `KIT_SHA_VERIFY=0` break-glass
+live in [the security model](concepts/security-model.md).
+
 ## The first `ddev start` takes forever
 
 **Cause:** mutagen download and image pulls into the fresh rootless daemon.

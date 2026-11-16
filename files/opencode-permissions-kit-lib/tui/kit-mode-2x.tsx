@@ -24,10 +24,15 @@
 // text.feedback.info.default / text.feedback.error.default). Everything
 // is defensive: a broken plugin must never take the TUI down.
 //
-// Deployed to /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx,
-// registered as a plugins entry in ~/.config/opencode/cli.json (opencode
-// user AND default user, additively — managed by py/tui-register.py,
-// gated on OPENCODE_MAJOR=2). The v1 plugin API does not run on 2.x
+// Deployed to /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx.
+// REGISTRATION on 2.x is the plugins/<name>/ directory symlink
+// (sh/tui-plugin.sh: mkdir -p plugins/opencode-permissions-kit +
+// ln -sfn .../kit-mode-2x.tsx .../tui.tsx, issue #80 dir discovery) —
+// cli.json `plugins` file-path entries are deliberately skipped by
+// opencode's reconciliation (install-core.sh: "registering there does
+// nothing"); py/tui-register.py's shipped role is UNREGISTER-only
+// legacy cleanup of such inert entries, on both majors (#568 a P1).
+// The v1 plugin API does not run on 2.x
 // ("moving a file is not enough" — opencode 2 migration guide), hence
 // this port; `import { Plugin } from "@opencode/plugin/tui"` resolves
 // against opencode's own bundle at runtime, and absolute package paths

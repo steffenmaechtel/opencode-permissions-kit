@@ -450,6 +450,56 @@ else
     fail "git_config_apply extractable (#431)"
 fi
 
+# --- Menu EOF/no-tty guard (#568 a M1) --------------------------------------
+# config.sh menu() spun forever when stdin was not a tty AND /dev/tty was
+# unopenable (cron/CI/ssh -T): ui_menu defaulted to "1", ui_ask EOF'd to
+# empty, the re-render loop never terminated. The guard aborts loud. Three
+# arms: the guard is wired into menu() BEFORE the loop, the probe arms on
+# the no-controlling-tty signature, and a pty caller stays un-armed.
+
+# 8a. Wiring + placement: the guard sits in menu() before `while true`.
+_menu_body="$(live_src "$CONFIG" | sed -n '/^menu()/,/^}/p')"
+if printf '%s' "$_menu_body" | grep -qF '[ ! -t 0 ] && ! (: </dev/tty)' &&
+    printf '%s' "$_menu_body" | grep -q 'config menu needs a terminal'; then
+    _guard_line="$(printf '%s' "$_menu_body" | grep -nF '[ ! -t 0 ]' | head -1 | cut -d: -f1)"
+    _loop_line="$(printf '%s' "$_menu_body" | grep -n 'while true' | head -1 | cut -d: -f1)"
+    if [ "${_guard_line:-0}" -lt "${_loop_line:-9999}" ]; then
+        pass "menu(): EOF/no-tty guard present, before the loop (a M1)"
+    else
+        fail "menu(): guard present but after the loop (a M1)"
+    fi
+else
+    fail "menu(): EOF/no-tty guard missing (a M1)"
+fi
+
+# 8b. Behavioral, the failure path as production observes it (L1): under
+# setsid (no controlling terminal) with stdin </dev/null the probe must
+# ARM (rc 7); under a pty (script -qec, the check-host-prompt idiom) a
+# tty stdin must NOT arm it (rc 0). rc discriminates the arm itself.
+if setsid sh -c 'if [ ! -t 0 ] && ! ( : </dev/tty ) 2>/dev/null; then exit 7; fi; exit 0' </dev/null >/dev/null 2>&1; then
+    fail "guard probe: no-tty/EOF stdin must arm (a M1)"
+else
+    _probe_rc=$?
+    [ "$_probe_rc" -eq 7 ] &&
+        pass "guard probe arms on no-tty/EOF stdin (rc 7, a M1)" ||
+        fail "guard probe: wrong rc on no-tty stdin: $_probe_rc (a M1)"
+fi
+if script -qec 'sh -c "[ ! -t 0 ] && exit 7; exit 0"' /dev/null >/dev/null 2>&1; then
+    pass "guard probe stays un-armed on a tty stdin (a M1)"
+else
+    fail "guard probe armed on tty stdin — interactive menus would abort (a M1)"
+fi
+
+# 8c. Hint truth (#568 b X1): the abort hint must name REAL subcommands
+# only — `backend` was not one (the action is container-backend) and an
+# operator following the hint verbatim hit "Unknown action".
+if printf '%s' "$_menu_body" | grep -q 'handover|container-backend|ddev-settings' &&
+    ! printf '%s' "$_menu_body" | grep -q 'handover|backend|ddev-settings'; then
+    pass "menu(): abort hint names real subcommands (b X1)"
+else
+    fail "menu(): abort hint names a subcommand that does not exist (b X1)"
+fi
+
 # --- Summary ---
 echo ""
 echo "===================================="

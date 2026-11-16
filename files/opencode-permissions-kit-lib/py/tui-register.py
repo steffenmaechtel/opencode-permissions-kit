@@ -2,10 +2,14 @@
 """
 opencode permissions kit -- cli.json plugin registration (opencode 2.x)
 
-Manages the kit's TUI mode plugin entry in ~/.config/opencode/cli.json:
+Manages the kit's LEGACY TUI plugin entries in ~/.config/opencode/cli.json:
 opencode 2.x moved terminal-client config from layered tui.json(c) files
-to one global cli.json, and v1 plugin implementations do not run there —
-the kit-mode-2x.tsx port is registered as a `plugins` entry instead.
+to one global cli.json, and the kit once registered the kit-mode-2x.tsx
+port as a `plugins` entry there. 2.x registration is the plugins/<name>/
+directory symlink today (sh/tui-plugin.sh) and cli.json file-path
+entries are skipped by opencode's reconciliation — the shipped role of
+this tool is UNREGISTER-only cleanup of inert legacy entries, on both
+majors (#568 a P1); its `register` mode has no shipped caller.
 cli.json is user-owned state (the TUI persists preferences there), so this
 is strictly ADDITIVE: only entries whose package path points into the
 kit's LIBDIR/tui directory are ever added, rewritten, or removed — every
