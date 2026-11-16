@@ -864,7 +864,9 @@ if [ ! -f "$_w5x2/dumps/manifest.conf" ]; then
 fi
 # c V2 functional: the publish-mv failure arm — a read-only dump dir
 # makes the final rename fail (EACCES on the dest dir); the drop must
-# WARN (b X3's whole point), never silently keep.
+# WARN (b X3's whole point), never silently keep. User-run by policy:
+# under root, CAP_DAC_OVERRIDE defeats the 555 mode, the publish mv
+# succeeds and this leg reds spuriously (same caveat as the 5c leg).
 _w5v2="$(work_new)"
 mkdir -p "$_w5v2/dumps" "$_w5v2/tmp"
 printf 'OK|projA|127.0.0.1|a.sql.gz\n' >"$_w5v2/dumps/manifest.conf"
