@@ -222,7 +222,7 @@ help:
 	@echo "  make test-rider-lint  Run rider lint tests (issue #460)"
 	@echo "  make test-stdin-anchor  Run stdin-run caller-dir anchor tests (issue #405)"
 	@echo "  make test-harness   Run test-harness meta tests (issue #394)"
-	@echo "  make test-rules-meta    Run rule-meta audit pins (invariants 1-9)"
+	@echo "  make test-rules-meta    Run rule-meta audit pins (invariants 1-10)"
 	@echo "  make test-rules-revisit  Run rule-meta revisit workflow pins (phase 4)"
 	@echo "  make test-skills-lint    Run .agents/skills frontmatter lint (issue #178)"
 	@echo "  make rules-report  Show the rule-meta revisit worklist (overdue + horizon + approval queue)"
@@ -736,7 +736,7 @@ test-reviews-meta-aggregate:
 	@./tests/unit/test-reviews-meta-aggregate.sh
 
 test-rules-meta:
-	@echo "=== Rule-Meta Audit Pins (invariants 1-9) ==="
+	@echo "=== Rule-Meta Audit Pins (invariants 1-10) ==="
 	@./tests/unit/test-rules-meta.sh
 
 test-rules-revisit:

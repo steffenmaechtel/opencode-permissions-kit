@@ -190,12 +190,17 @@ a bulk session, not one-off touches).
    double-quoted string in a meta's body — frontmatter and review log
    excluded, fenced blocks and inline code spans are code, not
    quotations — is findable (case-folded, inv5 normalization) in the
-   union of the in-repo file the `Source:` line names and the `rule:`
-   back-ref file: metas quote both their source record and the rule
-   text itself. A `Source:` line naming no in-repo file is an
-   external source (issue, PR body, chat, man page, named git
-   commit) — exempt. Retired metas are exempt (the inv5 retire
-   class).
+   union of the in-repo file(s) the `Source:` line resolves to (all
+   slash tokens; a path wrapped over a line break heals) and the
+   `rule:` back-ref file: metas quote both their source record and
+   the rule text itself. Tokens containing `..` never resolve. A
+   `Source:` line whose tokens resolve to nothing — broken path,
+   prose-adopted token, or external source naming no in-repo path
+   (issue, PR body, chat, man page, named git commit) — and an
+   unclosed code fence are REPORTED in the report-only inv10 lane;
+   only a `Source:`-less meta without flags is silently exempt
+   (report-only lane, #564 a A1). Retired metas are exempt (the inv5
+   retire class).
 
 CI blocks on 1–6, 9 and 10, and on `[meta-tree]` scope errors (find
 failures under the meta tree — #232); an overdue meta is a maintenance
