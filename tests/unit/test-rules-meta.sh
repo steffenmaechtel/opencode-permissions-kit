@@ -1,6 +1,8 @@
 #!/bin/sh
-# test-rules-meta.sh -- pins scripts/rules-audit.sh (invariants 1-9)
-# plus the no-fake-findings pin 10: outside the trailing (RM-NNNN)
+# test-rules-meta.sh -- pins scripts/rules-audit.sh (invariants 1-10)
+# plus the suite's own no-fake-findings pin 10 (unrelated numbering,
+# a suite-pin label -- audit invariants and suite pins count
+# separately): outside the trailing (RM-NNNN)
 # ref form, no real ID may appear in any scope file.
 #
 # Every blocking invariant gets a scratch-tree failure path that must
@@ -233,6 +235,97 @@ sed -i 's/^status: active/status: retired/;
         s/^quote: "Second demo rule"/quote: "Words absent from target"/' \
     "$(meta_file RM-9002)"
 expect_ok "inv5 retired exempt" "0 blocking"
+
+# 10a. inv 10 -- composite body quote not in the Source-named file
+#      nor the rule file (#561, the body-quote discipline)
+new_scratch n10a
+sed -i 's|^Body of RM-9002\.$|Source: agent/conventions.md, demo section.\n\nThe bad "composite quote nowhere" arm.|' \
+    "$(meta_file RM-9002)"
+expect_block "inv10 body quote not in source" "[inv10]"
+
+# 10b. inv 10 -- external source (no in-repo path) is exempt: the
+#      #561 spec constraint (issue/PR/chat/man-page quotes are not
+#      greppable in-tree)
+new_scratch n10b
+sed -i 's|^Body of RM-9002\.$|Source: issue #9 (chat quote).\n\nThe bad "composite quote nowhere" arm.|' \
+    "$(meta_file RM-9002)"
+expect_ok "inv10 external source exempt" "0 blocking"
+
+# 10c. inv 10 -- case normalization: a sentence-initial caps
+#      difference stays green (the #561 spec constraint; the fixture
+#      rule text carries "First demo rule")
+new_scratch n10c
+sed -i 's|^Body of RM-9002\.$|Source: agent/conventions.md, demo section.\n\nThe rule "first demo rule" quoted.|' \
+    "$(meta_file RM-9002)"
+expect_ok "inv10 case-folded quote green" "0 blocking"
+
+# 10d. inv 10 -- the rule file is a haystack on its own: the quote
+#      sits in the rule back-ref file, NOT in the Source-named file
+#      (metas quote both their source record and the rule text)
+new_scratch n10d
+sed -i 's|^Body of RM-9002\.$|Source: internal/records/rules-meta.md, demo section.\n\nThe rule "First demo rule" via rule file.|' \
+    "$(meta_file RM-9002)"
+expect_ok "inv10 rule-file haystack green" "0 blocking"
+
+# 10e. inv 10 -- code is not quotation (a corpus case from the #561
+#      survey): the same composite inside an inline code span stays
+#      green
+new_scratch n10e
+sed -i 's|^Body of RM-9002\.$|Source: agent/conventions.md, demo section.\n\nThe marker `"composite quote nowhere"` arm.|' \
+    "$(meta_file RM-9002)"
+expect_ok "inv10 code span is not a quote" "0 blocking"
+
+# 10f. inv 10 -- retired metas are exempt (the inv5 retire class)
+new_scratch n10f
+sed -i '/^- Second demo rule\. (RM-9002)$/d' "$SCRATCH/agent/conventions.md"
+sed -i 's/^status: active/status: retired/;
+    s|^Body of RM-9002\.$|Source: agent/conventions.md, demo section.\n\nThe bad "composite quote nowhere" arm.|' \
+    "$(meta_file RM-9002)"
+expect_ok "inv10 retired exempt" "0 blocking"
+
+# 10g. inv 10 (#564 a A1) -- a Source path wrapped over a line break
+#      heals (the wrap space after a slash fuses) and the quote is
+#      checked; without the heal the token cannot resolve and the
+#      meta would silently ride the exemption
+new_scratch n10g
+sed -i 's|^Body of RM-9002\.$|Source: agent/\nconventions.md, demo section.\n\nThe bad "composite quote nowhere" arm.|' \
+    "$(meta_file RM-9002)"
+expect_block "inv10 wrapped Source path heals and checks" "[inv10]"
+
+# 10h. inv 10 (#564 a A1) -- an unresolvable Source token is REPORTED
+#      (report-only lane), not silently exempt
+new_scratch n10h
+sed -i 's|^Body of RM-9002\.$|Source: management/nonexistent.sh, demo section.\n\nThe bad "composite quote nowhere" arm.|' \
+    "$(meta_file RM-9002)"
+expect_ok "inv10 unresolved token reported" "inv10 unresolved (report-only"
+
+# 10i. inv 10 (#564 a B3) -- multi-file Source lines: every resolvable
+#      token is a haystack leg (first-token-only would check only
+#      rules-meta.md; the quote lives in the second leg and the rule
+#      file is the first leg, so only the union discriminates)
+new_scratch n10i
+sed -i 's|^Body of RM-9004\.$|Source: internal/records/rules-meta.md and agent/conventions.md, demo.\n\nThe rule "First demo rule" quoted.|' \
+    "$(meta_file RM-9004)"
+expect_ok "inv10 all resolvable Source tokens are legs" "0 blocking"
+
+# 10j. inv 10 (#564 a B2, b D1) -- dot-dot tokens never resolve (no
+#      out-of-root read): a marker planted ../-reachable from $ROOT
+#      must NOT become a leg, and the rejection is visible in the
+#      report lane. With the guard deleted the marker WOULD resolve
+#      and the composite quote would block -- the arm discriminates
+#      the guard itself, not the sandbox layout.
+new_scratch n10j
+printf 'marker\n' >"$WORK/inv10-outside-marker.md"
+sed -i 's|^Body of RM-9002\.$|Source: see ../inv10-outside-marker.md, demo.\n\nThe bad "composite quote nowhere" arm.|' \
+    "$(meta_file RM-9002)"
+expect_ok "inv10 dot-dot token rejected and reported" "../inv10-outside-marker.md"
+
+# 10k. inv 10 (#564 a B4) -- an unclosed fence amputates the body:
+#      non-blocking, but flagged in the report lane
+new_scratch n10k
+sed -i 's|^Body of RM-9002\.$|Source: agent/conventions.md, demo section.\n\n```\nstray fence\nThe bad "composite quote nowhere" arm.|' \
+    "$(meta_file RM-9002)"
+expect_ok "inv10 odd fence flagged in report" "odd (unclosed) fence"
 
 # 6a. inv 6 -- next-revisit before created
 new_scratch n6a

@@ -186,8 +186,27 @@ a bulk session, not one-off touches).
    amendment events. Log ORDER decides same-day ties:
    approve-then-amend re-queues, amend-then-approve is the fresh
    approval.
+10. Body-quote parity (#561, the body-rules quote discipline): every
+   double-quoted string in a meta's body — frontmatter and review log
+   excluded, fenced blocks and inline code spans are code, not
+   quotations — is findable (case-folded, inv5 normalization) in the
+   union of the in-repo file(s) the `Source:` line resolves to (all
+   slash tokens; a path wrapped over a line break heals) and the
+   `rule:` back-ref file: metas quote both their source record and
+   the rule text itself. Tokens containing `..` never resolve. A
+   `Source:` line whose tokens resolve to nothing — broken path,
+   prose-adopted token, or external source naming no in-repo path
+   (issue, PR body, chat, man page, named git commit) — and an
+   unclosed code fence are REPORTED in the report-only inv10 lane;
+   only a meta whose `Source:` line yields no slash token at all (no
+   `Source:` line, or external prose without path-shaped words) is
+   silently exempt (#564 a A1, b D2). The wrap heal fuses every
+   slash-space — a ` / ` prose separator next to a named path hijacks
+   the leg into one fused unresolved token (visible in the report
+   lane); Source lines must not use ` / ` when naming paths (b D3).
+   Retired metas are exempt (the inv5 retire class).
 
-CI blocks on 1–6 and 9, and on `[meta-tree]` scope errors (find
+CI blocks on 1–6, 9 and 10, and on `[meta-tree]` scope errors (find
 failures under the meta tree — #232); an overdue meta is a maintenance
 signal, not a broken build. (RM-0030) The Phase-2 pending-unit
 parking valve (prefix-matched ref-less units reported non-blocking)

@@ -35,6 +35,22 @@
 #      word "amended" -- subject prefixes ("rationale amended") count,
 #      glued tokens ("amendedness") and lines opening with another
 #      event keyword (approved/revisit/created) do not (#337 a A1).
+#  10. body-quote parity (#561, the body-rules quote discipline): every
+#      double-quoted string in a meta's body (frontmatter and review
+#      log excluded; fenced blocks and inline code spans are code,
+#      not quotations) is findable -- case-folded, inv5-normalized --
+#      in the union of the in-repo file(s) the Source line resolves
+#      to (all slash tokens, wrapped paths healed) and the rule:
+#      back-ref file. Tokens containing '..' never resolve. A Source
+#      line whose tokens resolve to nothing, and an unclosed fence,
+#      are REPORTED (report-only inv10 lane) -- only a meta whose
+#      Source yields no slash token at all (no Source line, or
+#      external prose without path-shaped words) is silently exempt
+#      (#564 b D2). The heal fuses every slash-space: a ' / ' prose
+#      separator next to a named path hijacks the leg into one fused
+#      unresolved token (b D3) -- Source lines must not use ' / '
+#      when naming paths. Retired metas are exempt (the inv5 retire
+#      class).
 #
 # Report-only (non-blocking -- overdue is a maintenance signal):
 # 7. overdue list sorted by lateness; 8. INDEX.md regenerated on every
@@ -51,7 +67,7 @@
 # complete: the agent/ files and AGENTS.md ## Rules are in scope;
 # learnings.md stays out (record decision 10).
 #
-# Exit: 1 on blocking violations (1-6, 9) and [meta-tree] scope
+# Exit: 1 on blocking violations (1-6, 9, 10) and [meta-tree] scope
 #      errors, 0 otherwise.
 # Env: RM_AUDIT_ROOT (run against another tree -- tests),
 #      FORCE_TODAY (pin the date for overdue/report checks).
@@ -108,6 +124,8 @@ V=$WORK/violations
 : >"$V"
 OVER=$WORK/overdue
 : >"$OVER"
+UNRES=$WORK/inv10report
+: >"$UNRES"
 
 block() { printf '[inv%s] %s\n' "$1" "$2" >>"$V"; }
 
@@ -348,6 +366,82 @@ while IFS= read -r m; do
         fi
     fi
 
+    # 10 (#561): body-quote parity, the body-rules quote
+    # discipline -- quoted
+    # strings in meta bodies exist verbatim somewhere nameable. Code
+    # is not quotation (fences + inline spans dropped before quote
+    # extraction); haystack = the UNION of every in-repo file the
+    # Source line resolves to (all slash tokens; a path wrapped over
+    # a line break heals -- the wrap space after a slash fuses) plus
+    # the rule back-ref file, all inv5-normalized and case-folded
+    # (the #561 spec constraint: sentence-initial caps differ
+    # corpus-wide); tokens containing '..' never resolve (reads stay
+    # rooted under $ROOT). A Source line whose tokens resolve to
+    # NOTHING is REPORTED (report-only lane, inv10 report): external
+    # sources name no in-repo path, but a broken, prose-adopted or
+    # dot-dot token is visible instead of silently exempt -- as is a
+    # meta without a Source line carrying an odd (unclosed) fence,
+    # which would amputate the body. Only a meta whose Source tail
+    # yields no slash token at all stays silently exempt (#564 b D2);
+    # the heal's slash-space fusion is a documented boundary (#564 b
+    # D3); retired metas are exempt (the inv5 retire class).
+    if [ "$st" != retired ]; then
+        bj=$WORK/body.join
+        bflag=$WORK/body.flag
+        : >"$bflag"
+        awk -v flag="$bflag" '
+            function emit(l) { gsub(/`/, "", l); gsub(/\*/, "", l); printf "%s ", l }
+            BEGIN { fm = 0; fence = 0; stop = 0 }
+            /^---$/ { fm++; next }
+            fm < 2 { next }
+            /^```/ { fence = !fence; next }
+            fence { next }
+            /^## Review log/ { stop = 1 }
+            stop { next }
+            {
+                l = $0
+                while (match(l, /`[^`]*`/))
+                    l = substr(l, 1, RSTART - 1) substr(l, RSTART + RLENGTH)
+                emit(l)
+            }
+            END { if (fence) printf "odd fence" > flag }
+        ' "$m" | tr -s ' \t' ' ' >"$bj"
+        stail=$(sed -n 's/.*Source://p' "$bj" | sed 's|/ |/|g')
+        legs=""
+        unres=""
+        for tok in $(printf '%s\n' "$stail" |
+            grep -o '[A-Za-z0-9_./-]*/[A-Za-z0-9_./-]*[A-Za-z0-9]'); do
+            case $tok in
+                *..*) unres="$unres $tok" ;;
+                *) if [ -f "$ROOT/$tok" ]; then
+                    legs="$legs $tok"
+                else
+                    unres="$unres $tok"
+                fi ;;
+            esac
+        done
+        if [ -n "$legs" ]; then
+            hay=""
+            for leg in $legs; do hay=$hay$(norm_join "$ROOT/$leg"); done
+            [ -f "$ROOT/$tpath" ] && hay=$hay$(norm_join "$ROOT/$tpath")
+            hay=$(printf '%s' "$hay" | tr '[:upper:]' '[:lower:]')
+            legsmsg=$(printf '%s' "$legs" | sed 's/^ //; s/ /, /g')
+            grep -o '"[^"]*"' "$bj" | sed 's/^"//; s/"$//' |
+                while IFS= read -r bq; do
+                    [ -n "$bq" ] || continue
+                    nq=$(printf '%s' "$bq" | tr '[:upper:]' '[:lower:]')
+                    case $hay in
+                        *"$nq"*) ;;
+                        *) block 10 "$rel -- body quote not in '$legsmsg' or rule file: \"$bq\"" ;;
+                    esac
+                done
+        fi
+        [ -n "$unres" ] &&
+            printf '%s -- unresolved Source token(s):%s\n' "$base" "$unres" >>"$UNRES"
+        [ -s "$bflag" ] &&
+            printf '%s -- odd (unclosed) fence: body amputated from quote extraction\n' "$base" >>"$UNRES"
+    fi
+
     # 9: approval consistency (field <=> review-log line, same date --
     # any approval line counts: re-approvals after edits are legal)
     reviewed=$(fm_get "$m" reviewed)
@@ -480,6 +574,11 @@ no=$(wc -l <"$OVER" | tr -d ' ')
 if [ "$no" -gt 0 ]; then
     echo "overdue metas (maintenance signal, not blocking):"
     LC_ALL=C sort "$OVER" | while IFS='	' read -r d r; do echo "  $r (due $d)"; done
+fi
+
+if [ -s "$UNRES" ]; then
+    echo "inv10 unresolved (report-only, non-blocking):"
+    sort "$UNRES" | sed 's/^/  /'
 fi
 
 if [ "$nv" -gt 0 ]; then
