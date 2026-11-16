@@ -784,6 +784,22 @@ check "root-file type (codeigniter): same permanent root handover" \
 check "root-file types: flagged project gets the root back (handback)" \
     sh -c "printf 'type: symfony\ndisable_settings_management: true\n' > \"\$2/.ddev/config.yaml\" && . \"\$1\" && ddev_handover_project_back \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\" >/dev/null && test \"\$(stat -c %a \"\$2\")\" = 2775" _ "$HANDOVER" "$HWORK/proj"
 
+# --- 7c-3. dev-owned boolean casing (#568 a D1) ----------------------------------
+# ddev parses config.yaml with gopkg.in/yaml.v3, which resolves
+# true/True/TRUE as booleans — the flagged check must recognize exactly
+# those spellings or a hand-edited `True` project silently flips into
+# permanent forward handover. yes/no/on/off are PLAIN STRINGS under
+# YAML 1.2 (ddev does not resolve them either) — they must stay
+# unflagged.
+check "flagged: True casing recognized (yaml.v3 boolean)" \
+    sh -c "printf 'type: typo3\ndisable_settings_management: True\n' > \"\$2/.ddev/config.yaml\" && . \"\$1\" && ddev_devowned_flagged \"\$2\"" _ "$HANDOVER" "$HWORK/proj"
+check "flagged: TRUE casing recognized (yaml.v3 boolean)" \
+    sh -c "printf 'type: typo3\ndisable_settings_management: TRUE\n' > \"\$2/.ddev/config.yaml\" && . \"\$1\" && ddev_devowned_flagged \"\$2\"" _ "$HANDOVER" "$HWORK/proj"
+check "flagged: yes is a string under YAML 1.2 — stays unflagged" \
+    sh -c "printf 'type: typo3\ndisable_settings_management: yes\n' > \"\$2/.ddev/config.yaml\" && . \"\$1\" && ! ddev_devowned_flagged \"\$2\"" _ "$HANDOVER" "$HWORK/proj"
+check "flagged: False variant stays unflagged" \
+    sh -c "printf 'type: typo3\ndisable_settings_management: False\n' > \"\$2/.ddev/config.yaml\" && . \"\$1\" && ! ddev_devowned_flagged \"\$2\"" _ "$HANDOVER" "$HWORK/proj"
+
 # hint coverage (static): the bootstrap hint names the new type classes.
 # Boundary note (#416 a R6): the child-shell function-range awk legs
 # below (this hint-check block and its siblings) run inside sh -c

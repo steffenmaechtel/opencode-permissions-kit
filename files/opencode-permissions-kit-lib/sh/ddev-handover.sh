@@ -76,8 +76,15 @@ ddev_devowned_flagged() {
     [ -f "${1:-}/.ddev/config.yaml" ] || return 1
     # tr also strips \r: a Windows-edited config.yaml carries CRLF line
     # endings and "true\r" would miss the grep (issue #46 class of bugs).
+    # Boolean spellings (#568 a D1): ddev parses config.yaml with
+    # gopkg.in/yaml.v3, which resolves true/True/TRUE (and their false
+    # variants) as booleans — matching only lowercase `true` silently
+    # flipped a hand-edited `True` project into permanent forward
+    # handover. yes/no/on/off stay OUT on purpose: yaml.v3 is YAML 1.2
+    # and treats those as plain strings, so ddev does not resolve them
+    # to booleans either.
     sed -n 's/^disable_settings_management:[[:space:]]*//p' "$1/.ddev/config.yaml" |
-        head -1 | tr -d ' \t\r"'"'" | grep -qx true
+        head -1 | tr -d ' \t\r"'"'" | grep -qxE 'true|True|TRUE'
 }
 
 # ddev_devowned_flag <project-dir>: insert the top-level key into
