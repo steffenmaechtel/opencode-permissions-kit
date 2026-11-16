@@ -8,12 +8,12 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**160 metas · 157 active · 3 retired · 1 review-pending · next due 2026-11-16**
+**160 metas · 157 active · 3 retired · 0 review-pending · next due 2026-11-16**
 
 ## Actionable
 
 - **Review pending:** none
-- **Amended — pending:** RM-0030 (2026-11-17)
+- **Amended — pending:** none
 
 ## AGENTS.md
 
@@ -372,7 +372,7 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0030](0/0/3/RM-0030.md) | an overdue meta is a maintenance signal | active | **amended — pending** | 1m | 2026-12-17 |
+| [RM-0030](0/0/3/RM-0030.md) | an overdue meta is a maintenance signal | active | approved | 1m | 2026-12-17 |
 
 ### Retire
 
