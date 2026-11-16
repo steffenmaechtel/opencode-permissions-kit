@@ -91,6 +91,15 @@ Body rules:
   parenthetical between the intended words makes the quote unfindable
   (an invariant-5 failure whose record is issue #540 §2; rewording
   the bullet made the needle words contiguous). (RM-0156)
+- **Quoted strings in meta bodies exist verbatim in a named source**
+  — checked before posting; a paraphrase carries no quotation marks,
+  and a composite blending two sources' wording is never quoted as
+  one string (the incident: a draft's evidence quoted "the whole
+  population of 14", matching no source — one half standing prose
+  without the count, the other half a PR body's live-state count;
+  caught in review, fixed to cite the real string). The needle
+  parity rule directly above covers the frontmatter only; body
+  citations ride on this rule. (RM-0159)
 
 ## Quality bar for rationales
 
