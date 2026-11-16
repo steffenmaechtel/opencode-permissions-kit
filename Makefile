@@ -371,8 +371,10 @@ fmt:
 	@echo "formatted (gate scope): $$(echo $(SHELLCHECK_FILES) $(SHFMT_TEST_FILES) | wc -w) files"
 
 # Regenerate the SHA256SUMS integrity manifest (issue #478) from
-# update.sh's KIT_FILES list. Run after ANY change under files/ and
-# commit the manifest with your PR: the fetch-integrity suite's
+# update.sh's KIT_FILES list. Run after ANY change under files/ OR a
+# VERSION bump (the manifest hashes the VERSION file too — every
+# release PR owes a regen, issue #568 a B1) and commit the manifest
+# with your PR: the fetch-integrity suite's
 # freshness pin reddens `make test` on a stale manifest, and
 # scripts/release.sh refuses to cut a release from one. Generation is
 # deterministic (LC_ALL=C path sort), so an unchanged tree reproduces
@@ -555,7 +557,8 @@ clean:
 version:
 	@[ -n "$(VERSION)" ] || { echo "Usage: make version VERSION=x.y.z"; exit 1; }
 	@echo "$(VERSION)" > VERSION
-	@echo "Version stamp set to $(VERSION) (VERSION file). Release: tag it, then fast-forward 'stable' to master (internal/process/release-handling.md)."
+	@echo "Version stamp set to $(VERSION) (VERSION file). Also run 'make sums' — the manifest's VERSION entry must ride the bump (#568 a T1)."
+	@echo "Release: tag it, then fast-forward 'stable' to master (internal/process/release-handling.md)."
 
 check-version:
 	@v="$$(cat VERSION)"; \

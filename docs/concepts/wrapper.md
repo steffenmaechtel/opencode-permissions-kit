@@ -124,7 +124,7 @@ The kit registers a small TUI plugin for the `opencode` user. It renders one
 thin row at the very bottom of the TUI:
 
 ```text
-opencode-permissions-kit (0.0.20) Mode: with ddev/docker
+opencode-permissions-kit (<x.y.z>) Mode: with ddev/docker
 ```
 
 `with ddev/docker` when a rootless container backend is provisioned,

@@ -89,6 +89,26 @@ re-apply the group baseline **and** force the full rescan:
 opk update --refresh
 ```
 
+### Update integrity (SHA256SUMS)
+
+Every `opk update` verifies each fetched kit file against the
+`SHA256SUMS` manifest that rides the same ref — nothing deploys over a
+mismatch. Two aborts can surface on release day:
+
+- `fetched kit tree failed the SHA256SUMS verification` — the channel
+  moved mid-fetch (the `stable` mirror fast-forwards when a release is
+  cut); re-run the update.
+- `cannot establish the SHA256SUMS verification context` — the pinned
+  ref carries no manifest. Every tag up to and including `0.0.60`
+  predates the mechanism (it first ships with `0.0.61`), so the
+  `--channel 0.0.29`-style pins above fail closed with this error: pin
+  `0.0.61` or newer, or a branch.
+
+`KIT_SHA_VERIFY=0` in the environment disables the gate (break-glass
+for upstream outages). The trust model — what the manifest does and
+does not protect against — lives in
+[the security model](../concepts/security-model.md).
+
 ## Upgrade the opencode binary
 
 `opencode upgrade` and opencode's auto-updater cannot work behind the

@@ -550,6 +550,11 @@ stamped in `install.conf`. Switch channels without editing it:
 sudo opk update --channel stable   # or master, a feature branch, or a tag
 ```
 
+Each fetched file is verified against the ref's `SHA256SUMS` manifest
+before deploy (tags up to `0.0.60` predate it and abort with a named
+error; `KIT_SHA_VERIFY=0` is the break-glass) — details in the
+[security model](../concepts/security-model.md).
+
 | Flag | Meaning |
 |---|---|
 | `--yes`, `-y` | Skip the confirmation prompt |
