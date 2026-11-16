@@ -951,13 +951,24 @@ echo ""
 echo "--- 12d. config.sh interactive menu (displays) ---"
 E 'sudo mkdir -p /var/www/vhosts/menu-project' &&
     E 'sudo touch /var/www/vhosts/menu-project/.env'
-# The interactive menu uses read </dev/tty which blocks in a non-TTY
-# environment. We capture whatever output appears within 3 seconds before
-# timeout kills the process. At minimum the banner + current settings +
-# projects list should print. The full menu options ([2], [3], [q]) may
-# or may not appear depending on buffering and how far the script gets
-# before the read blocks.
-E 'timeout 3 sudo bash /usr/local/lib/opencode-permissions-kit/management/config.sh < /dev/null > /tmp/menu-out.txt 2>&1 || true'
+# The menu needs a terminal (#568 round a M1): without a stdin tty AND
+# an openable /dev/tty — this container has neither — every prompt
+# returns its default and the pre-a menu SPUN forever; the old run of
+# this test captured its output by racing a 3s timeout against that
+# spin. Two legs now: (1) no-tty aborts loud and FAST (rc 1, the
+# guard's error line, no settings section — the timeout is the no-hang
+# discriminator, rc 124 would mean a spin); (2) under a pty (script)
+# the menu displays exactly as designed and blocks on its read until
+# the timeout takes it — banner + current settings + project list.
+E 'timeout 5 sudo bash /usr/local/lib/opencode-permissions-kit/management/config.sh < /dev/null > /tmp/menu-abort.txt 2>&1; echo "rc=$?" >> /tmp/menu-abort.txt'
+E 'sudo chown dev /tmp/menu-abort.txt'
+check "menu: no-tty aborts loud (a M1)" \
+    E 'grep -q "config menu needs a terminal" /tmp/menu-abort.txt'
+check "menu: no-tty abort is fast rc=1, no spin" \
+    E 'grep -q "^rc=1$" /tmp/menu-abort.txt'
+check "menu: no-tty abort prints no settings section" \
+    E '! grep -q "Current settings" /tmp/menu-abort.txt'
+E 'timeout 5 script -qec "sudo bash /usr/local/lib/opencode-permissions-kit/management/config.sh" /dev/null > /tmp/menu-out.txt 2>&1 || true'
 E 'sudo chown dev /tmp/menu-out.txt'
 check "menu: banner shown" \
     E 'grep -q "opencode permissions kit" /tmp/menu-out.txt'
