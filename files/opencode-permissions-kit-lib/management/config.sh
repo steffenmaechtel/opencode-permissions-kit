@@ -1167,6 +1167,23 @@ ddev_settings_apply() {
 
 menu() {
     banner
+    # EOF/no-tty guard (#568 a M1): without a stdin tty AND without an
+    # openable /dev/tty (cron, CI, ssh -T) every ui_menu returns its
+    # default ("1") and every ui_ask EOF returns empty — the
+    # select->ask->continue cycle re-rendered this loop forever. The
+    # install-side twin of this class was fixed the same way (0.0.44a
+    # V6, install-core.sh project selection). The /dev/tty open probe
+    # consumes nothing: a failed open is the no-controlling-tty
+    # signature; a tty caller (or one piping stdin from a real
+    # terminal) keeps reading /dev/tty as before. The probe opens in a
+    # SUBSHELL: `:` is a special builtin, and dash treats a failed
+    # redirection on it as fatal for the whole script — isolated, the
+    # failure is just a non-zero rc the condition inverts.
+    if [ ! -t 0 ] && ! (: </dev/tty) 2>/dev/null; then
+        ui_error "config menu needs a terminal — run from an interactive shell ""\
+or use a subcommand (projects|git-config|refresh|handover|backend|ddev-settings)"
+        exit 1
+    fi
     while true; do
         ui_section "Current settings"
         git_config_status 2>/dev/null || true
