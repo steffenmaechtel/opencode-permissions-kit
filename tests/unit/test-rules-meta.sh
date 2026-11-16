@@ -308,12 +308,17 @@ sed -i 's|^Body of RM-9004\.$|Source: internal/records/rules-meta.md and agent/c
     "$(meta_file RM-9004)"
 expect_ok "inv10 all resolvable Source tokens are legs" "0 blocking"
 
-# 10j. inv 10 (#564 a B2) -- dot-dot tokens never resolve (no
-#      out-of-root read) and surface in the report lane instead
+# 10j. inv 10 (#564 a B2, b D1) -- dot-dot tokens never resolve (no
+#      out-of-root read): a marker planted ../-reachable from $ROOT
+#      must NOT become a leg, and the rejection is visible in the
+#      report lane. With the guard deleted the marker WOULD resolve
+#      and the composite quote would block -- the arm discriminates
+#      the guard itself, not the sandbox layout.
 new_scratch n10j
-sed -i 's|^Body of RM-9002\.$|Source: see ../../etc/passwd, demo.\n\nThe bad "composite quote nowhere" arm.|' \
+printf 'marker\n' >"$WORK/inv10-outside-marker.md"
+sed -i 's|^Body of RM-9002\.$|Source: see ../inv10-outside-marker.md, demo.\n\nThe bad "composite quote nowhere" arm.|' \
     "$(meta_file RM-9002)"
-expect_ok "inv10 dot-dot token rejected and reported" "../../etc/passwd"
+expect_ok "inv10 dot-dot token rejected and reported" "../inv10-outside-marker.md"
 
 # 10k. inv 10 (#564 a B4) -- an unclosed fence amputates the body:
 #      non-blocking, but flagged in the report lane

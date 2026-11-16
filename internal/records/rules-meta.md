@@ -198,9 +198,13 @@ a bulk session, not one-off touches).
    prose-adopted token, or external source naming no in-repo path
    (issue, PR body, chat, man page, named git commit) — and an
    unclosed code fence are REPORTED in the report-only inv10 lane;
-   only a `Source:`-less meta without flags is silently exempt
-   (report-only lane, #564 a A1). Retired metas are exempt (the inv5
-   retire class).
+   only a meta whose `Source:` line yields no slash token at all (no
+   `Source:` line, or external prose without path-shaped words) is
+   silently exempt (#564 a A1, b D2). The wrap heal fuses every
+   slash-space — a ` / ` prose separator next to a named path hijacks
+   the leg into one fused unresolved token (visible in the report
+   lane); Source lines must not use ` / ` when naming paths (b D3).
+   Retired metas are exempt (the inv5 retire class).
 
 CI blocks on 1–6, 9 and 10, and on `[meta-tree]` scope errors (find
 failures under the meta tree — #232); an overdue meta is a maintenance

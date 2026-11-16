@@ -43,10 +43,14 @@
 #      to (all slash tokens, wrapped paths healed) and the rule:
 #      back-ref file. Tokens containing '..' never resolve. A Source
 #      line whose tokens resolve to nothing, and an unclosed fence,
-#      are REPORTED (report-only inv10 lane) -- only a Source-less
-#      meta without flags is silently exempt as an external source
-#      (the #561 spec constraint). Retired metas are exempt (the
-#      inv5 retire class).
+#      are REPORTED (report-only inv10 lane) -- only a meta whose
+#      Source yields no slash token at all (no Source line, or
+#      external prose without path-shaped words) is silently exempt
+#      (#564 b D2). The heal fuses every slash-space: a ' / ' prose
+#      separator next to a named path hijacks the leg into one fused
+#      unresolved token (b D3) -- Source lines must not use ' / '
+#      when naming paths. Retired metas are exempt (the inv5 retire
+#      class).
 #
 # Report-only (non-blocking -- overdue is a maintenance signal):
 # 7. overdue list sorted by lateness; 8. INDEX.md regenerated on every
@@ -377,9 +381,10 @@ while IFS= read -r m; do
     # sources name no in-repo path, but a broken, prose-adopted or
     # dot-dot token is visible instead of silently exempt -- as is a
     # meta without a Source line carrying an odd (unclosed) fence,
-    # which would amputate the body. Only a Source-less meta without
-    # flags stays silently exempt; retired metas are exempt (the
-    # inv5 retire class).
+    # which would amputate the body. Only a meta whose Source tail
+    # yields no slash token at all stays silently exempt (#564 b D2);
+    # the heal's slash-space fusion is a documented boundary (#564 b
+    # D3); retired metas are exempt (the inv5 retire class).
     if [ "$st" != retired ]; then
         bj=$WORK/body.join
         bflag=$WORK/body.flag
@@ -420,7 +425,7 @@ while IFS= read -r m; do
             for leg in $legs; do hay=$hay$(norm_join "$ROOT/$leg"); done
             [ -f "$ROOT/$tpath" ] && hay=$hay$(norm_join "$ROOT/$tpath")
             hay=$(printf '%s' "$hay" | tr '[:upper:]' '[:lower:]')
-            legsmsg=$(printf '%s' "$legs" | tr -d ' ')
+            legsmsg=$(printf '%s' "$legs" | sed 's/^ //; s/ /, /g')
             grep -o '"[^"]*"' "$bj" | sed 's/^"//; s/"$//' |
                 while IFS= read -r bq; do
                     [ -n "$bq" ] || continue
