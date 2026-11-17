@@ -876,10 +876,24 @@ p10_lane_c_hits() { # $1 root, $2 scope; loud on scan death (#519:
     # lane read green over missing coverage), a death before any rows
     # read as a clean tree; rc 1 = no matches stays the normal clean
     # case, rc >= 2 is the loud path now)
+    # Traversal-level dumps prune (#587): e2e run evidence under
+    # tests/e2e/dumps/ is container-created (container-UID-owned,
+    # mode 700 -- the live make test died rc 2 mid-traversal; a
+    # post-filter grep -v chain cannot prevent a traversal death),
+    # and dump copies of repo files quoting RM-NNNN would false-red
+    # as fourth-site citations. Same exemption rationale as the
+    # line-length ratchet's reviews-meta data/ carve-out.
+    # Basename-scoped by --exclude-dir (matches at any depth):
+    # tests/e2e/dumps is the only dumps dir in-tree (created by
+    # tests/e2e/lib.sh); class sweep #587 found no other unit-lane
+    # scan walking the repo root -- skills-lint/update-core scan
+    # scratch, status/wsl-exposure scan files/ only, workflows/
+    # sandbox-policy/line-length use explicit path lists.
     _c_rc=0
     grep -rn "RM-[0-9][0-9][0-9][0-9]" \
         --include="*.md" --include="*.sh" --include="*.py" --include="*.yml" \
         --include="*.json" \
+        --exclude-dir=dumps \
         "$1" >"$WORK/p10c.raw" || _c_rc=$?
     if [ "$_c_rc" -gt 1 ]; then
         echo "rules-meta pin10: lane c scan died (rc=$_c_rc) -- lane output unreliable (#519)" >&2
@@ -964,6 +978,32 @@ case "$_hits" in
         ;;
     *) fail "pin10 lane c scratch: README citation not caught" ;;
 esac
+
+# --- #587 dumps prune arm: e2e run evidence under tests/e2e/dumps/
+# must neither kill the scan (unreadable container-made tree) nor
+# count as citations (readable dump copies quoting IDs verbatim),
+# while the living tree stays covered. Root-context caveat (mirror
+# of the #520 a B4 note below): as root, grep reads through chmod
+# 000 and the death leg trivially holds -- the readable-capture leg
+# still discriminates (the dump copy must stay absent from hits).
+P10D="$WORK/p10dumps.$$"
+mkdir -p "$P10D/tests/e2e/dumps/run-20260101-000000/tmp" "$P10D/docs"
+printf 'container-made run evidence\n' \
+    >"$P10D/tests/e2e/dumps/run-20260101-000000/tmp/containers-user-1001.md"
+chmod 000 "$P10D/tests/e2e/dumps/run-20260101-000000/tmp"
+printf 'readable dump copy quoting %s verbatim\n' "$_p10demo" \
+    >"$P10D/tests/e2e/dumps/run-20260101-000000/captured.md"
+printf 'living doc citing %s by bare ID\n' "$_p10demo" >"$P10D/docs/living.md"
+_pd_rc=0
+_pd_out="$(p10_lane_c_hits "$P10D" "")" || _pd_rc=$?
+if [ "$_pd_rc" -eq 0 ] &&
+    ! printf '%s\n' "$_pd_out" | grep -q 'dumps/run-20260101' &&
+    printf '%s\n' "$_pd_out" | grep -q 'docs/living.md'; then
+    pass "pin10 lane c dumps prune: run evidence exempt (unreadable + readable), living citations kept (#587)"
+else
+    fail "pin10 lane c dumps prune: run evidence must stay traversal-exempt, living citations kept (rc=$_pd_rc) (#587)"
+fi
+chmod 755 "$P10D/tests/e2e/dumps/run-20260101-000000/tmp" # teardown rc 2 guard
 
 # --- #519 guard arms: executed death paths for the lane producers -------------
 # lane b death leg (vanished dir) and empty leg (existing, empty);
