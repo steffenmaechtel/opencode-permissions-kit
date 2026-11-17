@@ -112,6 +112,17 @@ kit's own test scripts. Style is not a review topic: the gate
   IS the broken spaced-words shape, and the sq splice never trips
   fmt at all; post-fmt, only execution discriminates (#300 tier 1,
   sharpened by review #331 a a-2, measured 2026-10-31).
+- A pin greping a message that the house continuation idiom wraps
+  matches the WRAP, not the contiguous phrase: wrapping changes the
+  source bytes, so a `live_src` pin on the contiguous phrase reds on
+  a purely cosmetic wrap. Grep both fragments separately (`grep -q
+  'retry anytime' && grep -qF 'already-imported…'`) — the
+  test-ddev-migrate D3 retry-hint pin, pr-00568 wave a.
+- A structural pin greps the CANONICAL spelling — the bytes `make
+  fmt` leaves, not the bytes typed: shfmt reformats `! ( : </dev/tty
+  )` to `! (: </dev/tty)`, and a pin written against the pre-fmt
+  spelling reds after the next format run (test-git-config 8a,
+  pr-00568 wave a). Run `make fmt` before writing the pin.
 - Still human rules, NOT shfmt's business: the 120-column ratchet
   (`tests/unit/test-line-length.sh` — shfmt never wraps lines), the
   string-continuation join guard (`test-string-continuations.sh`,
@@ -161,6 +172,27 @@ Patterns already in this repo:
 | version resolution (GitHub/npm) | strict `case 1.*`/`2.*`, loud abort outside the shape | `management/update.sh` (`resolve_latest_opencode_version`) |
 | version probes | strict `grep -oE` extract; empty means unknown, never a guess | wrapper, `management/status.sh` |
 | exact id comparison | `grep -qxF` (fixed string, whole line) | `sh/advisories.sh` callers, scan dedup |
+
+## Shell semantics (dash and POSIX sh)
+
+The kit targets exactly two shells (dash and bash-as-sh — the SC3043
+exclusion in the Makefile's ShellCheck pin), and their differences
+have bitten shipped code and tests more than once. The rules below
+are the distilled incidents:
+
+- A special builtin's failed redirection is FATAL under dash — `:
+  </dev/tty` with an unopenable target kills the script outright,
+  where bash continues with a non-zero rc. Probe such a redirection
+  inside a subshell — `( : </dev/tty ) 2>/dev/null` — so the fatality
+  becomes a plain non-zero rc the caller can branch on (the config.sh
+  M1 guard shape, pr-00568 wave a). (RM-0163)
+- Comment text inside a single-quoted `sh -c` worker string (xargs
+  workers) stays apostrophe-free — an apostrophe terminates the
+  string and the remainder becomes garbage; `sh -n` on the outer file
+  is blind to it because the string is parsed only at runtime. Verify
+  edits that touch a worker string by SOURCING the file — the
+  pr-00568 wave broke ddev-handover.sh twice on `abort's` and only
+  the sourcing helper's rc 2 surfaced it. (RM-0164)
 
 ## Lib pairing and cross-lib guards (entries that source libs)
 

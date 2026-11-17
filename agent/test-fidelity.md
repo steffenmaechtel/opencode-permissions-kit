@@ -119,6 +119,14 @@ production code path touched (draining stdin). Rule for this repo:
    (`< <(printf ...)`), and PTY (§4.4). A bug in one variant is a
    bug. The same dimension applies to *tool versions*: the e2e suite
    matrices over the git build (`E2E_GIT_CHANNEL`, issue #118). (RM-0050)
+4. **No controlling tty in containers — split display from contract.**
+   In an e2e container the `/dev/tty` open FAILS; it does not block
+   (a wrong claim the old run.sh 12d comment carried). An
+   interactive-menu DISPLAY test therefore allocates a pty
+   (`script -qec '<command>' /dev/null`, the harness below), while a
+   no-tty CONTRACT test asserts the loud fast abort — rc 1 plus the
+   guard message, with a timeout as the no-hang discriminator
+   (pr-00568 wave a, the reworked 12d in tests/e2e/run.sh). (RM-0165)
 PTY harnesses, by weight: `script -qec '<command>' /dev/null`
 (util-linux) gives the command a real PTY in any CI script — cheap
 enough for one check per prompt flow: does it ask, does it accept the

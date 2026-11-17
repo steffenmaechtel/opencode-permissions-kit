@@ -255,6 +255,15 @@ nothing to review.
 
   Either way the round comments' work-order records remain the
   ledger. (RM-0136)
+- A FILED work order is self-contained at creation: the issue body
+  itself carries the finding's evidence — file:line, mechanism,
+  severity, provenance. The two places the detail otherwise lives are
+  both volatile: round comments carry full mechanisms for MED/HIGH
+  only, and the session scratch dies with its host — the #569–#573
+  filing had to be rescued by retroactive evidence-appendix comments
+  (#573 alone re-attached 34 findings). The folding pointer-comment
+  rule (the finding AND its evidence) governs filing too: the issue
+  IS the durable record. (RM-0161)
 - After the work-order gate settles (every YES filed or folded, every
   NO recorded, the closing summary's list posted), the loop's chat
   duties extend exactly once more: the disposition report ends by
@@ -533,6 +542,12 @@ Review-relevant code touched this round: yes/no → …
   disposition ledger table and the stop-rule check visible at top
   level (the one-view chain record) and nests only per-finding
   evidence. (RM-0128)
+- The closing summary's marker carries `"wave":"z"` and CASE-TOTAL
+  counts — raw/curated/posted/retracted and MED/HIGH summed across
+  rounds, reviewers summed, tier = the closing round's — never the
+  last round's letter (two markers would claim one wave). Corpus
+  precedent: PR #564, the pilot shape every closing summary since has
+  matched. (RM-0166)
 - The CI status fields assert only **completed** runs — the headline's
   `CI <status>` and the metadata's `CI on last push:` alike: while a
   push's run is still in progress the line says so (`CI: push 2 run in
@@ -603,6 +618,14 @@ Four places carry review knowledge, each with exactly one job:
   the main session auditing (see "Curation and verification");
   unverifiable claims are
   dropped or marked `unverified`. (RM-0074)
+- A finding whose mechanism rests on shell semantics — special
+  builtins, `set -e` interactions, xargs rc folding — is probed
+  empirically in scratch BEFORE the verdict posts: round b's Y2
+  (pr-00568) confirmed a worker re-source failure that was dead code
+  in every kit shape (`.` aborts the worker under dash AND bash-as-sh,
+  ENOENT and EACCES alike), and the correction had to ride a later
+  round comment. A CONFIRMED verdict over an unprobed mechanism is
+  `unverified`, not confirmed. (RM-0162)
 - Retractions stay visible in the round comment's "Retracted/ghost
   findings" section — they calibrate how much to trust the next
   unverified claim. (RM-0075)

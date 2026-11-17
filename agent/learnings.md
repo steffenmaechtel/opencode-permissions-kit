@@ -133,7 +133,13 @@ message of that producer — a phrase another guard message also carries
 reroutes the death through the wrong leg and the arm still passes
 (`#520 a B1`: a one-token readability change rerouted a death through
 the empty-set guard undetected; the discriminating phrase shape
-existed in the same wave).
+existed in the same wave). And a guard pin makes the guard's REMOVAL
+change the observable outcome — the failure path executes because of
+the construct, never because of environment luck: the first n10j arm
+stayed green with the dot-dot guard deleted (`../../etc/passwd`
+failed `-f` anyway — /tmp/etc/passwd happens not to exist) until the
+arm planted the reachable marker the guard exists to reject (PR #564
+round b D1, fixed in 86850e0b).
 
 ### L5 — Root-operand inventory check
 *Classes: `perm-model` + `race-toctou` — run 1: 53 findings, 23 MED/HIGH,

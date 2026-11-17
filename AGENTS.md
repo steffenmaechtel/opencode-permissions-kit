@@ -173,7 +173,13 @@ the SECOND cycle, after a fresh edit had landed uncommitted between two
 cycles. And sabotage by
 *deleting* the construct, not commenting it out: un-ridden grep-count
 pins (absence pins, bare control arms) still count commented lines, so
-a commented-out sabotage can pass green. After
+a commented-out sabotage can pass green. And the sabotage must keep
+the script parseable: a deletion that would empty a shell branch (the
+construct is its only command) replaces it with a no-op (`: #
+sabotaged`) instead — a syntax-error red fails every pin
+indiscriminately and proves nothing; the red must come from the pin's
+own assertion over a still-running script (pr-00581 fix wave,
+2026-11-17). After
 the sabotage run, restore the good state from the commit/stash (or a copy
 kept outside the tree) and re-run the suite to confirm green — and
 verify the restore CONTENT-based, never rc-based: grep the construct
