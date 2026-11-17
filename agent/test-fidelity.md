@@ -68,7 +68,7 @@ Programs switch on TTY detection: colors, progress, and — critically —
 **prompting**. The kit's own countermeasure is in `ui.sh`: prompts read
 from `/dev/tty`, never stdin, because under `curl | bash` stdin *is the
 script stream* (same class, other direction). Testing prompt flows
-therefore needs a PTY (§4.4); with piped stdin a `read` either gets EOF
+therefore needs a PTY (§4); with piped stdin a `read` either gets EOF
 or eats test data.
 
 ### 2.4 Signal and job-control differences
@@ -116,9 +116,18 @@ production code path touched (draining stdin). Rule for this repo:
 3. **Environment matrix as a test dimension.** For flows that read
    any file descriptor (fd), run the scenario against stdin
    variants: closed (`<&-`), EOF (`</dev/null`), pipe-with-data
-   (`< <(printf ...)`), and PTY (§4.4). A bug in one variant is a
+   (`< <(printf ...)`), and PTY (§4). A bug in one variant is a
    bug. The same dimension applies to *tool versions*: the e2e suite
    matrices over the git build (`E2E_GIT_CHANNEL`, issue #118). (RM-0050)
+4. **No controlling tty in containers — split display from contract.**
+   In an e2e container the `/dev/tty` open FAILS; it does not block
+   (a wrong claim the old run.sh 12d comment carried). An
+   interactive-menu DISPLAY test therefore allocates a pty
+   (`script -qec '<command>' /dev/null`, the harness below), while a
+   no-tty CONTRACT test asserts the loud fast abort — rc 1 plus the
+   guard message, with a timeout as the no-hang discriminator
+   (pr-00568 wave a, the reworked 12d in tests/e2e/run.sh). (RM-0165)
+
 PTY harnesses, by weight: `script -qec '<command>' /dev/null`
 (util-linux) gives the command a real PTY in any CI script — cheap
 enough for one check per prompt flow: does it ask, does it accept the
@@ -153,7 +162,7 @@ outgrows it, the candidates in the shell-testing ecosystem:
 - **bats-core** (+ bats-assert/bats-support) — the other mainstream
   choice; no built-in mocking discipline.
 - **pexpect/expect/tmux** — not unit frameworks; PTY harnesses for the
-  interactive tier (§4.4).
+  interactive tier (§4).
 
 Adopting either is a maintainer decision; nothing here blocks on it.
 
@@ -212,7 +221,8 @@ The terms this record leans on, in one place:
 - **PTY** — pseudo-terminal: a kernel-provided *fake* TTY — a pipe
   pair with terminal line discipline in between. What a terminal
   emulator, `script(1)`, pexpect, or tmux hands a child process so it
-  behaves as if a user were attached. The tool for §4.4.
+  behaves as if a user were attached. The PTY-harness tooling lives
+  in §4.
 - **Shell** — the program that reads and executes commands (bash,
   dash, zsh). *Interactive*: attached to a user's TTY, shows a
   prompt, loads rc files (`~/.bashrc` etc.) — where the kit's

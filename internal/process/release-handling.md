@@ -401,30 +401,54 @@ Releases are maintainer-only and fully scripted
 is the tag `x.y.z` on `master` plus a fast-forward of the `stable`
 mirror, which must stay **byte-identical** to `master` (§3, Option B).
 
-Copy the block, search & replace `0.0.36` with the new version, run the
+Copy the block, search & replace `0.0.61` with the new version, run the
 lines one by one. The VERSION bump lands on `master` **via PR** (never
 commit on master directly); `make release` then verifies a clean tree,
 sync with origin, the VERSION stamp, a **fresh `SHA256SUMS`** (issue
 #478: the integrity manifest streamed installs verify against —
-regenerate with `make sums` in the PR that changes `files/`), a free
+regenerate with `make sums` in the PR that changes `files/` OR bumps
+`VERSION`, because the manifest hashes the VERSION file too; the
+0.0.61 bump staled exactly this way, #568 round a B1), a free
 tag and `stable` fast-forwardability, runs the suite, and tags, mirrors
 and pushes (never force-pushes):
 
 ```bash
-git checkout -b release/0.0.36
-make version VERSION=0.0.36
-git commit -am "chore: bump VERSION to 0.0.36"
-git push origin release/0.0.36
+# Maintainer-run steps (the USER of the agent session):
 
-# On GitHub: open the PR for release/0.0.36 => merge => wait for green CI
+git checkout -b release/0.0.61
+
+make version VERSION=0.0.61 && make sums && make test
+
+git commit -am "chore: bump VERSION to 0.0.61"
+
+git push origin release/0.0.61
+
+# Commission the snapshot review (the agent creates the PR, reviews,
+# fixes, etc.); when merged:
 
 git checkout master
+
 git pull origin master
-make release VERSION=0.0.36
-gh release create 0.0.36 --generate-notes
+
+opk handover me /var/www/vhosts/opencode-permissions-kit/repo/tests/e2e/dumps
+
+make release VERSION=0.0.61
+
+gh release create 0.0.61 --generate-notes
+
+opk handover opencode /var/www/vhosts/opencode-permissions-kit/repo/tests/e2e/dumps
 ```
 
-`make release VERSION=0.0.36 ARGS=--dry-run` prints the steps without
+The two `opk handover` lines bracket the release-day runs, for both
+directions of the permission problem: `make release` runs the unit
+lane (`make test`), whose tree-wide scans traverse `tests/e2e/dumps`
+(the rules-meta citation scan dies on container-owned dump files
+otherwise, #587), and the maintainer-driven e2e runs around the
+release are what write there. The dumps tree belongs to the
+maintainer for that window and returns to the agent user afterwards
+(ownership follows the writer, docs/reference/cli.md).
+
+`make release VERSION=0.0.61 ARGS=--dry-run` prints the steps without
 changing anything.
 
 Everything else (branch protection on `stable`, announcements) is set up

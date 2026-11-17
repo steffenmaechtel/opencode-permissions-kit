@@ -235,5 +235,6 @@ One coreutils `sha256sum` line per streamed kit file
 `update.sh` from the same ref as the files and enforced before anything
 is staged — details and trust model:
 [security model](../concepts/security-model.md#download-integrity-sha256sums).
-Regenerate with `make sums` after any change under `files/` and commit
-it with your PR; the suite reddens on a stale manifest.
+Regenerate with `make sums` after any change under `files/` or a
+VERSION bump, and commit it with your PR; the suite reddens on a
+stale manifest.

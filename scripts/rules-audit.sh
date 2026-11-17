@@ -100,6 +100,7 @@ ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#fail-loud-detector-sweeps
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#named-cause-failure-guards-shipped-runners"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#rule-file-markdown-structure"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#standing-prose-history-not-rosters"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#shell-semantics-dash-and-posix-sh"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS internal/records/rules-meta.md#revisit-ladder"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS internal/records/rules-meta.md#the-main-rule"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS internal/records/rules-meta.md#meta-format-v12"

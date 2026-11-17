@@ -8,11 +8,11 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**160 metas · 157 active · 3 retired · 0 review-pending · next due 2026-11-17**
+**166 metas · 163 active · 3 retired · 6 review-pending · next due 2026-11-17**
 
 ## Actionable
 
-- **Review pending:** none
+- **Review pending:** RM-0161, RM-0162, RM-0163, RM-0164, RM-0165, RM-0166
 - **Amended — pending:** none
 
 ## AGENTS.md
@@ -64,6 +64,13 @@
 | [RM-0013](0/0/1/RM-0013.md) | Allowlist before argv/query | active | approved | 6m | 2027-05-17 |
 | [RM-0040](0/0/4/RM-0040.md) | Fail loud vs. fail open. Maintainer | active | approved | 1m | 2026-11-17 |
 | [RM-0041](0/0/4/RM-0041.md) | Prove it in tests. Payload attempts | active | approved | 1m | 2026-11-17 |
+
+### Shell semantics (dash and POSIX sh)
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0163](0/1/6/RM-0163.md) | A special builtin's failed redirection is FATAL | active | **pending** | 1m | 2026-12-17 |
+| [RM-0164](0/1/6/RM-0164.md) | Comment text inside a single-quoted sh -c worker | active | **pending** | 1m | 2026-12-17 |
 
 ### Fail-loud detector sweeps
 
@@ -170,6 +177,7 @@
 | [RM-0134](0/1/3/RM-0134.md) | On the non-shipped track, a | active | approved | 1m | 2026-11-30 |
 | [RM-0136](0/1/3/RM-0136.md) | Deferred work orders collected during | active | approved | 1m | 2026-12-17 |
 | [RM-0140](0/1/4/RM-0140.md) | After the work-order gate settles | active | approved | 1m | 2026-12-15 |
+| [RM-0161](0/1/6/RM-0161.md) | A FILED work order is self-contained at creation | active | **pending** | 1m | 2026-12-17 |
 
 ### Round typing and tiering
 
@@ -213,6 +221,7 @@
 | [RM-0153](0/1/5/RM-0153.md) | PR-body edits for wave-authored | active | approved | 1m | 2026-12-15 |
 | [RM-0154](0/1/5/RM-0154.md) | The CI status fields assert | active | approved | 1m | 2026-12-15 |
 | [RM-0158](0/1/5/RM-0158.md) | names its observation scope | active | approved | 1m | 2026-12-16 |
+| [RM-0166](0/1/6/RM-0166.md) | The closing summary's marker carries | active | **pending** | 1m | 2026-12-17 |
 
 ### Fixes close classes, not sites
 
@@ -243,6 +252,7 @@
 | [RM-0075](0/0/7/RM-0075.md) | Retractions stay visible in | active | approved | 1m | 2026-11-19 |
 | [RM-0112](0/1/1/RM-0112.md) | A review round MAY run | active | approved | 1m | 2026-12-17 |
 | [RM-0139](0/1/3/RM-0139.md) | Sabotage spot-checks run only against | active | approved | 1m | 2026-12-10 |
+| [RM-0162](0/1/6/RM-0162.md) | A finding whose mechanism rests on shell… | active | **pending** | 1m | 2026-12-17 |
 
 ### Suites are the standing review
 
@@ -307,6 +317,7 @@
 | [RM-0048](0/0/4/RM-0048.md) | Behavioral doubles + contract lock | active | approved | 1m | 2026-11-17 |
 | [RM-0049](0/0/4/RM-0049.md) | Real-binary tiers | active | approved | 1m | 2026-11-17 |
 | [RM-0050](0/0/5/RM-0050.md) | Environment matrix as a test | active | approved | 1m | 2026-11-17 |
+| [RM-0165](0/1/6/RM-0165.md) | No controlling tty in containers — split display | active | **pending** | 1m | 2026-12-17 |
 
 ### 6. Checklist for new kit code
 
