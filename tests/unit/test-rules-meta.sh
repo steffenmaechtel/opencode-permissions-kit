@@ -886,9 +886,11 @@ p10_lane_c_hits() { # $1 root, $2 scope; loud on scan death (#519:
     # Basename-scoped by --exclude-dir (matches at any depth):
     # tests/e2e/dumps is the only dumps dir in-tree (created by
     # tests/e2e/lib.sh); class sweep #587 found no other unit-lane
-    # scan walking the repo root -- skills-lint/update-core scan
-    # scratch, status/wsl-exposure scan files/ only, workflows/
-    # sandbox-policy/line-length use explicit path lists.
+    # scan walking the repo root -- every other traversal targets
+    # scratch, files/, .agents/skills/, or explicit path lists
+    # (skills-lint: scratch + .agents/skills; update-core: scratch
+    # + files/; status, wsl-exposure: files/; workflows,
+    # sandbox-policy, line-length: explicit lists).
     _c_rc=0
     grep -rn "RM-[0-9][0-9][0-9][0-9]" \
         --include="*.md" --include="*.sh" --include="*.py" --include="*.yml" \
