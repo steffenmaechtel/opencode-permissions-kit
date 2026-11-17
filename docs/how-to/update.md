@@ -24,23 +24,20 @@ sudo opk update --channel feature/xyz   # test a branch
 sudo opk update --channel 0.0.29    # pin an exact version
 ```
 
-The `KIT_BRANCH` environment variable does the same for every entry point
-(curl-streamed install or update, `opk update`):
+The `KIT_BRANCH` environment variable does the same for every entry
+point. For `opk update` it must ride the sudo invocation:
 
 ```bash
-# update from the stable release mirror (recommended default)
-curl -fsSL https://steffenmaechtel.github.io/opencode-permissions-kit/update.sh | sudo env KIT_BRANCH=stable bash
-
-# switch to the development channel
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/opencode-permissions-kit-lib/management/update.sh | sudo env KIT_BRANCH=master bash
-
-# test a feature branch / pin an exact version
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/refs/heads/<branch>/files/opencode-permissions-kit-lib/management/update.sh | sudo env KIT_BRANCH=<branch> bash
 sudo env KIT_BRANCH=0.0.29 opk update
 ```
 
-The Pages entry always serves the **stable** channel, so master/branch/tag
-installs address the raw refs directly (the ref is part of the URL).
+A bare `KIT_BRANCH=0.0.29 opk update` (without `sudo env`) drops the
+variable at opk's sudo boundary — the update then follows the stamped
+channel instead (the banner names the effective channel, but nothing
+warns about the dropped override). The streamed install/update variants
+for any channel (master, a feature branch, an exact version tag) live
+in
+[Streamed install and update (advanced)](../advanced/streamed-install-update.md).
 
 Updates are supported from kit **0.0.14 onwards**; on older installs
 `update.sh` aborts — re-run the installer instead (it keeps your projects

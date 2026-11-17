@@ -462,12 +462,11 @@ their own `.ddev` dirs which are not your projects.
 ## install.sh
 
 Installs the kit. Stream it from GitHub or run it from a checkout; when
-streamed, it self-fetches its sibling files from the same ref. The docs
-one-liner uses the GitHub Pages entry:
-
-```bash
-curl -fsSL https://steffenmaechtel.github.io/opencode-permissions-kit/install.sh | sudo env KIT_BRANCH=stable bash
-```
+streamed, it self-fetches its sibling files from the same ref. The
+stable one-liner lives in
+[Getting started](../getting-started.md#install); master, branch, and
+tag-pin streaming live in
+[Streamed install and update (advanced)](../advanced/streamed-install-update.md).
 
 | Flag | Meaning |
 |---|---|
@@ -537,11 +536,11 @@ the fresh-clone EPERM repair — see
 
 ## update.sh
 
-Re-deploy the kit after an update; upgrades the opencode binary.
-
-```bash
-curl -fsSL https://steffenmaechtel.github.io/opencode-permissions-kit/update.sh | sudo env KIT_BRANCH=stable bash
-```
+Re-deploy the kit after an update; upgrades the opencode binary. The
+regular interface is `sudo opk update` — see the
+[update guide](../how-to/update.md). The streamed variant for any
+channel lives in
+[Streamed install and update (advanced)](../advanced/streamed-install-update.md).
 
 Without `KIT_BRANCH` set, the deployed `update.sh` follows the channel
 stamped in `install.conf`. Switch channels without editing it:

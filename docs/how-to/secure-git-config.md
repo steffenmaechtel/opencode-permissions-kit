@@ -9,12 +9,9 @@ see the [security model](../concepts/security-model.md)).
 
 ## Switch it on or off
 
-At install time:
-
-```bash
-curl -fsSL https://steffenmaechtel.github.io/opencode-permissions-kit/install.sh \
-  | sudo env KIT_BRANCH=stable bash -s -- --secure-git-config
-```
+At install time, pass `--secure-git-config` to the installer — the
+one-liner lives in [Getting started](../getting-started.md#install),
+all flags in [the CLI reference](../reference/cli.md).
 
 Later, at any time:
 
