@@ -692,6 +692,69 @@ check "deny-all config denies everything" \
     E 'grep -q '\''"\*"'\'' /home/dev/.config/opencode/opencode.jsonc'
 check "deny-all config points to the agent config (discoverability hint)" \
     E 'grep -q "/home/opencode/.config/opencode/opencode.jsonc" /home/dev/.config/opencode/opencode.jsonc'
+check "deny-all config disables autoupdate (bypass self-update, #570)" \
+    E 'grep -qF "\"autoupdate\": false" /home/dev/.config/opencode/opencode.jsonc'
+check "deny-all config denies external_directory explicitly (#570)" \
+    E 'grep -qF "\"external_directory\": \"deny\"" /home/dev/.config/opencode/opencode.jsonc'
+
+# --- 6b-2. deny-all BEHAVIORAL probe (issue #570) ---------------------------
+# The checks above grep content; these run the REAL binary as the DEFAULT
+# user by absolute path — exactly the wrapper-bypass scenario the lockout
+# exists for (dev is in the sharing group and may exec the secured binary,
+# see section 3) — against the DEPLOYED deny-all config, and ask opencode's
+# own permission evaluator: same session.permission HTTP route as section
+# 3b, no LLM, no TUI. Route verified on opencode 1.19.6 and 2.3.0 (both
+# majors, 2026-11-17, issue #570) — deliberately NOT version-gated: if
+# upstream stops honoring "*", these checks go red, which is the drift
+# signal the issue asks for (its HIGH condition would otherwise be
+# invisible).
+echo ""
+echo "--- 6b-2. deny-all behavioral probe (real binary as dev, #570) ---"
+docker exec -u dev \
+    -e OPK_UPDATE_CHECK=0 \
+    -e OPENCODE_PASSWORD=e2e-deny-pw \
+    -e OPENCODE_SERVER_PASSWORD=e2e-deny-pw \
+    -e OPENCODE_DISABLE_MODELS_FETCH=1 \
+    "$E2E_CONTAINER" \
+    sh -c 'cd /tmp && exec /usr/local/lib/opencode-permissions-kit/bin/opencode serve --port 4791 --hostname 127.0.0.1 >/tmp/e2e-deny-serve.log 2>&1' \
+    >/dev/null 2>&1 &
+E2E_DENY_JOB=$!
+# Readiness is SEMANTIC (3b pattern): the HTTP listener answers before the
+# config rules are mounted into the evaluator — asks in that window return
+# "allow", a pre-config posture (measured ~2s warm on 2.3.0, >60s once on a
+# cold first run as a fresh user). Poll until the warmup ask evaluates
+# "deny": for deny-all the catch-all IS deny, so deny on a warmup ask is
+# the settled signal — the "*" lockout live in evaluation — without
+# pre-asserting any single check's resource below.
+_deny_up=""
+for _ in $(seq 1 60); do
+    _eff="$(E 'SID=$(curl -sf -u opencode:e2e-deny-pw -X POST -H "content-type: application/json" -d "{}" http://127.0.0.1:4791/api/session 2>/dev/null | grep -o "\"id\":\"[^\"]*\"" | head -1 | cut -d\" -f4); if [ -n "$SID" ]; then printf "%s" "$SID" > /tmp/e2e-deny-sid; curl -sf -u opencode:e2e-deny-pw -X POST -H "content-type: application/json" -d "{\"action\":\"shell\",\"resources\":[\"echo warmup\"]}" "http://127.0.0.1:4791/api/session/$SID/permission" 2>/dev/null | grep -o "\"effect\":\"[a-z]*\""; fi' || true)"
+    if [ "$_eff" = '"effect":"deny"' ]; then
+        _deny_up=1
+        break
+    fi
+    sleep 2
+done
+if [ -z "$_deny_up" ]; then
+    echo "  ${RED}WARN${NC}  deny-all evaluator did not settle within 120s — probes will fail"
+fi
+check "6b: probe session created on the real server (default user)" \
+    E 'test -s /tmp/e2e-deny-sid'
+check "6b: deny-all denies a benign shell command (echo, #570)" \
+    E 'curl -sf -u opencode:e2e-deny-pw -X POST -H "content-type: application/json" -d "{\"action\":\"shell\",\"resources\":[\"echo deny-all-probe\"]}" "http://127.0.0.1:4791/api/session/$(cat /tmp/e2e-deny-sid)/permission" | grep -q "\"effect\":\"deny\""'
+check "6b: deny-all denies file reads (read /etc/hostname, #570)" \
+    E 'curl -sf -u opencode:e2e-deny-pw -X POST -H "content-type: application/json" -d "{\"action\":\"read\",\"resources\":[\"/etc/hostname\"]}" "http://127.0.0.1:4791/api/session/$(cat /tmp/e2e-deny-sid)/permission" | grep -q "\"effect\":\"deny\""'
+check "6b: deny-all denies edits (edit probe, #570)" \
+    E 'curl -sf -u opencode:e2e-deny-pw -X POST -H "content-type: application/json" -d "{\"action\":\"edit\",\"resources\":[\"/tmp/e2e-deny-probe.txt\"]}" "http://127.0.0.1:4791/api/session/$(cat /tmp/e2e-deny-sid)/permission" | grep -q "\"effect\":\"deny\""'
+check "6b: deny-all denies webfetch (#570)" \
+    E 'curl -sf -u opencode:e2e-deny-pw -X POST -H "content-type: application/json" -d "{\"action\":\"webfetch\",\"resources\":[\"https://example.com/e2e-deny\"]}" "http://127.0.0.1:4791/api/session/$(cat /tmp/e2e-deny-sid)/permission" | grep -q "\"effect\":\"deny\""'
+# The discriminating arm: "*" does NOT cover external_directory (measured
+# on 2.3.0: "allow" under a bare "*" deny, "deny" only with the explicit
+# template key) — this check goes red if that key ever leaves the template.
+check "6b: deny-all denies external_directory (explicit key — '*' does not cover it, #570)" \
+    E 'curl -sf -u opencode:e2e-deny-pw -X POST -H "content-type: application/json" -d "{\"action\":\"external_directory\",\"resources\":[\"/outside/e2e-deny\"]}" "http://127.0.0.1:4791/api/session/$(cat /tmp/e2e-deny-sid)/permission" | grep -q "\"effect\":\"deny\""'
+# Teardown: killing the docker-exec client ends the exec session (3b shape).
+kill "$E2E_DENY_JOB" 2>/dev/null || true
 
 echo ""
 echo "--- 6c. Wrapper bypass guard (self-install + absolute path) ---"

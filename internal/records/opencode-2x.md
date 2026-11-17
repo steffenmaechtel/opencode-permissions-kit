@@ -44,6 +44,30 @@ Config files themselves stay in the v1 shape on both majors — 2.x
 normalizes on load and never rewrites them (verified against the
 migration guide and live probes).
 
+### 2b. The deny-all `"*"` key: honored on load AND in evaluation (#570)
+
+The default-user lockout (`templates/opencode-deny-all.jsonc`) rests on
+the v1 `"permission": { "*": "deny" }` catch-all surviving into
+evaluation — for years pinned only as deployed content, never behaviorally
+(issue #570). Verified 2026-11-17 against the real evaluator (the
+`session.permission` HTTP route, no LLM — the section 3b probe machinery):
+opencode **1.19.6** and **2.3.0** both evaluate `shell`, `read`, `edit`,
+`webfetch`, `glob`, `grep` asks as `"deny"` under the deployed lockout,
+so the v1→v2 in-memory migration keeps the non-action `"*"` key and the
+wildcard matcher honors it on both majors.
+
+One gap the probe surfaced: `"*"` does **not** cover the
+`external_directory` action. On 2.3.0 it evaluates `"allow"` under a bare
+`"*": "deny"` and `"deny"` only with the explicit
+`"external_directory": "deny"` key (the agent template always had it; the
+deny-all template gained it with #570, plus `"autoupdate": false` — a
+bypassed binary must not self-update either). The e2e suite pins both
+behaviors (run.sh section 6b-2): the real binary runs as the default user
+against the deployed config — the exact bypass scenario — and every probed
+action, `external_directory` included, must evaluate `"deny"`. Un-gated by
+version on purpose: an upstream regression here must redden the suite,
+not skip.
+
 ## 3. Session servers: force `--standalone` on 2.x
 
 The kit's env transport (`DOCKER_HOST`/`XDG_RUNTIME_DIR` exported before

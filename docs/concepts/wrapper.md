@@ -99,7 +99,18 @@ outside the kit.
 
 As a safety net, the kit installs a lockout config for the default user
 (`~/.config/opencode/opencode.jsonc`) that denies **everything** — even if
-the real binary takes over, it cannot read or modify anything.
+the real binary takes over, it cannot read or modify anything. The lockout
+is `"permission": { "*": "deny" }` plus two explicit keys:
+
+- `"external_directory": "deny"` — the `"*"` catch-all does **not** cover
+  that action (measured on opencode 2.3.0: it evaluates *allow* under a
+  bare `"*": "deny"`; only the explicit key denies it — issue #570).
+- `"autoupdate": false` — a bypassed binary must not self-update either.
+
+This is verified behaviorally, not just deployed: the e2e suite runs the
+real binary as the default user against the deployed lockout config and
+asserts that opencode's own permission evaluator denies benign tool asks
+(shell, read, edit, webfetch, external_directory) on opencode 1.x and 2.x.
 
 - During `install.sh`, an existing file is renamed to
   `opencode.jsonc_BAK_<timestamp>` first.
