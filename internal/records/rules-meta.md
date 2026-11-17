@@ -151,6 +151,37 @@ corrected like any other code, in a PR. The first real wave lands
 2026-11-14 – 2026-11-20 (the pilot-era metas, ~100 at once — expect
 a bulk session, not one-off touches).
 
+## Approval (maintainer)
+
+The approval queue is the report's third lane ("metas without
+maintainer approval", #333 — the INDEX "Actionable" section renders
+it). The maintainer owns the verdict, typically a chat acceptance
+listing metas by id ("direct chat review"); the agent executes the
+mechanical edit on that commission and carries the gate. Two forms:
+
+- **Fresh approval** (never-approved meta, rendered *pending*): add
+  `reviewed: DATE` after `status:` and append one review-log line of
+  the same date — inv 9 pairs field and line by that date, either
+  alone blocks. Canonical line:
+  `- DATE approved by maintainer (direct chat review).`
+- **Re-approval** (approved-then-amended meta, rendered *amended —
+  pending*): the fresh approval drops the `amended:` field (the
+  meta-format section owns that rule) and the ladder re-anchors per
+  the standing rule (Revisit workflow: approval / re-approval
+  re-anchors `next-revisit` to the approval date + interval,
+  #579 a A1). Canonical line:
+  `- DATE approved by maintainer (direct chat review, fresh approval after amendment).`
+
+inv 9 pins only the `- DATE approved by maintainer` prefix; the
+parenthetical is free text by design — the two forms above are the
+corpus forms (worked precedent: 52abc696, the seven #565-amended
+metas re-approved 2026-11-17; triage #610).
+
+Bulk waves run like any wave: regenerate `INDEX.md` via
+`python3 scripts/gen-rules-index.py` inside the committing chain
+before the suite reads it — the parity test regenerates and compares
+(the ordering duty AGENTS.md states for meta waves).
+
 ## Audit invariants (deterministic, CI)
 
 `scripts/rules-audit.sh`, pinned by `tests/unit/test-rules-meta.sh`:
