@@ -135,7 +135,9 @@ the external fact still holds. The mechanical half is scripted —
 the ladder (clean: up one step, 2y max; findings: reset to 1m),
 computes the next date calendar-correct from the revisit day itself,
 and appends one review-log line. A revisit log line is not an
-approval — `reviewed:` stays with the maintainer. A `findings`
+approval — `reviewed:` stays with the maintainer; an approval or
+re-approval re-anchors `next-revisit` to the approval date +
+interval (decided 2026-11-17, #579 a A1). A `findings`
 verdict enters the normal fix flow: rule text and rationale are
 corrected like any other code, in a PR. The first real wave lands
 2026-11-14 – 2026-11-20 (the pilot-era metas, ~100 at once — expect
@@ -206,7 +208,8 @@ a bulk session, not one-off touches).
    lane); Source lines must not use ` / ` when naming paths (b D3).
    Retired metas are exempt (the inv5 retire class).
 
-CI blocks on 1–6, 9 and 10, and on `[meta-tree]` scope errors (find
+CI blocks on 1–6, 9 and 10 (inv 10's unresolved-Source and unclosed-
+fence lane is report-only), and on `[meta-tree]` scope errors (find
 failures under the meta tree — #232); an overdue meta is a maintenance
 signal, not a broken build. The Phase-2 pending-unit parking valve
 (prefix-matched ref-less units reported non-blocking) was retired
