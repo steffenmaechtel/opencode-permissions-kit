@@ -821,13 +821,16 @@ if [ -n "$_f19_iblock" ] && [ -n "$_f19_ublock" ]; then
         fail "update deny-all staged_write deploy (rc=$_f19_u_rc out=$_f19_u_out) (#482 F19)"
     fi
     # #570 review a C1 — the update block's else branch: a kit-owned
-    # stale shape (byte-identical to a previously SHIPPED template, here
-    # the widespread pre-#570 one) heals with backup; a user-edited
-    # config matches no known hash and stays untouched.
-    _f19_stale="$(git -C "$REPO" show e2f9c1b2:files/opencode-deny-all.jsonc 2>/dev/null)" || _f19_stale=""
-    if [ -n "$_f19_stale" ]; then
+    # stale shape (byte-identical to a previously SHIPPED template) heals
+    # with backup; a user-edited config matches no known hash and stays
+    # untouched. The stale bytes come from a COMMITTED fixture (the
+    # historical pre-#570 template blob, sha256 3023ff29…), not a
+    # `git show <sha>` history lookup — CI checkouts are depth-1 and the
+    # lookup broke every CI lane deterministically (round b S1).
+    _f19_stale="$REPO/tests/fixtures/opencode-deny-all-pre570.jsonc"
+    if [ -s "$_f19_stale" ]; then
         mkdir -p "$_F19W/h-home/.config/opencode"
-        printf '%s\n' "$_f19_stale" >"$_F19W/h-home/.config/opencode/opencode.jsonc"
+        cp "$_f19_stale" "$_F19W/h-home/.config/opencode/opencode.jsonc"
         _f19_h_rc=0
         _f19_h_out=$(
             sh -c '
@@ -881,7 +884,7 @@ if [ -n "$_f19_iblock" ] && [ -n "$_f19_ublock" ]; then
             fail "update heal touched a user-edited config (#570 a C1)"
         fi
     else
-        fail "stale-shape fixture unavailable (git show e2f9c1b2) — heal arms not driven (#570 a C1)"
+        fail "stale-shape fixture unavailable (tests/fixtures/opencode-deny-all-pre570.jsonc) — heal arms not driven (#570 a C1 / b S1)"
     fi
 else
     fail "deny-all blocks extractable, install + update twin (#482 F19)"

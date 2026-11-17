@@ -846,10 +846,12 @@ E 'rm -rf /tmp/update-test && mkdir -p /tmp/update-test/files && cp -r /home/dev
 # #570 (review a C1): plant the pre-#570 kit template shape (the last
 # shipped stale deny-all) — the update run must HEAL kit-owned stale
 # shapes (backup + redeploy), closing the external_directory gap for
-# existing installs. Base64 transport (FAKE_DDEV_B64 precedent); old
-# BAKs cleared so the backup check below cannot pass vacuously.
-STALE_DENY_B64="$(git show 772f4d1a:files/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc | base64 | tr -d '\n')"
-E "echo $STALE_DENY_B64 | base64 -d > /home/dev/.config/opencode/opencode.jsonc"
+# existing installs. The stale bytes come from a COMMITTED fixture (the
+# historical template blob, sha256 3023ff29…), read through the repo
+# mount — a `git show <sha>` history lookup broke every CI lane
+# deterministically (depth-1 checkout, round b S1). Old BAKs cleared so
+# the backup check below cannot pass vacuously.
+E 'cp /home/dev/repo/tests/fixtures/opencode-deny-all-pre570.jsonc /home/dev/.config/opencode/opencode.jsonc'
 E 'rm -f /home/dev/.config/opencode/opencode.jsonc_BAK_*'
 E 'sudo bash /tmp/update-test/files/opencode-permissions-kit-lib/management/update.sh --yes' &&
     echo "  ${GREEN}OK${NC}  update.sh completed without prompts"
