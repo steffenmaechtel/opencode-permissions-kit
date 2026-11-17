@@ -169,7 +169,10 @@ posting mechanics:
    verdict files, the curation accounting. Write-through: the loop
    never reads the PR back.
 2. Post to the PR timeline; append the comment URL to the case
-   scratch `posted.log`. The comment posts BEFORE any fix starts —
+   scratch `posted.log` — the URL is `gh pr comment`'s own stdout,
+   captured directly, never reconstructed from follow-up api calls
+   (the rule lives in review-concept, "The PR-native loop"). The
+   comment posts BEFORE any fix starts —
    the hard seam. MECHANICAL FORM: before the first fix commit of
    the wave, re-read `posted.log` and confirm it contains THIS
    round's URL — no entry, no fix; post first. Long sessions lose

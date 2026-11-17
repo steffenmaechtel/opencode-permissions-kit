@@ -8,11 +8,11 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**174 metas · 171 active · 3 retired · 15 review-pending · next due 2026-11-17**
+**176 metas · 173 active · 3 retired · 17 review-pending · next due 2026-11-17**
 
 ## Actionable
 
-- **Review pending:** RM-0161, RM-0162, RM-0163, RM-0164, RM-0165, RM-0166, RM-0167, RM-0168, RM-0169, RM-0170, RM-0171, RM-0172, RM-0173, RM-0174
+- **Review pending:** RM-0161, RM-0162, RM-0163, RM-0164, RM-0165, RM-0166, RM-0167, RM-0168, RM-0169, RM-0170, RM-0171, RM-0172, RM-0173, RM-0174, RM-0175, RM-0176
 - **Amended — pending:** RM-0156 (2026-11-17)
 
 ## AGENTS.md
@@ -169,6 +169,7 @@
 | [RM-0122](0/1/2/RM-0122.md) | Scope brake (binding in | active | approved | 1m | 2026-11-28 |
 | [RM-0123](0/1/2/RM-0123.md) | Scope budget (autonomous commissions): the | active | approved | 1m | 2026-11-28 |
 | [RM-0138](0/1/3/RM-0138.md) | A fix-wave re-review is itself | active | approved | 1m | 2026-12-07 |
+| [RM-0175](0/1/7/RM-0175.md) | The posted.log entry is | active | **pending** | 1m | 2026-12-17 |
 
 ### The loop and the stop rule
 
@@ -204,6 +205,7 @@
 | [RM-0131](0/1/3/RM-0131.md) | Non-shipped staffing: standard | active | approved | 1m | 2026-11-30 |
 | [RM-0132](0/1/3/RM-0132.md) | Fresh-session entry (the batch | active | approved | 1m | 2026-11-30 |
 | [RM-0133](0/1/3/RM-0133.md) | Disposition policy on the non-shipped | active | approved | 1m | 2026-11-30 |
+| [RM-0176](0/1/7/RM-0176.md) | The in-round exceptions above | active | **pending** | 1m | 2026-12-17 |
 
 ### Curation and verification
 
