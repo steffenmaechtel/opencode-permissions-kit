@@ -197,22 +197,27 @@ a bulk session, not one-off touches).
    `rule:` back-ref file: metas quote both their source record and
    the rule text itself. Tokens containing `..` never resolve. A
    token that resolves to an existing directory is ignored — prose
-   naming a tree, not a file: neither a parity leg nor unresolved
-   (#565). A
+   naming a tree, not a file: neither a parity leg nor unresolved —
+   but listed in the audit's ignored sub-lane, so a broken file
+   citation colliding with a directory stays visible (#565;
+   pr-00581 a A1). A
    `Source:` line whose tokens resolve to nothing — broken path,
    prose-adopted token, or external source naming no in-repo path
    (issue, PR body, chat, man page, named git commit) — and an
    unclosed code fence are REPORTED in the report-only inv10 lane;
    only a meta whose `Source:` line yields no slash token at all (no
    `Source:` line, or external prose without path-shaped words) is
-   silently exempt (#564 a A1, b D2). The wrap heal fuses every
+   silently exempt (#564 a A1, b D2) — directory mentions are exempt
+   from checking but never silent. The wrap heal fuses every
    slash-space — a ` / ` prose separator next to a named path hijacks
-   the leg into one fused unresolved token (visible in the report
-   lane); Source lines must not use ` / ` when naming paths (b D3).
-   Retired metas are exempt (the inv5 retire class).
+   the leg into one fused token, visible as unresolved unless the
+   fused token resolves to a directory (then the ignored sub-lane
+   carries it); Source lines must not use ` / ` when naming paths
+   (b D3). Retired metas are exempt (the inv5 retire class).
 
-CI blocks on 1–6, 9 and 10 (inv 10's unresolved-Source and unclosed-
-fence lane is report-only), and on `[meta-tree]` scope errors (find
+CI blocks on 1–6, 9 and 10 (inv 10's lanes — unresolved-Source,
+ignored directory mentions, unclosed fence — are report-only), and on
+`[meta-tree]` scope errors (find
 failures under the meta tree — #232); an overdue meta is a maintenance
 signal, not a broken build. The Phase-2 pending-unit parking valve
 (prefix-matched ref-less units reported non-blocking) was retired

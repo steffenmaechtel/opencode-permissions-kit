@@ -299,20 +299,28 @@ sed -i 's|^Body of RM-9002\.$|Source: management/nonexistent.sh, demo section.\n
     "$(meta_file RM-9002)"
 expect_ok "inv10 unresolved token reported" "inv10 unresolved (report-only"
 
-# 10h2. inv 10 (#565) -- a Source token that resolves to an existing
-#       DIRECTORY is prose naming a tree: ignored -- no parity leg,
-#       no report-lane entry. The pin greps the lane's ABSENCE (an
-#       expect_ok "0 blocking" would pass either way -- the lane is
-#       report-only and never reddens the rc); without the -d arm the
-#       token would surface in the lane and redden this pin.
+# 10h2. inv 10 (#565, #581 a A1/a A3) -- a Source token that resolves
+#       to an existing DIRECTORY is prose naming a tree: ignored --
+#       no parity leg, no unresolved-lane entry, but VISIBLE in the
+#       ignored sub-lane (a broken file citation colliding with a
+#       directory must not vanish silently). The pin asserts the
+#       sub-lane line AND the unresolved lane's absence (an
+#       expect_ok "0 blocking" would pass either way -- neither lane
+#       reddens the rc). The fixture body carries a double-quoted
+#       string: deleting the ignore arm lands the token in the
+#       unresolved lane (red via the absence grep), and a regression
+#       turning the arm into a parity LEG runs the quote check --
+#       the unfindable quote blocks (red via rc) -- both halves
+#       discriminated.
 new_scratch n10h2
-sed -i 's|^Body of RM-9002\.$|Source: internal/rules-meta tree, demo.\n\nBody of RM-9002.|' \
+sed -i 's|^Body of RM-9002\.$|Source: internal/rules-meta tree, demo.\n\nThe bad "composite quote nowhere" arm.|' \
     "$(meta_file RM-9002)"
 run_audit
-if [ "$RC" -eq 0 ] && ! printf '%s' "$OUT" | grep -q 'inv10 unresolved'; then
-    pass "inv10 directory token ignored (no report-lane entry)"
+if [ "$RC" -eq 0 ] && ! printf '%s' "$OUT" | grep -q 'inv10 unresolved' &&
+    printf '%s' "$OUT" | grep -q 'RM-9002 -- directory mention (ignored): internal/rules-meta'; then
+    pass "inv10 directory token: ignored, sub-lane visible, never a leg"
 else
-    fail "inv10 directory token must be ignored (rc=$RC): $OUT"
+    fail "inv10 directory token: ignored + sub-lane expected (rc=$RC): $OUT"
 fi
 
 # 10i. inv 10 (#564 a B3) -- multi-file Source lines: every resolvable
