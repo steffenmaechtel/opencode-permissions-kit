@@ -879,11 +879,15 @@ ddev_migrate_import() {
         # THROUGH: [ -f ] follows links, and import-db would read an
         # agent-chosen OUT-OF-DIR file into a project database. The
         # operand NAME is gated too (#568 a D5): the manifest is
-        # agent-ownable content, and an $dm_f carrying a slash (or a
-        # bare `..`) redirects --file="$dm_dir/$dm_f" out of the dump
-        # dir through a REGULAR file no [ -L ] gate ever sees — the
-        # export side writes plain "<project>.sql.gz" manifest names
-        # only, so every slash operand is tampering. Honest scope
+        # agent-ownable content, and an $dm_f carrying a slash
+        # redirects --file="$dm_dir/$dm_f" out of the dump dir through
+        # a REGULAR file no [ -L ] gate ever sees — the export side
+        # writes plain "<project>.sql.gz" manifest names only, so
+        # every slash operand is tampering. A bare `..` is refused as
+        # the same class at the pattern level (#606 a Q2): it resolves
+        # to a directory and would die at the [ -f ] gate anyway —
+        # shape hardening, not the regular-file redirect the slash
+        # forms carry. Honest scope
         # (#420 a A11): both refusals are tamper-refusals, not a
         # content-integrity boundary — the agent owns the dir outright
         # and can rewrite any REGULAR in-dir dump's content directly;

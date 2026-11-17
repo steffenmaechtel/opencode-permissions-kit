@@ -96,6 +96,26 @@ if [ "${1:-}" = "--opk-devowned-flag" ]; then
     # lib directly keep their stderr semantics — this stays branch-local
     # (the main ddev exec below must not lose its stderr stream).
     exec 2>&1
+    # Temp registration for the lib's staged writes (#606 a S3/M2):
+    # ddev-handover.sh guards its _tmp_track call with command -v —
+    # without a tracker in THIS context an INT/TERM between the
+    # lib's mktemp and its cleanup stranded the temp (the root-run
+    # scans get the registry from config.sh/update.sh/install.sh;
+    # this helper sources none of them). Minimal registry + traps,
+    # the config.sh shape.
+    _opk_tmp_registry=""
+    _tmp_track() {
+        _opk_tmp_registry="${_opk_tmp_registry}${1}
+"
+    }
+    _opk_tmp_cleanup() {
+        [ -n "$_opk_tmp_registry" ] || return 0
+        printf '%s' "$_opk_tmp_registry" | while IFS= read -r _opk_te; do
+            [ -n "$_opk_te" ] && rm -f -- "$_opk_te"
+        done
+    }
+    trap _opk_tmp_cleanup EXIT
+    trap '_opk_tmp_cleanup; exit 1' INT TERM
     _opk_proj="${2:-}"
     # The flag writer ships as a sibling lib (repo checkout and deployed
     # kit alike); the fixed deployed path when invoked without a slash.

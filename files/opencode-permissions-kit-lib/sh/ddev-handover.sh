@@ -126,21 +126,30 @@ ddev_devowned_flag() {
     # committed config.yaml on a mid-write failure (ENOSPC), and the
     # retry's grep gate above would then accept — or re-flag — the
     # TRUNCATED file, baking the loss in; an interrupt between the
-    # mktemp and the cleanup stranded a root-owned config.yaml.opk.*
-    # temp in the agent-writable .ddev. mv replaces the directory
-    # entry — a partial temp never becomes the config. Owner and mode
-    # ride along EXPLICITLY now (the old same-inode argument no longer
-    # holds): the temp is dressed to the ORIGINAL's captured
-    # owner:group:mode BEFORE the mv, so the entry never appears with
-    # the 0600 mktemp default; as the opencode uid a dev-owned
-    # original legitimately flips to opencode ownership (group write
-    # stays, the content is committed team content) — disclosed by the
-    # post-mv compare, never silent. The temp registers with _tmp_track
-    # (interrupt cleanup) and re-checks [ -L ] at exec time
-    # (fs-baseline deeec30 pattern): the .ddev dir is agent-writable, a
-    # swapped temp name would disclose root-readable content into the
-    # agent-owned config, a swapped cfg would be written through
-    # (0.0.39g S2).
+    # mktemp and the cleanup stranded a runner-owned config.yaml.opk.*
+    # temp in the agent-writable .ddev (root-owned in the scan callers,
+    # opencode-owned in the hook — #606 a Q4). mv replaces the directory
+    # entry — a partial temp never becomes the config. What each gate
+    # protects (#606 a Q1/S1/S2/S4): the mktemp is O_EXCL; the awk
+    # redirect's open is the one UNGUARDED act on the temp name (a
+    # mktemp->awk link swap writes staged content THROUGH the link —
+    # pre-existing, the accepted residual of this shape); recheck A
+    # refuses a temp or cfg that is a LINK before the dress, so the
+    # dress (chmod/chown dereference symlinks — root would act on an
+    # agent-chosen target) never runs on a swapped name; recheck B,
+    # directly before the mv, refuses links AND a cfg swapped for a
+    # DIRECTORY (mv -f would move the temp INTO it and report rc 0 —
+    # the #568 c U1 rule), and the mv itself replaces the entry
+    # instead of writing through it. Owner, group and mode ride along
+    # EXPLICITLY (the old same-inode argument no longer holds): the
+    # temp is dressed to the ORIGINAL's captured values BEFORE the mv,
+    # so the entry never appears with the 0600 mktemp default; as the
+    # opencode uid a dev-owned original legitimately flips to opencode
+    # ownership — the post-mv restore (owner needs root, the group is
+    # restorable to a member) retries both and the compare discloses
+    # whatever stayed changed, never silent. The temp registers with
+    # _tmp_track where the caller provides it (the root-run scans;
+    # bin/ddev-as-opencode carries its own registry — #606 a S3/M2).
     # 0.0.46a F1: the opencode-uid caller (ddev-as-opencode
     # --opk-devowned-flag, issue #149) can actually fail these writes —
     # a clone whose .ddev arrived 0755/0644 dev-owned is outside the
@@ -185,36 +194,54 @@ ddev_devowned_flag() {
             }
         }
     ' "$ddf_cfg" >"$ddf_tmp"; then
-        # Dress the temp FIRST (#568 a D6): capture the original's
-        # owner:group:mode and apply it to the temp (mode plus
-        # group-write, the old post-write chmod g+w; then ownership).
-        # A failed stat (file raced away) refuses the write — an
-        # undressed 0600 mktemp temp must never become the committed
-        # config; a FAILED chmod refuses the swap the same way (a 0600
-        # config.yaml would lock ddev out of the project). A failed
-        # chown is best-effort: legal as the opencode uid on a
-        # dev-owned original — the post-mv compare discloses the flip.
-        ddf_stat=$(stat -c '%u:%g:%a' "$ddf_cfg" 2>/dev/null) || {
-            printf '%s\n' "  WARNING: dev-owned flag write to $ddf_cfg failed""\
+        # Exec-time [ -L ] recheck A — directly before the dress (#606 a
+        # S1): the chmod/chown below dereference a symlink-swapped temp,
+        # and root would chmod/chown an agent-chosen target; the .ddev
+        # dir is agent-writable, so the name can be swapped under us.
+        if [ ! -L "$ddf_tmp" ] && [ ! -L "$ddf_cfg" ]; then
+            # Capture owner, group and mode from the original BEFORE any
+            # swap (#568 a D6): a failed stat (file raced away) refuses
+            # the write — an undressed 0600 mktemp temp must never become
+            # the committed config; a FAILED chmod refuses the swap the
+            # same way (a 0600 config.yaml would lock ddev out of the
+            # project). A failed chown is best-effort: legal as the
+            # opencode uid on a dev-owned original — the post-mv compare
+            # discloses the flip.
+            ddf_stat=$(stat -c '%u:%g:%a' "$ddf_cfg" 2>/dev/null) || {
+                printf '%s\n' "  WARNING: dev-owned flag write to $ddf_cfg failed""\
  (cannot stat the committed config — original untouched; retry:""\
  sudo opk config handover \"${1:-}\" or opk update --refresh)" >&2
-            rm -f "$ddf_tmp"
-            return 0
-        }
-        ddf_ug=${ddf_stat%:*}
-        ddf_mode=${ddf_stat##*:}
-        if chmod "$ddf_mode" "$ddf_tmp" && chmod g+w "$ddf_tmp"; then
-            chown "$ddf_ug" "$ddf_tmp" 2>/dev/null || true
-            # Exec-time [ -L ] rechecks directly before the mv
-            # (re-check the operand immediately before acting): the
-            # .ddev dir is agent-writable, a swapped temp would
-            # disclose, a swapped cfg would be replaced instead of
-            # written through.
-            if [ ! -L "$ddf_tmp" ] && [ ! -L "$ddf_cfg" ]; then
-                if mv -f "$ddf_tmp" "$ddf_cfg" 2>/dev/null; then
-                    if [ "$(stat -c '%u:%g' "$ddf_cfg" 2>/dev/null)" != "$ddf_ug" ]; then
-                        printf '%s\n' "  note: $ddf_cfg changed owner to the running user""\
- (original owner unrestorable as this user — group write stays)" >&2
+                rm -f "$ddf_tmp"
+                return 0
+            }
+            ddf_u=${ddf_stat%%:*}
+            ddf_g=${ddf_stat#*:}
+            ddf_g=${ddf_g%%:*}
+            ddf_mode=${ddf_stat##*:}
+            if chmod "$ddf_mode" "$ddf_tmp" && chmod g+w "$ddf_tmp"; then
+                chown "$ddf_u:$ddf_g" "$ddf_tmp" 2>/dev/null || true
+                # Exec-time recheck B — directly before the mv (re-check
+                # the operand immediately before acting): links refuse
+                # (0.0.39g S2), and a DIRECTORY cfg would swallow the
+                # temp with mv rc 0 — the #568 c U1 rule.
+                if [ -L "$ddf_tmp" ] || [ -L "$ddf_cfg" ]; then
+                    printf '%s\n' "  WARNING: $ddf_cfg (or its temp) changed to a symlink mid-write""\
+ — dev-owned flag NOT written (links are never followed)" >&2
+                elif [ -d "$ddf_cfg" ]; then
+                    printf '%s\n' "  WARNING: $ddf_cfg changed to a directory mid-write""\
+ — dev-owned flag NOT written (the swap is refused, nothing moved into it)" >&2
+                elif mv -f "$ddf_tmp" "$ddf_cfg" 2>/dev/null; then
+                    # Post-mv restore (#606 a M3): the owner needs root
+                    # (fails as the agent uid on a dev-owned original);
+                    # the GROUP is restorable to a member — the kit's
+                    # shared group keeps the developer's write in the
+                    # baseline shape. The compare discloses whatever
+                    # stayed changed.
+                    chown "$ddf_u:$ddf_g" "$ddf_cfg" 2>/dev/null || true
+                    chgrp "$ddf_g" "$ddf_cfg" 2>/dev/null || true
+                    if [ "$(stat -c '%u:%g' "$ddf_cfg" 2>/dev/null)" != "$ddf_u:$ddf_g" ]; then
+                        printf '%s\n' "  note: $ddf_cfg ownership changed to the running user""\
+ (original owner/group unrestorable as this user)" >&2
                     fi
                     echo "  dev-owned flag written: $ddf_cfg (disable_settings_management: true — commit it)"
                 else
@@ -232,16 +259,16 @@ ddev_devowned_flag() {
  opk update --refresh)" >&2
                 fi
             else
-                # 0.0.39h F13: the exec-time recheck tripped (the config or its
-                # temp turned into a symlink mid-write) — announce the skip like
-                # the entry gate above does, instead of ending silently.
-                printf '%s\n' "  WARNING: $ddf_cfg (or its temp) changed to a symlink mid-write""\
- — dev-owned flag NOT written (links are never followed)" >&2
-            fi
-        else
-            printf '%s\n' "  WARNING: dev-owned flag write to $ddf_cfg failed""\
+                printf '%s\n' "  WARNING: dev-owned flag write to $ddf_cfg failed""\
  (cannot stage the mode — original untouched; retry:""\
  sudo opk config handover \"${1:-}\" or opk update --refresh)" >&2
+            fi
+        else
+            # 0.0.39h F13: the exec-time recheck tripped (the config or its
+            # temp turned into a symlink mid-write) — announce the skip like
+            # the entry gate above does, instead of ending silently.
+            printf '%s\n' "  WARNING: $ddf_cfg (or its temp) changed to a symlink mid-write""\
+ — dev-owned flag NOT written (links are never followed)" >&2
         fi
     else
         # awk died staging the new content (disk full?): the original

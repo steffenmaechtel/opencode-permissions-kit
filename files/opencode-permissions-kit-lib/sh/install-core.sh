@@ -2118,6 +2118,11 @@ do_deploy_phase() {
                 # keeps the dev's original as recovery material. The
                 # `:?` guard (rm -rf census, #571): an empty _opk_src
                 # must abort loud, never degenerate the rm -rf operand.
+                # Deliberate strengthening beyond agent/conventions.md
+                # "Test sandbox" item 3 (rm suffix guard):
+                # that rule mandates :? for literal-suffix operands and
+                # exempts pure variables — the old bare "$_opk_src" was
+                # compliant; the census tightens it anyway (#606 a Q5).
                 [ "$_opk_ag" = m ] && sudo rm -rf "${_opk_src:?}"
                 if [ "$_opk_ag" = m ]; then
                     ui_success "agent resources MOVED: $_opk_src -> $_opk_dst (group $OPENCODE_GROUP: both sides read/write)"
