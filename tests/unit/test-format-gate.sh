@@ -31,6 +31,12 @@
 #      invocation shape is pinned (fail-stub argv model), and
 #      set-but-empty SHFMT_BIN_DIR fails at the mkdir edge (marker
 #      absent). Scratch joins the trap.
+#   6. shellmetrics download integrity (#572 B3): the marker-extracted
+#      fetch+verify block from scripts/shellmetrics.sh runs under a
+#      controlled PATH (curl stub + real externals) -- a well-formed
+#      but wrong artifact is refused before execution, a matching
+#      digest installs atomically, a poisoned cache dies loud and is
+#      removed, and the SM_SHA256 pin literal is well-formed.
 #
 # Run: sh tests/unit/test-format-gate.sh
 
@@ -347,6 +353,114 @@ OKSTUB
     fi
 else
     fail "scratch setup failed (work_new) -- install-shfmt pins not run (D4 guard)"
+fi
+
+# --- 6. shellmetrics download integrity (#572 B3) --------------------------------
+# The kit's other own-tool download meets the same F28 standard as
+# install-shfmt: the fetch+verify block is extracted between its markers
+# and executed under a controlled PATH (agent/conventions.md, "Test
+# sandbox (unit suites)" -- the controlled-PATH rule) -- curl is a stub
+# serving a payload that "runs" happily (models the compromised release
+# that satisfies --version), the digest gate must refuse it BEFORE
+# execution. Three arms + the pin-literal shape check; the fixture class
+# is the one this issue prescribes (the digest-gate pins, §5's model).
+_smf="$(work_new)" || {
+    echo "format gate: scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
+if [ -d "$_smf" ]; then
+    mkdir -p "$_smf/bin"
+    for _sm_t in sha256sum awk rm mkdir chmod mv bash cat; do
+        _sm_w="$(command -v "$_sm_t" 2>/dev/null || true)"
+        [ -n "$_sm_w" ] && ln -s "$_sm_w" "$_smf/bin/$_sm_t"
+    done
+    cat >"$_smf/bin/curl" <<'SMCURL'
+#!/bin/sh
+# shellmetrics download stub: order-independent -o resolution; serves
+# the payload file (SM_PAYLOAD) or fails.
+_out=""
+while [ $# -gt 0 ]; do
+    if [ "$1" = "-o" ]; then
+        _out="$2"
+        shift 2
+        continue
+    fi
+    shift
+done
+[ -n "$_out" ] || exit 1
+cat "$SM_PAYLOAD" >"$_out" || exit 1
+SMCURL
+    chmod +x "$_smf/bin/curl"
+    printf '#!/bin/sh\necho v0.5.0-stub\n' >"$_smf/payload"
+    _sm_block="$(sed -n '/^# --- fetch + verify (issue #572 B3/,/^# --- end fetch + verify ---/p' \
+        scripts/shellmetrics.sh | sed '1d;$d')"
+    # the shipped pin (the evil arm models an UNoverridden run) and the
+    # stub payload's real digest (the ok arm rides the override seam)
+    _sm_pin="$(sed -n 's/^SM_SHA256="\${SM_SHA256:-\([0-9a-f]*\)}"$/\1/p' scripts/shellmetrics.sh)"
+    _sm_sha="$(sha256sum "$_smf/payload" | awk '{print $1}')"
+    if [ -n "$_sm_block" ] && [ "${#_sm_pin}" -eq 64 ]; then
+        pass "shellmetrics fetch block extractable, SM_SHA256 pin literal well-formed (B3)"
+    else
+        fail "shellmetrics fetch block/pin extraction came up empty (block=${#_sm_block} pin=${#_sm_pin})"
+    fi
+    # _sm_run <cache-dir> <SM_SHA256 value>: execute the extracted block
+    # in a controlled subshell; die() records the guard message on stderr.
+    _sm_run() {
+        (
+            PATH="$_smf/bin"
+            SM_DIR="$1"
+            SM_URL="https://stub.invalid/shellmetrics"
+            SM_SHA="stub-sha"
+            SM_SHA256="$2"
+            SM_PAYLOAD="$_smf/payload"
+            export PATH SM_DIR SM_URL SM_SHA SM_SHA256 SM_PAYLOAD
+            die() {
+                echo "die: $*" >&2
+                exit 1
+            }
+            eval "$_sm_block"
+        )
+    }
+    # evil arm: the stub payload satisfies --version but NOT the shipped
+    # pin -- refuse before anything is executed or installed.
+    _sm_out="$(_sm_run "$_smf/evil" "$_sm_pin" 2>&1)"
+    _sm_rc=$?
+    if [ "$_sm_rc" -ne 0 ] &&
+        printf '%s\n' "$_sm_out" | grep -q 'checksum mismatch' &&
+        [ ! -e "$_smf/evil/shellmetrics" ] &&
+        [ -z "$(find "$_smf/evil" -name '.shellmetrics.tmp.*' 2>/dev/null)" ]; then
+        pass "shellmetrics digest gate refuses a wrong artifact, installs nothing (B3/F28)"
+    else
+        fail "shellmetrics digest gate broken (rc=$_sm_rc out=$_sm_out)"
+    fi
+    # ok arm: the matching digest (override seam) installs atomically.
+    _sm_out="$(_sm_run "$_smf/ok" "$_sm_sha" 2>&1)"
+    _sm_rc=$?
+    if [ "$_sm_rc" -eq 0 ] &&
+        cmp -s "$_smf/ok/shellmetrics" "$_smf/payload" &&
+        [ -x "$_smf/ok/shellmetrics" ] &&
+        [ -z "$(find "$_smf/ok" -name '.shellmetrics.tmp.*' 2>/dev/null)" ]; then
+        pass "shellmetrics download with matching digest lands atomically, no temp left (B3)"
+    else
+        fail "shellmetrics verified install broken (rc=$_sm_rc out=$_sm_out)"
+    fi
+    # poisoned-cache arm: a planted executable copy with wrong bytes
+    # (the cache dir is user-writable) dies loud at the every-run gate
+    # and the bytes are removed for the next fetch.
+    mkdir -p "$_smf/pois"
+    printf '#!/bin/sh\necho poisoned\n' >"$_smf/pois/shellmetrics"
+    chmod +x "$_smf/pois/shellmetrics"
+    _sm_out="$(_sm_run "$_smf/pois" "$_sm_pin" 2>&1)"
+    _sm_rc=$?
+    if [ "$_sm_rc" -ne 0 ] &&
+        printf '%s\n' "$_sm_out" | grep -q 'fails its digest pin' &&
+        [ ! -e "$_smf/pois/shellmetrics" ]; then
+        pass "shellmetrics poisoned cache dies loud and is removed (B3)"
+    else
+        fail "shellmetrics cached-copy gate broken (rc=$_sm_rc out=$_sm_out)"
+    fi
+else
+    fail "scratch setup failed (work_new) -- shellmetrics pins not run (D4 guard)"
 fi
 
 echo ""

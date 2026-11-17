@@ -445,5 +445,19 @@ refuses a stale block.
 `make release VERSION=0.0.61 ARGS=--dry-run` prints the steps without
 changing anything.
 
+**Known residual — the CI-status gate fails open on unanswered hosts
+(#572 B2, maintainer decision 2026-11-17: documented, not hardened).**
+Every release precondition in `scripts/release.sh` fails closed except
+one: when no tool can answer whether this master commit's CI is green
+(neither `gh` nor `curl`+`python3` API access — offline or
+rate-limited), the script prints *"cannot verify CI status — check
+Actions manually before releasing"* and **continues**. That line is a
+manual duty, not a formality: before letting `make release` proceed,
+open Actions in the browser and confirm the master commit's runs
+(tests + e2e) are green. The local `make test` run inside the release
+script still gates; what can slip through unverified is exactly the
+e2e/CI layer. Hard-failing instead would block releases from offline
+hosts entirely — rejected for that reason.
+
 Everything else (branch protection on `stable`, announcements) is set up
 once, not per release.

@@ -6,7 +6,10 @@
 #      determinism, loud failures (missing file)
 #   2. repo freshness: the committed SHA256SUMS matches files/ on disk
 #      (the drift gate every `make test` runs), plus a discriminating
-#      scratch-tamper arm
+#      scratch-tamper arm; 2c adds the committed-manifest leg (#572
+#      T4: fresh-on-disk but stale-at-HEAD — the forgotten `git add`
+#      — reddens locally at the drift moment), discriminated by 2d's
+#      scratch git repo over all three verdicts
 #   3. fetch_kit end-to-end against a file-server curl stub (no network,
 #      no real curl dependency -- check-host keeps curl an e2e-only
 #      tool): success, tampered body, missing manifest, malformed
@@ -177,6 +180,84 @@ if sh "$_fi_clone/scripts/gen-sums.sh" >"$WORK/clone-tampered.txt" &&
     pass "freshness check discriminates (tampered tree yields a different manifest)"
 else
     fail "freshness check discriminates (tampered tree produced the committed manifest)"
+fi
+
+# 2c. committed-manifest leg (#572 T4): the freshness pin above compares
+# working-tree vs working-tree — a `make sums` output forgotten to
+# `git add` (the #602 class) passes green locally at exactly the drift
+# moment, while CI's clean checkout reds. When the manifest's inputs
+# (files/ + VERSION) are clean vs HEAD, the on-disk SHA256SUMS must
+# equal HEAD's committed one: fresh-on-disk + stale-in-HEAD is exactly
+# that drift. Mid-wave (inputs dirty or untracked) the leg skips by
+# design — the sanctioned chain runs `make test` BEFORE `git add`, and
+# the disk-vs-disk pin above covers that moment. Depth-1 CI is safe:
+# only HEAD is read, never a historical object.
+_fi_head_state() {
+    # $1 = repo dir; prints "<verdict>[:<reason>]": ok / drift / skip
+    if ! [ -f "$1/SHA256SUMS" ]; then
+        printf 'skip:no SHA256SUMS on disk'
+        return 0
+    fi
+    if ! git -C "$1" rev-parse --git-dir >/dev/null 2>&1; then
+        printf 'skip:not a git checkout'
+        return 0
+    fi
+    if [ -n "$(git -C "$1" status --porcelain -- files VERSION 2>/dev/null)" ]; then
+        printf 'skip:manifest inputs dirty vs HEAD (mid-wave)'
+        return 0
+    fi
+    if ! git -C "$1" show HEAD:SHA256SUMS >"$WORK/head-sums.txt" 2>/dev/null; then
+        printf 'skip:no committed SHA256SUMS at HEAD'
+        return 0
+    fi
+    if cmp -s "$WORK/head-sums.txt" "$1/SHA256SUMS"; then
+        printf 'ok'
+    else
+        printf 'drift:fresh on disk, stale at HEAD'
+    fi
+    return 0
+}
+_st="$(_fi_head_state "$REPO")"
+case "$_st" in
+    ok)
+        pass "committed SHA256SUMS matches HEAD (no forgotten git add, #572 T4)"
+        ;;
+    drift:*)
+        fail "git add SHA256SUMS with the wave — fresh on disk but stale at HEAD (#572 T4, the #602 class)"
+        ;;
+    skip:*)
+        # environment-marked (L4): mid-wave runs and non-git checkouts
+        # legitimately skip — the disk-vs-disk pin stays in force there
+        pass "committed-manifest leg skipped ($_st)"
+        ;;
+esac
+
+# 2d. the committed-manifest leg discriminates (L4): a scratch git repo
+# walks the three verdicts — committed-clean (ok), mid-wave dirty
+# inputs (skip: the sanctioned pre-add gate moment), fresh-on-disk
+# manifest (drift: the forgotten git add).
+_fg="$WORK/headleg"
+mkdir -p "$_fg/files" "$_fg/scripts"
+printf 'a\n' >"$_fg/files/a"
+printf 'v1\n' >"$_fg/VERSION"
+printf 'hasha  files/a\nhashv  VERSION\n' >"$_fg/SHA256SUMS"
+git -C "$_fg" init -q >/dev/null 2>&1
+git -C "$_fg" add -A >/dev/null 2>&1
+git -C "$_fg" -c user.email=kit@test.invalid -c user.name=kit-test \
+    commit -qm init >/dev/null 2>&1
+_fg_ok=0
+[ "$(_fi_head_state "$_fg")" = "ok" ] && _fg_ok=$((_fg_ok + 1))
+printf 'a2\n' >"$_fg/files/a"
+_fg_v="$(_fi_head_state "$_fg")"
+case "$_fg_v" in skip:*) _fg_ok=$((_fg_ok + 1)) ;; esac
+git -C "$_fg" checkout -q -- files/a
+printf 'hashb  files/a\nhashv  VERSION\n' >"$_fg/SHA256SUMS"
+_fg_v="$(_fi_head_state "$_fg")"
+case "$_fg_v" in drift:*) _fg_ok=$((_fg_ok + 1)) ;; esac
+if [ "$_fg_ok" -eq 3 ]; then
+    pass "committed-manifest leg discriminates ok/skip/drift (#572 T4)"
+else
+    fail "committed-manifest leg verdicts drifted ($_fg_ok of 3 arms)"
 fi
 
 # --- shared fixture machinery (sections 3-5) -------------------------------------
