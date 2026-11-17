@@ -330,6 +330,15 @@ root-running `scripts/` code.
   MED/HIGH finding escalates scope beyond the fix. Tier and track
   travel in the marker (`"tier":"high"|"med"|"low"`) and in the loop
   status prose. (RM-0124)
+- A release PR is shipped-track from creation — the release gate is
+  the heaviest review the repo runs, not a VERSION-only non-shipped
+  diff. The mechanical rule classifies a bump-only diff as
+  non-shipped; the release-gate commission is the deliberate POLICY
+  EXCEPTION — shipped-track staffing regardless of the initial diff
+  shape, because fix waves on the gate routinely touch `files/**`
+  (pr-00568 wave a: 6 of 7 commits, config.sh through
+  py/tui-register.py). Marker: `Track: shipped (release gate —
+  snapshot pass + fix waves touch files/)`. (RM-0169)
 - The PR body's closing keyword is the issue-closure selector,
   stated at PR creation like the Track line: a wave that fully
   dispositions its case issue writes `Closes #<issue>`, an
@@ -626,6 +635,14 @@ Four places carry review knowledge, each with exactly one job:
   ENOENT and EACCES alike), and the correction had to ride a later
   round comment. A CONFIRMED verdict over an unprobed mechanism is
   `unverified`, not confirmed. (RM-0162)
+- A claim about what a make target touches enumerates its transitive
+  scans, not just its prerequisites — the re-derivation includes what
+  the named commands recursively traverse: pr-00586 round a's A1 read
+  `make release` as the unit lane only (no e2e prerequisite) and
+  concluded the dumps tree untouched, while the unit lane's tree-wide
+  citation scan walks `tests/e2e/dumps/` — the maintainer's live
+  `make test` died rc 2 on container-owned dump files (#587, #588
+  §3). (RM-0168)
 - Retractions stay visible in the round comment's "Retracted/ghost
   findings" section — they calibrate how much to trust the next
   unverified claim. (RM-0075)

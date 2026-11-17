@@ -8,11 +8,11 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**166 metas · 163 active · 3 retired · 6 review-pending · next due 2026-11-17**
+**169 metas · 166 active · 3 retired · 9 review-pending · next due 2026-11-17**
 
 ## Actionable
 
-- **Review pending:** RM-0161, RM-0162, RM-0163, RM-0164, RM-0165, RM-0166
+- **Review pending:** RM-0161, RM-0162, RM-0163, RM-0164, RM-0165, RM-0166, RM-0167, RM-0168, RM-0169
 - **Amended — pending:** none
 
 ## AGENTS.md
@@ -139,6 +139,7 @@
 | [RM-0143](0/1/4/RM-0143.md) | New text cites its source | active | approved | 1m | 2026-12-15 |
 | [RM-0144](0/1/4/RM-0144.md) | learnings.md additions carry era-marked | active | approved | 1m | 2026-12-15 |
 | [RM-0145](0/1/4/RM-0145.md) | Shipped content is English and | active | approved | 1m | 2026-12-15 |
+| [RM-0167](0/1/6/RM-0167.md) | A wave codifying a reflection | active | **pending** | 1m | 2026-12-17 |
 
 ## agent/review-concept.md
 
@@ -186,6 +187,7 @@
 | [RM-0124](0/1/2/RM-0124.md) | Track selection is mechanical | active | approved | 1m | 2026-12-17 |
 | [RM-0125](0/1/2/RM-0125.md) | Round typing names what | active | approved | 1m | 2026-11-28 |
 | [RM-0160](0/1/6/RM-0160.md) | The PR body's closing keyword | active | approved | 1m | 2026-12-16 |
+| [RM-0169](0/1/6/RM-0169.md) | A release PR is shipped-track | active | **pending** | 1m | 2026-12-17 |
 
 ### Review tracks: shipped and non-shipped
 
@@ -253,6 +255,7 @@
 | [RM-0112](0/1/1/RM-0112.md) | A review round MAY run | active | approved | 1m | 2026-12-17 |
 | [RM-0139](0/1/3/RM-0139.md) | Sabotage spot-checks run only against | active | approved | 1m | 2026-12-10 |
 | [RM-0162](0/1/6/RM-0162.md) | A finding whose mechanism rests on shell… | active | **pending** | 1m | 2026-12-17 |
+| [RM-0168](0/1/6/RM-0168.md) | A claim about what a | active | **pending** | 1m | 2026-12-17 |
 
 ### Suites are the standing review
 

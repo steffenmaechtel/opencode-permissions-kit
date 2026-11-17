@@ -87,6 +87,13 @@ sessions, one per PR).
   restating
   ([conventions.md](conventions.md#referencing-not-restating)).
   (RM-0143)
+- A wave codifying a reflection issue's mechanism claims re-probes
+  them in scratch before writing them into rule text — the issue is
+  evidence, not verified truth: #578 §3's `sh -n` narrative was
+  codified unprobed, and the pr-00586 round-a probes showed it
+  conditional (the balanced apostrophe pair is the silent no-op) —
+  the verification duty's probe-before-verdict discipline, applied on
+  the rule-writing side. (RM-0167)
 - learnings.md additions carry era-marked evidence (out of rule-meta
   scope by design, the record's decision 10). (RM-0144)
 - Shipped content is English and never grows past 120 columns (the
