@@ -8,12 +8,12 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**176 metas · 173 active · 3 retired · 17 review-pending · next due 2026-11-17**
+**176 metas · 173 active · 3 retired · 0 review-pending · next due 2026-11-17**
 
 ## Actionable
 
-- **Review pending:** RM-0161, RM-0162, RM-0163, RM-0164, RM-0165, RM-0166, RM-0167, RM-0168, RM-0169, RM-0170, RM-0171, RM-0172, RM-0173, RM-0174, RM-0175, RM-0176
-- **Amended — pending:** RM-0156 (2026-11-17)
+- **Review pending:** none
+- **Amended — pending:** none
 
 ## AGENTS.md
 
@@ -69,8 +69,8 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0163](0/1/6/RM-0163.md) | A special builtin's failed redirection is FATAL | active | **pending** | 1m | 2026-12-17 |
-| [RM-0164](0/1/6/RM-0164.md) | Comment text inside a single-quoted sh -c worker | active | **pending** | 1m | 2026-12-17 |
+| [RM-0163](0/1/6/RM-0163.md) | A special builtin's failed redirection is FATAL | active | approved | 1m | 2026-12-17 |
+| [RM-0164](0/1/6/RM-0164.md) | Comment text inside a single-quoted sh -c worker | active | approved | 1m | 2026-12-17 |
 
 ### Fail-loud detector sweeps
 
@@ -102,7 +102,7 @@
 | [RM-0044](0/0/4/RM-0044.md) | rm suffix guard — any rm invocation | active | approved | 1m | 2026-11-17 |
 | [RM-0137](0/1/3/RM-0137.md) | Scratch receivers in harness-sourcing suites… | active | approved | 1m | 2026-12-06 |
 | [RM-0151](0/1/5/RM-0151.md) | The decision rule for writing NEW | active | approved | 1m | 2026-12-15 |
-| [RM-0173](0/1/7/RM-0173.md) | A harness env override consumed | active | **pending** | 1m | 2026-12-17 |
+| [RM-0173](0/1/7/RM-0173.md) | A harness env override consumed | active | approved | 1m | 2026-12-17 |
 
 ### Referencing review findings
 
@@ -127,8 +127,8 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0171](0/1/7/RM-0171.md) | A docs code block whose | active | **pending** | 1m | 2026-12-17 |
-| [RM-0174](0/1/7/RM-0174.md) | A load-bearing line shape | active | **pending** | 1m | 2026-12-17 |
+| [RM-0171](0/1/7/RM-0171.md) | A docs code block whose | active | approved | 1m | 2026-12-17 |
+| [RM-0174](0/1/7/RM-0174.md) | A load-bearing line shape | active | approved | 1m | 2026-12-17 |
 
 ### Rule-file markdown structure
 
@@ -147,7 +147,7 @@
 | [RM-0143](0/1/4/RM-0143.md) | New text cites its source | active | approved | 1m | 2026-12-15 |
 | [RM-0144](0/1/4/RM-0144.md) | learnings.md additions carry era-marked | active | approved | 1m | 2026-12-15 |
 | [RM-0145](0/1/4/RM-0145.md) | Shipped content is English and | active | approved | 1m | 2026-12-15 |
-| [RM-0167](0/1/6/RM-0167.md) | A wave codifying a reflection | active | **pending** | 1m | 2026-12-17 |
+| [RM-0167](0/1/6/RM-0167.md) | A wave codifying a reflection | active | approved | 1m | 2026-12-17 |
 
 ## agent/review-concept.md
 
@@ -169,7 +169,7 @@
 | [RM-0122](0/1/2/RM-0122.md) | Scope brake (binding in | active | approved | 1m | 2026-11-28 |
 | [RM-0123](0/1/2/RM-0123.md) | Scope budget (autonomous commissions): the | active | approved | 1m | 2026-11-28 |
 | [RM-0138](0/1/3/RM-0138.md) | A fix-wave re-review is itself | active | approved | 1m | 2026-12-07 |
-| [RM-0175](0/1/7/RM-0175.md) | The posted.log entry is | active | **pending** | 1m | 2026-12-17 |
+| [RM-0175](0/1/7/RM-0175.md) | The posted.log entry is | active | approved | 1m | 2026-12-17 |
 
 ### The loop and the stop rule
 
@@ -187,7 +187,7 @@
 | [RM-0134](0/1/3/RM-0134.md) | On the non-shipped track, a | active | approved | 1m | 2026-11-30 |
 | [RM-0136](0/1/3/RM-0136.md) | Deferred work orders collected during | active | approved | 1m | 2026-12-17 |
 | [RM-0140](0/1/4/RM-0140.md) | After the work-order gate settles | active | approved | 1m | 2026-12-15 |
-| [RM-0161](0/1/6/RM-0161.md) | A FILED work order is self-contained at creation | active | **pending** | 1m | 2026-12-17 |
+| [RM-0161](0/1/6/RM-0161.md) | A FILED work order is self-contained at creation | active | approved | 1m | 2026-12-17 |
 
 ### Round typing and tiering
 
@@ -196,7 +196,7 @@
 | [RM-0124](0/1/2/RM-0124.md) | Track selection is mechanical | active | approved | 1m | 2026-12-17 |
 | [RM-0125](0/1/2/RM-0125.md) | Round typing names what | active | approved | 1m | 2026-11-28 |
 | [RM-0160](0/1/6/RM-0160.md) | The PR body's closing keyword | active | approved | 1m | 2026-12-16 |
-| [RM-0169](0/1/6/RM-0169.md) | A release PR is shipped-track | active | **pending** | 1m | 2026-12-17 |
+| [RM-0169](0/1/6/RM-0169.md) | A release PR is shipped-track | active | approved | 1m | 2026-12-17 |
 
 ### Review tracks: shipped and non-shipped
 
@@ -205,7 +205,7 @@
 | [RM-0131](0/1/3/RM-0131.md) | Non-shipped staffing: standard | active | approved | 1m | 2026-11-30 |
 | [RM-0132](0/1/3/RM-0132.md) | Fresh-session entry (the batch | active | approved | 1m | 2026-11-30 |
 | [RM-0133](0/1/3/RM-0133.md) | Disposition policy on the non-shipped | active | approved | 1m | 2026-11-30 |
-| [RM-0176](0/1/7/RM-0176.md) | The in-round exceptions above | active | **pending** | 1m | 2026-12-17 |
+| [RM-0176](0/1/7/RM-0176.md) | The in-round exceptions above | active | approved | 1m | 2026-12-17 |
 
 ### Curation and verification
 
@@ -233,8 +233,8 @@
 | [RM-0153](0/1/5/RM-0153.md) | PR-body edits for wave-authored | active | approved | 1m | 2026-12-15 |
 | [RM-0154](0/1/5/RM-0154.md) | The CI status fields assert | active | approved | 1m | 2026-12-15 |
 | [RM-0158](0/1/5/RM-0158.md) | names its observation scope | active | approved | 1m | 2026-12-16 |
-| [RM-0166](0/1/6/RM-0166.md) | The closing summary's marker carries | active | **pending** | 1m | 2026-12-17 |
-| [RM-0170](0/1/7/RM-0170.md) | Mechanical fields derive from the | active | **pending** | 1m | 2026-12-17 |
+| [RM-0166](0/1/6/RM-0166.md) | The closing summary's marker carries | active | approved | 1m | 2026-12-17 |
+| [RM-0170](0/1/7/RM-0170.md) | Mechanical fields derive from the | active | approved | 1m | 2026-12-17 |
 
 ### Fixes close classes, not sites
 
@@ -265,8 +265,8 @@
 | [RM-0075](0/0/7/RM-0075.md) | Retractions stay visible in | active | approved | 1m | 2026-11-19 |
 | [RM-0112](0/1/1/RM-0112.md) | A review round MAY run | active | approved | 1m | 2026-12-17 |
 | [RM-0139](0/1/3/RM-0139.md) | Sabotage spot-checks run only against | active | approved | 1m | 2026-12-10 |
-| [RM-0162](0/1/6/RM-0162.md) | A finding whose mechanism rests on shell… | active | **pending** | 1m | 2026-12-17 |
-| [RM-0168](0/1/6/RM-0168.md) | A claim about what a | active | **pending** | 1m | 2026-12-17 |
+| [RM-0162](0/1/6/RM-0162.md) | A finding whose mechanism rests on shell… | active | approved | 1m | 2026-12-17 |
+| [RM-0168](0/1/6/RM-0168.md) | A claim about what a | active | approved | 1m | 2026-12-17 |
 
 ### Suites are the standing review
 
@@ -303,7 +303,7 @@
 | [RM-0108](0/1/0/RM-0108.md) | Fan-out is staged, never launched | active | approved | 1m | 2026-11-22 |
 | [RM-0111](0/1/1/RM-0111.md) | Sabotage spot-checks mutate the | active | approved | 1m | 2026-11-22 |
 | [RM-0114](0/1/1/RM-0114.md) | Agents stamp with their own | active | approved | 1m | 2026-11-22 |
-| [RM-0172](0/1/7/RM-0172.md) | A shipped code block is | active | **pending** | 1m | 2026-12-17 |
+| [RM-0172](0/1/7/RM-0172.md) | A shipped code block is | active | approved | 1m | 2026-12-17 |
 
 ### Release gate
 
@@ -332,7 +332,7 @@
 | [RM-0048](0/0/4/RM-0048.md) | Behavioral doubles + contract lock | active | approved | 1m | 2026-11-17 |
 | [RM-0049](0/0/4/RM-0049.md) | Real-binary tiers | active | approved | 1m | 2026-11-17 |
 | [RM-0050](0/0/5/RM-0050.md) | Environment matrix as a test | active | approved | 1m | 2026-11-17 |
-| [RM-0165](0/1/6/RM-0165.md) | No controlling tty in containers — split display | active | **pending** | 1m | 2026-12-17 |
+| [RM-0165](0/1/6/RM-0165.md) | No controlling tty in containers — split display | active | approved | 1m | 2026-12-17 |
 
 ### 6. Checklist for new kit code
 
@@ -376,7 +376,7 @@
 | [RM-0093](0/0/9/RM-0093.md) | In meta bodies, cross-references | active | approved | 1m | 2026-11-19 |
 | [RM-0094](0/0/9/RM-0094.md) | The review log names the | active | approved | 1m | 2026-11-19 |
 | [RM-0135](0/1/3/RM-0135.md) | Post-approval changes set | active | approved | 1m | 2026-11-30 |
-| [RM-0156](0/1/5/RM-0156.md) | The quote: needle is the | active | **amended — pending** | 1m | 2026-12-15 |
+| [RM-0156](0/1/5/RM-0156.md) | The quote: needle is the | active | approved | 1m | 2026-12-17 |
 | [RM-0159](0/1/5/RM-0159.md) | Quoted strings in meta bodies | active | approved | 1m | 2026-12-16 |
 
 ### Quality bar for rationales
