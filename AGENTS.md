@@ -223,7 +223,14 @@ git add && git commit`: the freshness pin inside `make test` reddens on
 a stale `SHA256SUMS` (issue #478), so the regeneration must land in
 the log before the suite reads it (#524 §1 paid one red gate for the
 order); `make sums` itself is idempotent (no-op output when the
-manifest is already fresh). The same ordering duty holds for the
+manifest is already fresh). The entry-checksum blocks in README and
+`docs/getting-started.md` are the ONE checksum artifact mid-cycle
+waves never touch: `make release-sums` rewrites them from the tree's
+`files/install.sh` **release PR only** (issue #492) — a mid-cycle
+regen would publish a hash for bytes `stable` does not serve yet;
+`make release` step 2.6 refuses a stale block, and the release PR's
+chain is `make version VERSION=x && make sums && make release-sums &&
+make test`. The same ordering duty holds for the
 rules-meta INDEX: a wave that adds or amends metas regenerates
 `internal/rules-meta/INDEX.md` inside the chain BEFORE the suite
 reads it (`sh scripts/rules-audit.sh`, or

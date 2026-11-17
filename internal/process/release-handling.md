@@ -417,7 +417,7 @@ and pushes (never force-pushes):
 
 git checkout -b release/0.0.61
 
-make version VERSION=0.0.61 && make sums && make test
+make version VERSION=0.0.61 && make sums && make release-sums && make test
 
 git commit -am "chore: bump VERSION to 0.0.61"
 
@@ -430,23 +430,17 @@ git checkout master
 
 git pull origin master
 
-opk handover me /var/www/vhosts/opencode-permissions-kit/repo/tests/e2e/dumps
-
 make release VERSION=0.0.61
 
 gh release create 0.0.61 --generate-notes
-
-opk handover opencode /var/www/vhosts/opencode-permissions-kit/repo/tests/e2e/dumps
 ```
 
-The two `opk handover` lines bracket the release-day runs, for both
-directions of the permission problem: `make release` runs the unit
-lane (`make test`), whose tree-wide scans traverse `tests/e2e/dumps`
-(the rules-meta citation scan dies on container-owned dump files
-otherwise, #587), and the maintainer-driven e2e runs around the
-release are what write there. The dumps tree belongs to the
-maintainer for that window and returns to the agent user afterwards
-(ownership follows the writer, docs/reference/cli.md).
+The `make release-sums` step in the release branch chain rewrites the
+verified-install checksum blocks in README and getting-started from
+the tree's `install.sh` (issue #492) — at that moment the tree equals
+the future `stable` bytes, so the hash the release will serve is the
+hash the docs carry. `make release` pre-flights it (step 2.6) and
+refuses a stale block.
 
 `make release VERSION=0.0.61 ARGS=--dry-run` prints the steps without
 changing anything.

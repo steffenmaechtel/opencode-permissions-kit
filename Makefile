@@ -4,6 +4,7 @@
     fmt \
     fmt-scope \
     sums \
+    release-sums \
     install-shfmt \
     check-host \
     check-py \
@@ -171,6 +172,7 @@ help:
 	@echo "  make fmt           One-shot shfmt -w over the whole gate scope"
 	@echo "  make fmt-scope     Print the gate's file scope (single source, used by the format-gate suite)"
 	@echo "  make sums          Regenerate SHA256SUMS (issue #478; commit it when files/ changed)"
+	@echo "  make release-sums  Rewrite the entry-checksum blocks in README/getting-started (release PR ONLY, issue #492; NOT the SHA256SUMS manifest)"
 	@echo "  make install-shfmt Download the pinned shfmt to ~/.local/bin (no root)"
 	@echo "  make test-opencode-as-opencode  Run wrapper (opencode-as-opencode) validation tests"
 	@echo "  make test-as-opencode-core      Run wrapper core lib (as-opencode-core.sh) tests"
@@ -391,6 +393,17 @@ sums:
 			rm -f "$$_sums_tmp"; \
 			echo "SHA256SUMS already fresh ($$(wc -l < SHA256SUMS | tr -d ' ') entries)"; \
 		fi
+
+# Entry-checksum blocks (issue #492): rewrite the verified-install hash
+# in README.md / docs/getting-started.md from this tree's
+# files/install.sh. RELEASE-PR ONLY -- the hash describes the bytes the
+# Pages entry serves from `stable`; a mid-cycle run would publish a
+# hash for bytes stable does not serve yet (users' verification would
+# fail falsely until the release). `make release` pre-flights freshness
+# (scripts/release-sums.sh --check) and refuses a stale block. This is
+# NOT the SHA256SUMS manifest -- that is `make sums`.
+release-sums:
+	@sh ./scripts/release-sums.sh
 
 # Download the pinned shfmt into ~/.local/bin (single static binary,
 # no root). CI uses this too -- the Makefile is the one source of the

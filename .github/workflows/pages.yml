@@ -54,9 +54,21 @@ jobs:
           path: stable
       - name: Assemble site
         run: |
+          # -o pipefail (pr-00600 a A5): without it a failing sha256sum
+          # below would render an EMPTY checksum into the page and the
+          # deploy would still go green (the rc of a pipeline is the
+          # last member's, and cut succeeds on empty input).
+          set -euo pipefail
           mkdir -p site
           cp .github/pages/index.md .github/pages/_config.yml site/
           cp stable/files/install.sh site/
+          # Render the verified-install checksum from the EXACT served
+          # bytes (issue #492): in sync by construction. The grep fails
+          # the deploy loudly when the placeholder is missing -- a sed
+          # without it would silently serve the raw token.
+          grep -F '__OPK_INSTALL_SHA256__' site/index.md
+          _sha="$(sha256sum site/install.sh | cut -d' ' -f1)"
+          sed -i "s/__OPK_INSTALL_SHA256__/${_sha}/g" site/index.md
       - uses: actions/configure-pages@v6
       - uses: actions/jekyll-build-pages@v1
         with:

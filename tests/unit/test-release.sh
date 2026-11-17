@@ -15,6 +15,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RELEASE="$SCRIPT_DIR/../../scripts/release.sh"
 GENSUMS="$SCRIPT_DIR/../../scripts/gen-sums.sh"
+RELSUMS="$SCRIPT_DIR/../../scripts/release-sums.sh"
 FILES_DIR="$SCRIPT_DIR/../../files"
 # Shared harness (issue #394): pass/fail, colors, counters
 # (and check/assert_eq where present) live in lib/harness.sh now.
@@ -27,6 +28,27 @@ WORK="$(work_new)"
 # a files/ tree + a FRESH SHA256SUMS, issue #478), all pushed. The
 # sandbox copy of each script resolves REPO from its own location, so
 # copying the real scripts into the sandbox tests the real logic.
+# _write_cksum_page <file> <entry-sha>: a page carrying one fresh
+# entry-checksum marker block (issue #492) — the shape release-sums.sh
+# and the 2.6 pre-flight expect in README.md and getting-started.md.
+_write_cksum_page() {
+    _wcp_file="$1"
+    _wcp_sha="$2"
+    mkdir -p "$(dirname "$_wcp_file")"
+    {
+        echo "kit"
+        echo "<!-- opk-checksum:start -->"
+        echo ""
+        echo '```bash'
+        echo "curl -fsSL -o /tmp/opk-install.sh https://steffenmaechtel.github.io/opencode-permissions-kit/install.sh &&"
+        echo "echo \"${_wcp_sha}  /tmp/opk-install.sh\" | sha256sum -c - &&"
+        echo "sudo env KIT_BRANCH=stable bash /tmp/opk-install.sh"
+        echo '```'
+        echo ""
+        echo "<!-- opk-checksum:end -->"
+    } >"$_wcp_file"
+}
+
 mkrepo() {
     rm -rf "${WORK:?}/r" "${WORK:?}/origin.git"
     git init -q -b master "$WORK/origin.git" --bare
@@ -37,9 +59,16 @@ mkrepo() {
     cp "$RELEASE" "$WORK/r/scripts/release.sh"
     cp "$GENSUMS" "$WORK/r/scripts/gen-sums.sh"
     chmod 755 "$WORK/r/scripts/gen-sums.sh"
+    cp "$RELSUMS" "$WORK/r/scripts/release-sums.sh"
+    chmod 755 "$WORK/r/scripts/release-sums.sh"
     cp -R "$FILES_DIR" "$WORK/r/files"
     echo "1.2.3" >"$WORK/r/VERSION"
-    echo "kit" >"$WORK/r/README.md"
+    # Both entry-checksum pages fresh (issue #492): the 2.6 pre-flight
+    # hashes the fixture's install.sh and refuses a stale block, so
+    # every scenario starts from fresh ones.
+    _eksha="$(sha256sum "$WORK/r/files/install.sh" | cut -d' ' -f1)"
+    _write_cksum_page "$WORK/r/README.md" "$_eksha"
+    _write_cksum_page "$WORK/r/docs/getting-started.md" "$_eksha"
     sh "$WORK/r/scripts/gen-sums.sh" >"$WORK/r/SHA256SUMS"
     git -C "$WORK/r" add -A
     git -C "$WORK/r" commit -qm "init 1.2.3"
@@ -295,24 +324,106 @@ git -C "$WORK/r" commit -qm "tamper files/ without regenerating the manifest"
 git -C "$WORK/r" push -q origin master
 expect_rc 1 "stale SHA256SUMS blocks the release" \
     sh "$WORK/r/scripts/release.sh" 1.2.3 --skip-tests --dry-run
-if printf '%s' "$LAST_OUT" | grep -q 'stale'; then
+if printf '%s' "$LAST_OUT" | grep -q 'SHA256SUMS is stale'; then
     pass "stale-manifest refusal points at make sums"
 else
     fail "stale-manifest refusal points at make sums (out=$LAST_OUT)"
 fi
 # Regenerating heals the sandbox (and proves the refusal was the drift,
-# not the fixture): make sums' exact pipeline + a re-run.
+# not the fixture): make sums' exact pipeline + make release-sums (the
+# tamper staled the entry block too, #492) + a re-run.
 sh "$WORK/r/scripts/gen-sums.sh" >"$WORK/r/SHA256SUMS"
-git -C "$WORK/r" add SHA256SUMS
-git -C "$WORK/r" commit -qm "regenerate SHA256SUMS"
+sh "$WORK/r/scripts/release-sums.sh" >/dev/null
+git -C "$WORK/r" add SHA256SUMS README.md docs/getting-started.md
+git -C "$WORK/r" commit -qm "regenerate SHA256SUMS + entry checksums"
 git -C "$WORK/r" push -q origin master
 expect_rc 0 "regenerated SHA256SUMS releases again" \
     sh "$WORK/r/scripts/release.sh" 1.2.3 --skip-tests --dry-run
+
+# --- 6e. entry-checksum freshness pre-flight (issue #492) --------------------------
+# A release must not ship a README whose verified-install hash fails
+# against the served install.sh: the 2.6 pre-flight hashes the tree's
+# install.sh and refuses a stale marker block by name.
+mkrepo
+expect_rc 0 "fresh entry checksum passes the pre-flight" \
+    sh "$WORK/r/scripts/release.sh" 1.2.3 --skip-tests --dry-run
+_ek_stale="$(printf 'a%.0s' $(seq 1 64))"
+sed -i "s/^echo \"[0-9a-f]\\{64\\}  \\/tmp\\/opk-install.sh\"/echo \"${_ek_stale}  \\/tmp\\/opk-install.sh\"/" "$WORK/r/README.md"
+git -C "$WORK/r" add README.md
+git -C "$WORK/r" commit -qm "stale the entry checksum block"
+git -C "$WORK/r" push -q origin master
+expect_rc 1 "stale entry checksum blocks the release" \
+    sh "$WORK/r/scripts/release.sh" 1.2.3 --skip-tests --dry-run
+if printf '%s' "$LAST_OUT" | grep -q 'entry checksum stale'; then
+    pass "stale-checksum refusal names the drift (discriminates a run failure)"
+else
+    fail "stale-checksum refusal names the drift (out=$LAST_OUT)"
+fi
+# Regen heals (and proves the refusal was the block, not the fixture).
+sh "$WORK/r/scripts/release-sums.sh" >/dev/null
+git -C "$WORK/r" add README.md docs/getting-started.md
+git -C "$WORK/r" commit -qm "regenerate entry checksum"
+git -C "$WORK/r" push -q origin master
+expect_rc 0 "regenerated entry checksum releases again" \
+    sh "$WORK/r/scripts/release.sh" 1.2.3 --skip-tests --dry-run
+
+# --- 6f. a A3: a failing sha256sum aborts loudly, writes nothing ---------------
+# POSIX sh has no pipefail: without the shape validation a failing
+# sha256sum yields an EMPTY entry_sha that rewrite mode would write
+# into both pages with a success message. The stub proves the abort.
+mkrepo
+mkdir -p "$WORK/badbin"
+printf '#!/bin/sh\necho "stub: sha256sum down" >&2\nexit 1\n' >"$WORK/badbin/sha256sum"
+chmod 755 "$WORK/badbin/sha256sum"
+_ek_out="$(PATH="$WORK/badbin:$PATH" sh "$WORK/r/scripts/release-sums.sh" 2>&1)" && _ek_rc=0 || _ek_rc=$?
+[ "$_ek_rc" -eq 1 ] &&
+    pass "failing sha256sum aborts rc 1 (a A3)" ||
+    fail "failing sha256sum aborts rc 1, got $_ek_rc (out=$_ek_out)"
+printf '%s' "$_ek_out" | grep -q 'could not derive a sha256' &&
+    pass "empty-hash abort names the derivation failure (a A3)" ||
+    fail "empty-hash abort names the derivation failure (out=$_ek_out)"
+if [ -z "$(git -C "$WORK/r" status --porcelain)" ]; then
+    pass "failed derivation touched no page (a A3)"
+else
+    fail "failed derivation modified the tree (a A3)"
+fi
+
+# --- 6g. a A4: a duplicated echo line cannot be "successfully" rewritten -------
+# The guard counts marker pairs, not echo lines: two echo lines used to
+# end as two canonical lines with rc 0. The post-rewrite verification
+# must refuse.
+mkrepo
+awk '/^echo "[0-9a-f]/ { print; print; next } { print }' \
+    "$WORK/r/README.md" >"$WORK/r/README.md.dup" && mv "$WORK/r/README.md.dup" "$WORK/r/README.md"
+_ek_out="$(sh "$WORK/r/scripts/release-sums.sh" 2>&1)" && _ek_rc=0 || _ek_rc=$?
+[ "$_ek_rc" -eq 1 ] &&
+    pass "duplicated echo line fails the rewrite verification (a A4)" ||
+    fail "duplicated echo line failed loudly, got $_ek_rc (out=$_ek_out)"
+printf '%s' "$_ek_out" | grep -q 'rewrite verification failed' &&
+    pass "dup refusal tells the maintainer to fix the block by hand (a A4)" ||
+    fail "dup refusal message missing (out=$_ek_out)"
 
 # --- 7. static: test gate + suite wiring -------------------------------------------
 grep -q 'make -C "$REPO" test check-version' "$RELEASE" &&
     pass "release runs the suite (make test check-version) by default" ||
     fail "release runs the suite (make test check-version) by default"
+
+# --- 7a. static: release-sums temp hygiene (pr-00600 a A2) -------------------------
+# mktemp (not a predictable $$ name: the checkout is group-writable for
+# the agent user, and the temp redirect follows a planted symlink) and
+# the INT/TERM/EXIT traps release.sh arms for the same pattern (#493 a B4).
+grep -q 'mktemp "${path}.release-sums.XXXXXX"' "$RELSUMS" &&
+    pass "release-sums temp name is unguessable (mktemp)" ||
+    fail "release-sums lost its mktemp temp handling"
+_traps=$(grep -c '^trap ' "$RELSUMS")
+[ "$_traps" -eq 3 ] &&
+    pass "release-sums arms EXIT/INT/TERM temp traps" ||
+    fail "release-sums trap count wrong ($_traps, want 3)"
+
+# --- 7b. static: entry-hash shape validation (pr-00600 a A3) -----------------------
+grep -qF "printf '%s' \"\$entry_sha\" | grep -q" "$RELSUMS" &&
+    pass "release-sums validates the derived hash shape before use" ||
+    fail "release-sums lost the entry_sha shape validation"
 
 # --- 0.0.44b W16: --help carries no code lines (V26); status list (V27) -----------------
 _h_out=$(sh "$RELEASE" --help 2>&1 || true)

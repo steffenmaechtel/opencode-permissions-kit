@@ -16,6 +16,15 @@ curl -fsSL https://steffenmaechtel.github.io/opencode-permissions-kit/install.sh
   | sudo env KIT_BRANCH=stable bash
 ```
 
+Verified variant — the checksum is rendered at deploy time from the
+exact bytes this site serves:
+
+```bash
+curl -fsSL -o /tmp/opk-install.sh https://steffenmaechtel.github.io/opencode-permissions-kit/install.sh &&
+echo "__OPK_INSTALL_SHA256__  /tmp/opk-install.sh" | sha256sum -c - &&
+sudo env KIT_BRANCH=stable bash /tmp/opk-install.sh
+```
+
 The served `install.sh` is a copy of the `stable` release channel — the
 release mirror branch, byte-identical to `master` at release points. The
 script self-fetches its sibling files from the same channel
