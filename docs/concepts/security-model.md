@@ -109,6 +109,14 @@ protection** — README, Pages site and repository share the GitHub
 account; an attacker with write access replaces both. Signed artifacts
 remain the Phase 2 answer.
 
+One local residual: the recipe checks and then runs a fixed
+`/tmp/opk-install.sh`. On a sticky `/tmp` (the WSL2/Linux default) the
+classic race is closed — a pre-planted file fails the download or is
+truncated before the check, and a post-check swap needs control of a
+file you own. On a shared host with a non-sticky `/tmp`, a co-located
+user could swap the bytes between check and execution — use a
+user-private download path there.
+
 Operational notes:
 
 - `KIT_SHA_VERIFY=0` disables the mechanism (break-glass for tag pins

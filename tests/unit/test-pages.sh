@@ -195,6 +195,12 @@ grep -qF 'sha256sum site/install.sh' "$WF" &&
 grep -qF 's/__OPK_INSTALL_SHA256__/' "$WF" &&
     pass "workflow substitutes the rendered hash" ||
     fail "workflow lacks the hash substitution"
+# The render pipeline must fail loudly on a sha256sum failure (a A5):
+# without pipefail the empty-hash substitution deploys green. The pin
+# scopes to the assemble block (the artifact-delete block sets it too).
+grep -A6 'name: Assemble site' "$WF" | grep -qF 'set -euo pipefail' &&
+    pass "assemble block fails loudly on hash pipeline failure (a A5)" ||
+    fail "assemble block lacks set -euo pipefail (a A5)"
 
 # Drift pin: the committed hash must describe either the bytes stable
 # serves (mid-cycle state) or this tree's install.sh (release-PR state)

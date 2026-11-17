@@ -54,6 +54,11 @@ jobs:
           path: stable
       - name: Assemble site
         run: |
+          # -o pipefail (pr-00600 a A5): without it a failing sha256sum
+          # below would render an EMPTY checksum into the page and the
+          # deploy would still go green (the rc of a pipeline is the
+          # last member's, and cut succeeds on empty input).
+          set -euo pipefail
           mkdir -p site
           cp .github/pages/index.md .github/pages/_config.yml site/
           cp stable/files/install.sh site/

@@ -354,10 +354,10 @@ git -C "$WORK/r" commit -qm "stale the entry checksum block"
 git -C "$WORK/r" push -q origin master
 expect_rc 1 "stale entry checksum blocks the release" \
     sh "$WORK/r/scripts/release.sh" 1.2.3 --skip-tests --dry-run
-if printf '%s' "$LAST_OUT" | grep -q 'release-sums'; then
-    pass "stale-checksum refusal points at make release-sums"
+if printf '%s' "$LAST_OUT" | grep -q 'entry checksum stale'; then
+    pass "stale-checksum refusal names the drift (discriminates a run failure)"
 else
-    fail "stale-checksum refusal points at make release-sums (out=$LAST_OUT)"
+    fail "stale-checksum refusal names the drift (out=$LAST_OUT)"
 fi
 # Regen heals (and proves the refusal was the block, not the fixture).
 sh "$WORK/r/scripts/release-sums.sh" >/dev/null
@@ -367,10 +367,63 @@ git -C "$WORK/r" push -q origin master
 expect_rc 0 "regenerated entry checksum releases again" \
     sh "$WORK/r/scripts/release.sh" 1.2.3 --skip-tests --dry-run
 
+# --- 6f. a A3: a failing sha256sum aborts loudly, writes nothing ---------------
+# POSIX sh has no pipefail: without the shape validation a failing
+# sha256sum yields an EMPTY entry_sha that rewrite mode would write
+# into both pages with a success message. The stub proves the abort.
+mkrepo
+mkdir -p "$WORK/badbin"
+printf '#!/bin/sh\necho "stub: sha256sum down" >&2\nexit 1\n' >"$WORK/badbin/sha256sum"
+chmod 755 "$WORK/badbin/sha256sum"
+_ek_out="$(PATH="$WORK/badbin:$PATH" sh "$WORK/r/scripts/release-sums.sh" 2>&1)" && _ek_rc=0 || _ek_rc=$?
+[ "$_ek_rc" -eq 1 ] &&
+    pass "failing sha256sum aborts rc 1 (a A3)" ||
+    fail "failing sha256sum aborts rc 1, got $_ek_rc (out=$_ek_out)"
+printf '%s' "$_ek_out" | grep -q 'could not derive a sha256' &&
+    pass "empty-hash abort names the derivation failure (a A3)" ||
+    fail "empty-hash abort names the derivation failure (out=$_ek_out)"
+if [ -z "$(git -C "$WORK/r" status --porcelain)" ]; then
+    pass "failed derivation touched no page (a A3)"
+else
+    fail "failed derivation modified the tree (a A3)"
+fi
+
+# --- 6g. a A4: a duplicated echo line cannot be "successfully" rewritten -------
+# The guard counts marker pairs, not echo lines: two echo lines used to
+# end as two canonical lines with rc 0. The post-rewrite verification
+# must refuse.
+mkrepo
+awk '/^echo "[0-9a-f]/ { print; print; next } { print }' \
+    "$WORK/r/README.md" >"$WORK/r/README.md.dup" && mv "$WORK/r/README.md.dup" "$WORK/r/README.md"
+_ek_out="$(sh "$WORK/r/scripts/release-sums.sh" 2>&1)" && _ek_rc=0 || _ek_rc=$?
+[ "$_ek_rc" -eq 1 ] &&
+    pass "duplicated echo line fails the rewrite verification (a A4)" ||
+    fail "duplicated echo line failed loudly, got $_ek_rc (out=$_ek_out)"
+printf '%s' "$_ek_out" | grep -q 'rewrite verification failed' &&
+    pass "dup refusal tells the maintainer to fix the block by hand (a A4)" ||
+    fail "dup refusal message missing (out=$_ek_out)"
+
 # --- 7. static: test gate + suite wiring -------------------------------------------
 grep -q 'make -C "$REPO" test check-version' "$RELEASE" &&
     pass "release runs the suite (make test check-version) by default" ||
     fail "release runs the suite (make test check-version) by default"
+
+# --- 7a. static: release-sums temp hygiene (pr-00600 a A2) -------------------------
+# mktemp (not a predictable $$ name: the checkout is group-writable for
+# the agent user, and the temp redirect follows a planted symlink) and
+# the INT/TERM/EXIT traps release.sh arms for the same pattern (#493 a B4).
+grep -q 'mktemp "${path}.release-sums.XXXXXX"' "$RELSUMS" &&
+    pass "release-sums temp name is unguessable (mktemp)" ||
+    fail "release-sums lost its mktemp temp handling"
+_traps=$(grep -c '^trap ' "$RELSUMS")
+[ "$_traps" -eq 3 ] &&
+    pass "release-sums arms EXIT/INT/TERM temp traps" ||
+    fail "release-sums trap count wrong ($_traps, want 3)"
+
+# --- 7b. static: entry-hash shape validation (pr-00600 a A3) -----------------------
+grep -qF "printf '%s' \"\$entry_sha\" | grep -q" "$RELSUMS" &&
+    pass "release-sums validates the derived hash shape before use" ||
+    fail "release-sums lost the entry_sha shape validation"
 
 # --- 0.0.44b W16: --help carries no code lines (V26); status list (V27) -----------------
 _h_out=$(sh "$RELEASE" --help 2>&1 || true)
