@@ -250,8 +250,11 @@ check "opencode user can execute the binary" \
 # wildcard matcher) and returns the effect — no LLM, no TUI involved.
 # The unit suite (test-template-bash-rules.sh) pins the rule shapes
 # against a matcher replica; this probe is the fidelity check that the
-# REAL evaluator agrees with it. Route verified in opencode v2.2.6;
-# older version pins skip the probe (the suite resolves latest).
+# REAL evaluator agrees with it. The ROUTE itself is verified beyond
+# 2.2.6 — opencode 1.19.6 and 2.3.0 both answer it (the 6b-2 deny-all
+# probe, #570) — but THIS probe's agent-template ask/allow/deny shapes
+# are unverified below 2.2.6; older version pins skip it (the suite
+# resolves latest).
 echo ""
 echo "--- 3b. Deployed-template permission evaluation (issue #391) ---"
 if [ "$(printf '%s\n2.2.6\n' "$OC_VERSION" | sort -V | tail -n 1)" = "$OC_VERSION" ]; then
@@ -306,7 +309,7 @@ if [ "$(printf '%s\n2.2.6\n' "$OC_VERSION" | sort -V | tail -n 1)" = "$OC_VERSIO
 else
     # Counted through skip() (issue #480 F35): visible in the tally and
     # to the E2E_STRICT lever — an uncounted echo was invisible to both.
-    skip "3b permission-route probes: opencode $OC_VERSION < 2.2.6 (route unverified there)"
+    skip "3b permission-route probes: opencode $OC_VERSION < 2.2.6 (agent-template probe shapes unverified there)"
 fi
 
 check "Wrapper is first in PATH" \
@@ -752,7 +755,7 @@ done
 if [ -z "$_deny_up" ]; then
     echo "  ${RED}WARN${NC}  deny-all evaluator did not settle within 180s — probes will fail"
 fi
-check "6b: probe session created on the real server (default user)" \
+check "6b-2: probe session created on the real server (default user)" \
     E 'test -s /tmp/e2e-deny-sid'
 # Each ask captures http code AND body separately (curl without -f — its
 # error discards the body): a red run's evidence dump then carries the raw
@@ -760,21 +763,27 @@ check "6b: probe session created on the real server (default user)" \
 _deny_check() { # $1 action, $2 resource -> rc 0 iff http 200 AND effect deny
     E 'code=$(curl -s -o /tmp/e2e-deny-'"$1"'.resp -w "%{http_code}" -u opencode:e2e-deny-pw -X POST -H "content-type: application/json" -d "{\"action\":\"'"$1"'\",\"resources\":[\"'"$2"'\"]}" "http://127.0.0.1:4791/api/session/$(cat /tmp/e2e-deny-sid 2>/dev/null)/permission"); echo "$code" > /tmp/e2e-deny-'"$1"'.code; test "$code" = 200 && grep -q "\"effect\":\"deny\"" /tmp/e2e-deny-'"$1"'.resp'
 }
-check "6b: deny-all denies a benign shell command (echo, #570)" \
+check "6b-2: deny-all denies a benign shell command (echo, #570)" \
     _deny_check shell "echo deny-all-probe"
-check "6b: deny-all denies file reads (read /etc/hostname, #570)" \
+check "6b-2: deny-all denies file reads (read /etc/hostname, #570)" \
     _deny_check read "/etc/hostname"
-check "6b: deny-all denies edits (edit probe, #570)" \
+check "6b-2: deny-all denies edits (edit probe, #570)" \
     _deny_check edit "/tmp/e2e-deny-probe.txt"
-check "6b: deny-all denies webfetch (#570)" \
+check "6b-2: deny-all denies webfetch (#570)" \
     _deny_check webfetch "https://example.com/e2e-deny"
 # The discriminating arm: "*" does NOT cover external_directory (measured
 # on 2.3.0: "allow" under a bare "*" deny, "deny" only with the explicit
 # template key) — this check goes red if that key ever leaves the template.
-check "6b: deny-all denies external_directory (explicit key — '*' does not cover it, #570)" \
+check "6b-2: deny-all denies external_directory (explicit key — '*' does not cover it, #570)" \
     _deny_check external_directory "/outside/e2e-deny"
 # Teardown: killing the docker-exec client ends the exec session (3b shape).
+# Belt-and-suspenders pkill for the regression case (review a C1's C2): an
+# orphaned dev-owned server on 4791 would hold the kit binary open and
+# surface as ETXTBSY in 11b/13 far from the cause; the suite's later
+# stop-guards pkill only -u opencode. The [1] bracket keeps the pattern
+# from matching its own command line.
 kill "$E2E_DENY_JOB" 2>/dev/null || true
+E 'sudo pkill -u dev -f "port 479[1]" >/dev/null 2>&1 || true'
 
 echo ""
 echo "--- 6c. Wrapper bypass guard (self-install + absolute path) ---"
@@ -834,6 +843,14 @@ E 'cat /etc/opencode-permissions-kit/projects.conf > /tmp/projects.conf.before'
 # BARE x.y.z (#376 B3): update.sh's shape gate aborts on anything else, and
 # the kit's VERSION discipline is bare-only anyway (AGENTS.md Rules).
 E 'rm -rf /tmp/update-test && mkdir -p /tmp/update-test/files && cp -r /home/dev/repo/files/* /tmp/update-test/files/ && echo "9.9.9" > /tmp/update-test/VERSION'
+# #570 (review a C1): plant the pre-#570 kit template shape (the last
+# shipped stale deny-all) — the update run must HEAL kit-owned stale
+# shapes (backup + redeploy), closing the external_directory gap for
+# existing installs. Base64 transport (FAKE_DDEV_B64 precedent); old
+# BAKs cleared so the backup check below cannot pass vacuously.
+STALE_DENY_B64="$(git show 772f4d1a:files/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc | base64 | tr -d '\n')"
+E "echo $STALE_DENY_B64 | base64 -d > /home/dev/.config/opencode/opencode.jsonc"
+E 'rm -f /home/dev/.config/opencode/opencode.jsonc_BAK_*'
 E 'sudo bash /tmp/update-test/files/opencode-permissions-kit-lib/management/update.sh --yes' &&
     echo "  ${GREEN}OK${NC}  update.sh completed without prompts"
 check "Wrapper still present after update" E 'test -x /usr/local/bin/opencode'
@@ -847,12 +864,25 @@ check "opencode.jsonc byte-identical (sha256 unchanged)" \
     E 'test "$(sudo sha256sum /home/opencode/.config/opencode/opencode.jsonc | cut -d" " -f1)" = "$(cat /tmp/sha-opencode-jsonc.before)"'
 check "default-user deny-all config survives update" \
     E 'test -f /home/dev/.config/opencode/opencode.jsonc'
+check "update heals a stale kit-deployed deny-all (#570 a C1)" \
+    E 'grep -qF "\"external_directory\": \"deny\"" /home/dev/.config/opencode/opencode.jsonc'
+check "heal kept a backup of the stale config (#570 a C1)" \
+    E 'ls /home/dev/.config/opencode/ | grep -q "opencode.jsonc_BAK_"'
 check "binary byte-identical (sha256 unchanged)" \
     E 'test "$(sudo sha256sum /usr/local/lib/opencode-permissions-kit/bin/opencode | cut -d" " -f1)" = "$(cat /tmp/sha-binary.before)"'
 check "projects.conf content unchanged" \
     E 'test "$(cat /etc/opencode-permissions-kit/projects.conf)" = "$(cat /tmp/projects.conf.before)"'
 check "install.conf VERSION bumped to sentinel" \
     E 'grep -qx "VERSION=9.9.9" /etc/opencode-permissions-kit/install.conf'
+# user-edited config (#570 a C1): a custom note makes the hash match no
+# shipped shape — a second update run must leave it untouched (no heal
+# loop over user domain).
+E 'printf "// my custom note\n" >> /home/dev/.config/opencode/opencode.jsonc'
+E 'sudo bash /tmp/update-test/files/opencode-permissions-kit-lib/management/update.sh --yes >/dev/null 2>&1'
+check "user-edited deny-all stays untouched by update (#570 a C1)" \
+    E 'grep -q "my custom note" /home/dev/.config/opencode/opencode.jsonc'
+check "user-edited deny-all keeps the healed kit keys (#570 a C1)" \
+    E 'grep -qF "\"external_directory\": \"deny\"" /home/dev/.config/opencode/opencode.jsonc'
 E 'rm -rf /tmp/update-test'
 
 echo ""

@@ -114,7 +114,11 @@ asserts that opencode's own permission evaluator denies benign tool asks
 
 - During `install.sh`, an existing file is renamed to
   `opencode.jsonc_BAK_<timestamp>` first.
-- `update.sh` only installs the lockout config when no config exists yet.
+- `update.sh` installs the lockout config when no config exists yet —
+  and heals a lockout that is still byte-identical to a previously
+  shipped kit template (backup first): older installs receive the
+  current keys that way. A config you edited yourself is never touched;
+  re-run `install.sh` to re-deploy deliberately.
 - To use opencode normally as your own user, delete or rename that config.
 
 `install.sh` also removes a self-installed binary from `~/.opencode/bin`

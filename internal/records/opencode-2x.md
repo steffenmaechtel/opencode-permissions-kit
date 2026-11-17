@@ -61,7 +61,12 @@ One gap the probe surfaced: `"*"` does **not** cover the
 `"*": "deny"` and `"deny"` only with the explicit
 `"external_directory": "deny"` key (the agent template always had it; the
 deny-all template gained it with #570, plus `"autoupdate": false` — a
-bypassed binary must not self-update either). The e2e suite pins both
+bypassed binary must not self-update either). The explicit key holds on
+1.x too: probed on 1.18.15 (the pinned OLD/offline-fallback version) with
+the final template, all five probed actions — `external_directory`
+included — evaluate `"deny"`, and the CI e2e-1x lane ran the un-gated
+6b-2 lane green on the resolved 1.x release (run 44153973870, 2026-11-17,
+review a S1 verification). The e2e suite pins both
 behaviors (run.sh section 6b-2): the real binary runs as the default user
 against the deployed config — the exact bypass scenario — and every probed
 action, `external_directory` included, must evaluate `"deny"`. Un-gated by

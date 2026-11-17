@@ -1204,7 +1204,38 @@ update_finalize_default_config() {
             ui_success "deny-all config installed for default user: $DEFAULT_OC_CONF"
             log "deny-all config installed for default user: $DEFAULT_OC_CONF"
         else
-            ui_detail "default-user config exists — left untouched (re-run install.sh to back it up)"
+            # #570 (review a C1): a config byte-identical to a previously
+            # SHIPPED deny-all template is kit-owned content, not a user
+            # edit — update heals it (backup first, staged_write), so the
+            # external_directory/autoupdate hardening reaches existing
+            # installs too. A current-shape or user-edited config matches
+            # no hash below and keeps the untouched contract.
+            _da_stale="ea22893f04f6d0e2c47ed86e2bcb16fca695a9e4c5d29b8e4c220292291a37b4"
+            _da_stale="$_da_stale 8acc09a8bdcf044173075cd9504c76c3de3d281fa801ef7a2550c71df39599c1"
+            _da_stale="$_da_stale 6bf77d0b32d1d007ac396941a124c8340322b6ec228cedc9a74907aa2014ef5a"
+            _da_stale="$_da_stale 3023ff29a8be14b26025762b6f2885e6e10cc2b291b77aff536a53ad62327623"
+            _da_hash="$(sha256sum "$DEFAULT_OC_CONF" 2>/dev/null | cut -d" " -f1)"
+            if [ -n "$_da_hash" ] &&
+                printf '%s' "$_da_stale" | tr ' ' '\n' | grep -qxF "$_da_hash"; then
+                _da_stamp=$(date +%Y%m%d-%H%M%S)
+                # mv (not cp) mirrors install's backup arm: the backup
+                # keeps the dev owner, and staged_write re-creates the
+                # file itself. A failed backup must NOT lose the user's
+                # file — heal aborts loud instead.
+                if sudo mv "$DEFAULT_OC_CONF" "${DEFAULT_OC_CONF}_BAK_$_da_stamp"; then
+                    staged_write 664 "$DEFAULT_USER:$NEW_OPENCODE_GROUP" \
+                        "$FILES_ROOT/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc" \
+                        "$DEFAULT_OC_CONF"
+                    ui_success "stale kit deny-all healed for default user"
+                    ui_detail "backup: ${DEFAULT_OC_CONF}_BAK_$_da_stamp"
+                    log "deny-all config healed for default user: $DEFAULT_OC_CONF"
+                else
+                    ui_warn "cannot back up the stale deny-all config — left untouched"
+                    log "deny-all heal aborted: backup failed for $DEFAULT_OC_CONF"
+                fi
+            else
+                ui_detail "default-user config exists — left untouched (re-run install.sh to re-deploy)"
+            fi
         fi
     fi
 }
