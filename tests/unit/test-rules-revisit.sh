@@ -1044,5 +1044,27 @@ else
     fail "R15 amended agreement: report rc=$RC audit rc=$AARC row9=$_r9_ok row7=$_r7_ok row8=$_r8_ok hdr=$_ah_ok bulp=$_bp_ok bula=$_ba_ok: $AAOUT"
 fi
 
+# V26. the writeback preserves the meta's inode and mode: the
+#     rewrite must go through the original file, not an mv-replace
+#     (an inode swap re-owns the file to the caller at mktemp's
+#     0600 -- on kit-managed checkouts that locks the owner out;
+#     found in the 2026-11-17 wave, fixed the same day)
+one_scratch 1m 2026-06-01 v13
+SCRATCH=$VSCRATCH
+T=2026-06-15
+M=$(meta_path "$VSCRATCH" RM-9001)
+chmod 640 "$M"
+INO_BEFORE=$(stat -c %i "$M")
+MODE_BEFORE=$(stat -c %a "$M")
+run_revisit RM-9001 clean "inode must survive"
+INO_AFTER=$(stat -c %i "$M")
+MODE_AFTER=$(stat -c %a "$M")
+if [ "$RC" -eq 0 ] && [ "$INO_BEFORE" = "$INO_AFTER" ] &&
+    [ "$MODE_BEFORE" = "640" ] && [ "$MODE_AFTER" = "640" ]; then
+    pass "V26 write-through: inode+mode preserved (mode $MODE_AFTER), file not re-owned"
+else
+    fail "V26 write-through: rc=$RC inode $INO_BEFORE->$INO_AFTER mode $MODE_BEFORE->$MODE_AFTER: $OUT"
+fi
+
 # ------------------------------------------------------------- summary
 suite_done "rules-revisit pins"

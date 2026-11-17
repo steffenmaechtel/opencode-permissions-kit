@@ -27,7 +27,10 @@
 # the reviewed: field stays with the maintainer (the audit's
 # invariant 9 pairs approvals only). Nothing else in the file is
 # touched, and the rewrite lands only after every field change was
-# validated (fail-loud, no partial writes).
+# validated (fail-loud). The writeback goes THROUGH the original
+# inode: an atomic mv-replace would re-own the file to its caller
+# (mktemp's 0600, no ACLs), locking the checkout's owner out on
+# kit-managed trees (found in the 2026-11-17 wave).
 #
 # Exit: 0 -- recorded. 1 -- domain refusal (unknown meta, retired
 # meta). 2 -- usage or environment error (bad arguments, note
@@ -171,7 +174,9 @@ else
 fi
 
 # rewrite: both frontmatter fields replaced exactly once, log line
-# appended, everything validated BEFORE the file is swapped in
+# appended, everything validated BEFORE anything is written back;
+# the write goes through the original inode so owner/mode/ACL
+# survive (kit-managed checkout, 2026-11-17)
 TMP=$(mktemp "${META}.tmp.XXXXXX") || die "mktemp failed"
 trap 'rm -f "$TMP"' EXIT
 awk -v iv="revisit-interval: $NEW" -v nr="next-revisit: $NEXT" '
@@ -203,7 +208,15 @@ sed -n '2,/^---$/p' "$TMP" | grep -qx "next-revisit: $NEXT" ||
         die "$ID: rewrite check failed (log line)"
     }
 
-mv -f "$TMP" "$META" || die "cannot update $META"
+# Write through the ORIGINAL file, not an mv-replace: a rename
+# swaps the inode and re-owns the file to the caller (mktemp 0600,
+# no ACLs) -- on kit-managed checkouts that locks the owner out
+# (2026-11-17 wave). The copy is not atomic, but its content was
+# fully validated above and git holds the history.
+cat "$TMP" >"$META" || {
+    rm -f "$TMP"
+    die "$ID: cannot update $META (write-through failed)"
+}
 
 echo "$ID: $VERDICT — interval $iv -> $NEW, next-revisit $NEXT" \
     "(from revisit date $TODAY); review log +1 line"
