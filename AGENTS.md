@@ -217,13 +217,26 @@ inventories) greps every consumer suite BEFORE the gate run — the
 gate stops at the first red and masks later same-cause suites behind
 it (issue #540 §1: the rules-meta fixture mirror surfaced only after
 rules-revisit's was fixed and the chain re-ran, in PR #539's session).
+A new function in a section lib (`sh/status-core.sh`,
+`sh/doctor-core.sh`) has THREE registration points: the pairing-guard
+list in the sourcing entry script (`status_pairing_guard` /
+`doctor_pairing_guard`), the `_defs` sourcing list in the lib's unit
+suite (with an in-place comment when a list is deliberately
+non-exhaustive), and the suite's count message — derive that count
+from the list (`_ndefs` from `_defs`, as test-as-opencode-core.sh
+does), never hardcode it. Missed points have cost a mid-wave red gate
+and review findings (#595, PR #590 rounds a–b).
 A wave whose diff touches `files/`
 also owes `make sums` IN the chain, first — `make sums && make test &&
 git add && git commit`: the freshness pin inside `make test` reddens on
 a stale `SHA256SUMS` (issue #478), so the regeneration must land in
 the log before the suite reads it (#524 §1 paid one red gate for the
 order); `make sums` itself is idempotent (no-op output when the
-manifest is already fresh). The entry-checksum blocks in README and
+manifest is already fresh). When the wave stages by explicit path
+(the co-edit-safe form below), `SHA256SUMS` must be named in the same
+`git add` — the chain regenerates the file, the path list does not
+know that (twice amended in one session, pr-00599 commits 8f7cae87
+and c09f13f2; issue #602). The entry-checksum blocks in README and
 `docs/getting-started.md` are the ONE checksum artifact mid-cycle
 waves never touch: `make release-sums` rewrites them from the tree's
 `files/install.sh` **release PR only** (issue #492) — a mid-cycle
@@ -273,6 +286,18 @@ CI or the kit execute by path with `git update-index --chmod=+x <path>`
 (invariant: 755 <=> executed by path, 644 <=> sourced lib / interpreter
 call / data; enforced by `tests/unit/test-workflows.sh`). Workflows
 carry no `chmod +x` lines — `actions/checkout` preserves tracked modes.
+An index-only mode does not survive a later `git add` of the same
+path: the add re-stages the mode from the DISK file, silently
+resetting a verified `update-index` entry when the disk lags — every
+gate that ran before the add stays green, the commit ships 644, CI
+reds (pr-00600 round a A1). For agent-CREATED scripts, `chmod 755`
+the disk file first (the agent owns files it created) so the add
+stages the mode naturally; for pre-existing files the handover
+procedure under "Checkout ownership" applies. And a gate check that
+reads the INDEX (the exec-bit consistency suite) runs in a
+stage-first chain — `git add … && make test && git commit` — so the
+check sees the state the commit will carry; the check-then-add order
+stays right for content gates (issue #603).
 
 ## Subagent fan-out (concurrency cap)
 

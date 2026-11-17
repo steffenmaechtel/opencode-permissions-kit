@@ -555,6 +555,16 @@ Review-relevant code touched this round: yes/no → …
   disposition ledger table and the stop-rule check visible at top
   level (the one-view chain record) and nests only per-finding
   evidence. (RM-0128)
+- Mechanical fields derive from the session records at posting, never
+  from the draft: marker counts are an image of the posted findings
+  table, and provenance timestamps come from the posting records
+  (posted.log, `date -u` in the posting command) — a pre-written
+  timestamp estimates a fact GitHub stamps itself (pr-00589 round b
+  posted 12:16Z over a 12:13:26Z comment), and a recalled marker count
+  corrupts the machine-readable record with no pin able to catch it
+  after posting (pr-00593 round a's draft carried a wrong HIGH count
+  over a 0-HIGH round — caught re-reading the draft, issue #597).
+  (RM-0170)
 - The closing summary's marker carries `"wave":"z"` and CASE-TOTAL
   counts — raw/curated/posted/retracted and MED/HIGH summed across
   rounds, reviewers summed, tier = the closing round's — never the
@@ -775,6 +785,14 @@ here.
 - Reviewer prompts for recurring blind-spot surfaces name the class
   explicitly, not just the file; a gate or claim about path operands
   is tested against its slash forms (`x/`, `x//`, `x/.`). (RM-0085)
+- A shipped code block is reviewed through its failure mode, not its
+  happy path: an axis covering docs commands asks what the block does
+  WHEN IT FAILS as pasted — "executable as printed" verifies the
+  happy path only, and three axes passed a block whose failed check
+  gated nothing until the maintainer caught it (pr-00600; the
+  compound-shape rule lives in
+  [conventions.md](conventions.md#docs-code-blocks-paste-safe-commands)).
+  (RM-0172)
 - Checkpoint discipline: each reviewer agent appends findings to a
   side file after every completed section (empty sections get a
   `clean` line) — end-synthesis turns are the primary failure mode,

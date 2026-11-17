@@ -566,6 +566,14 @@ review host):
   0.0.46a F2 environment-dependence class. Build a scratch bin with
   symlinks to the block's few externals instead of rewriting the probe
   lines away — the real probe keeps executing (0.0.47c C1 direction). (RM-0017)
+- A harness env override consumed through `:-` carries a non-empty
+  controlled value: `:-` substitutes on EMPTY as well as unset, so
+  `VAR=""` does not override `${VAR:-default}` — the harness silently
+  reads the real host state behind the empty string (an m3 arm passed
+  `ROOT_EQUIV_SOCKS=""` and scanned the REAL socket list plus ambient
+  /mnt/wsl mounts, pr-00590 round a T1). An assert whose outcome
+  depends on ambient host state is environment-dependent — learnings
+  L4's marking duty applies. (RM-0173)
 
 Enforced by `tests/unit/test-sandbox-policy.sh`, three checks over every
 unit suite (backslash-continued commands are joined first; full-comment
@@ -677,6 +685,23 @@ until round a B2, fixed in 6e13493b).
   roster's job belongs to a query mechanism (a label, a search); the
   prose POINTS at the mechanism instead of duplicating its current
   result. (RM-0157)
+
+## Docs code blocks (paste-safe commands)
+
+- A docs code block whose prose promises gating (check-then-run
+  recipes) is ONE compound command — a trailing `&&` per line, the
+  operator itself the continuation — never sequential plain lines:
+  pasted lines run in an interactive shell without `set -e`, so a
+  FAILED check prints its error and the next line executes anyway;
+  the check was a diagnosis, not a gate. "Executable as printed"
+  verified the happy path only — three review axes passed the plain
+  3-liner, the maintainer caught it (fixed 0f68f4d1, issue #604).
+  (RM-0171)
+- A load-bearing line shape a wave shares across docs AND script AND
+  pins AND fixtures (the echo-hash install line) records the grep
+  that enumerates the sites: the pins guard partial drift by design,
+  and a future shape change is a coordinated move over that list, not
+  a per-site rediscovery (pr-00600 A8/D1). (RM-0174)
 
 ## Rule-file markdown structure
 

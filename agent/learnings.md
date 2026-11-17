@@ -282,6 +282,17 @@ empty-match greps (`grep … || true` where empty output is rc 1), `IFS= read
   reconstructing the mapping afterward from assumed launch sequence
   crossed the work-order mapping — all three of #541/#542/#543 vs the
   PR-body table (PR #544 round a A3 MED).
+- **No history-dependent test pins — CI checkouts are depth-1**
+  (2026-11-17, pr-00599): test code that resolves historical git
+  objects at runtime (`git show <historical-sha>:<path>`) passes every
+  local gate on a full clone and breaks every CI lane deterministically
+  — actions/checkout defaults to depth-1, the SHAs are absent, the
+  unit lane dies loud on its fallback while an e2e plant pipeline
+  ending in `tr` planted an empty file silently (round b S1, HIGH).
+  Sanctioned shapes: committed fixtures
+  (`tests/fixtures/opencode-deny-all-pre570.jsonc`, commit 5ec21c02)
+  or a weighed `fetch-depth: 0` (rejected there for cost); sweep
+  marker: "history-dependent pin".
 
 ## When a rule fails
 
