@@ -13,7 +13,13 @@
 #      recipes (a channel-fixed entry cannot self-pin a ref);
 #   4. issue #492's removal ask: the regular docs carry no curl
 #      one-liners, docs/advanced/ carries no baked-in checksums (they
-#      would go stale with every branch push — verify manually there).
+#      would go stale with every branch push — verify manually there);
+#   5. issue #492 wave 2: the verified-install variant — marker blocks
+#      with exactly one literal hash in README/getting-started, the
+#      deploy-time placeholder on the landing page, the render step in
+#      the workflow, and the drift pin (hash matches stable or tree —
+#      the two sanctioned states; structural only where no stable ref
+#      exists, e.g. CI clones).
 #
 # Run: sh tests/unit/test-pages.sh
 set -u
@@ -145,6 +151,78 @@ if grep -rEq '[a-fA-F0-9]{64}' "$REPO/docs/advanced/" 2>/dev/null; then
     fail "docs/advanced/ bakes in a literal sha256 (policy: verify manually)"
 else
     pass "docs/advanced/ carries no baked-in sha256"
+fi
+
+# --- 5. verified-install variant + entry-checksum discipline (#492 wave 2) ----
+
+CKSUM_FILES="README.md docs/getting-started.md"
+
+for f in $CKSUM_FILES; do
+    _starts=$(grep -c '^<!-- opk-checksum:start -->$' "$REPO/$f")
+    _ends=$(grep -c '^<!-- opk-checksum:end -->$' "$REPO/$f")
+    [ "$_starts" -eq 1 ] && [ "$_ends" -eq 1 ] &&
+        pass "$f carries exactly one checksum marker block" ||
+        fail "$f marker block count wrong (start=$_starts end=$_ends)"
+    _hashes="$(sed -n '/^<!-- opk-checksum:start -->$/,/^<!-- opk-checksum:end -->$/p' "$REPO/$f" |
+        sed -n 's/^echo "\([0-9a-f]\{64\}\)  \/tmp\/opk-install.sh" | sha256sum -c -$/\1/p')"
+    [ -n "$_hashes" ] && [ "$(printf '%s\n' "$_hashes" | grep -c .)" -eq 1 ] &&
+        pass "$f marker block carries exactly one echo-hash line" ||
+        fail "$f marker block echo-hash line count != 1"
+    # A 64-hex run OUTSIDE the block would be an unmanaged stale copy
+    # (nothing regenerates it) — the same drift the block exists to avoid.
+    _outside=$(sed -e '/^<!-- opk-checksum:start -->$/,/^<!-- opk-checksum:end -->$/d' \
+        "$REPO/$f" | grep -c '[a-fA-F0-9]\{64\}')
+    [ "$_outside" -eq 0 ] &&
+        pass "$f carries no stray 64-hex outside the marker block" ||
+        fail "$f carries stray 64-hex outside the marker block ($_outside)"
+done
+
+# Landing page: the placeholder the workflow substitutes at deploy time
+# (the literal hash there is rendered, never committed).
+grep -qF '__OPK_INSTALL_SHA256__' "$INDEX" &&
+    pass "landing page carries the deploy-time checksum placeholder" ||
+    fail "landing page lacks the deploy-time checksum placeholder"
+
+# The workflow computes the hash from the exact served bytes and fails
+# loudly when the placeholder is missing (a bare sed would serve the
+# raw token silently).
+grep -qF "grep -F '__OPK_INSTALL_SHA256__' site/index.md" "$WF" &&
+    pass "workflow guards the placeholder before substitution" ||
+    fail "workflow lacks the placeholder guard grep"
+grep -qF 'sha256sum site/install.sh' "$WF" &&
+    pass "workflow hashes the served install.sh bytes" ||
+    fail "workflow does not hash the served install.sh bytes"
+grep -qF 's/__OPK_INSTALL_SHA256__/' "$WF" &&
+    pass "workflow substitutes the rendered hash" ||
+    fail "workflow lacks the hash substitution"
+
+# Drift pin: the committed hash must describe either the bytes stable
+# serves (mid-cycle state) or this tree's install.sh (release-PR state)
+# — the two sanctioned states of the release-only regen discipline. In
+# clones without a stable ref (CI) the value pin cannot run; the
+# structural pins above stay, and make release pre-flights freshness.
+_ck_ref=""
+if git -C "$REPO" rev-parse --verify -q origin/stable >/dev/null 2>&1; then
+    _ck_ref=origin/stable
+elif git -C "$REPO" rev-parse --verify -q stable >/dev/null 2>&1; then
+    _ck_ref=stable
+fi
+if [ -n "$_ck_ref" ]; then
+    _stable_sha=$(git -C "$REPO" show "$_ck_ref:files/install.sh" |
+        sha256sum | cut -d' ' -f1)
+    _tree_sha=$(sha256sum "$REPO/files/install.sh" | cut -d' ' -f1)
+    for f in $CKSUM_FILES; do
+        _h="$(sed -n '/^<!-- opk-checksum:start -->$/,/^<!-- opk-checksum:end -->$/p' \
+            "$REPO/$f" |
+            sed -n 's/^echo "\([0-9a-f]\{64\}\)  \/tmp\/opk-install.sh" | sha256sum -c -$/\1/p')"
+        if [ "$_h" = "$_stable_sha" ] || [ "$_h" = "$_tree_sha" ]; then
+            pass "$f entry checksum matches $_ck_ref or the tree (sanctioned)"
+        else
+            fail "$f entry checksum matches neither $_ck_ref nor the tree"
+        fi
+    done
+else
+    pass "no stable ref in this clone (CI) — structural checksum pins only"
 fi
 
 echo ""

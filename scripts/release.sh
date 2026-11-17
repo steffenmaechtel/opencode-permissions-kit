@@ -155,6 +155,21 @@ fi
 rm -f "$_sums_tmp"
 say "SHA256SUMS is fresh (matches files/ on disk)"
 
+# Entry-checksum freshness (issue #492): README.md and
+# docs/getting-started.md carry a verified-install variant whose literal
+# hash must describe the bytes this tree will serve as `stable` after
+# the fast-forward. A release cut from a stale block ships a README
+# whose verification fails against the served install.sh. The check
+# rewrites nothing (release-sums.sh --check) and aborts with the
+# regen instruction on drift.
+step "2.6/5 pre-flight: entry checksum freshness"
+
+if ! "$REPO/scripts/release-sums.sh" --check; then
+    err "entry checksum blocks are stale — regenerate and commit via PR:  make release-sums"
+    exit 1
+fi
+say "entry checksum blocks are fresh (match this tree's install.sh)"
+
 step "3/5 pre-flight: tag + mirror fast-forward check"
 
 HEAD_REV="$(git -C "$REPO" rev-parse master)"

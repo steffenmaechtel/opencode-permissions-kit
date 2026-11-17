@@ -40,6 +40,22 @@ are opencode's soft layer only (see [Security Model](docs/concepts/security-mode
 curl -fsSL https://steffenmaechtel.github.io/opencode-permissions-kit/install.sh | sudo env KIT_BRANCH=stable bash
 ```
 
+Optional verified variant — download, check the checksum, then run:
+
+<!-- opk-checksum:start -->
+
+```bash
+curl -fsSL -o /tmp/opk-install.sh https://steffenmaechtel.github.io/opencode-permissions-kit/install.sh
+echo "d291ca3c41011944889903f979e2f2400f03c5b031f5bf66086aa705b3de8fd1  /tmp/opk-install.sh" | sha256sum -c -
+sudo env KIT_BRANCH=stable bash /tmp/opk-install.sh
+```
+
+<!-- opk-checksum:end -->
+
+The checksum describes the `stable` bytes the URL serves and moves with
+every release that touches `install.sh`
+([integrity details](docs/concepts/security-model.md#download-integrity-sha256sums)).
+
 The `stable` ref is the release mirror (recommended); `master` is the
 development channel — see [Update channels](docs/how-to/update.md#channels).
 

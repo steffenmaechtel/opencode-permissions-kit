@@ -81,6 +81,34 @@ What it deliberately does **not** buy:
   that requires signed manifests (a public key shipped independently of
   the streamed scripts) — a deliberate Phase 2 non-goal for now.
 
+### The entry scripts themselves (verified install)
+
+The manifest cannot cover the script you pipe into bash — it runs
+before any verification code exists (the bootstrap gap). The stable
+channel documents a verified-install variant for exactly that gap:
+download `install.sh` as a file, check its sha256 — printed in the
+README, in [Getting started](../getting-started.md#install) and on the
+install page — then execute it. The install page's hash is rendered at
+deploy time from the exact bytes the site serves; README and Getting
+started carry the literal hash, rewritten only in the release PR
+(`make release-sums`; `make release` refuses to cut from a stale
+block).
+
+What this adds over the manifest alone:
+
+- **Entry-script corruption detection** — a captive portal, CDN fault
+  or broken mirror serving garbage instead of `install.sh` fails the
+  check as a clean named error instead of a cryptic bash syntax error
+  (or worse, unverified execution).
+- **Cross-channel visibility** — the README hash rides github.com
+  while the checked bytes come from the Pages site; the two channels
+  failing to agree is itself the tamper signal.
+
+It inherits the manifest's honest limit: **no origin-compromise
+protection** — README, Pages site and repository share the GitHub
+account; an attacker with write access replaces both. Signed artifacts
+remain the Phase 2 answer.
+
 Operational notes:
 
 - `KIT_SHA_VERIFY=0` disables the mechanism (break-glass for tag pins
@@ -99,6 +127,13 @@ Operational notes:
 - Maintainer side: the manifest is regenerated with `make sums` and
   committed; the unit suite's freshness pin reddens on a stale manifest
   and `make release` refuses to cut a release from one.
+- Maintainer side, entry checksums (issue #492): README and Getting
+  started carry the verified-install hash for the `stable` bytes. It is
+  rewritten by `make release-sums` — **release PR only**: a mid-cycle
+  regen would publish a hash for bytes `stable` does not serve yet
+  (users' verification would fail falsely until the release). Mid-cycle
+  waves touching `files/install.sh` owe nothing here; `make release`
+  pre-flights the block's freshness and refuses a stale one.
 
 ## Known residual gaps
 
