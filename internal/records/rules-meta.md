@@ -30,7 +30,7 @@ holds.
 | 1 | Main rule | every rule carries a rationale, externalized into a meta file referenced from the rule (RM-0020) |
 | 2 | Rule unit | one bullet / list item (not file, not section) — an estimated 100+ metas at full rollout (RM-0021) |
 | 3 | ID format | `RM-NNNN` — 4 digits zero-padded, globally sequential, never recycled or renumbered (RM-0022) |
-| 4 | Reference syntax | `(RM-NNNN)` at the bullet's end; no dates or history inline in rule files (RM-0023) |
+| 4 | Reference syntax | `(RM-NNNN)` at the bullet's end; short bullets, mini-why ok, history in the meta (RM-0023) |
 | 5 | Storage | `internal/rules-meta/N/N/N/` — three one-digit levels, 10 entries max per node (RM-0024) |
 | 6 | Index & report | **both**: `INDEX.md` regenerated per audit run (inv 8 skips) + audit stdout report (RM-0025) |
 | 7 | Pilot scope | `agent/` (4 files) + `AGENTS.md ## Rules` from the start |
@@ -135,7 +135,9 @@ the external fact still holds. The mechanical half is scripted —
 the ladder (clean: up one step, 2y max; findings: reset to 1m),
 computes the next date calendar-correct from the revisit day itself,
 and appends one review-log line. A revisit log line is not an
-approval — `reviewed:` stays with the maintainer. A `findings`
+approval — `reviewed:` stays with the maintainer; an approval or
+re-approval re-anchors `next-revisit` to the approval date +
+interval (decided 2026-11-17, #579 a A1). A `findings`
 verdict enters the normal fix flow: rule text and rationale are
 corrected like any other code, in a PR. The first real wave lands
 2026-11-14 – 2026-11-20 (the pilot-era metas, ~100 at once — expect
@@ -206,12 +208,13 @@ a bulk session, not one-off touches).
    lane); Source lines must not use ` / ` when naming paths (b D3).
    Retired metas are exempt (the inv5 retire class).
 
-CI blocks on 1–6, 9 and 10, and on `[meta-tree]` scope errors (find
+CI blocks on 1–6, 9 and 10 (inv 10's unresolved-Source and unclosed-
+fence lane is report-only), and on `[meta-tree]` scope errors (find
 failures under the meta tree — #232); an overdue meta is a maintenance
-signal, not a broken build. (RM-0030) The Phase-2 pending-unit
-parking valve (prefix-matched ref-less units reported non-blocking)
-was retired 2026-10-17 when its five occupants received metas — a
-ref-less unit in an active section now always blocks.
+signal, not a broken build. The Phase-2 pending-unit parking valve
+(prefix-matched ref-less units reported non-blocking) was retired
+2026-10-17 when its five occupants received metas — a ref-less unit
+in an active section now always blocks. (RM-0030)
 
 ## Retire
 
