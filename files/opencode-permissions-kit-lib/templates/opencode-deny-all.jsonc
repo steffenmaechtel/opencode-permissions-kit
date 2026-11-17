@@ -8,8 +8,11 @@
     // bypassing the wrapper and its ACL refresh (which only happen when the
     // wrapper execs opencode as the 'opencode' user). This config denies
     // everything for the default user so that bypass is locked down.
-    // The "*" key sets the global default for every tool (read, edit, bash,
-    // webfetch, ...); specific tools could be allowed back in on top of it.
+    // The "*" key sets the global default for the regular tools (read, edit,
+    // bash, webfetch, ...); specific tools could be allowed back in on top
+    // of it. EXCEPTION (issue #570, measured on opencode 2.3.0): "*" does
+    // NOT cover the external_directory action — under a bare "*" deny it
+    // evaluates "allow"; only the explicit key below denies it.
     //
     // LOOKING FOR THE AGENT'S PERMISSIONS? This file is NOT them — it only
     // locks out the bypass mode. The agent runs as its own user and reads:
@@ -17,5 +20,12 @@
     // Edit that file (you are in its sharing group) or run
     // `opk config` to change settings.
     "share": "disabled",
-    "permission": { "*": "deny" }
+    // No self-update in bypass mode either: a default-user binary run must
+    // not replace itself from outside the kit (same rationale as the agent
+    // config's autoupdate flag).
+    "autoupdate": false,
+    "permission": {
+        "*": "deny",
+        "external_directory": "deny"
+    }
 }

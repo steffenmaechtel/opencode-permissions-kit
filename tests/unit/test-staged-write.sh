@@ -820,6 +820,72 @@ if [ -n "$_f19_iblock" ] && [ -n "$_f19_ublock" ]; then
     else
         fail "update deny-all staged_write deploy (rc=$_f19_u_rc out=$_f19_u_out) (#482 F19)"
     fi
+    # #570 review a C1 — the update block's else branch: a kit-owned
+    # stale shape (byte-identical to a previously SHIPPED template) heals
+    # with backup; a user-edited config matches no known hash and stays
+    # untouched. The stale bytes come from a COMMITTED fixture (the
+    # historical pre-#570 template blob, sha256 3023ff29…), not a
+    # `git show <sha>` history lookup — CI checkouts are depth-1 and the
+    # lookup broke every CI lane deterministically (round b S1).
+    _f19_stale="$REPO/tests/fixtures/opencode-deny-all-pre570.jsonc"
+    if [ -s "$_f19_stale" ]; then
+        mkdir -p "$_F19W/h-home/.config/opencode"
+        cp "$_f19_stale" "$_F19W/h-home/.config/opencode/opencode.jsonc"
+        _f19_h_rc=0
+        _f19_h_out=$(
+            sh -c '
+                sudo() { "$@"; }
+                DEFAULT_OC_CONF="$1/h-home/.config/opencode/opencode.jsonc"
+                DEFAULT_USER="$2"
+                NEW_OPENCODE_GROUP="$3"
+                FILES_ROOT="$4"
+                SW_SUDO=""
+                SW_STAGE_DIR="$1/stage"
+                ui_success() { echo "success: $*"; }
+                ui_detail() { echo "detail: $*"; }
+                ui_warn() { echo "warn: $*"; }
+                log() { echo "log: $*"; }
+                . "$5"
+                eval "$6"
+            ' _ "$_F19W" "$(id -un)" "$(id -gn)" "$REPO/files" "$STAGEDWRITE" "$_f19_ublock"
+        ) || _f19_h_rc=$?
+        if [ "$_f19_h_rc" -eq 0 ] &&
+            [ "$(cat "$_F19W/h-home/.config/opencode/opencode.jsonc" 2>/dev/null)" = "$(cat "$_f19_tmpl")" ] &&
+            [ -n "$(ls "$_F19W/h-home/.config/opencode/"opencode.jsonc_BAK_* 2>/dev/null)" ] &&
+            printf '%s' "$_f19_h_out" | grep -q "healed"; then
+            pass "update heal: stale kit shape healed, backup kept (#570 a C1)"
+        else
+            fail "update heal of a stale kit shape (rc=$_f19_h_rc out=$_f19_h_out) (#570 a C1)"
+        fi
+        # user-edited config: current template + a custom note — hash
+        # matches no shipped shape, the file must stay untouched.
+        cat "$_f19_tmpl" >"$_F19W/h-home/.config/opencode/opencode.jsonc"
+        printf '// my custom note\n' >>"$_F19W/h-home/.config/opencode/opencode.jsonc"
+        rm -f "${_F19W:?}"/h-home/.config/opencode/opencode.jsonc_BAK_* 2>/dev/null || true
+        sh -c '
+            sudo() { "$@"; }
+            DEFAULT_OC_CONF="$1/h-home/.config/opencode/opencode.jsonc"
+            DEFAULT_USER="$2"
+            NEW_OPENCODE_GROUP="$3"
+            FILES_ROOT="$4"
+            SW_SUDO=""
+            SW_STAGE_DIR="$1/stage"
+            ui_success() { :; }
+            ui_detail() { :; }
+            ui_warn() { :; }
+            log() { :; }
+            . "$5"
+            eval "$6"
+        ' _ "$_F19W" "$(id -un)" "$(id -gn)" "$REPO/files" "$STAGEDWRITE" "$_f19_ublock"
+        if grep -q "my custom note" "$_F19W/h-home/.config/opencode/opencode.jsonc" 2>/dev/null &&
+            [ -z "$(ls "$_F19W/h-home/.config/opencode/"opencode.jsonc_BAK_* 2>/dev/null)" ]; then
+            pass "update heal leaves user-edited configs untouched (#570 a C1)"
+        else
+            fail "update heal touched a user-edited config (#570 a C1)"
+        fi
+    else
+        fail "stale-shape fixture unavailable (tests/fixtures/opencode-deny-all-pre570.jsonc) — heal arms not driven (#570 a C1 / b S1)"
+    fi
 else
     fail "deny-all blocks extractable, install + update twin (#482 F19)"
 fi
