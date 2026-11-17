@@ -98,7 +98,7 @@ check_live "install.sh skips silently when the mount is already restricted" \
 check_live "install preview: stat failure renders unknown, not counted restricted" \
     "$INSTALL_CORE" \
     -qF 'ui_kv "/mnt/c" "unknown — cannot stat the mount"'
-check_live "install preview: restricted arm is elif-guarded (mode always read)" \
+check_live "install preview: restricted arm renders the read mode (no ? fallback)" \
     "$INSTALL_CORE" \
     -qF 'ui_have "/mnt/c" "restricted (mode $_pm)"'
 check_live "hardening step: stat failure names the unknown mode" \

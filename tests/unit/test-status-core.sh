@@ -62,6 +62,9 @@ _st_dbdump_gap _st_ddev_basic _st_ddev_share_scan _st_ddev_router_ports
 _st_ddev_mkcert_ca _st_ddev_db_dumps _st_ddev_version _st_ddev_win_hosts
 status_groups_hits status_sock_agent_reachable
 status_sudo_verdict status_win_interop_verdict"
+# (#590 b F1 residue) _opk_timeout_ok stays unlisted BY DESIGN: the #248
+# sibling block below pins it BEHAVIORALLY (sourcing + broken-vs-healthy
+# call) — a removal/rename reddens that pin, so the list stays 25.
 _missing=""
 for _fn in $_defs; do
     sh -c '. "$1" && command -v "$2" >/dev/null' _ "$LIB" "$_fn" 2>/dev/null ||

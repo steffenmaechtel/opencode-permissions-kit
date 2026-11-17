@@ -922,7 +922,9 @@ fi
 # as ssv_pat now, and the probe CAPTURES its output instead of piping it
 # through grep — the pipe was the rc-masking bug.)
 _sudo_grep="$(live_src "$STATUS_CORE" | grep -F 'sudo -n -l -U "$OPENCODE_USER" 2>&1' | head -1 | sed 's/^ *//')"
-_sra_pat="$(grep -F "ssv_pat=" "$STATUS_CORE" | head -1 | sed -e 's/^ *//' -e "s/^ssv_pat=//" -e "s/^'//" -e "s/'\$//")"
+# (#590 b F2) the pattern leg rides live_src too — a comment carrying
+# `ssv_pat=` above the live assignment must not re-anchor the extraction
+_sra_pat="$(live_src "$STATUS_CORE" | grep -F "ssv_pat=" | head -1 | sed -e 's/^ *//' -e "s/^ssv_pat=//" -e "s/^'//" -e "s/'\$//")"
 if printf '%s\n' "$_sudo_grep" | grep -q 'LC_ALL=C' &&
     ! printf '%s' "$_sudo_grep" | grep -q 'grep'; then
     pass "sudo-rules audit probes with LC_ALL=C, capture not pipe (#569 M3, W3 verbatim pin)"
@@ -971,6 +973,10 @@ if [ -n "$_sra_pat" ]; then
     else
         pass "the translated not-allowed wording stays green (W3)"
     fi
+else
+    # (#590 b F2): an empty extraction must fail loudly — the replay block
+    # skipping silently would leave the W3/S3 replays vacuously green.
+    fail "ssv_pat extraction empty — the S3/W3 replay block was skipped"
 fi
 
 # OpenChamber state line (issue #154, Tier 3): the verdicts — secured via
