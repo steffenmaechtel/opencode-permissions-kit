@@ -118,6 +118,14 @@ back):
   comment URLs are logged to
   session scratch (`posted.log`). Reading the timeline back would
   re-import the whole case into context at every round. (RM-0121)
+- The posted.log entry is the posting command's own stdout URL,
+  captured directly (`url="$(gh pr comment …)"; printf '%s\n'
+  "$url" >> posted.log`) — never reconstructed from follow-up api
+  calls or supplementary echo scaffolding: in one session such
+  scaffolding twice wrote a fabricated second URL into the log (an
+  unrelated comment id, then a GraphQL node id), and the log is the
+  seam check's substrate — a polluted log invites a false seam pass
+  (pr-00605). (RM-0175)
 - The loop cap (default 6) is a hard brake, not a target: from round 5
   on, the loop status reports the distance to the cap; reaching the cap
   hands the case to the maintainer instead of starting another round.
@@ -418,6 +426,13 @@ works.
   the round still owes its low-tier re-review of the pin diff
   before closing. A true-but-unpinned claim is a claim-audit gap,
   not polish. (RM-0133)
+- The in-round exceptions above waive the FOLLOW-ON round, never the
+  round comment: the finding posts on the timeline before its fix
+  starts, whatever the change kind — reading "may be fixed in the
+  same round" as license to fix immediately (comment after commit)
+  is the pr-00605 round-b deviation, disclosed and recovered per the
+  loop rules; the seam's mechanical form (posted.log before the
+  first fix commit) holds for docs-only fixes too. (RM-0176)
 
 ## Curation and verification
 
