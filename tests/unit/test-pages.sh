@@ -97,8 +97,12 @@ grep -qF 'theme: jekyll-theme-cayman' "$CONFIG" &&
 
 # --- 3. stable-channel docs use the entry, advanced keeps raw recipes ---------
 
+# Entry-install URL only (#492 a A1): update.sh is no longer served, so
+# the dead update URL must NOT satisfy this pin — a regular doc citing
+# it is drift, not an entry use. The landing-page omission pin below
+# still asserts index.md never shows it.
 for f in README.md docs/getting-started.md; do
-    grep -q "$ENTRY_INSTALL\|$ENTRY_UPDATE" "$REPO/$f" &&
+    grep -qF "$ENTRY_INSTALL" "$REPO/$f" &&
         pass "$f uses the Pages entry URL" ||
         fail "$f carries no Pages entry URL"
 done
@@ -121,6 +125,10 @@ grep -q 'advanced/streamed-install-update' "$REPO/docs/README.md" &&
 # recipe lives under docs/advanced/.
 for f in docs/reference/cli.md docs/how-to/update.md \
     docs/how-to/secure-git-config.md; do
+    # Existence first (#492 a A2): grep rc 2 on a missing file would
+    # land in the else arm below and pass vacuously.
+    [ -f "$REPO/$f" ] ||
+        fail "$f missing — curl-absence pin cannot run"
     if grep -q 'curl -fsSL' "$REPO/$f"; then
         fail "$f still carries a curl one-liner (#492 removal ask)"
     else
@@ -133,7 +141,7 @@ done
 # hash there would go stale silently and fail honest verifications.
 # (grep rc 2 — advanced/ missing entirely — cannot reach the pass
 # branch silently: the existence pin above already failed the suite.)
-if grep -rEq '[a-f0-9]{64}' "$REPO/docs/advanced/" 2>/dev/null; then
+if grep -rEq '[a-fA-F0-9]{64}' "$REPO/docs/advanced/" 2>/dev/null; then
     fail "docs/advanced/ bakes in a literal sha256 (policy: verify manually)"
 else
     pass "docs/advanced/ carries no baked-in sha256"

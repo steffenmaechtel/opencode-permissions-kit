@@ -25,9 +25,16 @@ sudo opk update --channel 0.0.29    # pin an exact version
 ```
 
 The `KIT_BRANCH` environment variable does the same for every entry
-point — including the streamed install/update variants for any channel
-(master, a feature branch, an exact version tag). Those streamed paths
-live in
+point. For `opk update` it must ride the sudo invocation:
+
+```bash
+sudo env KIT_BRANCH=0.0.29 opk update
+```
+
+A bare `KIT_BRANCH=0.0.29 opk update` (without `sudo env`) drops the
+variable at opk's sudo boundary — the update then silently follows the
+stamped channel instead. The streamed install/update variants for any
+channel (master, a feature branch, an exact version tag) live in
 [Streamed install and update (advanced)](../advanced/streamed-install-update.md).
 
 Updates are supported from kit **0.0.14 onwards**; on older installs
