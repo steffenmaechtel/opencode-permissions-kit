@@ -30,6 +30,7 @@ archive).
 | [rules-meta.md](rules-meta.md) | rule-rationale system: metas, revisit ladder, audit invariants | CURRENT |
 | [review-calibration.md](review-calibration.md) | review-process history: calibration + incident evidence | CURRENT |
 | [cross-lib-pairing-guards.md](cross-lib-pairing-guards.md) | two-tier skew guards | CURRENT |
+| [sudo-l-contract.md](sudo-l-contract.md) | sudo -l rc/answer contract behind the sudo-rules row | CURRENT |
 
 Superseded and purely historical records live in
 [_archive/](_archive/) — `design/` (pre-streamline records),
