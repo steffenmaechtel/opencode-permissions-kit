@@ -889,8 +889,12 @@ p10_lane_c_hits() { # $1 root, $2 scope; loud on scan death (#519:
     # scan walking the repo root -- every other traversal targets
     # scratch, files/, .agents/skills/, or explicit path lists
     # (skills-lint: scratch + .agents/skills; update-core: scratch
-    # + files/; status, wsl-exposure: files/; workflows,
-    # sandbox-policy, line-length: explicit lists).
+    # + files/; status: scratch + files/; wsl-exposure: files/;
+    # workflows, line-length: explicit lists; sandbox-policy: an
+    # explicit tests/e2e '*.sh' walk -- descends toward dumps when
+    # readable, shielded today by container ownership, a readable
+    # dump with an unguarded rm-suffix shape would false-red
+    # check 3, #593 b B2).
     _c_rc=0
     grep -rn "RM-[0-9][0-9][0-9][0-9]" \
         --include="*.md" --include="*.sh" --include="*.py" --include="*.yml" \
