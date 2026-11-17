@@ -537,13 +537,19 @@ esac
 exit 0
 STUBEOF
 chmod +x "$_m3bin/id" "$_m3bin/sudo"
+# T1 (#590 a): the socket list MUST be a controlled non-empty override — a
+# set-but-empty ROOT_EQUIV_SOCKS falls through to the REAL default list
+# (the :- default) and the ambient /mnt/wsl find + /mnt/c gate keep scanning
+# the host; the asserts below stay ambient-host-independent on purpose
+# (the result-row leg the clean assert once carried is exactly the part
+# that was ambient — dropped, T4's narrow sra_finding gap recorded).
+_m3sock="$WORK/m3-absent.sock"
 m3_run() {
-    OPK_SUDO_STUB="$1" PATH="$_m3bin:$PATH" sh -c '
+    OPK_SUDO_STUB="$1" PATH="$_m3bin:$PATH" ROOT_EQUIV_SOCKS="$_m3sock" sh -c '
         set +e
         . "$1"
         . "$2"
         OPENCODE_USER=opencode
-        ROOT_EQUIV_SOCKS=""
         status_section_root_equiv
     ' m3run "$UI_LIB" "$STATUS_CORE" 2>&1 || true
 }
@@ -563,8 +569,7 @@ else
 fi
 _m3out_clean=$(m3_run clean)
 if printf '%s' "$_m3out_clean" | grep -qF 'none for opencode' &&
-    ! printf '%s' "$_m3out_clean" | grep -qF 'unknown — sudo' &&
-    printf '%s' "$_m3out_clean" | grep -qF 'no root-equivalent access found for opencode'; then
+    ! printf '%s' "$_m3out_clean" | grep -qF 'unknown — sudo'; then
     pass "sudo row: healthy no-rules answer stays the counted green none (#569 M3)"
 else
     fail "sudo row: healthy probe (out=$(printf '%s' "$_m3out_clean" | head -3))"
@@ -916,7 +921,7 @@ fi
 # TRANSLATED header. (#569 M3: the pattern lives in status_sudo_verdict
 # as ssv_pat now, and the probe CAPTURES its output instead of piping it
 # through grep — the pipe was the rc-masking bug.)
-_sudo_grep="$(grep -F 'sudo -n -l -U "$OPENCODE_USER" 2>&1' "$STATUS_CORE" | head -1 | sed 's/^ *//')"
+_sudo_grep="$(live_src "$STATUS_CORE" | grep -F 'sudo -n -l -U "$OPENCODE_USER" 2>&1' | head -1 | sed 's/^ *//')"
 _sra_pat="$(grep -F "ssv_pat=" "$STATUS_CORE" | head -1 | sed -e 's/^ *//' -e "s/^ssv_pat=//" -e "s/^'//" -e "s/'\$//")"
 if printf '%s\n' "$_sudo_grep" | grep -q 'LC_ALL=C' &&
     ! printf '%s' "$_sudo_grep" | grep -q 'grep'; then

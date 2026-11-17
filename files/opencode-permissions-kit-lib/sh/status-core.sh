@@ -1415,10 +1415,12 @@ status_win_interop_verdict() {
 # answer rc 1 with the same text, and a NON-fatal sudoers.d syntax error
 # still answers rc 0 while the diagnostic rides stderr — no rc value alone
 # separates the healthy state from those two broken shapes. Listing shapes
-# (the pattern's history: 0.0.45c S3 widened the runas disjunct to every
-# spec, 0.0.45d W3 pinned LC_ALL=C at the probe — sudo localizes the -l
-# listing and its env_keep preserves LANG/LC_*): the header line, or any
-# indented runas-spec line. Order matters: visible rules win over a broken
+# (the pattern's history, corrected #590 a Q5): the header line, or any
+# indented runas-spec line — 0.0.45c S3 re-keyed the check on the listing
+# header (the old regex knew only (ALL)/(opencode) runas specs); 0.0.45d W3
+# pinned LC_ALL=C at the probe (sudo localizes the -l listing and its
+# env_keep preserves LANG/LC_*) AND widened the disjunct to every runas
+# spec. Order matters: visible rules win over a broken
 # sudoers (the rules are real); a syntax/parse diagnostic voids the none; a
 # silent probe (fatal sudoers damage, unknown user) is probe-failed. The
 # runas disjunct is structural — ANY indented `(...) cmd` listing line —

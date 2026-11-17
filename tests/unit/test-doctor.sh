@@ -819,10 +819,11 @@ done
 [ "$_m5ok" -eq 6 ] && pass "doctor_roots_append: read failure warns, blank list stays silent (#569 M5)"
 
 # wiring: both roots-read arms route through the rc-observing helper; the
-# legacy silent shape ('>>"$WORK_ALL/roots" || true') is gone
+# legacy silent shape is gone — absence leg RAW by design (conventions,
+# "Source-counting pins": a commented-out survivor must keep failing here)
 if live_src "$DOCTOR_CORE" | grep -qF 'doctor_roots_append "$OPK_DOCTOR_SCAN_ROOTS" "$WORK_ALL/roots"' &&
     live_src "$DOCTOR_CORE" | grep -qF 'doctor_roots_append "$PROJECTS_CONF" "$WORK_ALL/roots"' &&
-    ! live_src "$DOCTOR_CORE" | grep -qF '>>"$WORK_ALL/roots" || true'; then
+    ! grep -qF '>>"$WORK_ALL/roots" || true' "$DOCTOR_CORE"; then
     pass "doctor_all: both roots-read arms route through the helper (#569 M5)"
 else
     fail "doctor_all: roots-read arms (#569 M5)"

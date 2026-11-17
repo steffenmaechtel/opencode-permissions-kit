@@ -91,6 +91,19 @@ check_live "install.sh names the activation step (wsl --shutdown)" "$INSTALL" -q
 check_live "install.sh skips silently when the mount is already restricted" \
     "$INSTALL_CORE" \
     -qF '/mnt/c already restricted'
+# #590 a Q1 (the 0.0.48b W3 class, install side): a FAILED stat on /mnt/c
+# must render an explicit unknown, never a verdict claim — the preview used
+# to fall into the counted ui_have "restricted (mode ?)", the hardening
+# step printed "already restricted" over an unreadable mode.
+check_live "install preview: stat failure renders unknown, not counted restricted" \
+    "$INSTALL_CORE" \
+    -qF 'ui_kv "/mnt/c" "unknown — cannot stat the mount"'
+check_live "install preview: restricted arm is elif-guarded (mode always read)" \
+    "$INSTALL_CORE" \
+    -qF 'ui_have "/mnt/c" "restricted (mode $_pm)"'
+check_live "hardening step: stat failure names the unknown mode" \
+    "$INSTALL_CORE" \
+    -qF '/mnt/c mode unknown (stat failed)'
 if live_src "$INSTALL" | grep -q 'still world-readable' &&
     live_src "$INSTALL" | grep -q 'warn on every start'; then
     pass "install.sh warns again in the final summary while /mnt/c is exposed"

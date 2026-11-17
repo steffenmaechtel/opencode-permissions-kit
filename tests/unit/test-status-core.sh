@@ -60,14 +60,15 @@ status_section_root_equiv status_section_leak_scan status_section_management
 _st_progress_tee _st_ddev_scan _st_ancestor_grants_x _st_root_blocker
 _st_dbdump_gap _st_ddev_basic _st_ddev_share_scan _st_ddev_router_ports
 _st_ddev_mkcert_ca _st_ddev_db_dumps _st_ddev_version _st_ddev_win_hosts
-status_groups_hits status_sock_agent_reachable"
+status_groups_hits status_sock_agent_reachable
+status_sudo_verdict status_win_interop_verdict"
 _missing=""
 for _fn in $_defs; do
     sh -c '. "$1" && command -v "$2" >/dev/null' _ "$LIB" "$_fn" 2>/dev/null ||
         _missing="$_missing $_fn"
 done
 if [ -z "$_missing" ]; then
-    pass "all 23 section/helper functions defined by sourcing"
+    pass "all 25 section/helper functions defined by sourcing"
 else
     fail "functions missing after sourcing:$_missing"
 fi

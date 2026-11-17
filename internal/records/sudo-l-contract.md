@@ -84,7 +84,9 @@ host`, common on WSL — matches no marker and does not flip the verdict
 - Helper: `status_sudo_verdict` in
   `files/opencode-permissions-kit-lib/sh/status-core.sh` (pure, no root
   needed) — rendered by `status_section_root_equiv`.
-- Pins: `tests/unit/test-status.sh` — 7 verdict asserts (incl. rc-1
-  no-rules tolerance, benign-noise, rules-precedence, translated-header
-  replay of the real pattern) + 4 stubbed section scenarios (PATH-stubbed
-  `id`/`sudo` drive the real section body through all four states).
+- Pins: `tests/unit/test-status.sh` — 7 verdict asserts (rc-1 no-rules
+  tolerance, benign stderr noise, rules-precedence among them) + 4 stubbed
+  section scenarios (PATH-stubbed `id`/`sudo` drive the real section body
+  through all four states) + the pre-existing S3/W3 replay block, now
+  re-extracted from `ssv_pat`, carrying the translated-header case
+  (attribution corrected #590 a Q4).
