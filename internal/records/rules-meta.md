@@ -196,6 +196,9 @@ a bulk session, not one-off touches).
    slash tokens; a path wrapped over a line break heals) and the
    `rule:` back-ref file: metas quote both their source record and
    the rule text itself. Tokens containing `..` never resolve. A
+   token that resolves to an existing directory is ignored — prose
+   naming a tree, not a file: neither a parity leg nor unresolved
+   (#565). A
    `Source:` line whose tokens resolve to nothing — broken path,
    prose-adopted token, or external source naming no in-repo path
    (issue, PR body, chat, man page, named git commit) — and an

@@ -299,6 +299,22 @@ sed -i 's|^Body of RM-9002\.$|Source: management/nonexistent.sh, demo section.\n
     "$(meta_file RM-9002)"
 expect_ok "inv10 unresolved token reported" "inv10 unresolved (report-only"
 
+# 10h2. inv 10 (#565) -- a Source token that resolves to an existing
+#       DIRECTORY is prose naming a tree: ignored -- no parity leg,
+#       no report-lane entry. The pin greps the lane's ABSENCE (an
+#       expect_ok "0 blocking" would pass either way -- the lane is
+#       report-only and never reddens the rc); without the -d arm the
+#       token would surface in the lane and redden this pin.
+new_scratch n10h2
+sed -i 's|^Body of RM-9002\.$|Source: internal/rules-meta tree, demo.\n\nBody of RM-9002.|' \
+    "$(meta_file RM-9002)"
+run_audit
+if [ "$RC" -eq 0 ] && ! printf '%s' "$OUT" | grep -q 'inv10 unresolved'; then
+    pass "inv10 directory token ignored (no report-lane entry)"
+else
+    fail "inv10 directory token must be ignored (rc=$RC): $OUT"
+fi
+
 # 10i. inv 10 (#564 a B3) -- multi-file Source lines: every resolvable
 #      token is a haystack leg (first-token-only would check only
 #      rules-meta.md; the quote lives in the second leg and the rule

@@ -41,7 +41,10 @@
 #      not quotations) is findable -- case-folded, inv5-normalized --
 #      in the union of the in-repo file(s) the Source line resolves
 #      to (all slash tokens, wrapped paths healed) and the rule:
-#      back-ref file. Tokens containing '..' never resolve. A Source
+#      back-ref file. Tokens containing '..' never resolve. A token
+#      that resolves to an existing DIRECTORY is ignored (#565) --
+#      prose naming a tree, not a file: neither a leg nor
+#      unresolved. A Source
 #      line whose tokens resolve to nothing, and an unclosed fence,
 #      are REPORTED (report-only inv10 lane) -- only a meta whose
 #      Source yields no slash token at all (no Source line, or
@@ -376,7 +379,9 @@ while IFS= read -r m; do
     # the rule back-ref file, all inv5-normalized and case-folded
     # (the #561 spec constraint: sentence-initial caps differ
     # corpus-wide); tokens containing '..' never resolve (reads stay
-    # rooted under $ROOT). A Source line whose tokens resolve to
+    # rooted under $ROOT); a token resolving to an existing
+    # DIRECTORY is ignored -- prose naming a tree, not a file
+    # (#565). A Source line whose tokens resolve to
     # NOTHING is REPORTED (report-only lane, inv10 report): external
     # sources name no in-repo path, but a broken, prose-adopted or
     # dot-dot token is visible instead of silently exempt -- as is a
@@ -415,6 +420,10 @@ while IFS= read -r m; do
                 *..*) unres="$unres $tok" ;;
                 *) if [ -f "$ROOT/$tok" ]; then
                     legs="$legs $tok"
+                elif [ -d "$ROOT/$tok" ]; then
+                    : # directory mention (#565): prose naming a tree,
+                    # not a file -- neither a parity leg (unusable as
+                    # a haystack) nor unresolved (the path exists)
                 else
                     unres="$unres $tok"
                 fi ;;
