@@ -164,7 +164,7 @@ for f in $CKSUM_FILES; do
         pass "$f carries exactly one checksum marker block" ||
         fail "$f marker block count wrong (start=$_starts end=$_ends)"
     _hashes="$(sed -n '/^<!-- opk-checksum:start -->$/,/^<!-- opk-checksum:end -->$/p' "$REPO/$f" |
-        sed -n 's/^echo "\([0-9a-f]\{64\}\)  \/tmp\/opk-install.sh" | sha256sum -c -$/\1/p')"
+        sed -n 's/^echo "\([0-9a-f]\{64\}\)  \/tmp\/opk-install.sh" | sha256sum -c - &&$/\1/p')"
     [ -n "$_hashes" ] && [ "$(printf '%s\n' "$_hashes" | grep -c .)" -eq 1 ] &&
         pass "$f marker block carries exactly one echo-hash line" ||
         fail "$f marker block echo-hash line count != 1"
@@ -220,7 +220,7 @@ if [ -n "$_ck_ref" ]; then
     for f in $CKSUM_FILES; do
         _h="$(sed -n '/^<!-- opk-checksum:start -->$/,/^<!-- opk-checksum:end -->$/p' \
             "$REPO/$f" |
-            sed -n 's/^echo "\([0-9a-f]\{64\}\)  \/tmp\/opk-install.sh" | sha256sum -c -$/\1/p')"
+            sed -n 's/^echo "\([0-9a-f]\{64\}\)  \/tmp\/opk-install.sh" | sha256sum -c - &&$/\1/p')"
         if [ "$_h" = "$_stable_sha" ] || [ "$_h" = "$_tree_sha" ]; then
             pass "$f entry checksum matches $_ck_ref or the tree (sanctioned)"
         else

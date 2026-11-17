@@ -44,13 +44,14 @@ Run it from your **normal user account** via `sudo` — never from a root shell
 `SUDO_USER`, so the installer would register `root` as the developer; it
 refuses such runs up front.
 
-Optional verified variant — download, check the checksum, then run:
+Optional verified variant — download, check the checksum, then run
+(the `&&` chain skips the execution when the check fails):
 
 <!-- opk-checksum:start -->
 
 ```bash
-curl -fsSL -o /tmp/opk-install.sh https://steffenmaechtel.github.io/opencode-permissions-kit/install.sh
-echo "d291ca3c41011944889903f979e2f2400f03c5b031f5bf66086aa705b3de8fd1  /tmp/opk-install.sh" | sha256sum -c -
+curl -fsSL -o /tmp/opk-install.sh https://steffenmaechtel.github.io/opencode-permissions-kit/install.sh &&
+echo "d291ca3c41011944889903f979e2f2400f03c5b031f5bf66086aa705b3de8fd1  /tmp/opk-install.sh" | sha256sum -c - &&
 sudo env KIT_BRANCH=stable bash /tmp/opk-install.sh
 ```
 

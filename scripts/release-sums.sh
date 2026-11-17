@@ -69,9 +69,9 @@ for f in $BLOCK_FILES; do
         exit 1
     fi
     block_hash="$(sed -n '/^<!-- opk-checksum:start -->$/,/^<!-- opk-checksum:end -->$/p' "$path" |
-        sed -n 's/^echo "\([0-9a-f]\{64\}\)  \/tmp\/opk-install.sh" | sha256sum -c -$/\1/p')"
+        sed -n 's/^echo "\([0-9a-f]\{64\}\)  \/tmp\/opk-install.sh" | sha256sum -c - &&$/\1/p')"
     if [ -z "$block_hash" ]; then
-        echo "release-sums: $f marker block lacks the echo \"<sha256>  /tmp/opk-install.sh\" line" >&2
+        echo "release-sums: $f marker block lacks the echo \"<sha256>  /tmp/opk-install.sh\" | sha256sum -c - && line" >&2
         exit 1
     fi
     if [ "$block_hash" = "$entry_sha" ]; then
@@ -93,8 +93,8 @@ for f in $BLOCK_FILES; do
         if ! awk -v sha="$entry_sha" '
             /^<!-- opk-checksum:start -->$/ { print; inblock = 1; next }
             /^<!-- opk-checksum:end -->$/ { inblock = 0; print; next }
-            inblock && /^echo "[0-9a-f][0-9a-f]*  \/tmp\/opk-install.sh" \| sha256sum -c -$/ {
-                print "echo \"" sha "  /tmp/opk-install.sh\" | sha256sum -c -"
+            inblock && /^echo "[0-9a-f][0-9a-f]*  \/tmp\/opk-install.sh" \| sha256sum -c - &&$/ {
+                print "echo \"" sha "  /tmp/opk-install.sh\" | sha256sum -c - &&"
                 next
             }
             { print }
@@ -111,7 +111,7 @@ for f in $BLOCK_FILES; do
         # a success message. Re-extract and demand exactly one line
         # equal to the entry hash before reporting success.
         _new_hash="$(sed -n '/^<!-- opk-checksum:start -->$/,/^<!-- opk-checksum:end -->$/p' "$path" |
-            sed -n 's/^echo "\([0-9a-f]\{64\}\)  \/tmp\/opk-install.sh" | sha256sum -c -$/\1/p')"
+            sed -n 's/^echo "\([0-9a-f]\{64\}\)  \/tmp\/opk-install.sh" | sha256sum -c - &&$/\1/p')"
         if [ "$(printf '%s\n' "$_new_hash" | grep -c .)" -ne 1 ] ||
             [ "$_new_hash" != "$entry_sha" ]; then
             echo "release-sums: $f rewrite verification failed (expected exactly one '$entry_sha' line) -- fix the marker block by hand" >&2

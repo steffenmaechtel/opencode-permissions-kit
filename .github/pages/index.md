@@ -20,8 +20,8 @@ Verified variant — the checksum is rendered at deploy time from the
 exact bytes this site serves:
 
 ```bash
-curl -fsSL -o /tmp/opk-install.sh https://steffenmaechtel.github.io/opencode-permissions-kit/install.sh
-echo "__OPK_INSTALL_SHA256__  /tmp/opk-install.sh" | sha256sum -c -
+curl -fsSL -o /tmp/opk-install.sh https://steffenmaechtel.github.io/opencode-permissions-kit/install.sh &&
+echo "__OPK_INSTALL_SHA256__  /tmp/opk-install.sh" | sha256sum -c - &&
 sudo env KIT_BRANCH=stable bash /tmp/opk-install.sh
 ```
 

@@ -40,8 +40,8 @@ _write_cksum_page() {
         echo "<!-- opk-checksum:start -->"
         echo ""
         echo '```bash'
-        echo "curl -fsSL -o /tmp/opk-install.sh https://steffenmaechtel.github.io/opencode-permissions-kit/install.sh"
-        echo "echo \"${_wcp_sha}  /tmp/opk-install.sh\" | sha256sum -c -"
+        echo "curl -fsSL -o /tmp/opk-install.sh https://steffenmaechtel.github.io/opencode-permissions-kit/install.sh &&"
+        echo "echo \"${_wcp_sha}  /tmp/opk-install.sh\" | sha256sum -c - &&"
         echo "sudo env KIT_BRANCH=stable bash /tmp/opk-install.sh"
         echo '```'
         echo ""
