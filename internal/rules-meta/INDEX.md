@@ -8,12 +8,12 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**160 metas · 157 active · 3 retired · 2 review-pending · next due 2026-11-17**
+**160 metas · 157 active · 3 retired · 0 review-pending · next due 2026-11-17**
 
 ## Actionable
 
 - **Review pending:** none
-- **Amended — pending:** RM-0023 (2026-11-17), RM-0030 (2026-11-17)
+- **Amended — pending:** none
 
 ## AGENTS.md
 
@@ -333,7 +333,7 @@
 | [RM-0020](0/0/2/RM-0020.md) | every rule carries a rationale | active | approved | 6m | 2027-05-17 |
 | [RM-0021](0/0/2/RM-0021.md) | one bullet / list item | active | approved | 6m | 2027-05-17 |
 | [RM-0022](0/0/2/RM-0022.md) | 4 digits zero-padded | active | approved | 6m | 2027-05-17 |
-| [RM-0023](0/0/2/RM-0023.md) | at the bullet's end | active | **amended — pending** | 1m | 2026-12-17 |
+| [RM-0023](0/0/2/RM-0023.md) | at the bullet's end | active | approved | 1m | 2026-12-17 |
 | [RM-0024](0/0/2/RM-0024.md) | three one-digit levels | active | approved | 6m | 2027-05-17 |
 | [RM-0025](0/0/2/RM-0025.md) | regenerated per audit run | active | approved | 1m | 2026-12-17 |
 | [RM-0026](0/0/2/RM-0026.md) | all content is English | active | approved | 6m | 2027-05-17 |
@@ -372,7 +372,7 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0030](0/0/3/RM-0030.md) | an overdue meta is a maintenance signal | active | **amended — pending** | 1m | 2026-12-17 |
+| [RM-0030](0/0/3/RM-0030.md) | an overdue meta is a maintenance signal | active | approved | 1m | 2026-12-17 |
 
 ### Retire
 
