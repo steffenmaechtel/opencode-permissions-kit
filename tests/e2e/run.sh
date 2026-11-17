@@ -719,40 +719,60 @@ docker exec -u dev \
     sh -c 'cd /tmp && exec /usr/local/lib/opencode-permissions-kit/bin/opencode serve --port 4791 --hostname 127.0.0.1 >/tmp/e2e-deny-serve.log 2>&1' \
     >/dev/null 2>&1 &
 E2E_DENY_JOB=$!
-# Readiness is SEMANTIC (3b pattern): the HTTP listener answers before the
-# config rules are mounted into the evaluator — asks in that window return
-# "allow", a pre-config posture (measured ~2s warm on 2.3.0, >60s once on a
-# cold first run as a fresh user). Poll until the warmup ask evaluates
-# "deny": for deny-all the catch-all IS deny, so deny on a warmup ask is
-# the settled signal — the "*" lockout live in evaluation — without
-# pre-asserting any single check's resource below.
+# Readiness is SEMANTIC and WHOLE-MATRIX (the 3b pattern, hardened): the
+# HTTP listener answers before the config rules are mounted into the
+# evaluator, and the pre-config posture is NONDETERMINISTIC — measured on
+# 2.3.0: all-allow, shell-deny-rest-allow and bash-deny-rest-allow all
+# occur in that window (session 2026-11-17, #570). A single-action warmup
+# signal can therefore mistake a pre-config posture for "settled" (the
+# first e2e run did exactly that). The loop settles only when a FULL
+# sweep — all five probed actions — evaluates deny: every observed
+# pre-config posture fails that criterion; the mounted deny-all state
+# passes it (measured warm ~2s; a cold first run as a fresh user can take
+# >60s — hence the 180s budget).
+_deny_ask() { # $1 action, $2 resource -> rc 0 iff the evaluator answers deny
+    E 'curl -s -u opencode:e2e-deny-pw -X POST -H "content-type: application/json" -d "{\"action\":\"'"$1"'\",\"resources\":[\"'"$2"'\"]}" "http://127.0.0.1:4791/api/session/$(cat /tmp/e2e-deny-sid 2>/dev/null)/permission" 2>/dev/null' |
+        grep -q '"effect":"deny"'
+}
 _deny_up=""
-for _ in $(seq 1 60); do
-    _eff="$(E 'SID=$(curl -sf -u opencode:e2e-deny-pw -X POST -H "content-type: application/json" -d "{}" http://127.0.0.1:4791/api/session 2>/dev/null | grep -o "\"id\":\"[^\"]*\"" | head -1 | cut -d\" -f4); if [ -n "$SID" ]; then printf "%s" "$SID" > /tmp/e2e-deny-sid; curl -sf -u opencode:e2e-deny-pw -X POST -H "content-type: application/json" -d "{\"action\":\"shell\",\"resources\":[\"echo warmup\"]}" "http://127.0.0.1:4791/api/session/$SID/permission" 2>/dev/null | grep -o "\"effect\":\"[a-z]*\""; fi' || true)"
-    if [ "$_eff" = '"effect":"deny"' ]; then
+for _ in $(seq 1 90); do
+    E 'SID=$(curl -sf -u opencode:e2e-deny-pw -X POST -H "content-type: application/json" -d "{}" http://127.0.0.1:4791/api/session 2>/dev/null | grep -o "\"id\":\"[^\"]*\"" | head -1 | cut -d\" -f4); if [ -n "$SID" ]; then printf "%s" "$SID" > /tmp/e2e-deny-sid; fi' || true
+    _ok=1
+    _deny_ask shell "echo warmup" || _ok=""
+    [ -n "$_ok" ] && _deny_ask read "/etc/hostname" || _ok=""
+    [ -n "$_ok" ] && _deny_ask edit "/tmp/e2e-deny-warmup.txt" || _ok=""
+    [ -n "$_ok" ] && _deny_ask webfetch "https://example.com/e2e-deny-warmup" || _ok=""
+    [ -n "$_ok" ] && _deny_ask external_directory "/outside/e2e-deny-warmup" || _ok=""
+    if [ -n "$_ok" ]; then
         _deny_up=1
         break
     fi
     sleep 2
 done
 if [ -z "$_deny_up" ]; then
-    echo "  ${RED}WARN${NC}  deny-all evaluator did not settle within 120s — probes will fail"
+    echo "  ${RED}WARN${NC}  deny-all evaluator did not settle within 180s — probes will fail"
 fi
 check "6b: probe session created on the real server (default user)" \
     E 'test -s /tmp/e2e-deny-sid'
+# Each ask captures http code AND body separately (curl without -f — its
+# error discards the body): a red run's evidence dump then carries the raw
+# evaluator answer (effect or any error body) plus the status code.
+_deny_check() { # $1 action, $2 resource -> rc 0 iff http 200 AND effect deny
+    E 'code=$(curl -s -o /tmp/e2e-deny-'"$1"'.resp -w "%{http_code}" -u opencode:e2e-deny-pw -X POST -H "content-type: application/json" -d "{\"action\":\"'"$1"'\",\"resources\":[\"'"$2"'\"]}" "http://127.0.0.1:4791/api/session/$(cat /tmp/e2e-deny-sid 2>/dev/null)/permission"); echo "$code" > /tmp/e2e-deny-'"$1"'.code; test "$code" = 200 && grep -q "\"effect\":\"deny\"" /tmp/e2e-deny-'"$1"'.resp'
+}
 check "6b: deny-all denies a benign shell command (echo, #570)" \
-    E 'curl -sf -u opencode:e2e-deny-pw -X POST -H "content-type: application/json" -d "{\"action\":\"shell\",\"resources\":[\"echo deny-all-probe\"]}" "http://127.0.0.1:4791/api/session/$(cat /tmp/e2e-deny-sid)/permission" | grep -q "\"effect\":\"deny\""'
+    _deny_check shell "echo deny-all-probe"
 check "6b: deny-all denies file reads (read /etc/hostname, #570)" \
-    E 'curl -sf -u opencode:e2e-deny-pw -X POST -H "content-type: application/json" -d "{\"action\":\"read\",\"resources\":[\"/etc/hostname\"]}" "http://127.0.0.1:4791/api/session/$(cat /tmp/e2e-deny-sid)/permission" | grep -q "\"effect\":\"deny\""'
+    _deny_check read "/etc/hostname"
 check "6b: deny-all denies edits (edit probe, #570)" \
-    E 'curl -sf -u opencode:e2e-deny-pw -X POST -H "content-type: application/json" -d "{\"action\":\"edit\",\"resources\":[\"/tmp/e2e-deny-probe.txt\"]}" "http://127.0.0.1:4791/api/session/$(cat /tmp/e2e-deny-sid)/permission" | grep -q "\"effect\":\"deny\""'
+    _deny_check edit "/tmp/e2e-deny-probe.txt"
 check "6b: deny-all denies webfetch (#570)" \
-    E 'curl -sf -u opencode:e2e-deny-pw -X POST -H "content-type: application/json" -d "{\"action\":\"webfetch\",\"resources\":[\"https://example.com/e2e-deny\"]}" "http://127.0.0.1:4791/api/session/$(cat /tmp/e2e-deny-sid)/permission" | grep -q "\"effect\":\"deny\""'
+    _deny_check webfetch "https://example.com/e2e-deny"
 # The discriminating arm: "*" does NOT cover external_directory (measured
 # on 2.3.0: "allow" under a bare "*" deny, "deny" only with the explicit
 # template key) — this check goes red if that key ever leaves the template.
 check "6b: deny-all denies external_directory (explicit key — '*' does not cover it, #570)" \
-    E 'curl -sf -u opencode:e2e-deny-pw -X POST -H "content-type: application/json" -d "{\"action\":\"external_directory\",\"resources\":[\"/outside/e2e-deny\"]}" "http://127.0.0.1:4791/api/session/$(cat /tmp/e2e-deny-sid)/permission" | grep -q "\"effect\":\"deny\""'
+    _deny_check external_directory "/outside/e2e-deny"
 # Teardown: killing the docker-exec client ends the exec session (3b shape).
 kill "$E2E_DENY_JOB" 2>/dev/null || true
 
