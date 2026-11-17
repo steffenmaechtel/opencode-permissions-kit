@@ -450,14 +450,19 @@ changing anything.
 Every release precondition in `scripts/release.sh` fails closed except
 one: when no tool can answer whether this master commit's CI is green
 (neither `gh` nor `curl`+`python3` API access — offline or
-rate-limited), the script prints *"cannot verify CI status — check
-Actions manually before releasing"* and **continues**. That line is a
-manual duty, not a formality: before letting `make release` proceed,
-open Actions in the browser and confirm the master commit's runs
-(tests + e2e) are green. The local `make test` run inside the release
-script still gates; what can slip through unverified is exactly the
-e2e/CI layer. Hard-failing instead would block releases from offline
-hosts entirely — rejected for that reason.
+rate-limited), the script prints *"cannot verify CI status (no gh, no
+curl+python3 API access) — check Actions manually before releasing"*
+and **continues**. That line is a manual duty, not a formality: before
+letting `make release` proceed, open Actions in the browser and confirm
+the master commit's runs (tests + e2e) are green. The local `make test`
+run inside the release script still gates; what can slip through
+unverified is exactly the e2e/CI layer. Hard-failing instead would
+block releases from offline hosts entirely — rejected for that reason.
+Two operator flags dissolve these backstops by name and are deliberate:
+`--skip-ci` removes the CI arm itself, `--skip-tests` removes the step
+3.5 `make test check-version` gate — a release run carrying either
+flag has consciously given up exactly the verification this paragraph
+describes.
 
 Everything else (branch protection on `stable`, announcements) is set up
 once, not per release.
