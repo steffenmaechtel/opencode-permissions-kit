@@ -165,7 +165,7 @@ calibrates how much to trust the next unverified claim.
   since been removed; the durable spec any reviewer prompt implements
   is the reviewer output contract (reviews README).
 
-## Ground-truth calibration (0.0.42d/-e)
+## Ground-truth calibration (0.0.42d-e)
 
 A claim like "CI runs every suite" is never verified via the mechanism
 that makes the claim: the 0.0.42d mechanical agent asserted "CI runs
@@ -209,7 +209,7 @@ context difference (different training AND freedom from the house
 skills' biases); a skill lesson that exempts a finding class must
 name its exact scope.
 
-## Invocation-shape calibration (0.0.45b/-c) and its correction
+## Invocation-shape calibration (0.0.45b-c) and its correction
 
 The opencode built-in `/review` command dispatches differently across
 majors — verified in the pinned checkouts: 1.x (v1.18.34) registers it

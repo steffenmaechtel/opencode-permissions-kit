@@ -51,7 +51,7 @@
 | [RM-0008](0/0/0/RM-0008.md) | Rows printed inside a pipeline | active | approved | 6m | 2027-05-17 |
 | [RM-0009](0/0/0/RM-0009.md) | UI_SILENT=1 mutes every non-interactive print… | active | approved | 6m | 2027-05-17 |
 | [RM-0037](0/0/3/RM-0037.md) | Severity rows are semantic, not | active | approved | 1m | 2026-11-17 |
-| [RM-0038](0/0/3/RM-0038.md) | Report commands carry their verdict in | active | approved | 1m | 2026-11-17 |
+| [RM-0038](0/0/3/RM-0038.md) | Report commands carry their verdict in | active | approved | 1m | 2026-12-17 |
 | [RM-0039](0/0/3/RM-0039.md) | File lists in code (fetch/deploy | active | approved | 1m | 2026-11-17 |
 
 ### Shell security (untrusted input)
@@ -202,7 +202,7 @@
 | [RM-0061](0/0/6/RM-0061.md) | Rounds chain inside Session | active | approved | 1m | 2026-11-28 |
 | [RM-0063](0/0/6/RM-0063.md) | The round comment's metadata records | active | approved | 1m | 2026-12-17 |
 | [RM-0109](0/1/0/RM-0109.md) | Freshness is measured in | active | approved | 1m | 2026-11-28 |
-| [RM-0110](0/1/1/RM-0110.md) | A freshness violation anyway | active | approved | 1m | 2026-11-28 |
+| [RM-0110](0/1/1/RM-0110.md) | A freshness violation anyway | active | approved | 1m | 2026-12-17 |
 
 ### The round comment contract
 
@@ -241,7 +241,7 @@
 |---|---|---|---|---|---|
 | [RM-0074](0/0/7/RM-0074.md) | Every reviewer-agent finding is | active | approved | 1m | 2026-11-28 |
 | [RM-0075](0/0/7/RM-0075.md) | Retractions stay visible in | active | approved | 1m | 2026-11-19 |
-| [RM-0112](0/1/1/RM-0112.md) | A review round MAY run | active | approved | 1m | 2026-11-22 |
+| [RM-0112](0/1/1/RM-0112.md) | A review round MAY run | active | approved | 1m | 2026-12-17 |
 | [RM-0139](0/1/3/RM-0139.md) | Sabotage spot-checks run only against | active | approved | 1m | 2026-12-10 |
 
 ### Suites are the standing review
@@ -266,9 +266,9 @@
 |---|---|---|---|---|---|
 | [RM-0080](0/0/8/RM-0080.md) | The main agent runs a strong | active | approved | 1m | 2026-11-19 |
 | [RM-0081](0/0/8/RM-0081.md) | Reviewer subagents get ad-hoc | active | approved | 1m | 2026-11-19 |
-| [RM-0082](0/0/8/RM-0082.md) | A coverage claim is NEVER | active | approved | 1m | 2026-11-19 |
-| [RM-0083](0/0/8/RM-0083.md) | For snapshot-scope reviews (the | active | approved | 1m | 2026-11-19 |
-| [RM-0084](0/0/8/RM-0084.md) | Invocation shape governs orchestration | active | approved | 1m | 2026-11-19 |
+| [RM-0082](0/0/8/RM-0082.md) | A coverage claim is NEVER | active | approved | 1m | 2026-12-17 |
+| [RM-0083](0/0/8/RM-0083.md) | For snapshot-scope reviews (the | active | approved | 1m | 2026-12-17 |
+| [RM-0084](0/0/8/RM-0084.md) | Invocation shape governs orchestration | active | approved | 1m | 2026-12-17 |
 | [RM-0085](0/0/8/RM-0085.md) | Reviewer prompts for recurring blind-spot | active | approved | 1m | 2026-11-19 |
 | [RM-0086](0/0/8/RM-0086.md) | Checkpoint discipline: each reviewer agent | active | approved | 1m | 2026-11-19 |
 | [RM-0087](0/0/8/RM-0087.md) | Med-tier diff-scope rounds: ~8 | active | approved | 1m | 2026-11-19 |
