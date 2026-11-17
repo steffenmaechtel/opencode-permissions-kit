@@ -784,6 +784,19 @@ fi
 check_live "D4: import hint is placeholder-shaped (0.0.39a S5 rule)" \
     "$MIG" -qF 'import manually: ddev start <project> && ddev import-db <project>'
 check_absent "D4: no interpolated paste-me hint left" "$MIG" -q 'import manually: ddev start \$'
+# Y3 (#568 b Y3): the closing cleanup hint placeholders the $dm_bin
+# slot too — _ddev_migrate_bin's candidates include the opencode
+# user's private install paths, an agent-plantable location; the D4
+# rule governs every paste-me line.
+check_live "Y3: closing cleanup hint is placeholder-shaped (#568 b Y3)" \
+    "$MIG" -qF 'sudo -u <dev-user> <ddev-bin> delete --omit-snapshot <project>'
+check_absent "Y3: no interpolated \$dm_bin paste-me hint left" \
+    "$MIG" -q 'sudo -u <dev-user> \$dm_bin'
+# D5 (#568 a D5): the import operand gate refuses manifest names that
+# escape the dump dir (slash or bare ..) — the [ -L ] twin above never
+# sees a REGULAR out-of-dir file.
+check_live "D5: import gate refuses slash/.. manifest operand names (#568 a D5)" \
+    "$MIG" -qF 'REFUSED — dump operand escapes the dump dir'
 _w5b="$(work_new)"
 mkdir -p "$_w5b/dumps" "$_w5b/tmp"
 printf 'OK|projA|127.0.0.1|a.sql.gz\nOK|projB|127.0.0.1|b.sql.gz\n' >"$_w5b/dumps/manifest.conf"
@@ -1526,6 +1539,53 @@ esac
 check "import: stub sanity — the victim's content is untouched (#264)" \
     sh -c "test \"\$(cat \"\$1\")\" = VICTIM-IMPORT-CONTENT" _ "$_w5i/victim.conf"
 rm -rf "${_w5i:?}"
+
+# --- 4c3. the operand NAME: a manifest dm_f escaping the dump dir is
+# REFUSED before any ddev hop (#568 a D5) ---------------------------------
+# The victim is a REGULAR file OUTSIDE the dump dir, reached via ../
+# from the manifest operand — the #264 [ -L ] gate above never sees it
+# (no symlink involved); without the name gate the drive would proceed
+# to "importing" (the stub ddev stands in for the sudo hop). The
+# victim is REACHABLE on purpose: pre-gate flow passes both [ -L ] and
+# [ -f ], so the red comes from the gate's own assertion, not from
+# environment luck. id shim + bin override keep the drive hermetic
+# (the #264 drive pattern).
+_w5j="$(work_new)"
+mkdir -p "$_w5j/bin" "$_w5j/dump"
+printf '#!/bin/sh\necho 0\n' >"$_w5j/bin/id"
+chmod +x "$_w5j/bin/id"
+printf 'OK|alpha|/roots/alpha|../victim.sql.gz\n' >"$_w5j/dump/manifest.conf"
+printf 'ESCAPED-OPERAND-CONTENT\n' >"$_w5j/victim.sql.gz"
+_w5j_out=$(PATH="$_w5j/bin:$PATH" sh -c \
+    '. "$1" && _ddev_migrate_bin() { echo /usr/bin/true; } && ddev_migrate_import "$2"' \
+    _ "$MIG" "$_w5j/dump" 2>&1) || true
+case "$_w5j_out" in
+    *"REFUSED — dump operand escapes the dump dir (../victim.sql.gz)"*)
+        pass "import: a slash/.. manifest operand is refused loudly (#568 a D5)"
+        ;;
+    *)
+        fail "import: a slash/.. manifest operand must be refused (got: $_w5j_out) (#568 a D5)"
+        ;;
+esac
+case "$_w5j_out" in
+    *"failed: alpha"*)
+        pass "import: the escaped-operand project lands in the failed list (#568 a D5)"
+        ;;
+    *)
+        fail "import: the escaped-operand project must land in the failed list (got: $_w5j_out) (#568 a D5)"
+        ;;
+esac
+# Y3 functional leg: the drive reaches the closing cleanup hint — it
+# must carry the <ddev-bin> placeholder, never the RESOLVED dm_bin
+# (the drive resolved /usr/bin/true; the old code printed it).
+check "import: closing cleanup hint carries the <ddev-bin> placeholder (#568 b Y3, functional)" \
+    sh -c "printf '%s\n' \"\$1\" | grep -qF 'sudo -u <dev-user> <ddev-bin> delete --omit-snapshot <project>'" _ "$_w5j_out"
+if printf '%s\n' "$_w5j_out" | grep -q 'sudo -u <dev-user> /'; then
+    fail "import: closing cleanup hint must not interpolate a resolved binary path (#568 b Y3)"
+else
+    pass "import: closing cleanup hint has no resolved binary path (#568 b Y3)"
+fi
+rm -rf "${_w5j:?}"
 
 # static: the import loop builds HOME via getent and rides conditional
 # backend vars as single quoted arguments (0.0.43a F6/F12).

@@ -913,6 +913,15 @@ if printf '%s\n' "$_O372D1C_OUT" | grep -qF 'SUDO: rm -rf' &&
 else
     fail "move-mode happy path must still remove the source (out=$_O372D1C_OUT) (pr-00429 b D1)"
 fi
+# rm -rf census (#571): the move-mode source removal carries the `:?`
+# empty-variable guard — a deliberate strengthening of the shipped-code
+# standard in agent/conventions.md "Test sandbox" item 3 (the rm suffix
+# guard: :? for literal-suffix operands, pure variables exempt).
+# Unreachable through the helper's own contract (the [ -d ] gate
+# returns first on an empty path), pure defense against future
+# refactors; the structural pin holds the line.
+check_live "move-mode rm -rf carries the :? empty-variable guard (rm -rf census, #571)" \
+    "$_MIG_CORE" -qF 'sudo rm -rf "${_opk_src:?}"'
 # pr-00429 a C3: the Step 8 blocks (.config, .config/opencode, .agents)
 # carry the same exec-time recheck — one entry gate + one re-walk per
 # block before the chown -R/chmod legs. Count on comment-stripped

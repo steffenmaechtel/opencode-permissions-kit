@@ -321,15 +321,21 @@ check_live "devowned-flag: helper respects the OPK_INSTALL_CONF override" \
 # is not hermetically constructible (the static exec pin plus these
 # cover the class).
 DFW=$(mktemp -d)
-mkdir -p "$DFW/cat/.ddev" "$DFW/tmp/.ddev" "$DFW/lnk/.ddev"
+mkdir -p "$DFW/cat/.ddev" "$DFW/tmp/.ddev" "$DFW/lnk/.ddev" "$DFW/bin"
 printf 'name: fwc\ntype: typo3\n' >"$DFW/cat/.ddev/config.yaml"
 printf 'name: fwt\ntype: typo3\n' >"$DFW/tmp/.ddev/config.yaml"
 printf 'target\n' >"$DFW/lnk/real-config.yaml"
 ln -s "$DFW/lnk/real-config.yaml" "$DFW/lnk/.ddev/config.yaml"
-chmod 444 "$DFW/cat/.ddev/config.yaml"
 chmod 555 "$DFW/tmp/.ddev"
-DFW_CAT=$(DDEV_DEV_OWNED=true PATH="$DF_STUB:$PATH" sh "$HELPER" --opk-devowned-flag "$DFW/cat" 2>/dev/null)
-check "W1 delivery: cat-write warning arrives on stdout despite the hook's stderr suppression (0.0.46b W1)" \
+# The third arm was the cat-truncate failure (a chmod 444 config.yaml);
+# #568 a D6's atomic swap retired that cause — a read-only file in a
+# writable .ddev is replaced now. The write failure the hook can still
+# hit is the swap itself; a failing mv stub drives it. What this pin
+# measures is unchanged: the warning's STDOUT delivery.
+printf '#!/bin/sh\nexit 1\n' >"$DFW/bin/mv"
+chmod 755 "$DFW/bin/mv"
+DFW_CAT=$(DDEV_DEV_OWNED=true PATH="$DFW/bin:$DF_STUB:$PATH" sh "$HELPER" --opk-devowned-flag "$DFW/cat" 2>/dev/null)
+check "W1 delivery: write-failure warning arrives on stdout despite the hook's stderr suppression (0.0.46b W1, #568 a D6)" \
     sh -c "printf '%s\n' \"\$1\" | grep -q 'dev-owned flag write to .* failed'" _ "$DFW_CAT"
 DFW_TMP=$(DDEV_DEV_OWNED=true PATH="$DF_STUB:$PATH" sh "$HELPER" --opk-devowned-flag "$DFW/tmp" 2>/dev/null)
 check "W1 delivery: mktemp warning arrives on stdout (class sweep, 0.0.46b W1)" \
@@ -1366,34 +1372,27 @@ printf 'webimage: config.yaml\nhooks:\n  post-start:\n    - exec: \"ls\"\n' >"$D
 check "flag writer: no anchor key at all -> top of the file (issue #28)" \
     sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\" >/dev/null; [ \"\$(grep -n '^disable_settings_management: true' \"\$2/.ddev/config.yaml\" | cut -d: -f1)\" = 3 ] && [ \"\$(grep -c '^\$' \"\$2/.ddev/config.yaml\")\" = 1 ]" _ "$HANDOVER" "$DWORK/fw7"
 
-# 0.0.46a F1: the opencode-uid caller (ddev-as-opencode
-# --opk-devowned-flag) can actually fail the write — a clone whose
-# config.yaml arrived 0644 dev-owned. The failure must be loud and
-# honest: a WARNING, never the unconditional success note (and never
-# silence). Owner-mode bits block the CURRENT non-root user — the same
-# self-blocking fixture shape as the chmod 007 cwd in section 2b.
+# 0.0.46a F1 reworked by #568 a D6: with the atomic temp+mv swap a
+# read-only config.yaml no longer blocks the write — the file mode
+# never protected against replacement (the writable .ddev dir governs
+# the directory entry), and the old failure here was an artifact of
+# the truncate-write mechanics. The write succeeds now, restoring
+# owner and mode (plus group-write). The loud-failure contract lives
+# on in the mktemp arm below (F1B) and the stubbed-tool legs (F6): a
+# write that cannot swap must still announce itself, never lie, never
+# stay silent.
 mkdir -p "$DWORK/f1a/.ddev"
 printf 'name: f1a\ntype: typo3\n' >"$DWORK/f1a/.ddev/config.yaml"
 chmod 444 "$DWORK/f1a/.ddev/config.yaml"
 F1A_RC=0
 F1A_OUT=$(sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\"" _ "$HANDOVER" "$DWORK/f1a" 2>&1) || F1A_RC=$?
-check "flag writer: unwritable config.yaml warns instead of lying (0.0.46a F1)" \
-    sh -c "[ \"\$2\" = 0 ] && printf '%s\n' \"\$1\" | grep -q 'dev-owned flag write to .* failed' && ! printf '%s\n' \"\$1\" | grep -q 'flag written'" _ "$F1A_OUT" "$F1A_RC"
-if ! printf '%s\n' "$F1A_OUT" | grep -q 'flag NOT'; then
-    pass "flag writer: failed write never claims NOT written — ENOSPC may leave a partial file (0.0.46b W2)"
+check "flag writer: read-only config.yaml is replaced atomically, owner+mode restored (#568 a D6)" \
+    sh -c "[ \"\$2\" = 0 ] && printf '%s\n' \"\$1\" | grep -q 'flag written' && grep -qx 'disable_settings_management: true' \"\$3/.ddev/config.yaml\" && [ \"\$(stat -c %a \"\$3/.ddev/config.yaml\")\" = 464 ]" _ "$F1A_OUT" "$F1A_RC" "$DWORK/f1a"
+if printf '%s\n' "$F1A_OUT" | grep -q 'ownership changed to the running user'; then
+    fail "flag writer: runner-owned original must not carry the flip note (#568 a D6)"
 else
-    fail "flag writer: failed write never claims NOT written — ENOSPC may leave a partial file (0.0.46b W2)"
+    pass "flag writer: runner-owned original carries no flip note (#568 a D6)"
 fi
-if printf '%s\n' "$F1A_OUT" | grep -q 'sudo opk config handover' &&
-    printf '%s\n' "$F1A_OUT" | grep -q 'opk update --refresh' &&
-    ! printf '%s\n' "$F1A_OUT" | grep -q 'next root-run scan retries'; then
-    pass "flag writer: retry hint names the explicit paths, not the stamp-skipped scan (0.0.46b W2)"
-else
-    fail "flag writer: retry hint names the explicit paths, not the stamp-skipped scan (0.0.46b W2)"
-fi
-F1A_RETRY="sudo opk config handover \"$DWORK/f1a\""
-check "flag writer: retry hint is verbatim-runnable — prints the root's path (0.0.46c C1)" \
-    sh -c "printf '%s\n' \"\$1\" | grep -F \"\$2\"" _ "$F1A_OUT" "$F1A_RETRY"
 chmod 644 "$DWORK/f1a/.ddev/config.yaml"
 mkdir -p "$DWORK/f1b/.ddev"
 printf 'name: f1b\ntype: typo3\n' >"$DWORK/f1b/.ddev/config.yaml"
@@ -1403,6 +1402,199 @@ F1B_OUT=$(sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\"" _ "$HANDOVER" "$DWORK/
 check "flag writer: unwritable .ddev dir warns (mktemp branch, 0.0.46a F1)" \
     sh -c "[ \"\$2\" = 0 ] && printf '%s\n' \"\$1\" | grep -q 'not writable (mktemp failed)' && ! printf '%s\n' \"\$1\" | grep -q 'flag written'" _ "$F1B_OUT" "$F1B_RC"
 chmod 755 "$DWORK/f1b/.ddev"
+
+# --- 5f. atomic flag write (#568 a D6): sibling temp + mv ------------------
+# The old temp + `cat >` truncate-write could lose the tail of the
+# committed config.yaml on a mid-write failure, and the retry's grep
+# gate then baked the truncation in; an interrupt between mktemp and
+# cleanup stranded a root-owned config.yaml.opk.* temp in the
+# agent-writable .ddev. The swap is atomic now, owner/mode ride on
+# the temp explicitly, the temp registers for interrupt cleanup.
+check_absent "atomic flag write: no truncate-write left (#568 a D6)" \
+    "$HANDOVER" -qF 'cat "$ddf_tmp" >"$ddf_cfg"'
+check_live "atomic flag write: the swap is a sibling mv (#568 a D6)" \
+    "$HANDOVER" -qF 'mv -f "$ddf_tmp" "$ddf_cfg"'
+check_live "atomic flag write: the ownership flip is disclosed (#568 a D6)" \
+    "$HANDOVER" -qF 'ownership changed to the running user'
+check_live "atomic flag write: the temp registers for interrupt cleanup (#568 a D6)" \
+    "$HANDOVER" -qF '_tmp_track "$ddf_tmp"'
+check_live "atomic flag write: owner:group:mode captured from the original (#568 a D6)" \
+    "$HANDOVER" -qF 'stat -c '"'"'%u:%g:%a'"'"' "$ddf_cfg"'
+mkdir -p "$DWORK/fw8/.ddev"
+printf 'name: fw8\ntype: typo3\n' >"$DWORK/fw8/.ddev/config.yaml"
+D6OUT=$(sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\"" _ "$HANDOVER" "$DWORK/fw8" 2>&1)
+check "atomic flag write: flag written through the swap" \
+    sh -c "grep -qx 'disable_settings_management: true' \"\$1/.ddev/config.yaml\"" _ "$DWORK/fw8"
+check "atomic flag write: no stranded config.yaml.opk.* temp" \
+    sh -c "[ -z \"\$(find \"\$1/.ddev\" -name 'config.yaml.opk.*' -print -quit)\" ]" _ "$DWORK/fw8"
+if printf '%s\n' "$D6OUT" | grep -q 'ownership changed to the running user'; then
+    fail "atomic flag write: runner-owned original must not carry the flip note (#568 a D6)"
+else
+    pass "atomic flag write: runner-owned original carries no flip note (#568 a D6)"
+fi
+# mode rides on the temp: a 0600 original comes back as 0620 (captured
+# mode plus group-write — the group had no read bit, exactly the old
+# cat + chmod g+w outcome), owner unchanged — the old cat kept the
+# inode for free; the swap must not lose the bits on the way.
+mkdir -p "$DWORK/fw9/.ddev"
+printf 'name: fw9\ntype: typo3\n' >"$DWORK/fw9/.ddev/config.yaml"
+chmod 600 "$DWORK/fw9/.ddev/config.yaml"
+sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\"" _ "$HANDOVER" "$DWORK/fw9" >/dev/null 2>&1
+check "atomic flag write: mode restored + group-write via the temp (0600 -> 0620)" \
+    sh -c "[ \"\$(stat -c %a \"\$1/.ddev/config.yaml\")\" = 620 ] && [ \"\$(stat -c %U \"\$1/.ddev/config.yaml\")\" = \"\$(id -un)\" ]" _ "$DWORK/fw9"
+# The refusal arms execute against stubbed tools (a scratch bin first
+# in PATH): each arm announces itself with its OWN cause, leaves the
+# original untouched and takes the temp with it — the old cat-failure
+# mode (possible truncation, baked in by the retry's grep gate) is
+# structurally gone.
+for _d6_t in mv chmod stat awk; do
+    mkdir -p "$DWORK/f6-$_d6_t/.ddev" "$DWORK/f6stub-$_d6_t"
+    printf '#!/bin/sh\nexit 1\n' >"$DWORK/f6stub-$_d6_t/$_d6_t"
+    chmod +x "$DWORK/f6stub-$_d6_t/$_d6_t"
+    printf 'name: f6\ntype: typo3\n' >"$DWORK/f6-$_d6_t/.ddev/config.yaml"
+    _d6_out=$(PATH="$DWORK/f6stub-$_d6_t:$PATH" sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\"" _ "$HANDOVER" "$DWORK/f6-$_d6_t" 2>&1) || true
+    printf '%s\n' "$_d6_out" >"$DWORK/f6-$_d6_t.out"
+    case "$_d6_t" in
+        mv) _d6_cause='original untouched' ;;
+        chmod) _d6_cause='cannot stage the mode' ;;
+        stat) _d6_cause='cannot stat the committed config' ;;
+        awk) _d6_cause='could not stage the new content' ;;
+    esac
+    check "atomic flag write: stub $_d6_t — announces its own cause" \
+        sh -c "printf '%s\n' \"\$1\" | grep -q 'dev-owned flag write to .* failed' && printf '%s\n' \"\$1\" | grep -qF \"\$2\" && ! printf '%s\n' \"\$1\" | grep -q 'flag written'" _ "$_d6_out" "$_d6_cause"
+    check "atomic flag write: stub $_d6_t — the original is untouched, no flag" \
+        sh -c "! grep -q disable_settings_management \"\$1/.ddev/config.yaml\"" _ "$DWORK/f6-$_d6_t"
+    check "atomic flag write: stub $_d6_t — no stranded temp" \
+        sh -c "[ -z \"\$(find \"\$1/.ddev\" -name 'config.yaml.opk.*' -print -quit)\" ]" _ "$DWORK/f6-$_d6_t"
+    check "atomic flag write: stub $_d6_t — retry hint names the explicit paths (0.0.46b W2)" \
+        sh -c "printf '%s\n' \"\$1\" | grep -q 'sudo opk config handover' && printf '%s\n' \"\$1\" | grep -q 'opk update --refresh' && ! printf '%s\n' \"\$1\" | grep -q 'flag NOT'" _ "$_d6_out"
+done
+# The mv leg's retry hint stays verbatim-runnable (0.0.46c C1): the
+# project's path travels with the command, quoted.
+check "atomic flag write: mv-failure retry hint is verbatim-runnable (0.0.46c C1)" \
+    sh -c "grep -F \"sudo opk config handover \\\"\$1\\\"\" \"\$2\"" _ "$DWORK/f6-mv" "$DWORK/f6-mv.out"
+
+# --- 5f2. the two exec-time rechecks and the group restore (#606 a
+# S1/S2/M3) -------------------------------------------------------
+check_live "atomic flag write: recheck A guards the dress (#606 a S1)" \
+    "$HANDOVER" -qF 'if [ ! -L "$ddf_tmp" ] && [ ! -L "$ddf_cfg" ]; then'
+check_live "atomic flag write: recheck B refuses a directory cfg (#606 a S2)" \
+    "$HANDOVER" -qF 'changed to a directory mid-write'
+check_live "atomic flag write: the group restore runs after the mv (#606 a M3)" \
+    "$HANDOVER" -qF 'chgrp "$ddf_g" "$ddf_cfg"'
+# Executed drives: an awk stub swaps the staged operand mid-flight —
+# the temp for a symlink to a 0400 victim (S1: without recheck A the
+# dress chmod dereferences the link; the victim's mode is the marker,
+# the #564 b D1 reachable-marker shape), the cfg for a directory (S2:
+# mv -f would swallow the temp with rc 0 and the success note lies).
+mkdir -p "$DWORK/s1/.ddev" "$DWORK/s1stub"
+printf 'name: s1\ntype: typo3\n' >"$DWORK/s1/.ddev/config.yaml"
+printf 'VICTIM\n' >"$DWORK/s1/victim.conf"
+chmod 400 "$DWORK/s1/victim.conf"
+OPK_S1_VICTIM="$DWORK/s1/victim.conf"
+export OPK_S1_VICTIM
+printf '#!/bin/sh\n_last=""\nfor _a in "$@"; do _last=$_a; done\n_dir=$(dirname "$_last")\nfor _t in "$_dir"/config.yaml.opk.*; do\n[ -f "$_t" ] || continue\nrm -f "$_t"\nln -s "$OPK_S1_VICTIM" "$_t"\ndone\nexit 0\n' \
+    >"$DWORK/s1stub/awk"
+chmod 755 "$DWORK/s1stub/awk"
+S1OUT=$(PATH="$DWORK/s1stub:$PATH" sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\"" _ "$HANDOVER" "$DWORK/s1" 2>&1) || true
+check "recheck A: a temp->symlink swap is refused before any act (#606 a S1)" \
+    sh -c "printf '%s\n' \"\$1\" | grep -q 'changed to a symlink mid-write' && ! printf '%s\n' \"\$1\" | grep -q 'flag written'" _ "$S1OUT"
+check "recheck A: the dress never chmods through the swapped link (#606 a S1)" \
+    sh -c "[ \"\$(stat -c %a \"\$1\")\" = 400 ]" _ "$DWORK/s1/victim.conf"
+unset OPK_S1_VICTIM
+mkdir -p "$DWORK/s2/.ddev" "$DWORK/s2stub"
+printf 'name: s2\ntype: typo3\n' >"$DWORK/s2/.ddev/config.yaml"
+printf '#!/bin/sh\n_last=""\nfor _a in "$@"; do _last=$_a; done\nrm -f "$_last"\nmkdir "$_last"\nexit 0\n' >"$DWORK/s2stub/awk"
+chmod 755 "$DWORK/s2stub/awk"
+S2OUT=$(PATH="$DWORK/s2stub:$PATH" sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\"" _ "$HANDOVER" "$DWORK/s2" 2>&1) || true
+check "recheck B: a dir-swapped cfg is refused, no false success (#606 a S2)" \
+    sh -c "printf '%s\n' \"\$1\" | grep -q 'changed to a directory mid-write' && ! printf '%s\n' \"\$1\" | grep -q 'flag written'" _ "$S2OUT"
+check "recheck B: the temp never lands inside the planted dir (#606 a S2)" \
+    sh -c "[ -z \"\$(find \"\$1/.ddev\" -name 'config.yaml.opk.*' -print -quit)\" ]" _ "$DWORK/s2"
+
+# --- 5f3. the hook context registers its temps (#606 a S3/M2):
+# bin/ddev-as-opencode defines the tracker itself — the root-run
+# callers ship theirs (config.sh/update.sh/install.sh); without it the
+# lib's guarded call silently no-oped here. The interrupt MECHANICS
+# (trap fires on SIGINT mid-write) stay unpinned by budget: the §11e
+# FIFO+setsid choreography, LOW finding (conventions.md "Pin-cost
+# budget") — the registration's presence is the pinned floor.
+check_live "hook context: ddev-as-opencode defines the temp tracker (#606 a S3/M2)" \
+    "$HELPER" -qF '_tmp_track() {'
+check_live "hook context: the registry cleans on EXIT/INT/TERM (#606 a S3/M2)" \
+    "$HELPER" -qF "trap '_opk_tmp_cleanup; exit 1' INT TERM"
+
+# --- 5f4. recheck C before the restore acts (#606 b B1) ----------------
+# Hermetic post-mv swap: the mv stub performs the real move, then
+# replaces the cfg name with a symlink to a victim; chown/chgrp are
+# recorder stubs — their log proves whether the restore acts ran at
+# all (the dress chown logs the temp operand, a restore act would log
+# the cfg operand). Without recheck C the acts dereference the swapped
+# name (probe: chgrp through a link follows); with it the swap warns,
+# nothing restores, no success note.
+mkdir -p "$DWORK/b1/.ddev" "$DWORK/b1stub"
+printf 'name: b1\ntype: typo3\n' >"$DWORK/b1/.ddev/config.yaml"
+printf 'B1VICTIM\n' >"$DWORK/b1/victim.conf"
+OPK_B1_VICTIM="$DWORK/b1/victim.conf"
+OPK_B1_LOG="$DWORK/b1/ops.log"
+export OPK_B1_VICTIM OPK_B1_LOG
+: >"$OPK_B1_LOG"
+printf '#!/bin/sh\n/bin/mv "$@"\n_rc=$?\n_last=""\nfor _a in "$@"; do _last=$_a; done\nrm -f "$_last"\nln -s "$OPK_B1_VICTIM" "$_last"\nexit $_rc\n' \
+    >"$DWORK/b1stub/mv"
+printf '#!/bin/sh\necho "chown $*" >>"$OPK_B1_LOG"\nexit 0\n' >"$DWORK/b1stub/chown"
+printf '#!/bin/sh\necho "chgrp $*" >>"$OPK_B1_LOG"\nexit 0\n' >"$DWORK/b1stub/chgrp"
+chmod 755 "$DWORK/b1stub/mv" "$DWORK/b1stub/chown" "$DWORK/b1stub/chgrp"
+B1OUT=$(PATH="$DWORK/b1stub:$PATH" sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\"" _ "$HANDOVER" "$DWORK/b1" 2>&1) || true
+check "recheck C: a post-mv symlink swap warns, no false success (#606 b B1)" \
+    sh -c "printf '%s\n' \"\$1\" | grep -q 'changed to a symlink after the write' && ! printf '%s\n' \"\$1\" | grep -q 'flag written'" _ "$B1OUT"
+check "recheck C: the restore acts never touch the swapped name (#606 b B1)" \
+    sh -c "! grep -q 'config.yaml\$' \"\$1\"" _ "$OPK_B1_LOG"
+unset OPK_B1_VICTIM OPK_B1_LOG
+
+# --- 5f5. the note names what actually changed (#606 b B2) --------------
+# The compare's stat is stubbed shape-selectively: the 3-field capture
+# stays real (runner:primary-group), the 2-field compare reports uid 0
+# with the runner's group — the chown-failed/chgrp-succeeded state
+# (owner changed, group kept) the static parenthetical used to misname.
+mkdir -p "$DWORK/b2/.ddev" "$DWORK/b2stub"
+printf 'name: b2\ntype: typo3\n' >"$DWORK/b2/.ddev/config.yaml"
+printf '#!/bin/sh\nif [ "$1" = "-c" ] && [ "$2" = "%%u:%%g" ]; then echo "0:$(id -g)"; exit 0; fi\nexec /usr/bin/stat "$@"\n' \
+    >"$DWORK/b2stub/stat"
+chmod 755 "$DWORK/b2stub/stat"
+B2OUT=$(PATH="$DWORK/b2stub:$PATH" sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\"" _ "$HANDOVER" "$DWORK/b2" 2>&1) || true
+check "note: owner-changed-with-group-kept is named precisely (#606 b B2)" \
+    sh -c "printf '%s\n' \"\$1\" | grep -qF 'original owner unrestorable as this user — group kept'" _ "$B2OUT"
+
+# --- 5g. the ddev() direct arm never matches a MISSING opencode user -------
+# (#568 a D7): the old `id -u opencode || echo 0` fallback made the
+# probe yield 0 when the user does not exist — a root shell (id -u = 0)
+# matched and ran ddev as root directly (ddev refuses root itself;
+# half-uninstalled-kit cosmetic). Hermetic: the id stub answers ONLY
+# the bare `-u` probe (the root caller) and FAILS the user lookup; a
+# ddev stub records the direct arm. With the fix the else arm runs —
+# the marker stays empty whatever that arm does in this environment.
+mkdir -p "$DWORK/d7/bin"
+printf '#!/bin/sh\nif [ "$#" -eq 1 ] && [ "$1" = "-u" ]; then echo 0; exit 0; fi\nexit 1\n' \
+    >"$DWORK/d7/bin/id"
+printf '#!/bin/sh\necho ran-direct >>"$OPK_D7_MARK"\n' >"$DWORK/d7/bin/ddev"
+chmod +x "$DWORK/d7/bin/id" "$DWORK/d7/bin/ddev"
+OPK_D7_MARK="$DWORK/d7/mark"
+export OPK_D7_MARK
+: >"$OPK_D7_MARK"
+D7OUT=$(PATH="$DWORK/d7/bin:$PATH" sh -c '. "$1" && ddev true' _ "$FUNC" 2>&1) || true
+if [ -s "$OPK_D7_MARK" ]; then
+    fail "ddev(): a missing opencode user must not take the direct arm (#568 a D7)"
+else
+    pass "ddev(): a missing opencode user must not take the direct arm (#568 a D7)"
+fi
+# control: user PRESENT with a matching uid — the direct arm still
+# runs (the fix must not break the normal already-opencode path).
+printf '#!/bin/sh\necho 7\n' >"$DWORK/d7/bin/id"
+: >"$OPK_D7_MARK"
+PATH="$DWORK/d7/bin:$PATH" sh -c '. "$1" && ddev true' _ "$FUNC" >/dev/null 2>&1 || true
+check "ddev(): the matching-uid direct arm still runs (control, #568 a D7)" \
+    sh -c "test -s \"\$1\"" _ "$OPK_D7_MARK"
+unset OPK_D7_MARK
 
 # flagged detection
 check "flagged detection: true" \

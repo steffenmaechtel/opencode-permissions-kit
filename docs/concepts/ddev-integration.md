@@ -322,3 +322,7 @@ through: the export refuses the operand loudly (the dump directory is
 agent-group-writable during the whole export wave, and a planted link is
 tampering), counts the project as failed and leaves the link in place for
 you to remove — after removing it, re-running exports the project cleanly.
+On import, a manifest entry whose file name escapes the dump directory
+(`../…` or any slash) is refused the same way: the import reads regular
+files by their plain names only, and anything else in the agent-ownable
+manifest counts as tampering.

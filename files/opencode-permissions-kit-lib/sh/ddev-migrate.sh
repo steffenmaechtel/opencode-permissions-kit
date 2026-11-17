@@ -877,13 +877,30 @@ ddev_migrate_import() {
         # agent-owned (750 since finalize, no sticky) — a dump swapped
         # for a symlink in the export->import gap must never be imported
         # THROUGH: [ -f ] follows links, and import-db would read an
-        # agent-chosen OUT-OF-DIR file into a project database. Honest
-        # scope (#420 a A11): this is a tamper-refusal, not a
+        # agent-chosen OUT-OF-DIR file into a project database. The
+        # operand NAME is gated too (#568 a D5): the manifest is
+        # agent-ownable content, and an $dm_f carrying a slash
+        # redirects --file="$dm_dir/$dm_f" out of the dump dir through
+        # a REGULAR file no [ -L ] gate ever sees — the export side
+        # writes plain "<project>.sql.gz" manifest names only, so
+        # every slash operand is tampering. A bare `..` is refused as
+        # the same class at the pattern level (#606 a Q2): it resolves
+        # to a directory and would die at the [ -f ] gate anyway —
+        # shape hardening, not the regular-file redirect the slash
+        # forms carry. Honest scope
+        # (#420 a A11): both refusals are tamper-refusals, not a
         # content-integrity boundary — the agent owns the dir outright
-        # and can rewrite any REGULAR dump's content directly; the gate
-        # removes the out-of-dir redirection, nothing more. Refuse
-        # loudly and count the project failed; the operator removes the
-        # link and re-imports.
+        # and can rewrite any REGULAR in-dir dump's content directly;
+        # the gates remove the out-of-dir redirection, nothing more.
+        # Refuse loudly and count the project failed; the operator
+        # removes the link (or repairs the manifest) and re-imports.
+        case "$dm_f" in
+            */* | ..)
+                echo "  $dm_n: REFUSED — dump operand escapes the dump dir ($dm_f) — tampering? Repair the manifest and re-run"
+                dm_failed="$dm_failed $dm_n"
+                continue
+                ;;
+        esac
         if [ -L "$dm_dir/$dm_f" ]; then
             echo "  $dm_n: REFUSED — dump operand is a symlink ($dm_dir/$dm_f) — tampering? Remove it and re-run"
             dm_failed="$dm_failed $dm_n"
@@ -934,7 +951,13 @@ ddev_migrate_import() {
     [ -n "$dm_failed" ] && echo "  failed:$dm_failed — dumps stay in $dm_dir (retry anytime;""\
  already-imported projects are skipped)"
     echo "  old containers/volumes remain in the dev daemon; remove them with:"
-    echo "    sudo -u <dev-user> $dm_bin delete --omit-snapshot <project>"
+    # Placeholder, never the interpolated $dm_bin (#568 b Y3, the
+    # #568 a D4 rule two hints up): _ddev_migrate_bin's candidate list
+    # includes the OPENCODE user's private install paths — ddev absent
+    # from root's PATH lets the agent plant the binary there, and the
+    # interpolated hint would invite the operator to paste it (executed
+    # as the dev user, the ddev-hosts.sh 0.0.39a S5 class).
+    echo "    sudo -u <dev-user> <ddev-bin> delete --omit-snapshot <project>"
     [ -z "$dm_failed" ]
 }
 

@@ -613,6 +613,19 @@ E 'sudo mkdir -p /var/www/vhosts/devowned-mig/.ddev && sudo chown -R dev:dev /va
 E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/config.sh --yes handover /var/www/vhosts/devowned-mig'
 check "4e: previously handed-over root migrates back to dev (2775)" \
     E 'test "$(stat -c %U /var/www/vhosts/devowned-mig)" = "dev" && test "$(stat -c %a /var/www/vhosts/devowned-mig)" = "2775"'
+# 4f (#568 a D6): the opencode-uid flag write on a dev-owned clone —
+# the atomic swap runs in the agent-group-writable .ddev, and the
+# dev-owned config.yaml flips to opencode ownership (the agent uid
+# cannot chown it back): the flip is DISCLOSED, group write stays.
+E 'sudo mkdir -p /var/www/vhosts/devowned-uidflag/.ddev && sudo chown -R dev:dev /var/www/vhosts/devowned-uidflag && printf "type: typo3\n" > /var/www/vhosts/devowned-uidflag/.ddev/config.yaml && sudo chgrp opencode /var/www/vhosts/devowned-uidflag/.ddev && sudo chmod 2775 /var/www/vhosts/devowned-uidflag/.ddev'
+check "4f: opencode-uid flag write discloses the ownership flip (#568 a D6)" \
+    E 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode --opk-devowned-flag /var/www/vhosts/devowned-uidflag 2>&1 | grep -q "ownership changed to the running user"'
+check "4f: flag written despite the flip (best-effort contract)" \
+    E 'grep -qx "disable_settings_management: true" /var/www/vhosts/devowned-uidflag/.ddev/config.yaml'
+check "4f: flipped config.yaml is opencode-owned, group write stays" \
+    E 'test "$(stat -c %U /var/www/vhosts/devowned-uidflag/.ddev/config.yaml)" = "opencode" && test "$(stat -c %a /var/www/vhosts/devowned-uidflag/.ddev/config.yaml)" = "664"'
+check "4f: no stranded config.yaml.opk.* temp (#568 a D6)" \
+    E 'test -z "$(find /var/www/vhosts/devowned-uidflag/.ddev -name "config.yaml.opk.*" -print -quit)"'
 # hook hint on an unflagged fresh clone mentions the dev-owned effect
 E 'sudo mkdir -p /var/www/vhosts/devowned-hint/.ddev && sudo chown -R dev:dev /var/www/vhosts/devowned-hint && printf "type: typo3\n" > /var/www/vhosts/devowned-hint/.ddev/config.yaml && chmod 2775 /var/www/vhosts/devowned-hint'
 check "4e: hook hint mentions disable_settings_management (dev-owned note)" \
