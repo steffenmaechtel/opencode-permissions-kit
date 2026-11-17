@@ -102,7 +102,7 @@
 | [RM-0044](0/0/4/RM-0044.md) | rm suffix guard — any rm invocation | active | approved | 1m | 2026-11-17 |
 | [RM-0137](0/1/3/RM-0137.md) | Scratch receivers in harness-sourcing suites… | active | approved | 1m | 2026-12-06 |
 | [RM-0151](0/1/5/RM-0151.md) | The decision rule for writing NEW | active | approved | 1m | 2026-12-15 |
-| [RM-0173](0/1/7/RM-0173.md) | A harness env override | active | **pending** | 1m | 2026-12-17 |
+| [RM-0173](0/1/7/RM-0173.md) | A harness env override consumed | active | **pending** | 1m | 2026-12-17 |
 
 ### Referencing review findings
 

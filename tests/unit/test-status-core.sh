@@ -65,13 +65,14 @@ status_sudo_verdict status_win_interop_verdict"
 # (#590 b F1 residue) _opk_timeout_ok stays unlisted BY DESIGN: the #248
 # sibling block below pins it BEHAVIORALLY (sourcing + broken-vs-healthy
 # call) — a removal/rename reddens that pin, so the list stays 25.
+_ndefs="$(printf '%s\n' $_defs | wc -w | tr -d ' ')"
 _missing=""
 for _fn in $_defs; do
     sh -c '. "$1" && command -v "$2" >/dev/null' _ "$LIB" "$_fn" 2>/dev/null ||
         _missing="$_missing $_fn"
 done
 if [ -z "$_missing" ]; then
-    pass "all 25 section/helper functions defined by sourcing"
+    pass "all $_ndefs section/helper functions defined by sourcing"
 else
     fail "functions missing after sourcing:$_missing"
 fi
