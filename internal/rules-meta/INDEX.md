@@ -8,12 +8,12 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**169 metas · 166 active · 3 retired · 9 review-pending · next due 2026-11-17**
+**169 metas · 166 active · 3 retired · 10 review-pending · next due 2026-11-17**
 
 ## Actionable
 
 - **Review pending:** RM-0161, RM-0162, RM-0163, RM-0164, RM-0165, RM-0166, RM-0167, RM-0168, RM-0169
-- **Amended — pending:** none
+- **Amended — pending:** RM-0156 (2026-11-17)
 
 ## AGENTS.md
 
@@ -364,7 +364,7 @@
 | [RM-0093](0/0/9/RM-0093.md) | In meta bodies, cross-references | active | approved | 1m | 2026-11-19 |
 | [RM-0094](0/0/9/RM-0094.md) | The review log names the | active | approved | 1m | 2026-11-19 |
 | [RM-0135](0/1/3/RM-0135.md) | Post-approval changes set | active | approved | 1m | 2026-11-30 |
-| [RM-0156](0/1/5/RM-0156.md) | The quote: needle is the | active | approved | 1m | 2026-12-15 |
+| [RM-0156](0/1/5/RM-0156.md) | The quote: needle is the | active | **amended — pending** | 1m | 2026-12-15 |
 | [RM-0159](0/1/5/RM-0159.md) | Quoted strings in meta bodies | active | approved | 1m | 2026-12-16 |
 
 ### Quality bar for rationales
