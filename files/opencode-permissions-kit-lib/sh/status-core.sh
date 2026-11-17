@@ -1375,14 +1375,67 @@ status_groups_hits() {
 # status_sock_agent_reachable <socket-path> <agent-groups>: exit 0 when the
 # agent user can plausibly connect — socket world-writable, or group-writable
 # with its group among <agent-groups>. Pure stat math, works unprivileged.
+# rc 2 = the stat itself failed (#569 M2 class sweep, third instance): the
+# caller renders an uncounted unknown row — the old single-rc shape folded
+# a dead probe into the counted green "not agent-reachable".
 status_sock_agent_reachable() {
-    ssr_mode=$(stat -c %a "$1" 2>/dev/null) || return 1
+    ssr_mode=$(stat -c %a "$1" 2>/dev/null) || return 2
     [ $((0$ssr_mode & 0002)) -ne 0 ] && return 0
     if [ $((0$ssr_mode & 0020)) -ne 0 ]; then
         ssr_grp=$(stat -c %G "$1" 2>/dev/null)
         case " $2 " in *" $ssr_grp "*) return 0 ;; esac
     fi
     return 1
+}
+
+# status_win_interop_verdict <cmd.exe path>: echoes exec | blocked | unknown —
+# the stat outcome triple the win-interop row renders. Pure stat math, same
+# shape as the helpers above (#569 M2: the stat failure must surface as its
+# own verdict, not fall into the blocked arm's counted green — live on
+# restricted drvfs mounts, where cmd.exe is not statable).
+status_win_interop_verdict() {
+    swiv_mode=$(stat -c %a "$1" 2>/dev/null) || {
+        echo unknown
+        return 0
+    }
+    if [ $((0$swiv_mode & 0001)) -ne 0 ]; then
+        echo exec
+    else
+        echo blocked
+    fi
+    return 0
+}
+
+# status_sudo_verdict <probe-rc> <merged-capture>: echoes rules | none |
+# sudoers-trouble | probe-failed for the sudo-rules row. <merged-capture> is
+# the combined stdout+stderr of `LC_ALL=C sudo -n -l -U <user>`. The green
+# "none" keys on sudo's own ANSWER TEXT, not on rc: verified against real
+# sudo 1.9 on the target host (#569) — a healthy no-rules user answers rc 0
+# with "User X is not allowed to run sudo on <host>", older generations
+# answer rc 1 with the same text, and a NON-fatal sudoers.d syntax error
+# still answers rc 0 while the diagnostic rides stderr — no rc value alone
+# separates the healthy state from those two broken shapes. Listing shapes
+# (the pattern's history: 0.0.45c S3 widened the runas disjunct to every
+# spec, 0.0.45d W3 pinned LC_ALL=C at the probe — sudo localizes the -l
+# listing and its env_keep preserves LANG/LC_*): the header line, or any
+# indented runas-spec line. Order matters: visible rules win over a broken
+# sudoers (the rules are real); a syntax/parse diagnostic voids the none; a
+# silent probe (fatal sudoers damage, unknown user) is probe-failed. The
+# runas disjunct is structural — ANY indented `(...) cmd` listing line —
+# because a manual `(root)` or `(dev)` grant is exactly the later-manual-
+# grant class this row exists to surface.
+status_sudo_verdict() {
+    ssv_pat='may run the following commands|^[[:space:]]*\([^)]+\)'
+    if printf '%s\n' "$2" | grep -Eq "$ssv_pat"; then
+        echo rules
+    elif printf '%s\n' "$2" | grep -Eq 'syntax error|parse error'; then
+        echo sudoers-trouble
+    elif printf '%s\n' "$2" | grep -Eq 'is not allowed to run sudo|may not run sudo'; then
+        echo none
+    else
+        echo probe-failed
+    fi
+    return 0
 }
 status_section_root_equiv() {
     ui_section "Root-equivalent access (audit)"
@@ -1430,9 +1483,15 @@ status_section_root_equiv() {
         sra_r=$(readlink -f "$sra_s" 2>/dev/null || echo "$sra_s")
         case " $sra_seen " in *" $sra_r "*) continue ;; esac
         sra_seen="$sra_seen $sra_r"
-        if status_sock_agent_reachable "$sra_s" "$sra_groups"; then
+        status_sock_agent_reachable "$sra_s" "$sra_groups"
+        sra_s_rc=$?
+        if [ "$sra_s_rc" -eq 0 ]; then
             ui_kv_bad "socket" "$sra_s — AGENT-REACHABLE (root-equivalent daemon)"
             sra_finding=true
+        elif [ "$sra_s_rc" -eq 2 ]; then
+            # #569 M2 class sweep: uncounted unknown, never a counted green
+            # over a probe that never ran
+            ui_kv "socket" "$sra_s — unknown (cannot stat the socket)"
         else
             ui_kv_ok "socket" "$sra_s — present, not agent-reachable"
         fi
@@ -1443,40 +1502,52 @@ status_section_root_equiv() {
     # profile access). The /mnt/c restriction above (fmask) also blocks this
     # exec path — this probe makes the interop outcome explicit.
     if [ -e /mnt/c/Windows/System32 ]; then
-        sra_mode=$(stat -c %a /mnt/c/Windows/System32/cmd.exe 2>/dev/null || true)
-        if [ -n "$sra_mode" ] && [ $((0$sra_mode & 0001)) -ne 0 ]; then
-            ui_kv_bad "win interop" "agent can execute Windows binaries (/mnt/c world-executable)"
-            sra_finding=true
-        else
-            ui_kv_ok "win interop" "blocked for the agent (/mnt/c restricted)"
-        fi
+        case "$(status_win_interop_verdict /mnt/c/Windows/System32/cmd.exe)" in
+            exec)
+                ui_kv_bad "win interop" "agent can execute Windows binaries (/mnt/c world-executable)"
+                sra_finding=true
+                ;;
+            unknown)
+                # #569 M2: uncounted unknown in the /mnt/c twin's shape
+                # (0.0.48b W3) — a failing stat used to land in the blocked
+                # arm's counted green.
+                ui_kv "win interop" "unknown — cannot stat cmd.exe"
+                ;;
+            blocked)
+                ui_kv_ok "win interop" "blocked for the agent (/mnt/c restricted)"
+                ;;
+        esac
     fi
 
     # The agent user itself must have NO sudo rules (the kit grants rules only
     # to the developer, RunAs opencode). Only checkable when status.sh runs as
-    # root; otherwise silent. The check keys on the listing HEADER, not on any
-    # runas spec (0.0.45c S3): the old regex matched only (ALL...) and
-    # (opencode...) runas specs — a manual `(root)` or `(dev)` grant, exactly
-    # the "later manual grant" class this row exists to surface, printed the
-    # green "none" verdict. 0.0.45d W3: the header grep alone was locale-
-    # fragile — sudo localizes the -l listing (gettext catalogs) and its
-    # default env_keep preserves LANG/LC_*, so a translated header escaped
-    # the English pattern. LC_ALL=C pins the listing's language, and a
-    # structural runas-spec disjunct (any indented `(...) ...` listing line)
-    # flags grants even where the locale survives (belt and braces — it is
-    # the old syntax-based idea, widened to every runas).
+    # root; otherwise silent. The verdict logic (listing shapes, answer text,
+    # sudoers diagnostics) lives in status_sudo_verdict above — pure and
+    # unit-pinned.
     if [ "$(id -u)" -eq 0 ] && command -v sudo >/dev/null 2>&1; then
-        # LC_ALL=C pins the listing's language (W3: sudo localizes the -l
-        # listing and its default env_keep preserves LANG/LC_*); the runas
-        # disjunct is the structural belt-and-braces for any locale that
-        # survives anyway.
-        _sra_pat='may run the following commands|^[[:space:]]*\([^)]+\)'
-        if LC_ALL=C sudo -n -l -U "$OPENCODE_USER" 2>/dev/null | grep -Eq "$_sra_pat"; then
-            ui_kv_bad "sudo rules" "$OPENCODE_USER may run sudo — the kit grants it none (investigate)"
-            sra_finding=true
-        else
-            ui_kv_ok "sudo rules" "none for $OPENCODE_USER"
-        fi
+        # #569 M3: the old `sudo ... | grep -Eq` pipe let a failing probe
+        # (broken sudoers, silent output, grep rc 1) ride into the counted
+        # green "none" — in exactly the broken-host state this row exists to
+        # inspect. The probe's rc and merged output are captured now; the
+        # green arm is only reachable through sudo's own no-rules answer.
+        sra_sudo_out=$(LC_ALL=C sudo -n -l -U "$OPENCODE_USER" 2>&1)
+        sra_sudo_rc=$?
+        case "$(status_sudo_verdict "$sra_sudo_rc" "$sra_sudo_out")" in
+            rules)
+                ui_kv_bad "sudo rules" \
+                    "$OPENCODE_USER may run sudo — the kit grants it none (investigate)"
+                sra_finding=true
+                ;;
+            sudoers-trouble)
+                ui_kv "sudo rules" "unknown — sudo reported a sudoers problem"
+                ;;
+            probe-failed)
+                ui_kv "sudo rules" "unknown — sudo -l answered nothing (rc $sra_sudo_rc)"
+                ;;
+            none)
+                ui_kv_ok "sudo rules" "none for $OPENCODE_USER"
+                ;;
+        esac
     fi
 
     if [ "$sra_finding" = false ]; then

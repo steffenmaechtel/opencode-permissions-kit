@@ -206,6 +206,23 @@ doctor_cli() {
 # scan root, or no markers under them) -> 2; otherwise 0.
 # shellcheck disable=SC2317  # invoked via trap only
 _doctor_all_cleanup() { rm -rf "$WORK_ALL"; }
+
+# doctor_roots_append <list-file> <dest>: appends the file's non-blank lines
+# to <dest> (the doctor_all roots list). -a (round a A1): a line carrying a
+# raw C1 byte makes GNU grep deem the whole list BINARY — it then prints
+# "binary file matches" and delivers NO lines, so the per-root gate below
+# never sees the offending root; --text keeps the line stream intact and the
+# gate refuses it sanitized. rc discipline (#569 M5): rc 1 (no non-blank
+# lines) is benign; rc >1 is a real read failure — the precheck-to-read
+# race — which the old `|| true` swallowed while the list shrank SILENTLY.
+# Loud now like the sibling unreadable arm in doctor_all (warn row), never
+# a silent skip; rc 0 returned either way (a roots read never kills the run).
+doctor_roots_append() {
+    dra_rc=0
+    grep -a -v '^[[:space:]]*$' "$1" >>"$2" || dra_rc=$?
+    [ "$dra_rc" -gt 1 ] && ui_kv_warn "scan root" "$1 unreadable -- its roots are not scanned"
+    return 0
+}
 doctor_all() {
     [ "$DOCTOR_MODE" = "all" ] || return 0
     # kit pre-flight (one loud error instead of one per child): children
@@ -242,22 +259,21 @@ doctor_all() {
             :
         elif [ ! -f "$OPK_DOCTOR_SCAN_ROOTS" ] || [ ! -r "$OPK_DOCTOR_SCAN_ROOTS" ]; then
             # -f, not just -r: a directory would pass -r and die later in
-            # the grep (#360 a F7)
+            # the roots read (#360 a F7)
             ui_error "doctor: OPK_DOCTOR_SCAN_ROOTS is set but not a readable file: $OPK_DOCTOR_SCAN_ROOTS"
             exit 1
         else
-            # -a (round a A1): a line carrying a raw C1 byte makes GNU
-            # grep deem the whole list BINARY -- it then prints "binary
-            # file matches" and delivers NO lines, so the per-root gate
-            # below never sees the offending root. --text keeps the
-            # line stream intact; the gate refuses it sanitized.
-            grep -a -v '^[[:space:]]*$' "$OPK_DOCTOR_SCAN_ROOTS" >>"$WORK_ALL/roots" || true
+            # the precheck above covers the static case; the helper observes
+            # the read's own rc for the race window (#569 M5)
+            doctor_roots_append "$OPK_DOCTOR_SCAN_ROOTS" "$WORK_ALL/roots"
         fi
     else
         [ -d /var/www/vhosts ] && printf '%s\n' /var/www/vhosts >>"$WORK_ALL/roots"
         if [ -f "$PROJECTS_CONF" ]; then
             if [ -r "$PROJECTS_CONF" ]; then
-                grep -a -v '^[[:space:]]*$' "$PROJECTS_CONF" >>"$WORK_ALL/roots" || true
+                # #569 M5: read failures inside the race window warn here
+                # too (helper), not just the static -r precheck arm below
+                doctor_roots_append "$PROJECTS_CONF" "$WORK_ALL/roots"
             else
                 ui_kv_warn "scan root" "$PROJECTS_CONF unreadable -- its roots are not scanned"
             fi

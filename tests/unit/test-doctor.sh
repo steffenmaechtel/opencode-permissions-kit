@@ -784,6 +784,50 @@ rc_doctor_roots "all: unreadable seam -> rc 1" 1 "$ALLROOTS" all
 grep_last_out "seam error row" grep -qF "OPK_DOCTOR_SCAN_ROOTS is set but not a readable file"
 chmod 644 "$ALLROOTS"
 
+# --- #569 M5: a roots-list read failure warns, never silently shrinks -------
+# The -f/-r precheck above covers the static case; the precheck-to-read
+# race is pinned at the helper seam — grep rc 2 on a vanished path is
+# exactly what the raced read observes (deterministic, unlike the race).
+(
+    . "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/ui.sh"
+    . "$DOCTOR_CORE"
+    _m5src="$WORK/m5-roots"
+    _m5dst="$WORK/m5-dst"
+    : >"$_m5dst"
+    printf '/var/www/one\n\n  \n/var/www/two\n' >"$_m5src"
+    doctor_roots_append "$_m5src" "$_m5dst" &&
+        echo M5-APPEND-OK
+    [ "$(wc -l <"$_m5dst")" -eq 2 ] && echo M5-FILTERED-OK
+    printf '\n\n\n' >"$_m5src"
+    doctor_roots_append "$_m5src" "$_m5dst" >"$WORK/m5-blank.out" 2>&1 &&
+        echo M5-BLANK-OK
+    grep -qF "unreadable" "$WORK/m5-blank.out" || echo M5-BLANK-NOWARN-OK
+    doctor_roots_append "$WORK/m5-vanished" "$_m5dst" >"$WORK/m5-vanish.out" 2>&1
+    _m5rc=$?
+    [ "$_m5rc" -eq 0 ] && echo M5-RC0-OK
+    grep -qF "m5-vanished unreadable -- its roots are not scanned" "$WORK/m5-vanish.out" &&
+        echo M5-WARN-OK
+) >"$WORK/m5.out" 2>&1 || true
+_m5ok=0
+for _want in M5-APPEND-OK M5-FILTERED-OK M5-BLANK-OK M5-BLANK-NOWARN-OK M5-RC0-OK M5-WARN-OK; do
+    if grep -q "$_want" "$WORK/m5.out"; then
+        _m5ok=$((_m5ok + 1))
+    else
+        fail "roots helper: missing $_want ($(cat "$WORK/m5.out"))"
+    fi
+done
+[ "$_m5ok" -eq 6 ] && pass "doctor_roots_append: read failure warns, blank list stays silent (#569 M5)"
+
+# wiring: both roots-read arms route through the rc-observing helper; the
+# legacy silent shape ('>>"$WORK_ALL/roots" || true') is gone
+if live_src "$DOCTOR_CORE" | grep -qF 'doctor_roots_append "$OPK_DOCTOR_SCAN_ROOTS" "$WORK_ALL/roots"' &&
+    live_src "$DOCTOR_CORE" | grep -qF 'doctor_roots_append "$PROJECTS_CONF" "$WORK_ALL/roots"' &&
+    ! live_src "$DOCTOR_CORE" | grep -qF '>>"$WORK_ALL/roots" || true'; then
+    pass "doctor_all: both roots-read arms route through the helper (#569 M5)"
+else
+    fail "doctor_all: roots-read arms (#569 M5)"
+fi
+
 # missing scan root in the seam: warn + skip; nothing was scanned, so
 # the summary names THAT state (#360 a F10 -- not a markers message)
 ALLGONE="$WORK/all-gone.txt"
