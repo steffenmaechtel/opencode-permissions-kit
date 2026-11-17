@@ -607,10 +607,15 @@ do_plan_phase() {
     # WSL2 /mnt/c exposure preview (hardening snippet comes later in step 4).
     if [ -d /mnt/c ]; then
         _pm=$(stat -c %a /mnt/c 2>/dev/null || echo "")
-        if [ -n "$_pm" ] && [ $((0$_pm & 0004)) -ne 0 ]; then
+        if [ -z "$_pm" ]; then
+            # (#590 a Q1, the 0.0.48b W3 class): a failed stat used to fall
+            # into the counted ui_have "restricted (mode ?)" — a false green
+            # in the install preview; uncounted unknown now.
+            ui_kv "/mnt/c" "unknown — cannot stat the mount"
+        elif [ $((0$_pm & 0004)) -ne 0 ]; then
             ui_atten "/mnt/c" "world-readable (mode $_pm) — hardening snippet shown in step 4"
         else
-            ui_have "/mnt/c" "restricted (mode ${_pm:-?})"
+            ui_have "/mnt/c" "restricted (mode $_pm)"
         fi
     fi
 
@@ -1039,8 +1044,12 @@ do_ddev_phase() {
     # explicit call and takes effect only after 'wsl --shutdown' from Windows.
     if [ -d /mnt/c ]; then
         mnt_mode=$(stat -c %a /mnt/c 2>/dev/null || echo "")
-        if [ -z "$mnt_mode" ] || [ $((0$mnt_mode & 0004)) -eq 0 ]; then
-            echo "  /mnt/c already restricted (mode ${mnt_mode:-?}) — Windows profile not exposed."
+        if [ -z "$mnt_mode" ]; then
+            # (#590 a Q1): a failed stat used to print "already restricted
+            # (mode ?)" — a false security statement in the hardening step.
+            echo "  /mnt/c mode unknown (stat failed) — cannot verify the restriction."
+        elif [ $((0$mnt_mode & 0004)) -eq 0 ]; then
+            echo "  /mnt/c already restricted (mode $mnt_mode) — Windows profile not exposed."
         elif grep -q '^\[automount\]' /etc/wsl.conf 2>/dev/null; then
             ui_warn "NOTE: /etc/wsl.conf already has an [automount] section — left untouched."
             echo "  /mnt/c is world-readable (mode $mnt_mode); every WSL user incl. the agent"

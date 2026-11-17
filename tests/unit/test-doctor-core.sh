@@ -69,14 +69,14 @@ doctor_daemon_user doctor_ranges doctor_header doctor_policy
 doctor_detect doctor_scan_trees doctor_fix doctor_summary
 _doctor_usage _doctor_all_cleanup _doctor_cleanup doctor_cntrl_bad
 doctor_show_sanitize doctor_userns_ranges doctor_load_policy
-doctor_classify doctor_examples _doctor_detect_path_ok"
+doctor_classify doctor_examples _doctor_detect_path_ok doctor_roots_append"
 _missing=""
 for _fn in $_defs; do
     sh -c '. "$1" && command -v "$2" >/dev/null' _ "$LIB" "$_fn" 2>/dev/null ||
         _missing="$_missing $_fn"
 done
 if [ -z "$_missing" ]; then
-    pass "all 22 section/helper functions defined by sourcing"
+    pass "all 23 section/helper functions defined by sourcing"
 else
     fail "functions missing after sourcing:$_missing"
 fi

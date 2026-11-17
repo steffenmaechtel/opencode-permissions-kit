@@ -217,7 +217,8 @@ status_pairing_guard() {
         _st_ddev_basic _st_ddev_db_dumps _st_ddev_mkcert_ca \
         _st_ddev_router_ports _st_ddev_scan _st_ddev_share_scan \
         _st_ddev_version _st_ddev_win_hosts _st_progress_tee \
-        _st_root_blocker status_groups_hits status_sock_agent_reachable; do
+        _st_root_blocker status_groups_hits status_sock_agent_reachable \
+        status_sudo_verdict status_win_interop_verdict; do
         command -v "$_spg" >/dev/null 2>&1 || {
             echo "error: function '$_spg' missing from status-core.sh — version-skewed entry/lib""\
  pairing, refusing to run (fix: sudo opk update)" >&2

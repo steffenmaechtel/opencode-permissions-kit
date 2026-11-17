@@ -453,6 +453,145 @@ else
     fail "audit section body: foreign-group socket flagged or crashed (out=$(printf '%s' "$audit_out2" | head -3))"
 fi
 
+# --- 1c2. probe-failure verdicts (#569): unknown rows, never false greens --
+# M2/M3 render through pure helpers (plus the socket helper's new rc 2), so
+# the failure paths are pinnable without /mnt/c or root: every assert
+# executes the verdict the row renders on a dead/unreadable probe. The
+# sudo shapes mirror real sudo 1.9 behavior verified on the target host.
+(
+    . "$UI_LIB"
+    . "$STATUS_CORE"
+
+    _vexe="$WORK/cmd.exe"
+    : >"$_vexe"
+    chmod 755 "$_vexe"
+    [ "$(status_win_interop_verdict "$_vexe")" = exec ] && echo WIN-EXEC-OK
+    chmod 644 "$_vexe"
+    [ "$(status_win_interop_verdict "$_vexe")" = blocked ] && echo WIN-BLOCKED-OK
+    [ "$(status_win_interop_verdict "$WORK/absent.exe")" = unknown ] && echo WIN-UNKNOWN-OK
+
+    status_sock_agent_reachable "$WORK/absent.sock" "" 2>/dev/null || _vrc=$?
+    [ "${_vrc:-1}" -eq 2 ] && echo SOCK-STATFAIL-RC2-OK
+
+    [ "$(status_sudo_verdict 0 'User opencode is not allowed to run sudo on x.')" = none ] &&
+        echo SUDO-NONE-OK
+    [ "$(status_sudo_verdict 1 'User opencode is not allowed to run sudo on x.')" = none ] &&
+        echo SUDO-NONE-RC1-OK
+    _vrules=$(printf 'User opencode may run the following commands on x:\n    (ALL) NOPASSWD: /bin/true')
+    [ "$(status_sudo_verdict 0 "$_vrules")" = rules ] && echo SUDO-RULES-OK
+    [ "$(status_sudo_verdict 1 '')" = probe-failed ] && echo SUDO-SILENT-OK
+    _vtrouble=$(printf 'User opencode is not allowed to run sudo on x.\n/etc/sudoers.d/broken:1:9: syntax error')
+    [ "$(status_sudo_verdict 0 "$_vtrouble")" = sudoers-trouble ] && echo SUDO-TROUBLE-OK
+    _vnoise=$(printf 'sudo: unable to resolve host x: Name or service not known\nUser opencode is not allowed to run sudo on x.')
+    [ "$(status_sudo_verdict 0 "$_vnoise")" = none ] && echo SUDO-BENIGN-STDERR-OK
+    _vboth=$(printf '/etc/sudoers.d/broken:1:9: syntax error\nUser opencode may run the following commands on x:\n    (ALL) NOPASSWD: /bin/true')
+    [ "$(status_sudo_verdict 0 "$_vboth")" = rules ] && echo SUDO-RULES-PRECEDENCE-OK
+) >"$WORK/verdicts.out" 2>&1 || true
+_verdicts_ok=0
+for _want in WIN-EXEC-OK WIN-BLOCKED-OK WIN-UNKNOWN-OK SOCK-STATFAIL-RC2-OK \
+    SUDO-NONE-OK SUDO-NONE-RC1-OK SUDO-RULES-OK SUDO-SILENT-OK SUDO-TROUBLE-OK \
+    SUDO-BENIGN-STDERR-OK SUDO-RULES-PRECEDENCE-OK; do
+    if grep -q "$_want" "$WORK/verdicts.out"; then
+        _verdicts_ok=$((_verdicts_ok + 1))
+    else
+        fail "verdict helper: missing $_want ($(cat "$WORK/verdicts.out"))"
+    fi
+done
+[ "$_verdicts_ok" -eq 11 ] && pass "probe-failure verdict helpers: 11/11 (#569 M2/M3)"
+
+# --- 1c3. sudo-rules row through the real section body (#569 M3) -----------
+# The root guard keeps the row out of non-root unit runs — a PATH-stubbed
+# id/sudo pair drives the section itself through the four probe states.
+# The failure states must render the uncounted unknown row and must NOT
+# render the counted green "none for".
+_m3bin="$WORK/m3stub"
+mkdir -p "$_m3bin"
+cat >"$_m3bin/id" <<'STUBEOF'
+#!/bin/sh
+[ "$1" = "-u" ] && { echo 0; exit 0; }
+[ "$1" = "-nG" ] && { echo ""; exit 0; }
+exec /usr/bin/id "$@"
+STUBEOF
+cat >"$_m3bin/sudo" <<'STUBEOF'
+#!/bin/sh
+case "${OPK_SUDO_STUB:-}" in
+    fatal)
+        printf 'sudo: /etc/sudoers is owned by uid 1000, should be 0\n' >&2
+        exit 1
+        ;;
+    syntax)
+        printf '/etc/sudoers.d/broken:1:9: syntax error\n' >&2
+        printf 'User opencode is not allowed to run sudo on x.\n'
+        exit 0
+        ;;
+    clean)
+        printf 'User opencode is not allowed to run sudo on x.\n'
+        exit 0
+        ;;
+    rules)
+        printf 'User opencode may run the following commands on x:\n'
+        printf '    (ALL) NOPASSWD: /bin/true\n'
+        exit 0
+        ;;
+esac
+exit 0
+STUBEOF
+chmod +x "$_m3bin/id" "$_m3bin/sudo"
+# T1 (#590 a): the socket list MUST be a controlled non-empty override — a
+# set-but-empty ROOT_EQUIV_SOCKS falls through to the REAL default list
+# (the :- default) and the ambient /mnt/wsl find + /mnt/c gate keep scanning
+# the host; the asserts below stay ambient-host-independent on purpose
+# (the result-row leg the clean assert once carried is exactly the part
+# that was ambient — dropped, T4's narrow sra_finding gap recorded).
+_m3sock="$WORK/m3-absent.sock"
+m3_run() {
+    OPK_SUDO_STUB="$1" PATH="$_m3bin:$PATH" ROOT_EQUIV_SOCKS="$_m3sock" sh -c '
+        set +e
+        . "$1"
+        . "$2"
+        OPENCODE_USER=opencode
+        status_section_root_equiv
+    ' m3run "$UI_LIB" "$STATUS_CORE" 2>&1 || true
+}
+_m3out_fatal=$(m3_run fatal)
+if printf '%s' "$_m3out_fatal" | grep -qF 'unknown — sudo -l answered nothing (rc 1)' &&
+    ! printf '%s' "$_m3out_fatal" | grep -qF 'none for opencode'; then
+    pass "sudo row: silent probe renders unknown, never the green none (#569 M3)"
+else
+    fail "sudo row: silent probe (out=$(printf '%s' "$_m3out_fatal" | head -3))"
+fi
+_m3out_syn=$(m3_run syntax)
+if printf '%s' "$_m3out_syn" | grep -qF 'unknown — sudo reported a sudoers problem' &&
+    ! printf '%s' "$_m3out_syn" | grep -qF 'none for opencode'; then
+    pass "sudo row: sudoers.d syntax error renders unknown (#569 M3)"
+else
+    fail "sudo row: syntax-error probe (out=$(printf '%s' "$_m3out_syn" | head -3))"
+fi
+_m3out_clean=$(m3_run clean)
+if printf '%s' "$_m3out_clean" | grep -qF 'none for opencode' &&
+    ! printf '%s' "$_m3out_clean" | grep -qF 'unknown — sudo'; then
+    pass "sudo row: healthy no-rules answer stays the counted green none (#569 M3)"
+else
+    fail "sudo row: healthy probe (out=$(printf '%s' "$_m3out_clean" | head -3))"
+fi
+_m3out_rules=$(m3_run rules)
+if printf '%s' "$_m3out_rules" | grep -qF 'may run sudo' &&
+    ! printf '%s' "$_m3out_rules" | grep -qF 'no root-equivalent access found'; then
+    pass "sudo row: visible rules stay red and flip the result row (#569 M3)"
+else
+    fail "sudo row: rules probe (out=$(printf '%s' "$_m3out_rules" | head -3))"
+fi
+
+# wiring: the section routes the win-interop and socket probes through the
+# verdict helpers, and the stat-failure rows exist as uncounted unknowns
+if live_src "$STATUS_CORE" | grep -qF 'status_win_interop_verdict /mnt/c/Windows/System32/cmd.exe' &&
+    live_src "$STATUS_CORE" | grep -qF 'ui_kv "win interop" "unknown — cannot stat cmd.exe"' &&
+    live_src "$STATUS_CORE" | grep -qF 'ui_kv "socket" "$sra_s — unknown (cannot stat the socket)"'; then
+    pass "section wiring: stat-failed win-interop and socket rows render unknown (#569)"
+else
+    fail "section wiring: unknown rows for stat-failed probes (#569)"
+fi
+
 # --- 1d. live ddev version probe (issue #56) -------------------------------------
 # DDEV_VERSION in install.conf is an install-time stamp; status.sh must
 # report the LIVE binary version instead (the stale stamp showed 1.25.3
@@ -779,13 +918,18 @@ fi
 # the English pattern; the probe now pins LC_ALL=C and the pattern gains
 # a structural runas disjunct. Verbatim pins on both, behavioral replay
 # of the REAL extracted pattern against representative listings incl. a
-# TRANSLATED header.
-_sudo_grep="$(grep -F "LC_ALL=C sudo -n -l -U " "$STATUS_CORE" | head -1 | sed 's/^ *//')"
-_sra_pat="$(grep -F "_sra_pat=" "$STATUS_CORE" | head -1 | sed -e 's/^ *//' -e "s/^_sra_pat=//" -e "s/^'//" -e "s/'\$//")"
-if printf '%s\n' "$_sudo_grep" | grep -q 'grep -Eq'; then
-    pass "sudo-rules audit probes with LC_ALL=C (S3+W3, verbatim pin)"
+# TRANSLATED header. (#569 M3: the pattern lives in status_sudo_verdict
+# as ssv_pat now, and the probe CAPTURES its output instead of piping it
+# through grep — the pipe was the rc-masking bug.)
+_sudo_grep="$(live_src "$STATUS_CORE" | grep -F 'sudo -n -l -U "$OPENCODE_USER" 2>&1' | head -1 | sed 's/^ *//')"
+# (#590 b F2) the pattern leg rides live_src too — a comment carrying
+# `ssv_pat=` above the live assignment must not re-anchor the extraction
+_sra_pat="$(live_src "$STATUS_CORE" | grep -F "ssv_pat=" | head -1 | sed -e 's/^ *//' -e "s/^ssv_pat=//" -e "s/^'//" -e "s/'\$//")"
+if printf '%s\n' "$_sudo_grep" | grep -q 'LC_ALL=C' &&
+    ! printf '%s' "$_sudo_grep" | grep -q 'grep'; then
+    pass "sudo-rules audit probes with LC_ALL=C, capture not pipe (#569 M3, W3 verbatim pin)"
 else
-    fail "sudo-rules audit must pin the listing locale with LC_ALL=C (W3)"
+    fail "sudo-rules audit must pin LC_ALL=C and capture its rc (#569 M3/W3)"
 fi
 if printf '%s\n' "$_sra_pat" | grep -qF 'may run the following commands' &&
     printf '%s\n' "$_sra_pat" | grep -qF '\([^)]+\)'; then
@@ -829,6 +973,10 @@ if [ -n "$_sra_pat" ]; then
     else
         pass "the translated not-allowed wording stays green (W3)"
     fi
+else
+    # (#590 b F2): an empty extraction must fail loudly — the replay block
+    # skipping silently would leave the W3/S3 replays vacuously green.
+    fail "ssv_pat extraction empty — the S3/W3 replay block was skipped"
 fi
 
 # OpenChamber state line (issue #154, Tier 3): the verdicts — secured via
