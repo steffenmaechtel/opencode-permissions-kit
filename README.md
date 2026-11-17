@@ -54,7 +54,8 @@ sudo env KIT_BRANCH=stable bash /tmp/opk-install.sh
 
 The checksum describes the `stable` bytes the URL serves and moves with
 every release that touches `install.sh` — right after such a release the
-check can fail for a moment until the mirror has caught up; re-run it
+check can fail until the Pages site has redeployed (usually minutes; if
+it keeps failing, retry later)
 ([integrity details](docs/concepts/security-model.md#download-integrity-sha256sums)).
 
 The `stable` ref is the release mirror (recommended); `master` is the

@@ -324,7 +324,7 @@ git -C "$WORK/r" commit -qm "tamper files/ without regenerating the manifest"
 git -C "$WORK/r" push -q origin master
 expect_rc 1 "stale SHA256SUMS blocks the release" \
     sh "$WORK/r/scripts/release.sh" 1.2.3 --skip-tests --dry-run
-if printf '%s' "$LAST_OUT" | grep -q 'stale'; then
+if printf '%s' "$LAST_OUT" | grep -q 'SHA256SUMS is stale'; then
     pass "stale-manifest refusal points at make sums"
 else
     fail "stale-manifest refusal points at make sums (out=$LAST_OUT)"
