@@ -8,11 +8,11 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**169 metas · 166 active · 3 retired · 10 review-pending · next due 2026-11-17**
+**174 metas · 171 active · 3 retired · 15 review-pending · next due 2026-11-17**
 
 ## Actionable
 
-- **Review pending:** RM-0161, RM-0162, RM-0163, RM-0164, RM-0165, RM-0166, RM-0167, RM-0168, RM-0169
+- **Review pending:** RM-0161, RM-0162, RM-0163, RM-0164, RM-0165, RM-0166, RM-0167, RM-0168, RM-0169, RM-0170, RM-0171, RM-0172, RM-0173, RM-0174
 - **Amended — pending:** RM-0156 (2026-11-17)
 
 ## AGENTS.md
@@ -102,6 +102,7 @@
 | [RM-0044](0/0/4/RM-0044.md) | rm suffix guard — any rm invocation | active | approved | 1m | 2026-11-17 |
 | [RM-0137](0/1/3/RM-0137.md) | Scratch receivers in harness-sourcing suites… | active | approved | 1m | 2026-12-06 |
 | [RM-0151](0/1/5/RM-0151.md) | The decision rule for writing NEW | active | approved | 1m | 2026-12-15 |
+| [RM-0173](0/1/7/RM-0173.md) | A harness env override | active | **pending** | 1m | 2026-12-17 |
 
 ### Referencing review findings
 
@@ -121,6 +122,13 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0157](0/1/5/RM-0157.md) | enumerates them as history | active | approved | 1m | 2026-12-16 |
+
+### Docs code blocks (paste-safe commands)
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0171](0/1/7/RM-0171.md) | A docs code block whose | active | **pending** | 1m | 2026-12-17 |
+| [RM-0174](0/1/7/RM-0174.md) | A load-bearing line shape | active | **pending** | 1m | 2026-12-17 |
 
 ### Rule-file markdown structure
 
@@ -224,6 +232,7 @@
 | [RM-0154](0/1/5/RM-0154.md) | The CI status fields assert | active | approved | 1m | 2026-12-15 |
 | [RM-0158](0/1/5/RM-0158.md) | names its observation scope | active | approved | 1m | 2026-12-16 |
 | [RM-0166](0/1/6/RM-0166.md) | The closing summary's marker carries | active | **pending** | 1m | 2026-12-17 |
+| [RM-0170](0/1/7/RM-0170.md) | Mechanical fields derive from the | active | **pending** | 1m | 2026-12-17 |
 
 ### Fixes close classes, not sites
 
@@ -292,6 +301,7 @@
 | [RM-0108](0/1/0/RM-0108.md) | Fan-out is staged, never launched | active | approved | 1m | 2026-11-22 |
 | [RM-0111](0/1/1/RM-0111.md) | Sabotage spot-checks mutate the | active | approved | 1m | 2026-11-22 |
 | [RM-0114](0/1/1/RM-0114.md) | Agents stamp with their own | active | approved | 1m | 2026-11-22 |
+| [RM-0172](0/1/7/RM-0172.md) | A shipped code block is | active | **pending** | 1m | 2026-12-17 |
 
 ### Release gate
 
