@@ -121,12 +121,26 @@ ddev_devowned_flag() {
     elif grep -q '^type:' "$ddf_cfg"; then
         ddf_anchor='^type:'
     fi
-    # Rewrite via temp + `cat >` (same inode: owner and mode of the
-    # committed config.yaml survive, unlike an mv). The temp re-checks
-    # [ -L ] at exec time (fs-baseline deeec30 pattern): the .ddev dir is
-    # agent-writable, a swapped temp name would disclose root-readable
-    # content into the agent-owned config, a swapped cfg would be written
-    # through (0.0.39g S2).
+    # Atomic rewrite via sibling temp + mv (#568 a D6): the old
+    # temp + `cat >` truncate-write could lose the TAIL of the
+    # committed config.yaml on a mid-write failure (ENOSPC), and the
+    # retry's grep gate above would then accept — or re-flag — the
+    # TRUNCATED file, baking the loss in; an interrupt between the
+    # mktemp and the cleanup stranded a root-owned config.yaml.opk.*
+    # temp in the agent-writable .ddev. mv replaces the directory
+    # entry — a partial temp never becomes the config. Owner and mode
+    # ride along EXPLICITLY now (the old same-inode argument no longer
+    # holds): the temp is dressed to the ORIGINAL's captured
+    # owner:group:mode BEFORE the mv, so the entry never appears with
+    # the 0600 mktemp default; as the opencode uid a dev-owned
+    # original legitimately flips to opencode ownership (group write
+    # stays, the content is committed team content) — disclosed by the
+    # post-mv compare, never silent. The temp registers with _tmp_track
+    # (interrupt cleanup) and re-checks [ -L ] at exec time
+    # (fs-baseline deeec30 pattern): the .ddev dir is agent-writable, a
+    # swapped temp name would disclose root-readable content into the
+    # agent-owned config, a swapped cfg would be written through
+    # (0.0.39g S2).
     # 0.0.46a F1: the opencode-uid caller (ddev-as-opencode
     # --opk-devowned-flag, issue #149) can actually fail these writes —
     # a clone whose .ddev arrived 0755/0644 dev-owned is outside the
@@ -138,6 +152,7 @@ ddev_devowned_flag() {
  dev-owned flag NOT written" >&2
         return 0
     }
+    command -v _tmp_track >/dev/null 2>&1 && _tmp_track "$ddf_tmp"
     if awk -v opk_anchor="$ddf_anchor" '
         BEGIN {
             c1 = "# opencode permissions kit: dev-owned mode — ddev must not"
@@ -170,36 +185,72 @@ ddev_devowned_flag() {
             }
         }
     ' "$ddf_cfg" >"$ddf_tmp"; then
-        if [ ! -L "$ddf_tmp" ] && [ ! -L "$ddf_cfg" ]; then
-            if cat "$ddf_tmp" >"$ddf_cfg" 2>/dev/null; then
-                if [ ! -L "$ddf_cfg" ]; then
-                    chmod g+w "$ddf_cfg" 2>/dev/null || true
-                fi
-                echo "  dev-owned flag written: $ddf_cfg (disable_settings_management: true — commit it)"
-            else
-                # 0.0.46a F1 / 0.0.46b W2: the write itself failed (not
-                # opencode-writable config.yaml, or a full disk) — the
-                # old code printed the success note anyway. Never claim
-                # "NOT written": a failed cat may have written PART of
-                # the temp (config.yaml can end up truncated). And the
-                # retry must be the explicit paths — the stamp-skipped
-                # plain `opk update` never comes back for this root
-                # (issue #112). The handover retry carries the root's
-                # path verbatim (0.0.46c C1): bare, it dies on usage,
-                # and the fresh clone is typically unregistered —
-                # there the path-ful form is the only retry that
-                # reaches the project.
-                printf '%s\n' "  WARNING: dev-owned flag write to $ddf_cfg failed""\
- (config.yaml may be truncated; retry: sudo opk config handover \"${1:-}\" or""\
+        # Dress the temp FIRST (#568 a D6): capture the original's
+        # owner:group:mode and apply it to the temp (mode plus
+        # group-write, the old post-write chmod g+w; then ownership).
+        # A failed stat (file raced away) refuses the write — an
+        # undressed 0600 mktemp temp must never become the committed
+        # config; a FAILED chmod refuses the swap the same way (a 0600
+        # config.yaml would lock ddev out of the project). A failed
+        # chown is best-effort: legal as the opencode uid on a
+        # dev-owned original — the post-mv compare discloses the flip.
+        ddf_stat=$(stat -c '%u:%g:%a' "$ddf_cfg" 2>/dev/null) || {
+            printf '%s\n' "  WARNING: dev-owned flag write to $ddf_cfg failed""\
+ (cannot stat the committed config — original untouched; retry:""\
+ sudo opk config handover \"${1:-}\" or opk update --refresh)" >&2
+            rm -f "$ddf_tmp"
+            return 0
+        }
+        ddf_ug=${ddf_stat%:*}
+        ddf_mode=${ddf_stat##*:}
+        if chmod "$ddf_mode" "$ddf_tmp" && chmod g+w "$ddf_tmp"; then
+            chown "$ddf_ug" "$ddf_tmp" 2>/dev/null || true
+            # Exec-time [ -L ] rechecks directly before the mv
+            # (re-check the operand immediately before acting): the
+            # .ddev dir is agent-writable, a swapped temp would
+            # disclose, a swapped cfg would be replaced instead of
+            # written through.
+            if [ ! -L "$ddf_tmp" ] && [ ! -L "$ddf_cfg" ]; then
+                if mv -f "$ddf_tmp" "$ddf_cfg" 2>/dev/null; then
+                    if [ "$(stat -c '%u:%g' "$ddf_cfg" 2>/dev/null)" != "$ddf_ug" ]; then
+                        printf '%s\n' "  note: $ddf_cfg changed owner to the running user""\
+ (original owner unrestorable as this user — group write stays)" >&2
+                    fi
+                    echo "  dev-owned flag written: $ddf_cfg (disable_settings_management: true — commit it)"
+                else
+                    # mv failed — the ORIGINAL is untouched: the temp
+                    # holds the new content and is removed below. And
+                    # the retry must be the explicit paths — the
+                    # stamp-skipped plain `opk update` never comes back
+                    # for this root (issue #112). The handover retry
+                    # carries the root's path verbatim (0.0.46c C1):
+                    # bare, it dies on usage, and the fresh clone is
+                    # typically unregistered — there the path-ful form
+                    # is the only retry that reaches the project.
+                    printf '%s\n' "  WARNING: dev-owned flag write to $ddf_cfg failed""\
+ (original untouched; retry: sudo opk config handover \"${1:-}\" or""\
  opk update --refresh)" >&2
+                fi
+            else
+                # 0.0.39h F13: the exec-time recheck tripped (the config or its
+                # temp turned into a symlink mid-write) — announce the skip like
+                # the entry gate above does, instead of ending silently.
+                printf '%s\n' "  WARNING: $ddf_cfg (or its temp) changed to a symlink mid-write""\
+ — dev-owned flag NOT written (links are never followed)" >&2
             fi
         else
-            # 0.0.39h F13: the exec-time recheck tripped (the config or its
-            # temp turned into a symlink mid-write) — announce the skip like
-            # the entry gate above does, instead of ending silently.
-            printf '%s\n' "  WARNING: $ddf_cfg (or its temp) changed to a symlink mid-write""\
- — dev-owned flag NOT written (links are never followed)" >&2
+            printf '%s\n' "  WARNING: dev-owned flag write to $ddf_cfg failed""\
+ (cannot stage the mode — original untouched; retry:""\
+ sudo opk config handover \"${1:-}\" or opk update --refresh)" >&2
         fi
+    else
+        # awk died staging the new content (disk full?): the original
+        # is untouched — the atomic swap never ran, and the old
+        # truncate-write's partial-loss mode is gone with it (#568 a
+        # D6). Announce, never go silent (0.0.46a F1 discipline).
+        printf '%s\n' "  WARNING: dev-owned flag write to $ddf_cfg failed""\
+ (could not stage the new content — original untouched; retry:""\
+ sudo opk config handover \"${1:-}\" or opk update --refresh)" >&2
     fi
     rm -f "$ddf_tmp"
     return 0

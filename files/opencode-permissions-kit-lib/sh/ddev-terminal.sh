@@ -245,7 +245,12 @@ _opk_is_browser_cmd() {
 }
 
 ddev() {
-    if [ "$(id -u)" = "$(id -u opencode 2>/dev/null || echo 0)" ]; then
+    # No numeric fallback on the probe (#568 a D7): with the opencode
+    # user missing (half-uninstalled kit) `id -u opencode || echo 0`
+    # made a ROOT shell match the direct arm and run ddev as root (ddev
+    # refuses root itself) — the arm means "already running AS the
+    # opencode user", and a missing user never satisfies that.
+    if _opk_ocuid=$(id -u opencode 2>/dev/null) && [ "$_opk_ocuid" = "$(id -u)" ]; then
         command ddev "$@"
     else
         # Bootstrap hint BEFORE the run: on a fresh typo3 clone `ddev

@@ -2115,8 +2115,10 @@ do_deploy_phase() {
                 esac
                 # Move-mode source removal runs LAST, after copy AND
                 # baseline both succeeded (pr-00429 b D1) — a trip above
-                # keeps the dev's original as recovery material.
-                [ "$_opk_ag" = m ] && sudo rm -rf "$_opk_src"
+                # keeps the dev's original as recovery material. The
+                # `:?` guard (rm -rf census, #571): an empty _opk_src
+                # must abort loud, never degenerate the rm -rf operand.
+                [ "$_opk_ag" = m ] && sudo rm -rf "${_opk_src:?}"
                 if [ "$_opk_ag" = m ]; then
                     ui_success "agent resources MOVED: $_opk_src -> $_opk_dst (group $OPENCODE_GROUP: both sides read/write)"
                     log "agents migration: moved $_opk_src -> $_opk_dst"
