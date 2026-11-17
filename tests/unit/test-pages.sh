@@ -1,14 +1,19 @@
 #!/bin/sh
 # Unit tests for the GitHub Pages entry site (short one-liner URLs):
-#   1. the deploy workflow exists and pins the served scripts to the
+#   1. the deploy workflow exists and pins the served script to the
 #      `stable` channel (the public entry must never serve dev state),
-#      copies install.sh + update.sh, and wires the Jekyll build +
-#      Pages deployment;
+#      copies install.sh (update.sh is deliberately NOT served — issue
+#      #492: `opk update` is the regular update path, streamed updates
+#      address the raw refs, see docs/advanced/streamed-install-update.md),
+#      and wires the Jekyll build + Pages deployment;
 #   2. the landing assets exist (index.md with layout front matter,
-#      _config.yml pinning the Cayman theme) and carry the entry URLs;
-#   3. the user-facing docs use the entry URLs for the stable channel
-#      and keep the ref-addressed raw URLs for master/branch/tag pins
-#      (a channel-fixed entry cannot self-pin a ref).
+#      _config.yml pinning the Cayman theme) and carry the entry URL;
+#   3. the stable-channel docs (README, getting-started) use the entry
+#      URL, and the advanced streamed paths keep the ref-addressed raw
+#      recipes (a channel-fixed entry cannot self-pin a ref);
+#   4. issue #492's removal ask: the regular docs carry no curl
+#      one-liners, docs/advanced/ carries no baked-in checksums (they
+#      would go stale with every branch push — verify manually there).
 #
 # Run: sh tests/unit/test-pages.sh
 set -u
@@ -23,7 +28,6 @@ CONFIG="$REPO/.github/pages/_config.yml"
 
 ENTRY_INSTALL="https://steffenmaechtel.github.io/opencode-permissions-kit/install.sh"
 ENTRY_UPDATE="https://steffenmaechtel.github.io/opencode-permissions-kit/update.sh"
-RAW_BRANCH="https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/refs/heads/<branch>/"
 
 # --- 1. deploy workflow ---------------------------------------------------
 
@@ -43,9 +47,13 @@ grep -qF 'ref: stable' "$WF" &&
 grep -qF 'cp stable/files/install.sh site/' "$WF" &&
     pass "install.sh copied from the stable checkout" ||
     fail "install.sh copy from stable missing"
-grep -qF 'cp stable/files/opencode-permissions-kit-lib/management/update.sh site/' "$WF" &&
-    pass "update.sh copied from the stable checkout" ||
-    fail "update.sh copy from stable missing"
+# update.sh is deliberately no longer served (#492). Absence pin: the
+# grep matches the actual cp line, so a commented-out copy still fails.
+if grep -qF 'cp stable/files/opencode-permissions-kit-lib/management/update.sh site/' "$WF"; then
+    fail "pages.yml still serves update.sh (#492: opk update is the path)"
+else
+    pass "pages.yml no longer serves update.sh"
+fi
 
 grep -qF 'jekyll-build-pages' "$WF" &&
     pass "Jekyll build wired (theme landing page)" ||
@@ -87,19 +95,49 @@ grep -qF 'theme: jekyll-theme-cayman' "$CONFIG" &&
     pass "Cayman theme pinned" ||
     fail "Cayman theme not pinned in _config.yml"
 
-# --- 3. docs use the entry for stable, raw refs for pins ------------------
+# --- 3. stable-channel docs use the entry, advanced keeps raw recipes ---------
 
-for f in README.md docs/getting-started.md docs/reference/cli.md \
-    docs/how-to/secure-git-config.md docs/how-to/update.md; do
+for f in README.md docs/getting-started.md; do
     grep -q "$ENTRY_INSTALL\|$ENTRY_UPDATE" "$REPO/$f" &&
         pass "$f uses the Pages entry URL" ||
         fail "$f carries no Pages entry URL"
 done
 
-# The pin recipe must survive on the ref-addressed raw URLs.
-grep -qF "$RAW_BRANCH" "$REPO/docs/how-to/update.md" &&
-    pass "branch-pin recipe keeps the ref-addressed raw URL" ||
-    fail "branch-pin recipe lost its raw URL"
+# --- 4. advanced streamed paths + the #492 removal ask -----------------------
+
+ADV="$REPO/docs/advanced/streamed-install-update.md"
+
+[ -f "$ADV" ] && pass "docs/advanced/streamed-install-update.md exists" ||
+    fail "advanced streamed page missing"
+grep -qF 'refs/heads/<branch>/' "$ADV" &&
+    pass "advanced page keeps the ref-addressed raw recipes" ||
+    fail "advanced page lost its ref-addressed raw recipes"
+grep -q 'advanced/streamed-install-update' "$REPO/docs/README.md" &&
+    pass "docs index lists the advanced page" ||
+    fail "docs index misses the advanced page"
+
+# Removal ask (#492): the regular docs carry no curl one-liners — the
+# stable entry stays in README/getting-started, every other streaming
+# recipe lives under docs/advanced/.
+for f in docs/reference/cli.md docs/how-to/update.md \
+    docs/how-to/secure-git-config.md; do
+    if grep -q 'curl -fsSL' "$REPO/$f"; then
+        fail "$f still carries a curl one-liner (#492 removal ask)"
+    else
+        pass "$f carries no curl one-liner"
+    fi
+done
+
+# Checksum policy (#492): nothing under docs/advanced/ bakes in a
+# literal sha256 — no release-time regen ever touches advanced/, so a
+# hash there would go stale silently and fail honest verifications.
+# (grep rc 2 — advanced/ missing entirely — cannot reach the pass
+# branch silently: the existence pin above already failed the suite.)
+if grep -rEq '[a-f0-9]{64}' "$REPO/docs/advanced/" 2>/dev/null; then
+    fail "docs/advanced/ bakes in a literal sha256 (policy: verify manually)"
+else
+    pass "docs/advanced/ carries no baked-in sha256"
+fi
 
 echo ""
 if [ "$failures" -gt 0 ]; then

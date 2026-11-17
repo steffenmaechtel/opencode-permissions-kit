@@ -28,9 +28,10 @@ sudo opk update
 ```
 
 The command follows the channel your install tracks (`opk status`
-shows it). Advanced paths — streamed updates, channel switches, version
-pins — live in the
-[update guide](https://github.com/steffenmaechtel/opencode-permissions-kit/blob/master/docs/how-to/update.md).
+shows it). Channel switches live in the
+[update guide](https://github.com/steffenmaechtel/opencode-permissions-kit/blob/master/docs/how-to/update.md);
+streamed updates and version pins in
+[Streamed install and update (advanced)](https://github.com/steffenmaechtel/opencode-permissions-kit/blob/master/docs/advanced/streamed-install-update.md).
 
 ## Documentation
 

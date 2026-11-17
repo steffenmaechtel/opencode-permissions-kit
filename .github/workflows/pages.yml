@@ -3,13 +3,19 @@ name: pages
 # GitHub Pages entry site (short install URLs, issue context: line-length
 # baseline debt of the raw.githubusercontent one-liners):
 # steffenmaechtel.github.io/opencode-permissions-kit serves a landing page
-# plus copies of install.sh / update.sh, so the docs one-liners get a
-# 68/69-char URL instead of the 98/139-char raw URLs.
+# plus a copy of install.sh, so the docs one-liner gets a 68-char URL
+# instead of the 98-char raw URL.
 #
-# Channel discipline: the SCRIPT copies always come from the `stable`
-# release mirror — the public entry URLs must never serve dev state, no
+# Only install.sh is served (issue #492): `sudo opk update` is the regular
+# update path, and the streamed-update variants for any channel address
+# the raw refs directly (docs/advanced/streamed-install-update.md) — a
+# channel-fixed entry cannot self-pin a ref anyway. The update.sh copy
+# this workflow used to deploy was dropped with that move.
+#
+# Channel discipline: the SCRIPT copy always comes from the `stable`
+# release mirror — the public entry URL must never serve dev state, no
 # matter which ref triggered the run (a manual dispatch from master is
-# fine for the landing page, but the scripts stay pinned to stable).
+# fine for the landing page, but the script stays pinned to stable).
 # Landing page template: from the triggering ref (at release time
 # stable == master anyway).
 #
@@ -51,7 +57,6 @@ jobs:
           mkdir -p site
           cp .github/pages/index.md .github/pages/_config.yml site/
           cp stable/files/install.sh site/
-          cp stable/files/opencode-permissions-kit-lib/management/update.sh site/
       - uses: actions/configure-pages@v6
       - uses: actions/jekyll-build-pages@v1
         with:

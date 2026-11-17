@@ -44,6 +44,12 @@ kit fits your setup.
 
 - [Troubleshooting](troubleshooting.md) — symptom → cause → fix
 
+## Advanced (special paths)
+
+- [Streamed install and update](advanced/streamed-install-update.md) —
+  curl-streaming the entry scripts for non-stable channels and version
+  pins, with manual integrity verification
+
 ## Internal documentation
 
 Everything that is not user documentation lives outside this folder:
