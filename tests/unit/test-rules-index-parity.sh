@@ -2,11 +2,18 @@
 # test-rules-index-parity.sh -- generated rules INDEX <-> rule metas
 #
 #   1. regenerating internal/rules-meta/INDEX.md reproduces the file
-#      byte-for-byte — a hand edit drifts and fails
+#      byte-for-byte — a hand edit drifts and fails. Every
+#      regeneration is STAGED through the generator's --output
+#      (#572 T2): the suite never writes the real INDEX — a kill in
+#      the old regen→restore window used to leave an unregistered
+#      regenerated INDEX the next run reported as a hand edit. Leg 5
+#      pins the never-write property.
 #   2. every meta file has exactly one INDEX row and vice versa
 #   3. the output is date-invariant — FORCE_TODAY must not change
 #      one byte (#527: a date-honoring generator writes a variant
 #      the parity gate rejects on every audit run over due metas)
+#   4. the header points to the report-only overdue lane (#530)
+#   5. the real INDEX is byte-unchanged by the whole run (#572 T2)
 #
 # Run: sh tests/unit/test-rules-index-parity.sh
 
@@ -16,26 +23,31 @@ cd "$REPO_ROOT" || exit 1
 # Shared harness (issue #444 adoption, trap-only class): the FAIL-rows
 # gate stays suite-local -- adoption covers the scratch receivers, which
 # register with the work registry (issue #395); the local trap is gone.
-# The three suffixed siblings hang off the same TMP base (#443: the old
-# trap listed only TMP and TMP.gen, so one .files and one .rows file
-# leaked per run) -- registered here at their known creation points.
+# The suffixed siblings hang off the same TMP base (#443: the old
+# trap listed only TMP and TMP.gen, so per-run scratch leaked) --
+# registered here at their known creation points.
 . "$REPO_ROOT/tests/unit/lib/harness.sh"
 TMP="$(work_new_file)" || {
     echo "rules index parity: FAILED - scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
     exit 1
 }
-work_register "${TMP}.gen" "${TMP}.files" "${TMP}.rows" "${TMP}.in" "${TMP}.bare"
+work_register "${TMP}.gen" "${TMP}.files" "${TMP}.rows" "${TMP}.in" "${TMP}.bare" "${TMP}.ft" "${TMP}.now"
 
 INDEX=internal/rules-meta/INDEX.md
 
-# 1. regeneration is byte-identical (hand edits drift)
-cp "$INDEX" "$TMP.gen"
-python3 scripts/gen-rules-index.py >/dev/null 2>&1 || {
+# incoming copy + mtime marker: leg 5 compares against both -- the run
+# must leave the real INDEX byte-identical AND unwritten (#572 T2; the
+# mtime arm catches an in-place regeneration of identical bytes)
+cp "$INDEX" "$TMP.in"
+cp "$INDEX" "$TMP.now"
+
+# 1. regeneration is byte-identical (hand edits drift) -- staged via
+#    --output, the real file is never written
+python3 scripts/gen-rules-index.py --output "$TMP.gen" >/dev/null 2>&1 || {
     echo "FAIL generator exited non-zero" >>"$TMP"
 }
 if ! cmp -s "$INDEX" "$TMP.gen"; then
-    echo "FAIL INDEX.md is not what the generator produces (hand edit? regenerate)" >>"$TMP"
-    cp "$TMP.gen" "$INDEX" # restore the committed state
+    echo "FAIL INDEX.md is not what the generator produces (hand edit? regenerate: sh scripts/rules-audit.sh)" >>"$TMP"
 fi
 
 # 2. meta file <-> row parity (both directions)
@@ -49,26 +61,18 @@ for k in $(comm -13 "$TMP.files" "$TMP.rows"); do
 done
 
 # 3. date-invariance (#527): the INDEX is a pure function of the meta
-#    tree — a pinned date must not change one byte. The parity gate
-#    compares the bare run, while the audit's regen used to pass
-#    FORCE_TODAY: on an overdue tree every audit run then wrote the
-#    Overdue variant, and the next make test rejected the tree as a
-#    hand edit. The far-future date maximizes the arm — under a
+#    tree — a pinned date must not change one byte. Both runs staged
+#    (#572 T2). The far-future date maximizes the arm — under a
 #    date-honoring generator every active meta goes overdue at once.
-#    Purely observational: the incoming file state is restored
-#    unconditionally, red or green.
-cp "$INDEX" "$TMP.in"
-python3 scripts/gen-rules-index.py >/dev/null 2>&1 || {
+python3 scripts/gen-rules-index.py --output "$TMP.bare" >/dev/null 2>&1 || {
     echo "FAIL generator exited non-zero (bare run)" >>"$TMP"
 }
-cp "$INDEX" "$TMP.bare"
-FORCE_TODAY=2099-01-01 python3 scripts/gen-rules-index.py >/dev/null 2>&1 || {
+FORCE_TODAY=2099-01-01 python3 scripts/gen-rules-index.py --output "$TMP.ft" >/dev/null 2>&1 || {
     echo "FAIL generator exited non-zero with FORCE_TODAY set" >>"$TMP"
 }
-if ! cmp -s "$INDEX" "$TMP.bare"; then
+if ! cmp -s "$TMP.bare" "$TMP.ft"; then
     echo "FAIL INDEX.md output depends on FORCE_TODAY (date-variant, #527)" >>"$TMP"
 fi
-cp "$TMP.in" "$INDEX"
 
 # 4. the header points to the report-only overdue lane (#530): the
 #    lane moved out of the INDEX with the date-invariance redesign
@@ -85,6 +89,20 @@ grep -qF -- 'Overdue is report-only' "$INDEX" &&
     grep -qF -- '(inv 7)' "$INDEX" || {
     echo "FAIL INDEX header lost the report-only overdue pointer (#530)" >>"$TMP"
 }
+
+# 5. never-write pin (#572 T2): every regeneration above staged through
+#    --output — the real INDEX must be byte-identical to the incoming
+#    copy AND not newer than the run's start marker (a regressed
+#    in-place leg rewrites the file even when the bytes do not change —
+#    the exact kill-window residual T2 closes). Red restores the
+#    incoming bytes; the red stands.
+if ! cmp -s "$INDEX" "$TMP.in"; then
+    echo "FAIL INDEX.md changed during the run — a leg wrote the real file (stage via --output, #572 T2)" >>"$TMP"
+    cp "$TMP.in" "$INDEX"
+elif [ "$INDEX" -nt "$TMP.now" ]; then
+    echo "FAIL INDEX.md was written during the run (mtime moved; identical \
+bytes) — stage via --output, #572 T2" >>"$TMP"
+fi
 
 if [ -s "$TMP" ]; then
     echo "rules index parity: FAILED"

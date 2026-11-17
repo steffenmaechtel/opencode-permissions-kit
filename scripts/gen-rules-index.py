@@ -21,10 +21,11 @@ with its `id:`, a file outside its ID-derived shard bucket, or an
 unlistable bucket directory (#322) aborts generation — the INDEX is
 never built from a broken tree.
 
-Usage: python3 scripts/gen-rules-index.py   (from the repo root)
-Writes internal/rules-meta/INDEX.md. Hand edits are pointless — the
-parity test (tests/unit/test-rules-index-parity.sh) regenerates and
-compares.
+Usage: python3 scripts/gen-rules-index.py [--output PATH]   (repo root)
+Writes internal/rules-meta/INDEX.md; --output stages the same bytes to
+PATH instead (the parity test's idiom, #572 T2: a test run must never
+write the real INDEX). Hand edits are pointless — the parity test
+(tests/unit/test-rules-index-parity.sh) regenerates staged and compares.
 """
 import os
 import re
@@ -149,6 +150,15 @@ def iter_metas():
 
 
 def main():
+    args = sys.argv[1:]
+    out = os.path.join(RMROOT, 'INDEX.md')
+    if args and args[0] == '--output':
+        if len(args) != 2:
+            die('usage: gen-rules-index.py [--output PATH]')
+        out = args[1]
+        args = args[2:]
+    if args:
+        die('usage: gen-rules-index.py [--output PATH]')
     metas = []
     for path in sorted(iter_metas()):
         fm = parse_meta(path)
@@ -239,10 +249,9 @@ def main():
                     fm['id'], rel, desc(fm['quote']), fm['status'], review,
                     fm['revisit-interval'], fm['next-revisit']))
             lines.append('')
-    out = os.path.join(RMROOT, 'INDEX.md')
     with open(out, 'w', encoding='utf-8') as fh:
         fh.write('\n'.join(lines).rstrip() + '\n')
-    print('INDEX.md: %d metas' % len(metas))
+    print('%s: %d metas' % (os.path.basename(out), len(metas)))
 
 
 if __name__ == '__main__':

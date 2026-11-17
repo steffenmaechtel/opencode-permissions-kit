@@ -216,6 +216,17 @@ else
     # tools that cannot answer (missing, offline, rate-limited) only
     # warn. Both paths yield "<status>\t<conclusion>" lines for THIS
     # master commit only.
+    #
+    # RESIDUAL, deliberate (#572 B2, maintainer decision 2026-11-17 —
+    # documented, not hardened): the cannot-answer arm below is the ONE
+    # release precondition that passes by absence of an answer (every
+    # sibling arm fails closed: answered-but-empty, still-running and
+    # red runs all exit 1). Deliberate so releases stay cuttable from
+    # offline/unauthenticated hosts; the local full `make test` below
+    # still gates. Operator contract: the warning line is a MANUAL
+    # DUTY, not a formality — open Actions in the browser, confirm this
+    # master commit's runs are green, and only then continue. Recorded
+    # in internal/process/release-handling.md §9.
     _ci_answered=false
     _ci_tsv=""
     if command -v gh >/dev/null 2>&1; then
