@@ -8,7 +8,7 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**160 metas · 157 active · 3 retired · 0 review-pending · next due 2026-11-16**
+**160 metas · 157 active · 3 retired · 0 review-pending · next due 2026-11-17**
 
 ## Actionable
 
@@ -38,18 +38,18 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0002](0/0/0/RM-0002.md) | Default choice: n for anything that changes the… | active | approved | 6m | 2027-05-17 |
-| [RM-0004](0/0/0/RM-0004.md) | Format: <question> [Y/n] or <question> [y/N] | active | approved | 1m | 2026-11-16 |
-| [RM-0005](0/0/0/RM-0005.md) | Enter accepts the default (empty answer =… | active | approved | 1m | 2026-11-16 |
-| [RM-0006](0/0/0/RM-0006.md) | Accepted input: y, yes, n, no — case-insensitive | active | approved | 1m | 2026-11-16 |
-| [RM-0007](0/0/0/RM-0007.md) | Don't invent alternatives | active | approved | 1m | 2026-11-16 |
+| [RM-0004](0/0/0/RM-0004.md) | Format: <question> [Y/n] or <question> [y/N] | active | approved | 6m | 2027-05-17 |
+| [RM-0005](0/0/0/RM-0005.md) | Enter accepts the default (empty answer =… | active | approved | 6m | 2027-05-17 |
+| [RM-0006](0/0/0/RM-0006.md) | Accepted input: y, yes, n, no — case-insensitive | active | approved | 6m | 2027-05-17 |
+| [RM-0007](0/0/0/RM-0007.md) | Don't invent alternatives | active | approved | 6m | 2027-05-17 |
 | [RM-0036](0/0/3/RM-0036.md) | Free-text questions (ui_ask) show [default] | active | approved | 1m | 2026-11-17 |
 
 ### Script output style
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0008](0/0/0/RM-0008.md) | Rows printed inside a pipeline | active | approved | 1m | 2026-11-16 |
-| [RM-0009](0/0/0/RM-0009.md) | UI_SILENT=1 mutes every non-interactive print… | active | approved | 1m | 2026-11-16 |
+| [RM-0008](0/0/0/RM-0008.md) | Rows printed inside a pipeline | active | approved | 6m | 2027-05-17 |
+| [RM-0009](0/0/0/RM-0009.md) | UI_SILENT=1 mutes every non-interactive print… | active | approved | 6m | 2027-05-17 |
 | [RM-0037](0/0/3/RM-0037.md) | Severity rows are semantic, not | active | approved | 1m | 2026-11-17 |
 | [RM-0038](0/0/3/RM-0038.md) | Report commands carry their verdict in | active | approved | 1m | 2026-11-17 |
 | [RM-0039](0/0/3/RM-0039.md) | File lists in code (fetch/deploy | active | approved | 1m | 2026-11-17 |
@@ -58,10 +58,10 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0010](0/0/1/RM-0010.md) | Quoting. Every expansion of external data is… | active | approved | 1m | 2026-11-16 |
-| [RM-0011](0/0/1/RM-0011.md) | printf '%s' style | active | approved | 1m | 2026-11-16 |
-| [RM-0012](0/0/1/RM-0012.md) | Free text flows through files, not argv | active | approved | 1m | 2026-11-16 |
-| [RM-0013](0/0/1/RM-0013.md) | Allowlist before argv/query | active | approved | 1m | 2026-11-16 |
+| [RM-0010](0/0/1/RM-0010.md) | Quoting. Every expansion of external data is… | active | approved | 6m | 2027-05-17 |
+| [RM-0011](0/0/1/RM-0011.md) | printf '%s' style | active | approved | 6m | 2027-05-17 |
+| [RM-0012](0/0/1/RM-0012.md) | Free text flows through files, not argv | active | approved | 6m | 2027-05-17 |
+| [RM-0013](0/0/1/RM-0013.md) | Allowlist before argv/query | active | approved | 6m | 2027-05-17 |
 | [RM-0040](0/0/4/RM-0040.md) | Fail loud vs. fail open. Maintainer | active | approved | 1m | 2026-11-17 |
 | [RM-0041](0/0/4/RM-0041.md) | Prove it in tests. Payload attempts | active | approved | 1m | 2026-11-17 |
 
@@ -86,10 +86,10 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0003](0/0/0/RM-0003.md) | An rm — any flag form, on a variable with a… | active | approved | 6m | 2027-05-17 |
-| [RM-0014](0/0/1/RM-0014.md) | Operate only on the suite's scratch | active | approved | 1m | 2026-11-16 |
-| [RM-0015](0/0/1/RM-0015.md) | Never touch real project or system trees | active | approved | 1m | 2026-11-16 |
-| [RM-0016](0/0/1/RM-0016.md) | Fixture data is written sandboxed at the source | active | approved | 1m | 2026-11-16 |
-| [RM-0017](0/0/1/RM-0017.md) | Code extracted from shipped scripts and eval'd… | active | approved | 1m | 2026-11-16 |
+| [RM-0014](0/0/1/RM-0014.md) | Operate only on the suite's scratch | active | approved | 6m | 2027-05-17 |
+| [RM-0015](0/0/1/RM-0015.md) | Never touch real project or system trees | active | approved | 6m | 2027-05-17 |
+| [RM-0016](0/0/1/RM-0016.md) | Fixture data is written sandboxed at the source | active | approved | 6m | 2027-05-17 |
+| [RM-0017](0/0/1/RM-0017.md) | Code extracted from shipped scripts and eval'd… | active | approved | 6m | 2027-05-17 |
 | [RM-0042](0/0/4/RM-0042.md) | Mutation check — a mutating verb | active | approved | 1m | 2026-11-17 |
 | [RM-0043](0/0/4/RM-0043.md) | Real-tree ratchet — any path-shaped | active | approved | 1m | 2026-11-17 |
 | [RM-0044](0/0/4/RM-0044.md) | rm suffix guard — any rm invocation | active | approved | 1m | 2026-11-17 |
@@ -101,7 +101,7 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0018](0/0/1/RM-0018.md) | Live cases (PR-native process, since | active | approved | 1m | 2026-11-28 |
-| [RM-0019](0/0/1/RM-0019.md) | Legacy corpus (stems 0.0.38–0.0.49) | active | approved | 1m | 2026-11-16 |
+| [RM-0019](0/0/1/RM-0019.md) | Legacy corpus (stems 0.0.38–0.0.49) | active | approved | 6m | 2027-05-17 |
 
 ### Referencing house rules (RM keys)
 
