@@ -439,13 +439,14 @@ gh release create 0.0.61 --generate-notes
 opk handover opencode /var/www/vhosts/opencode-permissions-kit/repo/tests/e2e/dumps
 ```
 
-The two `opk handover` lines bracket the release-day verification:
-`make release` itself runs only the unit lane (`make test`), but the
-maintainer drives the e2e suites around it — the release gate
-(AGENTS.md Testing) — and their harness writes into
-`tests/e2e/dumps`; the dumps tree belongs to the maintainer for that
-window and returns to the agent user afterwards (ownership follows
-the writer, docs/reference/cli.md).
+The two `opk handover` lines bracket the release-day runs, for both
+directions of the permission problem: `make release` runs the unit
+lane (`make test`), whose tree-wide scans traverse `tests/e2e/dumps`
+(the rules-meta citation scan dies on container-owned dump files
+otherwise, #587), and the maintainer-driven e2e runs around the
+release are what write there. The dumps tree belongs to the
+maintainer for that window and returns to the agent user afterwards
+(ownership follows the writer, docs/reference/cli.md).
 
 `make release VERSION=0.0.61 ARGS=--dry-run` prints the steps without
 changing anything.
