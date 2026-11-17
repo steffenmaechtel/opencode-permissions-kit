@@ -174,7 +174,7 @@ mechanical edit on that commission and carries the gate. Two forms:
 
 inv 9 pins only the `- DATE approved by maintainer` prefix; the
 parenthetical is free text by design — the two forms above are the
-corpus forms (worked precedent: 52abc696, the seven #565-amended
+dominant corpus forms (worked precedent: 52abc696, the seven #565-amended
 metas re-approved 2026-11-17; triage #610).
 
 Bulk waves run like any wave: regenerate `INDEX.md` via
