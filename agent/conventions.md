@@ -188,11 +188,14 @@ are the distilled incidents:
   M1 guard shape, pr-00568 wave a). (RM-0163)
 - Comment text inside a single-quoted `sh -c` worker string (xargs
   workers) stays apostrophe-free — an apostrophe terminates the
-  string and the remainder becomes garbage; `sh -n` on the outer file
-  is blind to it because the string is parsed only at runtime. Verify
-  edits that touch a worker string by SOURCING the file — the
-  pr-00568 wave broke ddev-handover.sh twice on `abort's` and only
-  the sourcing helper's rc 2 surfaced it. (RM-0164)
+  string and the remainder becomes garbage. Neither `sh -n` nor a
+  clean run is the discriminator: an UNBALANCED apostrophe fails
+  `sh -n` outright, but a balanced pair mangles the worker into a
+  silent no-op that `sh -n` AND a clean execution both pass (probe,
+  pr-00586 round a A2). The check is the grep — worker-string
+  comments carry no apostrophe at all (the pr-00568 wave broke
+  ddev-handover.sh twice on `abort's` before that rule existed).
+  (RM-0164)
 
 ## Lib pairing and cross-lib guards (entries that source libs)
 
