@@ -99,8 +99,8 @@ grep -qF 'theme: jekyll-theme-cayman' "$CONFIG" &&
 
 # Entry-install URL only (#492 a A1): update.sh is no longer served, so
 # the dead update URL must NOT satisfy this pin — a regular doc citing
-# it is drift, not an entry use. The landing-page omission pin below
-# still asserts index.md never shows it.
+# it is drift, not an entry use. The landing-page omission pin above
+# (section 2) still asserts index.md never shows it.
 for f in README.md docs/getting-started.md; do
     grep -qF "$ENTRY_INSTALL" "$REPO/$f" &&
         pass "$f uses the Pages entry URL" ||
