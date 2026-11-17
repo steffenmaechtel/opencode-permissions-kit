@@ -68,8 +68,6 @@
     e2e-ddev \
     e2e-ddev-fresh \
     e2e-all \
-    install-dev \
-    clean \
     version \
     check-version \
     release
@@ -234,8 +232,6 @@ help:
 	@echo "  make e2e-ddev ARGS='--fresh'     Force a golden-image rebuild (new ddev version, recipe bump)"
 	@echo "  make e2e-ddev-fresh Same as e2e-ddev ARGS=--fresh"
 	@echo "  make e2e-all        Run both e2e suites"
-	@echo "  make install-dev   Quick dev install (skip prompts)"
-	@echo "  make clean         Uninstall"
 	@echo "  make version VERSION=x.y.z   Set display version stamp (VERSION file only)"
 	@echo "  make check-version Validate VERSION + consistent KIT_BRANCH in install.sh/update.sh"
 	@echo "  make release VERSION=x.y.z  Cut a release: tag + fast-forward the stable mirror (maintainer)"
@@ -547,12 +543,6 @@ e2e-ddev-fresh:
 	@sh ./tests/e2e/run-ddev.sh --fresh
 
 e2e-all: e2e e2e-rootless
-
-install-dev:
-	@sudo ./files/install.sh --yes $(if $(PROJECTS),--projects $(PROJECTS))
-
-clean:
-	@./files/opencode-permissions-kit-lib/management/uninstall.sh --yes
 
 version:
 	@[ -n "$(VERSION)" ] || { echo "Usage: make version VERSION=x.y.z"; exit 1; }
