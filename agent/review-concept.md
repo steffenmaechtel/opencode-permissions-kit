@@ -338,7 +338,11 @@ root-running `scripts/` code.
   shape, because fix waves on the gate routinely touch `files/**`
   (pr-00568 wave a: 6 of 7 commits, config.sh through
   py/tui-register.py). Marker: `Track: shipped (release gate —
-  snapshot pass + fix waves touch files/)`. (RM-0169)
+  snapshot pass + fix waves touch files/)`. The declared line
+  governs: the round marker records `"track":"shipped"` and the
+  shipped findings policy applies from creation — the re-derivation
+  treats the release-gate commission as the sanctioned exception, not
+  a misclassification. (RM-0169)
 - The PR body's closing keyword is the issue-closure selector,
   stated at PR creation like the Track line: a wave that fully
   dispositions its case issue writes `Closes #<issue>`, an
