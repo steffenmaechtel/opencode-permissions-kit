@@ -231,19 +231,47 @@ ddev_devowned_flag() {
                     printf '%s\n' "  WARNING: $ddf_cfg changed to a directory mid-write""\
  — dev-owned flag NOT written (the swap is refused, nothing moved into it)" >&2
                 elif mv -f "$ddf_tmp" "$ddf_cfg" 2>/dev/null; then
-                    # Post-mv restore (#606 a M3): the owner needs root
-                    # (fails as the agent uid on a dev-owned original);
-                    # the GROUP is restorable to a member — the kit's
-                    # shared group keeps the developer's write in the
-                    # baseline shape. The compare discloses whatever
-                    # stayed changed.
-                    chown "$ddf_u:$ddf_g" "$ddf_cfg" 2>/dev/null || true
-                    chgrp "$ddf_g" "$ddf_cfg" 2>/dev/null || true
-                    if [ "$(stat -c '%u:%g' "$ddf_cfg" 2>/dev/null)" != "$ddf_u:$ddf_g" ]; then
-                        printf '%s\n' "  note: $ddf_cfg ownership changed to the running user""\
- (original owner/group unrestorable as this user)" >&2
+                    # Recheck C — directly before the restore acts (#606 b
+                    # B1): chown/chgrp dereference a name swapped for a
+                    # symlink after the mv; never act through it. The
+                    # write itself landed (mv replaced the entry) — a
+                    # tripped swap warns instead of the success note.
+                    if [ -L "$ddf_cfg" ]; then
+                        printf '%s\n' "  WARNING: $ddf_cfg changed to a symlink after the write""\
+ — owner/group restore skipped (links are never followed)" >&2
+                    else
+                        # Post-mv restore (#606 a M3): the owner needs root
+                        # (fails as the agent uid on a dev-owned original);
+                        # the GROUP is restorable to a member — the kit's
+                        # shared group keeps the developer's write in the
+                        # baseline shape. The compare names exactly what
+                        # stayed changed (#606 b B2): a succeeded chgrp
+                        # after a failed chown must not read as a lost
+                        # group.
+                        chown "$ddf_u:$ddf_g" "$ddf_cfg" 2>/dev/null || true
+                        chgrp "$ddf_g" "$ddf_cfg" 2>/dev/null || true
+                        ddf_now=$(stat -c '%u:%g' "$ddf_cfg" 2>/dev/null || printf '?')
+                        ddf_nu=${ddf_now%%:*}
+                        ddf_ng=${ddf_now#*:}
+                        ddf_ng=${ddf_ng%%:*}
+                        ddf_note=''
+                        ddf_kept=''
+                        [ "$ddf_nu" != "$ddf_u" ] && ddf_note='owner'
+                        if [ "$ddf_ng" != "$ddf_g" ]; then
+                            if [ -n "$ddf_note" ]; then
+                                ddf_note='owner and group'
+                            else
+                                ddf_note='group'
+                            fi
+                        elif [ -n "$ddf_note" ]; then
+                            ddf_kept=' — group kept'
+                        fi
+                        if [ -n "$ddf_note" ]; then
+                            printf '%s\n' "  note: $ddf_cfg ownership changed to the running user""\
+ (original $ddf_note unrestorable as this user$ddf_kept)" >&2
+                        fi
+                        echo "  dev-owned flag written: $ddf_cfg (disable_settings_management: true — commit it)"
                     fi
-                    echo "  dev-owned flag written: $ddf_cfg (disable_settings_management: true — commit it)"
                 else
                     # mv failed — the ORIGINAL is untouched: the temp
                     # holds the new content and is removed below. And

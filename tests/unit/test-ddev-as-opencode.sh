@@ -1524,6 +1524,47 @@ check_live "hook context: ddev-as-opencode defines the temp tracker (#606 a S3/M
 check_live "hook context: the registry cleans on EXIT/INT/TERM (#606 a S3/M2)" \
     "$HELPER" -qF "trap '_opk_tmp_cleanup; exit 1' INT TERM"
 
+# --- 5f4. recheck C before the restore acts (#606 b B1) ----------------
+# Hermetic post-mv swap: the mv stub performs the real move, then
+# replaces the cfg name with a symlink to a victim; chown/chgrp are
+# recorder stubs — their log proves whether the restore acts ran at
+# all (the dress chown logs the temp operand, a restore act would log
+# the cfg operand). Without recheck C the acts dereference the swapped
+# name (probe: chgrp through a link follows); with it the swap warns,
+# nothing restores, no success note.
+mkdir -p "$DWORK/b1/.ddev" "$DWORK/b1stub"
+printf 'name: b1\ntype: typo3\n' >"$DWORK/b1/.ddev/config.yaml"
+printf 'B1VICTIM\n' >"$DWORK/b1/victim.conf"
+OPK_B1_VICTIM="$DWORK/b1/victim.conf"
+OPK_B1_LOG="$DWORK/b1/ops.log"
+export OPK_B1_VICTIM OPK_B1_LOG
+: >"$OPK_B1_LOG"
+printf '#!/bin/sh\n/bin/mv "$@"\n_rc=$?\n_last=""\nfor _a in "$@"; do _last=$_a; done\nrm -f "$_last"\nln -s "$OPK_B1_VICTIM" "$_last"\nexit $_rc\n' \
+    >"$DWORK/b1stub/mv"
+printf '#!/bin/sh\necho "chown $*" >>"$OPK_B1_LOG"\nexit 0\n' >"$DWORK/b1stub/chown"
+printf '#!/bin/sh\necho "chgrp $*" >>"$OPK_B1_LOG"\nexit 0\n' >"$DWORK/b1stub/chgrp"
+chmod 755 "$DWORK/b1stub/mv" "$DWORK/b1stub/chown" "$DWORK/b1stub/chgrp"
+B1OUT=$(PATH="$DWORK/b1stub:$PATH" sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\"" _ "$HANDOVER" "$DWORK/b1" 2>&1) || true
+check "recheck C: a post-mv symlink swap warns, no false success (#606 b B1)" \
+    sh -c "printf '%s\n' \"\$1\" | grep -q 'changed to a symlink after the write' && ! printf '%s\n' \"\$1\" | grep -q 'flag written'" _ "$B1OUT"
+check "recheck C: the restore acts never touch the swapped name (#606 b B1)" \
+    sh -c "! grep -q 'config.yaml\$' \"\$1\"" _ "$OPK_B1_LOG"
+unset OPK_B1_VICTIM OPK_B1_LOG
+
+# --- 5f5. the note names what actually changed (#606 b B2) --------------
+# The compare's stat is stubbed shape-selectively: the 3-field capture
+# stays real (runner:primary-group), the 2-field compare reports uid 0
+# with the runner's group — the chown-failed/chgrp-succeeded state
+# (owner changed, group kept) the static parenthetical used to misname.
+mkdir -p "$DWORK/b2/.ddev" "$DWORK/b2stub"
+printf 'name: b2\ntype: typo3\n' >"$DWORK/b2/.ddev/config.yaml"
+printf '#!/bin/sh\nif [ "$1" = "-c" ] && [ "$2" = "%%u:%%g" ]; then echo "0:$(id -g)"; exit 0; fi\nexec /usr/bin/stat "$@"\n' \
+    >"$DWORK/b2stub/stat"
+chmod 755 "$DWORK/b2stub/stat"
+B2OUT=$(PATH="$DWORK/b2stub:$PATH" sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\"" _ "$HANDOVER" "$DWORK/b2" 2>&1) || true
+check "note: owner-changed-with-group-kept is named precisely (#606 b B2)" \
+    sh -c "printf '%s\n' \"\$1\" | grep -qF 'original owner unrestorable as this user — group kept'" _ "$B2OUT"
+
 # --- 5g. the ddev() direct arm never matches a MISSING opencode user -------
 # (#568 a D7): the old `id -u opencode || echo 0` fallback made the
 # probe yield 0 when the user does not exist — a root shell (id -u = 0)
