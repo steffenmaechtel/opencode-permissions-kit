@@ -231,6 +231,14 @@ reads it (`sh scripts/rules-audit.sh`, or
 pin reds on a stale INDEX AND restores the stale bytes on red, so the
 red persists until the explicit regen runs (issue #549 §1: a fix wave
 paid one red gate for the order).
+An evidence probe rides the same chain discipline — a probe whose
+output feeds a verdict is a gate over that verdict: one unbroken `&&`
+chain, absolute paths, no `;` separator. A half-run probe's output is
+not evidence: pr-00586's A2 re-verification probe ran
+`cd <scratch> && … ; echo rc; …`, the cd failed before the dir
+existed, the `;` segments still ran — files landed in an unintended
+cwd, the printed rc was the failed cd's — and the output counted only
+after a deterministic re-run (#588 §1).
 While the maintainer co-edits the working
 tree (interactive iteration), stage explicitly by path — `git add -A`
 is for solo phases with a verified-clean tree (a `git add -A` chain
