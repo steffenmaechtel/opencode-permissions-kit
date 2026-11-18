@@ -342,7 +342,19 @@ fi
 sfx_scan() {
     _sx_dir="$1"
     _sx_list="$(mktemp)"
-    find "$_sx_dir" \( -name "${2:-test-*.sh}" -o -path '*/lib/*.sh' \) ! -name 'test-sandbox-policy.sh' |
+    # #596: prune basename dumps from the traversal — e2e run evidence
+    # (tests/e2e/dumps/<label>-<ts>/, the container's whole /tmp via
+    # docker cp) holds dumped .sh files of exactly the name class this
+    # walk collects. The walk has READ the dumps on rootless/local
+    # checkouts all along (opencode-owned, world-readable here) — what
+    # kept check 3 green was content: no dumped .sh carried an
+    # unguarded rm-suffix shape yet (#628 a M2), not the container
+    # ownership that shields rootful-CI hosts. The find filters below
+    # select what is PRINTED, not what is descended. Basename-scoped at
+    # any depth, mirroring pin10 lane c's --exclude-dir=dumps
+    # (#587, PR #593): living e2e scripts stay in the walk.
+    find "$_sx_dir" -name dumps -prune -o \
+        \( -name "${2:-test-*.sh}" -o -path '*/lib/*.sh' \) ! -name 'test-sandbox-policy.sh' -print |
         sort >"$_sx_list"
     set --
     while IFS= read -r _sx_f; do
@@ -405,6 +417,28 @@ if [ "$_sfx_rows" -eq 9 ] && grep -q 'PX/evil' "$VIOL" && grep -q 'PX/evil2' "$V
 else
     fail "self-probe: check 3 must catch the unguarded suffix variants only (rows=$_sfx_rows)"
     grep 'test-probe-sfx.sh' "$VIOL" || true
+fi
+
+# self-probe (#596): dumps run evidence is pruned from the tests/e2e
+# walk. A readable dumps/<label>-<ts>/ carrying a dumped .sh with the
+# offending shape must NOT land in the violation list, while a living
+# e2e script with the SAME shape still must — the pair discriminates
+# the prune from both directions (a scan death fails loud above).
+mkdir -p "$PROBE_DIR/e2e/dumps/run-20260101-000000"
+printf '#!/bin/sh\n# probe: living e2e script, unguarded suffix -- must be caught\nrm -f "$PX/live-evil"\n' \
+    >"$PROBE_DIR/e2e/section-probe.sh"
+printf '#!/bin/sh\n# probe: dumped copy, same shape -- must NOT be caught (#596)\nrm -f "$PX/dumped-evil"\n' \
+    >"$PROBE_DIR/e2e/dumps/run-20260101-000000/dumped.sh"
+: >"$VIOL"
+if ! sfx_scan "$PROBE_DIR/e2e" '*.sh' >"$VIOL"; then
+    fail "sfx_scan died on the e2e dumps probe scan -- check 3 self-probes unreliable (#519)"
+fi
+if grep -q 'section-probe.sh' "$VIOL" && grep -q 'PX/live-evil' "$VIOL" &&
+    ! grep -q 'dumps/run-20260101' "$VIOL"; then
+    pass "self-probe: dumps run evidence pruned from the walk, living e2e scripts kept (#596)"
+else
+    fail "self-probe: check 3 must scan living e2e scripts but prune dumps run evidence (#596)"
+    grep -E 'section-probe|dumps/run' "$VIOL" || true
 fi
 
 # --- 4. trap coverage floor: receivers must sit under an armed trap ------------

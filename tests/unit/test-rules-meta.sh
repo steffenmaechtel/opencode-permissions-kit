@@ -932,12 +932,16 @@ p10_lane_c_hits() { # $1 root, $2 scope; loud on scan death (#519:
     # read as a clean tree; rc 1 = no matches stays the normal clean
     # case, rc >= 2 is the loud path now)
     # Traversal-level dumps prune (#587): e2e run evidence under
-    # tests/e2e/dumps/ is container-created (container-UID-owned,
-    # mode 700 -- the live make test died rc 2 mid-traversal; a
-    # post-filter grep -v chain cannot prevent a traversal death),
-    # and dump copies of repo files quoting RM-NNNN would false-red
-    # as fourth-site citations. Same exemption rationale as the
-    # line-length ratchet's reviews-meta data/ carve-out.
+    # tests/e2e/dumps/ is container-created (on the rootful host that
+    # motivated #587 it landed container-UID-owned, mode 700 -- the
+    # live make test died rc 2 mid-traversal; a post-filter grep -v
+    # chain cannot prevent a traversal death. That ownership never
+    # applied universally: dumps are readable, opencode-owned on
+    # rootless/local checkouts -- #628 b M1 keeps the two claims from
+    # contradicting), and dump copies of repo files quoting RM-NNNN
+    # would false-red as fourth-site citations. Same exemption
+    # rationale as the line-length ratchet's reviews-meta data/
+    # carve-out.
     # Basename-scoped by --exclude-dir (matches at any depth):
     # tests/e2e/dumps is the only dumps dir in-tree (created by
     # tests/e2e/lib.sh); class sweep #587 found no other unit-lane
@@ -946,10 +950,12 @@ p10_lane_c_hits() { # $1 root, $2 scope; loud on scan death (#519:
     # (skills-lint: scratch + .agents/skills; update-core: scratch
     # + files/; status: scratch + files/; wsl-exposure: files/;
     # workflows, line-length: explicit lists; sandbox-policy: an
-    # explicit tests/e2e '*.sh' walk -- descends toward dumps when
-    # readable, shielded today by container ownership, a readable
-    # dump with an unguarded rm-suffix shape would false-red
-    # check 3, #593 b B2).
+    # explicit tests/e2e '*.sh' walk -- prunes basename dumps since
+    # #596 (find -prune arm, closing the #593 b B2 latent false-red:
+    # the historical green was content luck, not container ownership
+    # -- dumps are readable on rootless/local checkouts, and a dumped
+    # .sh with an unguarded rm-suffix shape would have false-redded
+    # check 3, #628 a M2).
     _c_rc=0
     grep -rn "RM-[0-9][0-9][0-9][0-9]" \
         --include="*.md" --include="*.sh" --include="*.py" --include="*.yml" \

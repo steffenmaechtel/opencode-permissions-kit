@@ -151,6 +151,8 @@ check_live "lib.sh fetches the installer to a temp name first (#485 F30)" "$LIB"
     -qF -- '-o "$_oc_ins_tmp"'
 check_live "lib.sh moves the fetched installer into place atomically (#485 F30)" "$LIB" \
     -qF 'mv -f "$_oc_ins_tmp" "$OC_INSTALLER"'
+check_live "lib.sh chmods the fetched installer temp world-readable before the mv (#601, #628 a M1)" "$LIB" \
+    -qF 'chmod 644 "$_oc_ins_tmp"'
 
 # Behavioral drive of the real e2e_resolve_cache against a fake curl:
 # the lib copy's OC_CACHE_DIR is rewritten into scratch (the ONE
@@ -205,6 +207,14 @@ INSTCURL
     else
         fail "installer cache: good-path fetch failed or wrong content (rc=$_rc, install.sh present: $([ -s "$INSTWORK/cache/install.sh" ] && echo yes))"
     fi
+    # #601: the landed installer must be world-readable — mktemp
+    # creates 0600 and mv preserves it; a rootless container reads the
+    # cache as a subuid != the owner, and a 0600 install.sh killed the
+    # suite at run.sh section 1 (observed twice on 2026-11-17).
+    _ins_mode="$(stat -c %a "$INSTWORK/cache/install.sh" 2>/dev/null || echo missing)"
+    [ "$_ins_mode" = "644" ] &&
+        pass "installer cache: landed installer is world-readable (mktemp 0600 healed, #601)" ||
+        fail "installer cache: landed installer must be mode 644, got '$_ins_mode' (#601)"
     rm -f "${INSTWORK:?}/cache/install.sh"
     _rc=0
     _inst_drive partial >/dev/null || _rc=$?
@@ -224,6 +234,34 @@ INSTCURL
         pass "installer cache: an empty cached installer refetches (-s probe, #485 F30)"
     else
         fail "installer cache: empty cached installer treated as fresh (rc=$_rc)"
+    fi
+    # #601 failure arm: a chmod that cannot land 644 must remove the
+    # temp (the next run refetches; nothing ever lands at the final
+    # name — #628 a M1 moved the chmod before the mv) and fail loud.
+    # Driven with an always-failing fake chmod ahead of the fake-curl
+    # bin dir; the FAIL line is a console progress line (echo ->
+    # stdout, like the neighboring fetch arms), so the drive captures
+    # stdout.
+    mkdir -p "$INSTWORK/bin2"
+    printf '#!/bin/sh\n# fake chmod: always fails (the #601 failure-arm drive)\nexit 1\n' \
+        >"$INSTWORK/bin2/chmod"
+    chmod +x "$INSTWORK/bin2/chmod"
+    rm -f "${INSTWORK:?}/cache/install.sh"
+    _rc=0
+    (
+        cd "$INSTWORK" || exit 99
+        E2E_OC_VERSION=1.18.15 TMP_PROJECT="$INSTWORK/proj" \
+            FAKE_CURL_MODE=good PATH="$INSTWORK/bin2:$INSTWORK/bin:$PATH" \
+            sh -c '. "$1"; e2e_resolve_cache' _ "$INSTWORK/lib.sh" \
+            >"$INSTWORK/chmod-fail.out" 2>/dev/null
+    ) || _rc=$?
+    _ins_tmp2="$(find "$INSTWORK/cache" -name 'install.sh.tmp.*' 2>/dev/null || true)"
+    if [ "$_rc" -ne 0 ] && [ ! -e "$INSTWORK/cache/install.sh" ] &&
+        [ -z "$_ins_tmp2" ] &&
+        grep -q 'cannot make the fetched installer readable' "$INSTWORK/chmod-fail.out"; then
+        pass "installer cache: chmod failure cleans the temp and fails loud, nothing lands (#601, #628 a M1)"
+    else
+        fail "installer cache: chmod failure must clean the temp and fail loud (rc=$_rc, install.sh: $([ -e "$INSTWORK/cache/install.sh" ] && echo left), tmp:$_ins_tmp2)"
     fi
 fi
 rm -rf "$INSTWORK"
