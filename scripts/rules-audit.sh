@@ -41,7 +41,11 @@
 #      not quotations) is findable -- case-folded, inv5-normalized --
 #      in the union of the in-repo file(s) the Source line resolves
 #      to (all slash tokens, wrapped paths healed) and the rule:
-#      back-ref file. Tokens containing '..' never resolve. A token
+#      back-ref file. The haystack is content-inclusive: fenced
+#      blocks of a leg or the rule file are searchable text (#572
+#      B4) -- the fence carve-out is quotation-side only, it decides
+#      which meta strings are checked, not what the named files may
+#      contain. Tokens containing '..' never resolve. A token
 #      that resolves to an existing DIRECTORY is ignored (#565) --
 #      prose naming a tree, not a file: neither a leg nor unresolved,
 #      but REPORTED in the ignored sub-lane so a broken file citation
@@ -159,6 +163,21 @@ norm_join() { # file -> single line, ` and * stripped, ws squeezed
     awk 'BEGIN { ORS = "" }
         /^```/ { fence = !fence; next }
         fence { next }
+        { gsub(/`/, ""); gsub(/\*/, ""); printf "%s ", $0 }' "$1" |
+        tr -s ' \t' ' '
+}
+
+hay_join() { # file -> single line for the inv10 haystack -- fenced
+    # blocks KEPT (#572 B4): the haystack is content-inclusive, a
+    # body quote may cite text that lives in a fenced block of a
+    # Source leg or the rule file. "Code is not quotation" is
+    # meta-side extraction semantics only, and inline spans were
+    # always searchable here (backticks stripped, content kept) --
+    # dropping fenced lines was that carve-out leaking into the
+    # haystack builder. norm_join (fence-skipping) stays inv5's
+    # quote-findability transform: the quote: needle pairs with
+    # rule prose.
+    awk 'BEGIN { ORS = "" }
         { gsub(/`/, ""); gsub(/\*/, ""); printf "%s ", $0 }' "$1" |
         tr -s ' \t' ' '
 }
@@ -380,7 +399,8 @@ while IFS= read -r m; do
     # discipline -- quoted
     # strings in meta bodies exist verbatim somewhere nameable. Code
     # is not quotation (fences + inline spans dropped before quote
-    # extraction); haystack = the UNION of every in-repo file the
+    # extraction -- quotation-side only; the haystack KEEPS fenced
+    # content, #572 B4); haystack = the UNION of every in-repo file the
     # Source line resolves to (all slash tokens; a path wrapped over
     # a line break heals -- the wrap space after a slash fuses) plus
     # the rule back-ref file, all inv5-normalized and case-folded
@@ -448,8 +468,8 @@ while IFS= read -r m; do
         done
         if [ -n "$legs" ]; then
             hay=""
-            for leg in $legs; do hay=$hay$(norm_join "$ROOT/$leg"); done
-            [ -f "$ROOT/$tpath" ] && hay=$hay$(norm_join "$ROOT/$tpath")
+            for leg in $legs; do hay=$hay$(hay_join "$ROOT/$leg"); done
+            [ -f "$ROOT/$tpath" ] && hay=$hay$(hay_join "$ROOT/$tpath")
             hay=$(printf '%s' "$hay" | tr '[:upper:]' '[:lower:]')
             legsmsg=$(printf '%s' "$legs" | sed 's/^ //; s/ /, /g')
             grep -o '"[^"]*"' "$bj" | sed 's/^"//; s/"$//' |
@@ -574,9 +594,17 @@ fi
 # (#318 a A1): never regenerate from a partial walk -- a run whose
 # walk was partial (find errors above) must not refresh the INDEX.
 # (#323, pr-325 a A3): regen still runs on other blocked runs (sort
-# rc, inv blocks) -- the INDEX walk is independent of the worklist;
-# a regen WRITE failure (e.g. ENOSPC) is warned about but restores
-# nothing, so a truncated INDEX can remain (pre-existing shape).
+# rc, inv blocks) -- the INDEX walk is independent of the worklist.
+# (#572 B5): the regen is STAGED -- the generator writes to a
+# dot-prefixed temp BESIDE the INDEX and only a successful run is
+# mv'd into place (same filesystem, atomic rename): a generator die
+# (structural meta errors) or a write failure (ENOSPC) can no longer
+# leave a truncated INDEX behind, closing the old warn-without-
+# restore shape. A hard kill between stage and mv leaves at most a
+# stray dot-temp the walks never see (find -name 'RM-*.md'; the
+# generator's digit-dir walk; no gen-sums roots) -- it is NOT
+# self-cleaning: each run stages under its own PID suffix (the
+# concurrency guard), so remove strays manually after a kill.
 # (#527): the regen runs BARE, no FORCE_TODAY -- the committed INDEX
 # is the date-invariant variant the parity gate pins (bare generator
 # run). Passing TODAY here wrote the Overdue variant whenever metas
@@ -585,11 +613,20 @@ fi
 if [ -s "$WORK/finderr" ]; then
     echo "INDEX not regenerated (meta-tree walk reported errors)"
 elif [ -x "$(command -v python3)" ] && [ -f "$ROOT/scripts/gen-rules-index.py" ]; then
-    cp "$ROOT/$METAS/INDEX.md" "$WORK/index.before" 2>/dev/null || : >"$WORK/index.before"
-    python3 "$ROOT/scripts/gen-rules-index.py" >/dev/null 2>&1 ||
-        echo "warning: INDEX regeneration failed (structural meta errors or write failure)" >&2
-    if ! cmp -s "$ROOT/$METAS/INDEX.md" "$WORK/index.before"; then
-        echo "INDEX regenerated (was stale)"
+    stidx="$ROOT/$METAS/.INDEX.staged.$$"
+    if python3 "$ROOT/scripts/gen-rules-index.py" --output "$stidx" \
+        >/dev/null 2>&1; then
+        if cmp -s "$stidx" "$ROOT/$METAS/INDEX.md" 2>/dev/null; then
+            rm -f "$stidx" # byte-identical: nothing to replace
+        elif mv -f "$stidx" "$ROOT/$METAS/INDEX.md"; then
+            echo "INDEX regenerated (was stale)"
+        else
+            rm -f "$stidx"
+            echo "warning: INDEX replace failed -- previous INDEX kept" >&2
+        fi
+    else
+        rm -f "$stidx"
+        echo "warning: INDEX regeneration failed (structural meta errors or write failure) -- INDEX untouched" >&2
     fi
 else
     echo "warning: python3 or gen-rules-index.py unavailable -- INDEX not regenerated"
