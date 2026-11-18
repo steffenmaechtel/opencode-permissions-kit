@@ -708,18 +708,21 @@ chmod 700 "$WORK/s4acl"
     _st_ancestor_grants_x "$WORK/s4acl" && echo G-GETFACL-GRANT-OK
 ) >"$WORK/s4-getfacl.out" 2>&1 || true
 
-# (#621 a Q1) — the ancestry stat %G rc-2 arm, pinned behaviorally: %A
-# succeeds without other-x, getfacl succeeds with only base entries (no
+# (#621 a Q1, b B1) — the ancestry stat %G rc-2 arm, pinned behaviorally:
+# %A succeeds without other-x, getfacl succeeds with only base entries (no
 # named grant), %G dies -> rc 2, and the blocker carries the unknown marker.
+# Stub heredoc UNQUOTED on purpose: the real stat path is baked at write
+# time (the quoted shape left exec "$_real_stat" literal and killed %A —
+# rc 2 then fired from the %A arm, not the %G arm the pin pins).
 _s4g2bin="$WORK/s4statgfail"
 _s4g3bin="$WORK/s4getfaclbase"
 mkdir -p "$_s4g2bin" "$_s4g3bin" "$WORK/s4aclg/proj"
-cat >"$_s4g2bin/stat" <<'STGEOF'
+cat >"$_s4g2bin/stat" <<STGEOF
 #!/bin/sh
-case "$1 $2" in
+case "\$1 \$2" in
     "-c %G") exit 1 ;;
 esac
-exec "$_real_stat" "$@"
+exec "$_real_stat" "\$@"
 STGEOF
 cat >"$_s4g3bin/getfacl" <<'GFNLEOF'
 #!/bin/sh
