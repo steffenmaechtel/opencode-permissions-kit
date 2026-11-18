@@ -601,8 +601,10 @@ fi
 # (structural meta errors) or a write failure (ENOSPC) can no longer
 # leave a truncated INDEX behind, closing the old warn-without-
 # restore shape. A hard kill between stage and mv leaves at most a
-# stray dot-temp the meta walk never sees (find -name 'RM-*.md');
-# the next successful run replaces it.
+# stray dot-temp the walks never see (find -name 'RM-*.md'; the
+# generator's digit-dir walk; no gen-sums roots) -- it is NOT
+# self-cleaning: each run stages under its own PID suffix (the
+# concurrency guard), so remove strays manually after a kill.
 # (#527): the regen runs BARE, no FORCE_TODAY -- the committed INDEX
 # is the date-invariant variant the parity gate pins (bare generator
 # run). Passing TODAY here wrote the Overdue variant whenever metas
