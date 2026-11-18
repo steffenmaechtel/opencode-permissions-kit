@@ -4,7 +4,7 @@ d291ca3c41011944889903f979e2f2400f03c5b031f5bf66086aa705b3de8fd1  files/install.
 3052fa97c78c4074d6cffc083ab23df97a3b4668f9a31604835fef06675b5c64  files/opencode-permissions-kit-lib/bin/browser-bridge
 cc0600ce9007dd07229d2c9d0a2538ae17d7777f4586025169679a2410190f33  files/opencode-permissions-kit-lib/bin/cwd-check
 eb27c679b0ba45c8ed2ce030d26928e8d4ff22297475468410002b9d536c7e5f  files/opencode-permissions-kit-lib/bin/ddev-as-opencode
-c894b8208798f29047c8ea880b66e988f1b30f793946a20c8c8398832ac93c96  files/opencode-permissions-kit-lib/bin/ddev-migrate
+90eb08093849c4eb5bac8924ffadc7bda9f9cbfd01d7b17b7c11f6039e8b4e06  files/opencode-permissions-kit-lib/bin/ddev-migrate
 269c7c1db8ff3a1461c4d237c22c09276b8c5ed83c15528996894f64bc64f596  files/opencode-permissions-kit-lib/bin/opencode-as-opencode
 faf1193e92d7e4fc6755f00bb458ea0e4cd0c026e0b17218df03209796f4c112  files/opencode-permissions-kit-lib/bin/opk
 0ccdc3dcd152ecc845f8045c71a515d48e5929bfb0318a3c133db28060ca7977  files/opencode-permissions-kit-lib/bin/setup-container-backend
