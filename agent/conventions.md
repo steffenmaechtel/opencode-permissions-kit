@@ -422,7 +422,8 @@ the working idiom). Corollary: inside a quoted heredoc nothing expands
 at all — never pre-escape backticks or fences there (issue #624's
 body was posted with literal escape sequences this way).
 
-The pin-cost angle: a stub-capture restructure ships only when a
+The arm-discrimination duty: a stub-capture restructure ships only
+when a
 sabotage cycle proves the pin discriminates through the INTENDED arm —
 red-on-delete is not enough when an earlier arm can manufacture the
 rc; trace which arm produces the rc, or make the marker arm-unique

@@ -225,8 +225,9 @@ still-unpushed commit). The redirect must bind to the WHOLE chain,
 never the last member: a redirect after the final command belongs to
 that command alone (shell precedence), so when an earlier gate reds
 the log is never written and the full output floods the session
-context instead (three live floods in pr-00621, one in the
-docs-loop-623 first chain run; #624, dedup #627 item 1). House form —
+context instead (three live floods in pr-00621's gate runs, one more
+in its pilot session, one in the docs-loop-623 first chain run;
+#624, dedup #627 item 1). House form —
 per-command logs, rc and a three-line tail echoed AFTER the chain
 (diagnostics, not gate members):
 

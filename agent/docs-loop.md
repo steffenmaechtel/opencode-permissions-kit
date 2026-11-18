@@ -53,7 +53,7 @@ closes only when every item has a final disposition (the `Closes`/
 `Ref` discipline is the birth-PR rule, review.md — the agent-side
 bullet lives in review-concept, "Round typing and tiering").
 
-## Batching — the commission names the batch
+## Batching — the commission names the batch, or the wave infers and discloses
 
 The commission is the scope authority
 ([internal/process/review.md](../internal/process/review.md)): it

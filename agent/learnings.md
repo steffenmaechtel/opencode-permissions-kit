@@ -110,8 +110,8 @@ inherits an UNVERIFIED claim as if audited — issue #594's own
 "false green" analysis text was the error source, caught in flight by
 pr-00621 round a Q2 (#626). For the shipping wave, an issue's
 mechanism claims are claim-audit objects like any other: verify, do
-not inherit (the docs-loop's probe-before-codify duty is the
-rule-text sibling).
+not inherit (the docs-loop's re-probe duty for mechanism claims is
+the rule-text sibling).
 
 ### L4 — Pins must discriminate, and sit before the summary gate
 *Class: `test-vacuous` — run 1: 37 findings; run 2: 45 findings, 4 MED/HIGH,
