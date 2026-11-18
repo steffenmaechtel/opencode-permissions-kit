@@ -302,10 +302,14 @@ empty-match greps (`grep … || true` where empty output is rc 1), `IFS= read
 
 If a re-run of the meta-analysis shows a class recurring **after** its rule
 landed, the rule is not enforced hard enough — escalate: sharpen the
-checklist wording here, or turn it into a gate/test that fails the suite.
-Both escalations have live examples: L2's wording was sharpened twice after
-the class returned (#214 5 above), and L1/L4's pin-placement shape became a
-suite-mechanics rule (pins before the summary gate). The sabotage-vs-
+checklist wording here, turn it into a gate/test that fails the suite, or —
+when it is the demand itself the class keeps recurring against — change the
+process shape so the safe path is also the cheap one. All three escalations
+have live examples: L2's wording was sharpened twice after the class
+returned (#214 5 above), L1/L4's pin-placement shape became a
+suite-mechanics rule (pins before the summary gate), and the sabotage-vs-
+uncommitted-tree class gained the pre-restore copy as a sanctioned securing
+move after surviving two sharpenings (#577 option 2.a). The sabotage-vs-
 uncommitted-tree incident (2026-10) never entered a review snapshot — it
 lived as an AGENTS.md Testing rule alone until the class recurred anyway
 (2026-11; roughly every third session, maintainer estimate). The
