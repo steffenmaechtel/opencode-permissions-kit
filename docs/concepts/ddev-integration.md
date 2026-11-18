@@ -326,3 +326,8 @@ On import, a manifest entry whose file name escapes the dump directory
 (`../…` or any slash) is refused the same way: the import reads regular
 files by their plain names only, and anything else in the agent-ownable
 manifest counts as tampering.
+On export, a registry **project name** that would escape the dump
+directory (any slash or a bare `..`) is refused the same way: the name
+comes from ddev's registry files, and the export trusts only plain
+names to shape dump paths — the project counts as failed until the
+registry entry is repaired.

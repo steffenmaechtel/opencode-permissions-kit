@@ -577,6 +577,53 @@ check "shop itself IS skipped (its own OK line matches, both engines)" \
 check "the published manifest keeps exactly one OK line per project (W13)" \
     sh -c "test \"\$(grep -c '^OK|' \"\$1\")\" -eq 5" _ "$DUMP_DIR/manifest.conf"
 
+# --- 4e2. name-shape gate: registry names that escape the dump dir (#612) ------------
+# $dm_n is registry-derived (agent-ownable YAML; the scanner validates
+# no name, the root filter constrains only the approot). A name carrying
+# ../ redirects every dump-operand path out of the dump dir — and the
+# loop-top symlink/regular-file gates inspect the ESCAPED path, so an
+# out-of-dir REGULAR victim passes them both. The name gate must refuse
+# BEFORE any acting arm: no start, no export-db write through the
+# escape, FAIL entry (the failed-list carrier), loop continues. Sabotage
+# discriminator: without the gate the fake ddev's export-db writes
+# FAKEDUMP through $DUMP_DIR/../evil.sql.gz (= $WORK/backups/evil.sql.gz,
+# inside the suite's own scratch) and OKs the project.
+cat >>"$WORK/devhome/.ddev/project_list.yaml" <<'YML'
+  ../evil:
+    approot: /var/tmp/opencode-ddev-mig-roots/vhosts/alpha
+  ..:
+    approot: /var/tmp/opencode-ddev-mig-roots/vhosts/alpha
+YML
+printf 'VICTIM-ESCAPE\n' >"$WORK/backups/evil.sql.gz"
+OUTE=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev-run-e.log" \
+    DDEV_MIG_DEV_HOME="$WORK/devhome" \
+    PATH="$WORK/bin:$PATH" \
+    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null 2>&1) || true
+case "$OUTE" in
+    *"REFUSED — project name escapes the dump dir (../evil)"*)
+        pass "slashed registry name refused loudly, before any acting arm (#612)"
+        ;;
+    *) fail "slashed registry name must be refused loudly (got: $OUTE) (#612)" ;;
+esac
+check_absent "refused name: ddev is never started with the slashed name" \
+    "$WORK/ddev-run-e.log" -q 'ddev:start \.\./evil'
+check_absent "refused name: export-db never opens the escaped operand" \
+    "$WORK/ddev-run-e.log" -q 'ddev:export-db \.\./evil'
+check "refused name: the out-of-dir victim keeps its content (no write through the escape)" \
+    sh -c "test \"\$(cat \"\$1\")\" = VICTIM-ESCAPE" _ "$WORK/backups/evil.sql.gz"
+check "refused name: FAIL entry lands in the manifest (the failed-list carrier)" \
+    sh -c "grep -q '^FAIL|\.\./evil|' \"\$1\"" _ "$DUMP_DIR/manifest.conf"
+check_fail "refused name: no OK line is written for the slashed name" \
+    sh -c "grep -q '^OK|\.\./evil|' \"\$1\"" _ "$DUMP_DIR/manifest.conf"
+check "bare .. registry name is refused at the pattern level too" \
+    sh -c "grep -q '^FAIL|\.\.|' \"\$1\" && ! grep -q '^OK|\.\.|' \"\$1\"" _ "$DUMP_DIR/manifest.conf"
+check_absent "bare .. name: no ddev arm runs it (start/stop, EOL-anchored)" \
+    "$WORK/ddev-run-e.log" -qE 'ddev:(start|stop) \.\.$'
+check "refused names: the loop CONTINUES (a later project's start still runs)" \
+    sh -c "grep -q 'ddev:start nodbrt' \"\$1\"" _ "$WORK/ddev-run-e.log"
+check "refused names: the wave still finishes (poweroff ran, no abort)" \
+    sh -c "grep -q 'ddev:poweroff' \"\$1\"" _ "$WORK/ddev-run-e.log"
+
 # --- 4f. the seed's owner arm refuses a manifest the dev does not own (0.0.44d F4/C3) --
 # The manifest in $DUMP_DIR is owned by the CURRENT user; running the
 # export with dm_dev=nobody (an existing unrelated user) must hit the

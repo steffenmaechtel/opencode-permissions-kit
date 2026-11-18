@@ -496,6 +496,32 @@ ddev_migrate_export() {
     # dump per export invocation, resume picked up the next each time).
     printf '%s\n' "$dm_list" | while IFS='|' read -r dm_n dm_ar; do
         echo "  exporting $dm_n ($dm_ar) ..."
+        # Name-shape gate (#612, the export-side twin of the import
+        # operand gate #568 a D5 / PR #606): $dm_n is REGISTRY-derived
+        # content (project_list.yaml or the legacy project_info block —
+        # agent-ownable files, scanned with no name validation; the
+        # root filter constrains only the approot). A name carrying a
+        # slash or a bare `..` redirects EVERY "$DD_MIG_DUMP_DIR/$dm_n"
+        # operand out of the dump dir: the symlink/regular-file gates
+        # below inspect the ESCAPED path (an out-of-dir REGULAR file
+        # passes both), and the acting arms follow it — export-db's
+        # --file= write as the dev user, the root rm -f in the failure
+        # arms. ddev's own [a-z0-9-] project-name validation is
+        # external behavior, unverifiable from this repo; this gate
+        # closes the class kit-side. Bare `..` builds an in-dir
+        # "...sql.gz" operand (no traversal) — refused at the pattern
+        # level anyway, same shape hardening as the import gate.
+        # Per-project refusal like the operand gates below: FAIL entry
+        # (drop-then-add keeps the manifest single-entry), continue
+        # with the other projects.
+        case "$dm_n" in
+            */* | ..)
+                echo "    REFUSED — project name escapes the dump dir ($dm_n) — tampering? Repair the registry and re-run" >&2
+                _dm_manifest_drop "$dm_n"
+                _dm_manifest_add "FAIL|$dm_n|$dm_ar|"
+                continue
+                ;;
+        esac
         # Dump-operand gates (#264 + #420 a A6): the dump dir is
         # agent-group-writable for the whole minutes-long loop (3770
         # above), and ddev export-db opens --file for WRITING as the dev
