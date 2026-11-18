@@ -512,12 +512,39 @@ ddev_migrate_export() {
         # closes the class kit-side. Bare `..` builds an in-dir
         # "...sql.gz" operand (no traversal) — refused at the pattern
         # level anyway, same shape hardening as the import gate.
+        # Option shapes (#635, the argv arm of the same gate): a
+        # dash-leading name rides the ddev command line as an OPTION —
+        # start/export-db/stop below address projects by bare name with
+        # no `--` separator — and ddev's cobra CLI parses flags in that
+        # position: `start` and `stop` really carry `--all`
+        # (cmd/ddev/cmd/start.go / stop.go — every registered project at
+        # once; the one-at-a-time discipline exists for RAM, see the
+        # stop comment below), so a forged registry key `--all` reaches
+        # exactly that arm as the dev user. ddev-side a `--`
+        # end-of-options separator WOULD work (pflag terminates flag
+        # parsing at `--`), but the name would have to move after every
+        # flag — export-db/import-db take the name before `--file=`, a
+        # `--` in front of it would swallow that flag as a positional —
+        # rewriting all five acting arms to end in ddev's "could not
+        # find requested project" over a name ddev itself can never
+        # register: ValidateProjectName enforces RFC 1123 hostname
+        # labels (pkg/ddevapp/config.go), which never start with a
+        # dash — verified against ddev's source, so the refusal has no
+        # false-positive arm. The sibling gate in ddev-hosts.sh
+        # (0.0.39g Q6) made the same call for `ddev hostname`: refuse
+        # the dash shape, never trust it into argv.
         # Per-project refusal like the operand gates below: FAIL entry
         # (drop-then-add keeps the manifest single-entry), continue
         # with the other projects.
         case "$dm_n" in
             */* | ..)
                 echo "    REFUSED — project name escapes the dump dir ($dm_n) — tampering? Repair the registry and re-run" >&2
+                _dm_manifest_drop "$dm_n"
+                _dm_manifest_add "FAIL|$dm_n|$dm_ar|"
+                continue
+                ;;
+            -*)
+                echo "    REFUSED — option-shaped project name ($dm_n) — tampering? Repair the registry and re-run" >&2
                 _dm_manifest_drop "$dm_n"
                 _dm_manifest_add "FAIL|$dm_n|$dm_ar|"
                 continue
@@ -900,6 +927,23 @@ ddev_migrate_import() {
     dm_failed=""
     while IFS='|' read -r dm_st dm_n dm_ar dm_f; do
         [ "$dm_st" = "OK" ] && [ -n "$dm_n" ] && [ -n "$dm_ar" ] && [ -n "$dm_f" ] || continue
+        # Project-name gate (#635, the import twin of the export loop's
+        # name gate above): $dm_n is manifest-derived (agent-ownable
+        # after finalize) and reaches ddev argv by bare name — start and
+        # import-db below, no `--` separator — so a dash-shaped entry is
+        # parsed as a ddev OPTION, not a project: `--all` hits start's
+        # real all-projects flag as the opencode user. The operand gate
+        # below validates $dm_f only; this arm closes the name side (the
+        # `--`-separator decision lives at the export gate). Refusal
+        # counts the project failed; the operator repairs the manifest
+        # and re-runs.
+        case "$dm_n" in
+            -*)
+                echo "  $dm_n: REFUSED — option-shaped project name — tampering? Repair the manifest and re-run"
+                dm_failed="$dm_failed $dm_n"
+                continue
+                ;;
+        esac
         # Operand gate (#264's import twin): the finalized dump dir is
         # agent-owned (750 since finalize, no sticky) — a dump swapped
         # for a symlink in the export->import gap must never be imported

@@ -624,6 +624,47 @@ check "refused names: the loop CONTINUES (a later project's start still runs)" \
 check "refused names: the wave still finishes (poweroff ran, no abort)" \
     sh -c "grep -q 'ddev:poweroff' \"\$1\"" _ "$WORK/ddev-run-e.log"
 
+# --- 4e3. option-shaped names: dash-leading registry keys never reach ddev
+# argv (#635) ------------------------------------------------------------
+# The scanner admits a `--all:` key (probe-verified against the awk),
+# and the loop's acting arms pass $dm_n by bare name with no `--`
+# separator: without the gate the fake ddev logs `start --all` — the
+# REAL ddev flag for every registered project at once — and export-db
+# runs with `--all` in flag position (unknown-flag on real ddev, but
+# the gate must not rely on ddev rejecting it). The in-dir operand
+# `--all.sql.gz` stays untouched: refusal happens at the loop top,
+# before any acting arm.
+cat >>"$WORK/devhome/.ddev/project_list.yaml" <<'YML'
+  --all:
+    approot: /var/tmp/opencode-ddev-mig-roots/vhosts/alpha
+YML
+OUTD=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev-run-d.log" \
+    DDEV_MIG_DEV_HOME="$WORK/devhome" \
+    PATH="$WORK/bin:$PATH" \
+    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null 2>&1) || true
+case "$OUTD" in
+    *"REFUSED — option-shaped project name (--all)"*)
+        pass "dash-leading registry name refused loudly, before any acting arm (#635)"
+        ;;
+    *) fail "dash-leading registry name must be refused loudly (got: $OUTD) (#635)" ;;
+esac
+check_absent "refused dash name: ddev start never sees it as a flag" \
+    "$WORK/ddev-run-d.log" -q 'ddev:start --all'
+check_absent "refused dash name: export-db never sees it as a flag" \
+    "$WORK/ddev-run-d.log" -q 'ddev:export-db --all'
+check_absent "refused dash name: stop never sees it as a flag" \
+    "$WORK/ddev-run-d.log" -q 'ddev:stop --all'
+check "refused dash name: FAIL entry lands in the manifest (the failed-list carrier)" \
+    sh -c "grep -q '^FAIL|--all|' \"\$1\"" _ "$DUMP_DIR/manifest.conf"
+check_fail "refused dash name: no OK line is written for it" \
+    sh -c "grep -q '^OK|--all|' \"\$1\"" _ "$DUMP_DIR/manifest.conf"
+check_fail "refused dash name: no in-dir operand is created for it" \
+    test -e "$DUMP_DIR/--all.sql.gz"
+check "refused dash name: the loop CONTINUES (a later project's start still runs)" \
+    sh -c "grep -q 'ddev:start nodbrt' \"\$1\"" _ "$WORK/ddev-run-d.log"
+check "refused dash name: the wave still finishes (poweroff ran, no abort)" \
+    sh -c "grep -q 'ddev:poweroff' \"\$1\"" _ "$WORK/ddev-run-d.log"
+
 # --- 4f. the seed's owner arm refuses a manifest the dev does not own (0.0.44d F4/C3) --
 # The manifest in $DUMP_DIR is owned by the CURRENT user; running the
 # export with dm_dev=nobody (an existing unrelated user) must hit the
@@ -1633,6 +1674,60 @@ else
     pass "import: closing cleanup hint has no resolved binary path (#568 b Y3)"
 fi
 rm -rf "${_w5j:?}"
+
+# --- 4c5. the project NAME: a dash-shaped manifest name is REFUSED before
+# any ddev hop (#635) — argv option injection --------------------------------
+# $dm_n rides `start`/`import-db` argv by bare name; `start` really
+# carries `--all` (verified against ddev's source — cmd/ddev/cmd/
+# start.go), so a forged OK line with a dash name would start every
+# opencode-side project. The sudo shim records every hop's argv and
+# fails — the discriminator is WHAT reached the hop, not its rc: the
+# log file exists from the start, so an empty log is "no hop", never a
+# missing-file accident. The dump operand is REACHABLE and regular on
+# purpose: without the gate the pre-hop flow passes every operand
+# check (the #420 a A10 reachability rule), so the red comes from the
+# gate's own assertion.
+_w5k="$(work_new)"
+mkdir -p "$_w5k/bin" "$_w5k/dump"
+printf '#!/bin/sh\necho 0\n' >"$_w5k/bin/id"
+chmod +x "$_w5k/bin/id"
+printf '#!/bin/sh\necho "sudo:$*" >> "%s/sudo.log"\nexit 1\n' "$_w5k" >"$_w5k/bin/sudo"
+chmod +x "$_w5k/bin/sudo"
+: >"$_w5k/sudo.log"
+printf 'OK|--all|/roots/alpha|alpha.sql.gz\n' >"$_w5k/dump/manifest.conf"
+printf 'DASH-DUMP\n' >"$_w5k/dump/alpha.sql.gz"
+_w5k_out=$(PATH="$_w5k/bin:$PATH" sh -c \
+    '. "$1" && _ddev_migrate_bin() { echo /usr/bin/true; } && ddev_migrate_import "$2"' \
+    _ "$MIG" "$_w5k/dump" 2>&1) || true
+case "$_w5k_out" in
+    *"REFUSED — option-shaped project name"*)
+        pass "import: a dash-shaped manifest name is refused loudly (#635)"
+        ;;
+    *)
+        fail "import: a dash-shaped manifest name must be refused (got: $_w5k_out) (#635)"
+        ;;
+esac
+case "$_w5k_out" in
+    *"failed: --all"*)
+        pass "import: the refused dash name lands in the failed list, rc degrades (#635)"
+        ;;
+    *)
+        fail "import: the refused dash name must land in the failed list (got: $_w5k_out) (#635)"
+        ;;
+esac
+check_absent "import: the dash name never reaches a ddev hop as a flag" \
+    "$_w5k/sudo.log" -q 'start --all'
+check_absent "import: no import-db hop for the dash name either" \
+    "$_w5k/sudo.log" -q 'import-db --all'
+case "$_w5k_out" in
+    *"importing --all"*)
+        fail "import: the pre-hop echo must not run for the dash name (#635)"
+        ;;
+    *)
+        pass "import: no importing echo for the dash name (#635)"
+        ;;
+esac
+rm -rf "${_w5k:?}"
 
 # static: the import loop builds HOME via getent and rides conditional
 # backend vars as single quoted arguments (0.0.43a F6/F12).

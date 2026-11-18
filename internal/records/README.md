@@ -15,6 +15,7 @@ archive).
 | [ddev-migration.md](ddev-migration.md) | database bridge for the daemon switch at install time | IMPLEMENTED |
 | [ddev-url-transports.md](ddev-url-transports.md) | how browser commands get their URL to the Windows side | IMPLEMENTED |
 | [ddev-workflow-improvements.md](ddev-workflow-improvements.md) | issue #149 workflow audit: replay method, findings, fixes | IMPLEMENTED |
+| [ddev-cli-contract.md](ddev-cli-contract.md) | verified ddev CLI facts + source-clone substrate (#635) | CURRENT |
 | [handover-scan-skip.md](handover-scan-skip.md) | fast `opk update` on large trees (scan-skip stamps) | CURRENT |
 | [openchamber-2x-hardening.md](openchamber-2x-hardening.md) | OpenChamber 2.x settings-pin bypass + policy-pin fix | CURRENT |
 | [root-ancestor-traversal.md](root-ancestor-traversal.md) | root ancestor traversal + versioned no-bind-mounts | IMPLEMENTED |

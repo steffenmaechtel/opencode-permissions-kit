@@ -331,3 +331,9 @@ directory (any slash or a bare `..`) is refused the same way: the name
 comes from ddev's registry files, and the export trusts only plain
 names to shape dump paths — the project counts as failed until the
 registry entry is repaired.
+A **dash-leading** project name is refused on export and on import
+alike: ddev commands address projects by bare name, and an
+option-shaped name (like `--all`) would be parsed as a ddev flag
+instead of a project — no ddev-registered name can start with a dash,
+so the project counts as failed until the registry entry or manifest
+line is repaired.
