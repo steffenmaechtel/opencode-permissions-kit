@@ -230,9 +230,9 @@ empty-match greps (`grep … || true` where empty output is rc 1), `IFS= read
   `<SHA>`-fill's +2 bytes per row budgeted (issue #237; the rule
   itself lives in the review README — AGENTS.md Testing owns the
   chain mechanics); and a diff touching `files/` owes `make sums`
-  inside the chain — the regenerated `SHA256SUMS` is committed with
-  the wave, `make test`'s freshness pin reddens on a stale manifest
-  (issue #478)
+  inside the chain — the regenerated repo-root `SHA256SUMS` is
+  committed with the wave, `make test`'s freshness pin reddens on a
+  stale manifest (issue #478)
 - **Comment-strip riders on source-counting pins** (#261, PR #284) —
   a `grep -c` count pin over shipped source without the rider is
   pass-green on commented-out code. Census: 39 strip sites across 14
@@ -338,6 +338,21 @@ empty-match greps (`grep … || true` where empty output is rc 1), `IFS= read
   script before it is believed, and the corrected re-probe lands in
   the wave's provenance (the docs-loop's probe-before-codify duty,
   surprise arm).
+- **Typographic anchors: switch to the shortest special-char-free
+  anchor, never re-aim longer from memory** (2026-11-18, PR #634
+  wave; the same trust-the-file family as the two 2026-11-15
+  bullets above in this list) — when an
+  edit-tool oldString misses on a line carrying typographic
+  characters (em-dash, apostrophe) despite an apparently exact copy,
+  re-read the target region and switch to the shortest anchor that
+  avoids the special characters entirely; do not keep re-trying
+  longer reconstructions from memory. Two live instances in one
+  session: a failure pair on agent/conventions.md (two visually
+  byte-identical oldStrings no-matched, `od -c` showed standard
+  UTF-8; the special-char-free short anchor matched first try) and,
+  as contrast, an em-dash-rich meta-body edit that matched
+  immediately — the trigger is not simply the character class (root
+  cause unidentified, #636).
 
 ## When a rule fails
 

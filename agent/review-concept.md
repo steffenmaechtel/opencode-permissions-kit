@@ -714,11 +714,14 @@ Between reviews, the unit/e2e suites are the review (see also the
   guard becomes one in the same wave that fixes it. (RM-0076)
 - Root-script behavior changes owe the e2e suites immediately, not
   "later". (RM-0077)
-- The debt's due date splits by change class: root-run script changes
+- The debt's due date splits by change class: root-run code changes
   that alter SEMANTICS (rc contracts, traps, sudoers, provisioning,
-  wrapper) owe both e2e suites in the wave itself; message- or
-  comment-only changes to root-run scripts may ride to the release
-  gate. Either way the debt is recorded once — and any later session
+  wrapper) or BEHAVIOR (new refusal/skip/abort arms, changed control
+  flow — including the `sh/*.sh` libs the installer sources, which
+  run as root during install, #638) owe both e2e suites in the wave
+  itself; message- or comment-only changes to root-run code may ride
+  to the release gate. Either way the debt is recorded once — and
+  any later session
   that runs both suites green on a committed tree discharges it (tree
   SHA + counts into the ledger; that record doubles as the fresh
   comparator the next count claim needs). (RM-0113)

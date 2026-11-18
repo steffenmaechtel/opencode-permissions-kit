@@ -404,7 +404,8 @@ mirror, which must stay **byte-identical** to `master` (§3, Option B).
 Copy the block, search & replace `0.0.61` with the new version, run the
 lines one by one. The VERSION bump lands on `master` **via PR** (never
 commit on master directly); `make release` then verifies a clean tree,
-sync with origin, the VERSION stamp, a **fresh `SHA256SUMS`** (issue
+sync with origin, the VERSION stamp, a **fresh `SHA256SUMS`** at the
+repo root (issue
 #478: the integrity manifest streamed installs verify against —
 regenerate with `make sums` in the PR that changes `files/` OR bumps
 `VERSION`, because the manifest hashes the VERSION file too; the

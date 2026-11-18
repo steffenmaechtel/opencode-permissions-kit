@@ -118,11 +118,18 @@ sessions, one per PR).
   before the gate, a self-application sweep — every pointer name the
   new text coins greps in its target, every new name is
   collision-checked against the target file's existing headings and
-  leads, and every count is reconciled with the cited source's full
-  body (pr-00629 round a A1–A3: a grep-dead pointer written into the
+  leads, every count is reconciled with the cited source's full
+  body, and every new clause is read against the sibling text of the
+  section it lands in — scope models, phrasing, contradictions: two
+  half-true descriptions of one mechanism give a reader opposite
+  answers (pr-00629 round a A1–A3: a grep-dead pointer written into the
   citation rule's own item, a name collision in the very file being
-  edited, a count its cited source contradicts — all caught by
-  review, none by the wave itself, #632). (RM-0182)
+  edited, a count its cited source contradicts; pr-00634 round a A1:
+  the same wave's amended check-3 bullet in conventions.md carried
+  two opposite scope models unreconciled — the fresh sweep's
+  enumeration covered names, pointers and counts, not phrase-level
+  consistency, so it could not catch its own wave's sibling edit —
+  all caught by review, none by the wave itself, #632, #636). (RM-0182)
 
 ## Closure — and the next cycle
 

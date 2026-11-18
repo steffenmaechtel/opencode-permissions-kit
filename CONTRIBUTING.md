@@ -14,7 +14,9 @@ how to work on the code. For what the kit does, see the
    release mirror, which is fast-forwarded to `master` only on release
    (`KIT_CHANNEL` in `install.conf` records what an install tracks).
 5. **Changed anything under `files/`? Regenerate the integrity
-   manifest** (`make sums`) and commit `SHA256SUMS` with your PR. The
+   manifest** (`make sums`) and commit the repo-root `SHA256SUMS`
+   with your PR — the manifest lives at the repository root, not
+   under `files/` (#637). The
    streamed install/update verify every fetched file against it
    (issue #478); the suite's freshness pin reddens `make test` on a
    stale manifest, and `make release` refuses to cut one.
@@ -106,7 +108,10 @@ make e2e-rootless      # docker-rootless daemon suite (needs systemd-in-containe
   `cp`/`scp` without `-p`). `sh <script>` works everywhere.
 - After changes to `install.sh`, `update.sh`, the wrapper, or backend
   provisioning, **both** e2e suites are part of the definition of done — a
-  green `make e2e` alone is not sufficient.
+  green `make e2e` alone is not sufficient. The same duty covers
+  semantics and behavioral changes (new refusal/skip/abort arms,
+  changed control flow) to any other root-run code, including the
+  `sh/*.sh` libs the installer sources (#638).
 - The e2e suites **should run in parallel** on one Docker host whenever
   the cache precondition below holds — sequential runs cost the other
   suite's full runtime for no benefit: their

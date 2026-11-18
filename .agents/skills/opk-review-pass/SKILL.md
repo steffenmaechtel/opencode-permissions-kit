@@ -117,6 +117,12 @@ BEFORE the fan-out launches.
   Flash break the calibrated verification policy (strong owns
   verification) just as quietly. The loop status (section 8) names
   the models that actually ran.
+- The subagent tool's blanket never-set-model warning (the `model`
+  parameter's own description) yields to the commission here: the
+  review process is the named-model authority (review-concept,
+  "Parallel reviewer agents" — the tier split). Look up the exact
+  provider/model ID (e.g. via the models tool) before launching;
+  never guess the ID string (#639, PR #633).
 - Build each reviewer prompt from
   [axis-prompt.md](axis-prompt.md) — role, axis, material, budget,
   checkpoint discipline, output contract. The OUTPUT CONTRACT block
