@@ -125,10 +125,11 @@ sessions, one per PR).
   answers (pr-00629 round a A1–A3: a grep-dead pointer written into the
   citation rule's own item, a name collision in the very file being
   edited, a count its cited source contradicts; pr-00634 round a A1:
-  this sweep's own fresh bullet carried two opposite scope models
-  unreconciled — the enumeration covered names, pointers and counts,
-  not phrase-level consistency — all caught by review, none by the
-  wave itself, #632, #636). (RM-0182)
+  the same wave's amended check-3 bullet in conventions.md carried
+  two opposite scope models unreconciled — the fresh sweep's
+  enumeration covered names, pointers and counts, not phrase-level
+  consistency, so it could not catch its own wave's sibling edit —
+  all caught by review, none by the wave itself, #632, #636). (RM-0182)
 
 ## Closure — and the next cycle
 
