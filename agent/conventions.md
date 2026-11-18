@@ -456,6 +456,14 @@ waves (#496 a B1, #498, #519: `_rule2_batch`, `_rule1_batch`,
   branch: dash's negation clobbers it (#520 a A1, a death diagnostic
   that always said rc=0). `grep` rc 1 = no match (normal) vs rc ≥ 2 =
   death; awk rc ≠ 0 = death. (RM-0150)
+- The channel is a property of the OBSERVED emitter, not of the
+  capture convention: shipped runners' diagnostics go to stderr (the
+  capture shape above), but `tests/e2e/lib.sh`'s FAIL and WARNING
+  lines are console progress lines — plain `echo`, stdout — so a
+  drive asserting one captures stdout and greps there; an empty
+  capture file with rc and file state already green is the tell of
+  the wrong channel (the #601 chmod-failure drive asserted its FAIL
+  line from an empty stderr capture, PR #628, #631). (RM-0181)
 
 ## Named-cause failure guards (shipped runners)
 
@@ -635,7 +643,15 @@ lines are skipped):
    helper scripts (`tests/e2e/**/*.sh`). The same `:?` standard
    applies to shipped code's `rm` var+suffix sites, root context
    included: new sites must not regress it (convention, enforced by
-   review — the unit guard's scan deliberately stops at tests/). (RM-0044)
+   review — the unit guard's scan deliberately stops at tests/). The statement scoping is chain-based,
+    not a parse — an unquoted semicolon or redirect boundary breaks
+    the chain, but every token INSIDE the span is walked: MESSAGE
+    PROSE on a live line can match too — a literal `rm` inside a
+    fail/pass message, with only single-space-separated words between
+    it and a quoted `"$VAR/suffix"` literal, walks the same middle and
+    tail (the #601 chmod arm's fail message tripped it, one red cycle,
+    PR #628 — say `remove` in prose near quoted path literals, #630).
+    (RM-0044)
 
 The suite self-probes all three checks (continuation-split `rm`, inert
 and quoted and redirect-glued literals, the unguarded suffix shapes —

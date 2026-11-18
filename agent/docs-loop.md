@@ -114,6 +114,15 @@ sessions, one per PR).
   scope by design, the record's decision 10). (RM-0144)
 - Shipped content is English and never grows past 120 columns (the
   AGENTS.md language rule, the line-length ratchet). (RM-0145)
+- The wave's own new prose is subject to the wave's own new rules:
+  before the gate, a self-application sweep — every pointer name the
+  new text coins greps in its target, every new name is
+  collision-checked against the target file's existing headings and
+  leads, and every count is reconciled with the cited source's full
+  body (pr-00629 round a A1–A3: a grep-dead pointer written into the
+  citation rule's own item, a name collision in the very file being
+  edited, a count its cited source contradicts — all caught by
+  review, none by the wave itself, #632). (RM-0182)
 
 ## Closure — and the next cycle
 
