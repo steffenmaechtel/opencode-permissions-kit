@@ -8,12 +8,12 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**183 metas · 180 active · 3 retired · 11 review-pending · next due 2026-11-17**
+**184 metas · 181 active · 3 retired · 13 review-pending · next due 2026-11-17**
 
 ## Actionable
 
-- **Review pending:** RM-0177, RM-0178, RM-0179, RM-0180, RM-0181, RM-0182, RM-0183
-- **Amended — pending:** RM-0044 (2026-11-18), RM-0113 (2026-11-18), RM-0141 (2026-11-18), RM-0175 (2026-11-18)
+- **Review pending:** RM-0177, RM-0178, RM-0179, RM-0180, RM-0181, RM-0182, RM-0183, RM-0184
+- **Amended — pending:** RM-0044 (2026-11-18), RM-0113 (2026-11-18), RM-0141 (2026-11-18), RM-0154 (2026-11-18), RM-0175 (2026-11-18)
 
 ## AGENTS.md
 
@@ -168,6 +168,7 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0057](0/0/5/RM-0057.md) | A diff of ~2.5k lines | active | approved | 1m | 2026-11-19 |
+| [RM-0184](0/1/8/RM-0184.md) | The round diff range is | active | **pending** | 1m | 2026-12-18 |
 
 ### The PR-native loop
 
@@ -243,7 +244,7 @@
 | [RM-0128](0/1/2/RM-0128.md) | One comment per review | active | approved | 1m | 2026-11-28 |
 | [RM-0129](0/1/2/RM-0129.md) | Size guard: GitHub caps | active | approved | 1m | 2026-11-28 |
 | [RM-0153](0/1/5/RM-0153.md) | PR-body edits for wave-authored | active | approved | 1m | 2026-12-15 |
-| [RM-0154](0/1/5/RM-0154.md) | The CI status fields assert | active | approved | 1m | 2026-12-15 |
+| [RM-0154](0/1/5/RM-0154.md) | The CI status fields assert | active | **amended — pending** | 1m | 2026-12-15 |
 | [RM-0158](0/1/5/RM-0158.md) | names its observation scope | active | approved | 1m | 2026-12-16 |
 | [RM-0166](0/1/6/RM-0166.md) | The closing summary's marker carries | active | approved | 1m | 2026-12-17 |
 | [RM-0170](0/1/7/RM-0170.md) | Mechanical fields derive from the | active | approved | 1m | 2026-12-17 |

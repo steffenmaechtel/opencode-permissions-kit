@@ -118,6 +118,15 @@ kit's own test scripts. Style is not a review topic: the gate
   a purely cosmetic wrap. Grep both fragments separately (`grep -q
   'retry anytime' && grep -qF 'already-imported…'`) — the
   test-ddev-migrate D3 retry-hint pin, pr-00568 wave a.
+- That pin rule has a sweep-side inverse: an inventory or class sweep
+  over shipped shell joins backslash continuations BEFORE grepping
+  (or greps the payload fragment standalone) before claiming site
+  completeness — the house dq-splice idiom puts the variable on the
+  SECOND physical line, invisible to any single-line `echo.*$var`
+  pattern (PR #642 round b S1: the round-a sweep found 5 of 7 warn
+  arms in ddev-migrate.sh, the continuation-joined re-sweep all 7;
+  any mechanical join is fine — the round-b/c form folded
+  backslash-newlines with python before grep).
 - A structural pin greps the CANONICAL spelling — the bytes `make
   fmt` leaves, not the bytes typed: shfmt reformats `! ( : </dev/tty
   )` to `! (: </dev/tty)`, and a pin written against the pre-fmt

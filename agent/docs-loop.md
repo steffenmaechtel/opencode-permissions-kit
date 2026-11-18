@@ -120,9 +120,13 @@ sessions, one per PR).
   collision-checked against the target file's existing headings and
   leads, every count is reconciled with the cited source's full
   body, every incident compression is re-read against the record the
-  wave itself consulted, and every new clause is read against the
-  sibling text of the
-  section it lands in — scope models, phrasing, contradictions: two
+  wave itself consulted, every new clause is read against the
+  sibling text of its whole adjacent unit — every leg of that unit,
+  not only the clause's origin line — and an edit to an enumerated
+  rule unit reconciles its mirror texts (the meta's Check line
+  re-states the enumeration) against the full new enumeration: greps
+  find drift in what exists; mirrors drift by omission. Scope
+  models, phrasing, contradictions: two
   half-true descriptions of one mechanism give a reader opposite
   answers (pr-00629 round a A1–A3: a grep-dead pointer written into the
   citation rule's own item, a name collision in the very file being
@@ -134,7 +138,11 @@ sessions, one per PR).
   pr-00640 round a Q1: the pr-00634 A1 evidence had been verified at
   its ref and still drifted in the compression — naming the sweep's
   own fresh bullet instead of the wave's amended check-3 bullet —
-  all caught by review, none by the wave itself, #632, #636, #641).
+  all caught by review, none by the wave itself, #632, #636, #641;
+  pr-00643 round a Q2/Q1: the sweep's own second wave read a new
+  clause at phrase depth (its origin line) and missed the adjacent
+  unit's opposite answer, and an enumeration edit left the meta's
+  Check line legs behind the bullet, #645).
   (RM-0182)
 - The self-application sweep's sibling-read is section-scoped by
   wording; same-mechanism rule texts in OTHER files are the class
