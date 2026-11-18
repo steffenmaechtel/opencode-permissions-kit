@@ -216,12 +216,31 @@ running suite (#524 §5).
 `| tail` or any pipe on a gate command (the pipeline returns the last
 member's rc — a red gate goes green through it), no `;` separator after
 a gate (the chain breaks; whatever follows runs on red), `set -o
-pipefail` when wrapping is needed anyway; redirect gate output to a log
-file instead of piping it away. Two live instances on 2026-10-25, both
+pipefail` when wrapping is needed anyway; redirect gate output to log
+files instead of piping it away. Two live instances on 2026-10-25, both
 in pr-00263: the fix wave committed through a red line-length ratchet
 behind a piped gate, and the d wave's `; echo` separator let a
 121-char resolution row slip past the gate (caught by amending the
-still-unpushed commit). Check-then-commit is only protection if the
+still-unpushed commit). The redirect must bind to the WHOLE chain,
+never the last member: a redirect after the final command belongs to
+that command alone (shell precedence), so when an earlier gate reds
+the log is never written and the full output floods the session
+context instead (three live floods in pr-00621's gate runs, one more
+in its pilot session, one in the docs-loop-623 first chain run;
+#624, dedup #627 item 1). House form —
+per-command logs, rc and a three-line tail echoed AFTER the chain
+(diagnostics, not gate members):
+
+```sh
+make sums >/tmp/opencode/<case>/sums.log 2>&1 &&
+make lint >/tmp/opencode/<case>/lint.log 2>&1 &&
+make test >/tmp/opencode/<case>/test.log 2>&1 &&
+git add <paths> && git commit -m "…" && echo "GATE-OK"
+rc=$?; tail -3 /tmp/opencode/<case>/test.log; echo "RC=$rc"
+```
+
+Diagnosis only on red: `tail -40 /tmp/opencode/<case>/<offender>.log`.
+Check-then-commit is only protection if the
 check can fail the chain. The chain's SCOPE for fix waves is the full
 gate (`make test`), never only the touched suites: tree-wide invariant
 suites (rules-meta, sandbox-policy, workflows, format-gate) redden on

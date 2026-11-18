@@ -407,6 +407,28 @@ the guard or the planted row in a sabotage run and observe the red)
 — count pins alone stayed green through three rounds' sabotage
 candidates.
 
+A PATH stub that must reach the real binary bakes the binary's
+ABSOLUTE path at write time: UNQUOTED heredoc delimiter, every `$` in
+the stub body escaped (`\$1`, `\$2`, `\$@`), and the real path
+expanded into the exec line — the stat-stub idiom in
+`tests/unit/test-status.sh`. A QUOTED heredoc leaves the variable
+literal: the stub runs as its own `#!/bin/sh` process, the unexported
+variable arrives empty, `exec ""` dies rc 126 on the first
+reach-through, and a pin asserting a downstream rc can pass from the
+WRONG arm — pr-00621 round b B1's markers asserted rc 2 and went green
+off the helper's first-probe arm while the `%G` guard they claimed to
+pin was never exercised (issue #626; fixed in 3966d1c5 by mirroring
+the working idiom). Corollary: inside a quoted heredoc nothing expands
+at all — never pre-escape backticks or fences there (issue #624's
+body was posted with literal escape sequences this way).
+
+The arm-discrimination duty: a stub-capture restructure ships only
+when a
+sabotage cycle proves the pin discriminates through the INTENDED arm —
+red-on-delete is not enough when an earlier arm can manufacture the
+rc; trace which arm produces the rc, or make the marker arm-unique
+(#626, the B1 follow-up).
+
 ## Fail-loud detector sweeps
 
 The fail-loud detector-sweep pattern — a scan/producer function whose

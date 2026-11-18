@@ -104,7 +104,14 @@ Testing), so the prose itself must carry the citation — PR + round +
 finding ID — or every fresh reader hits a `git log -S` dead end
 (pr-00537 round a A2's sandbox-policy comment read `unverified` until
 main resolved it at PR #520 a B1; the carried-ref shape is fix commit
-ad93f5cf).
+ad93f5cf). Issue-sourced claims are the inheritance arm: a wave that
+ships an issue's mechanism claim verbatim in commit/PR/test text
+inherits an UNVERIFIED claim as if audited — issue #594's own
+"false green" analysis text was the error source, caught in flight by
+pr-00621 round a Q2 (#626). For the shipping wave, an issue's
+mechanism claims are claim-audit objects like any other: verify, do
+not inherit (the docs-loop's re-probe duty for mechanism claims is
+the rule-text sibling).
 
 ### L4 — Pins must discriminate, and sit before the summary gate
 *Class: `test-vacuous` — run 1: 37 findings; run 2: 45 findings, 4 MED/HIGH,

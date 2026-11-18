@@ -53,11 +53,16 @@ closes only when every item has a final disposition (the `Closes`/
 `Ref` discipline is the birth-PR rule, review.md — the agent-side
 bullet lives in review-concept, "Round typing and tiering").
 
-## Batching — the commission names the batch
+## Batching — the commission names the batch, or the wave infers and discloses
 
 The commission is the scope authority
 ([internal/process/review.md](../internal/process/review.md)): it
-names the issues and whether they ride one PR or several. The default
+names the issues and whether they ride one PR or several. A commission
+that names the issues but not the cut still authorizes the loop: the
+session takes the default collection-PR cut and names the inference
+in the ledger's Commission line as a disclosed default — the veto
+points are the ledger comment and the PR review (#627 item 2). The
+default
 proposal for a reflection backlog is the batch PR — most items are
 one-to-three sentence sharpenings, so one session works several issues
 into one coherent diff:
