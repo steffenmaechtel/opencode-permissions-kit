@@ -581,8 +581,9 @@ review host):
   body's `cat` outside the PATH kills every arm, rc 127), and
   (iii) every variable the block expands in message strings is set by
   the runner even on failure paths — unset under `set -u`, the die
-  line dies with `parameter not set` instead of its message (all
-  three probed 2026-11-18, #616). (RM-0179)
+  line dies with the shell's unbound-variable diagnostic
+  (`parameter not set` in dash, `unbound variable` in bash) instead
+  of its message (all three probed 2026-11-18, #616). (RM-0179)
 
 Enforced by `tests/unit/test-sandbox-policy.sh`, three checks over every
 unit suite (backslash-continued commands are joined first; full-comment
