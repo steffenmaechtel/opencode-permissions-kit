@@ -932,12 +932,16 @@ p10_lane_c_hits() { # $1 root, $2 scope; loud on scan death (#519:
     # read as a clean tree; rc 1 = no matches stays the normal clean
     # case, rc >= 2 is the loud path now)
     # Traversal-level dumps prune (#587): e2e run evidence under
-    # tests/e2e/dumps/ is container-created (container-UID-owned,
-    # mode 700 -- the live make test died rc 2 mid-traversal; a
-    # post-filter grep -v chain cannot prevent a traversal death),
-    # and dump copies of repo files quoting RM-NNNN would false-red
-    # as fourth-site citations. Same exemption rationale as the
-    # line-length ratchet's reviews-meta data/ carve-out.
+    # tests/e2e/dumps/ is container-created (on the rootful host that
+    # motivated #587 it landed container-UID-owned, mode 700 -- the
+    # live make test died rc 2 mid-traversal; a post-filter grep -v
+    # chain cannot prevent a traversal death. That ownership never
+    # applied universally: dumps are readable, opencode-owned on
+    # rootless/local checkouts -- #628 b M1 keeps the two claims from
+    # contradicting), and dump copies of repo files quoting RM-NNNN
+    # would false-red as fourth-site citations. Same exemption
+    # rationale as the line-length ratchet's reviews-meta data/
+    # carve-out.
     # Basename-scoped by --exclude-dir (matches at any depth):
     # tests/e2e/dumps is the only dumps dir in-tree (created by
     # tests/e2e/lib.sh); class sweep #587 found no other unit-lane
