@@ -351,6 +351,61 @@ sed -i 's|^Body of RM-9002\.$|Source: agent/conventions.md, demo section.\n\n```
     "$(meta_file RM-9002)"
 expect_ok "inv10 odd fence flagged in report" "odd (unclosed) fence"
 
+# 10l. inv 10 (#572 B4) -- the haystack is content-inclusive: fenced
+#      blocks of a haystack file are searchable text. A body quote
+#      citing a string that lives ONLY inside a fence of the rule
+#      back-ref file (the round-marker template shape) stays green;
+#      with the fence-skipping transform as the haystack builder it
+#      falsely blocks -- the exact false red the finding names.
+new_scratch n10l
+printf '\n```\nmarker template: "fence only vocabulary"\n```\n' \
+    >>"$SCRATCH/agent/conventions.md"
+sed -i 's|^Body of RM-9002\.$|Source: internal/records/rules-meta.md, demo.\n\nCites "fence only vocabulary" values.|' \
+    "$(meta_file RM-9002)"
+expect_ok "inv10 fence-only quote in rule file green" "0 blocking"
+
+# 10m. inv 10 (#572 B4) -- same content-inclusion for a Source leg:
+#      the fence-only string sits in the Source-named file, not the
+#      rule file (the union's other half)
+new_scratch n10m
+printf '\n```\nmarker template: "leg fence vocabulary"\n```\n' \
+    >>"$SCRATCH/internal/records/rules-meta.md"
+sed -i 's|^Body of RM-9002\.$|Source: internal/records/rules-meta.md, demo.\n\nCites "leg fence vocabulary" values.|' \
+    "$(meta_file RM-9002)"
+expect_ok "inv10 fence-only quote in Source leg green" "0 blocking"
+
+# 10n. inv 8 (#572 B5) -- a FAILING regen never leaves a truncated
+#      INDEX: the audit stages the regeneration (--output, the T2
+#      generator flag) and replaces the real INDEX only after the
+#      generator succeeded. The scratch generator simulates the
+#      write-failure arm: it truncates its output target, then dies.
+#      Called with --output (the audit's shape) the victim is the
+#      staged temp; a regression back to the in-place call shape
+#      makes the REAL INDEX the victim -- the sentinel check fails,
+#      so the pin discriminates the call shape, not the generator.
+new_scratch n10n
+printf 'sentinel INDEX -- must survive a failed regen\n' \
+    >"$SCRATCH/internal/rules-meta/INDEX.md"
+cat >"$SCRATCH/scripts/gen-rules-index.py" <<'PYEOF'
+import os, sys
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+out = os.path.join(ROOT, 'internal', 'rules-meta', 'INDEX.md')
+if '--output' in sys.argv:
+    out = sys.argv[sys.argv.index('--output') + 1]
+open(out, 'w').write('truncated')
+sys.exit(1)
+PYEOF
+run_audit
+if [ "$RC" -eq 0 ] &&
+    grep -qxF 'sentinel INDEX -- must survive a failed regen' \
+        "$SCRATCH/internal/rules-meta/INDEX.md" &&
+    printf '%s' "$OUT" | grep -q 'INDEX regeneration failed' &&
+    ! printf '%s' "$OUT" | grep -q '\[inv'; then
+    pass "inv8 failed regen: staged shape, real INDEX untouched"
+else
+    fail "inv8 failed regen: INDEX damaged or audit red (rc=$RC)"
+fi
+
 # 6a. inv 6 -- next-revisit before created
 new_scratch n6a
 sed -i 's/^next-revisit: 2026-11-16/next-revisit: 2026-10-01/' "$(meta_file RM-9001)"

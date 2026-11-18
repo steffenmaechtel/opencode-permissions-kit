@@ -23,8 +23,9 @@ never built from a broken tree.
 
 Usage: python3 scripts/gen-rules-index.py [--output PATH]   (repo root)
 Writes internal/rules-meta/INDEX.md; --output stages the same bytes to
-PATH instead (the parity test's idiom, #572 T2: a test run must never
-write the real INDEX). Hand edits are pointless — the parity test
+PATH instead (the staging idiom of the parity test and the audit's
+regen, #572 T2/B5: neither ever writes the real INDEX directly). Hand
+edits are pointless — the parity test
 (tests/unit/test-rules-index-parity.sh) regenerates staged and compares.
 """
 import os
