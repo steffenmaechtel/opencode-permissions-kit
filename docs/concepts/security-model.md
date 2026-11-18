@@ -68,8 +68,11 @@ from agent-writable surfaces there:
 - This is OS-level narrowing — the one place the kit deliberately steps
   out of the pure soft model, scoped to `.git` internals that ddev never
   touches. Workflow costs accepted with it: repo-scope `git config` and
-  `git submodule add` fail for the agent (both write `.git/config`);
-  agent-side `git gc` can hit the sticky bit on `packed-refs`.
+  `git submodule add` fail for the agent (both write `.git/config`) —
+  including the tracking write of a first `git push -u`, so agents push
+  without `-u` (`git push origin <branch>`; the transfer itself is
+  unaffected); agent-side `git gc` can hit the sticky bit on
+  `packed-refs`.
 - What it does **not** close: the `.git` pointer *file* inside
   agent-created worktree trees (delete+recreate sidesteps a pin — work in
   the protected main checkout, not in agent worktrees), and agent-owned

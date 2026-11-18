@@ -91,7 +91,10 @@ expect the reported paths to exist locally.
   creation (review-concept.md, "Round typing and tiering") — the
   review re-derives it; a missing line is a disclosed deviation.
   Merging the PR and closing the review loop stay with the
-  maintainer. (RM-0097)
+  maintainer. Push **without `-u`** (`git push origin <branch>`): the
+  `.git` heal pins `.git/config` developer-owned (issue #651), so the
+  tracking write a first `git push -u` performs fails with
+  `Operation not permitted` — the push itself transfers fine. (RM-0097)
 - **All shipped content is English** — scripts, docs, prompts, messages. (RM-0098)
 - **Follow `agent/conventions.md`** for interactive prompts, output
   style, shell security (untrusted input), and other shipped-code

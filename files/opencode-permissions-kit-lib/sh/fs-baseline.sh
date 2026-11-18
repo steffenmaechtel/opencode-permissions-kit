@@ -479,7 +479,10 @@ _fsb_pass() {
 # the heal pins.
 #
 # Accepted workflow costs (shipped with #651): repo-scope `git config`
-# and `git submodule add` fail for the agent (both write .git/config);
+# and `git submodule add` fail for the agent (both write .git/config) —
+# including the tracking write of a first `git push -u`, so agents push
+# without -u (git push origin <branch>; the transfer itself is
+# unaffected — live-confirmed in the pilot session, PR #654 wave);
 # agent-side `git gc` can hit the sticky bit renaming packed-refs;
 # merges inside agent-created worktrees keep working (their gitdir
 # retains create rights — only the two pointer files are pinned).
