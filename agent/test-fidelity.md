@@ -30,6 +30,15 @@ are all absent there too.
 
 ## 2. The bug classes that live in the gaps
 
+The classes below are environment gaps; the file's thesis has a
+test-machinery twin — a double whose guarded arm is never reached,
+the suite green, the real path unexercised. Live instance: pr-00621
+round b B1, a PATH stat stub whose quoted-heredoc quoting killed the
+reach-through (rc 126) while the pin's markers asserted a downstream
+rc and passed from the wrong arm (issue #626; the stub idiom and the
+arm-discrimination duty live in conventions.md, "Quoting-aware test
+machinery").
+
 ### 2.1 stdin semantics — the `b14a198` class
 
 The production bug: `ddev-migrate export` looped over projects via
