@@ -1765,6 +1765,44 @@ case "$_w5k_out" in
 esac
 rm -rf "${_w5k:?}"
 
+# b S1 (#642): an ESC-carrying NON-dash name passes the import name
+# gate, imports, and reaches _dmi_drop_publish — the warn arms must
+# print the SCRUBBED name (the round-a sweep missed the two
+# continuation-wrapped sites here; this pin closes that gap). The
+# dir-guard arm is driven deterministically (a directory planted at
+# the manifest path — no privilege dependence, unlike the read-only
+# 555 legs).
+_w5s1="$(work_new)"
+mkdir -p "$_w5s1/dumps/manifest.conf" "$_w5s1/tmp"
+printf 'OK|%s|127.0.0.1|a.sql.gz\n' "evil$(printf '\033')[2Kcancel" >"$_w5s1/dumps/manifest.staged"
+printf 'A\n' >"$_w5s1/dumps/a.sql.gz"
+{
+    printf '%s\n' \
+        'dm_dir=$1' 'dm_bin=ddev' 'dm_oc=x' 'dm_oc_h=/h' 'dm_oc_i=1' '' \
+        'dm_extra=' 'dm_ok=0' 'dm_failed=""' \
+        'sudo() { return 0; }' \
+        'dm_manifest=$1/manifest.staged' \
+        'dm_resid=$(mktemp)'
+    printf 'cat "$dm_manifest" >"$dm_resid"\n'
+    sed -n '/^_ddev_migrate_show()/,/^}/p' "$MIG"
+    sed -n '/^    _dmi_drop_publish()/,/^    }/p' "$MIG"
+    sed -n "/while IFS='|' read -r dm_st dm_n dm_ar dm_f; do/,/done <\"\$dm_manifest\"/p" "$MIG"
+    printf 'rm -f "$dm_resid"\n'
+} >"$_w5s1/run.sh"
+_w5s1_out="$(TMPDIR="$_w5s1/tmp" sh "$_w5s1/run.sh" "$_w5s1/dumps" 2>&1)" || true
+case "$_w5s1_out" in
+    *"$(printf '\033')"*)
+        fail "drop-publish warn carries a raw escape byte (#642 b S1)"
+        ;;
+    *) pass "drop-publish warn output carries no raw escape byte (#642 b S1)" ;;
+esac
+if printf '%s' "$_w5s1_out" | grep -qF 'after dropping evil?[2Kcancel'; then
+    pass "dir-guard warn shows the SCRUBBED name (#642 b S1)"
+else
+    fail "dir-guard warn must show the scrubbed name (#642 b S1)"
+fi
+rm -rf "${_w5s1:?}"
+
 # static: the import loop builds HOME via getent and rides conditional
 # backend vars as single quoted arguments (0.0.43a F6/F12).
 check_live "import resolves the agent HOME via getent (not /home/<user>)" "$MIG" -qF 'dm_oc_h=$(getent passwd'

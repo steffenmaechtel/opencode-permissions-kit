@@ -344,7 +344,9 @@ ddev_migrate_has_db() {
 # value stays the data currency (manifest lines, grep -F operands,
 # argv, paths).
 _ddev_migrate_show() {
-    printf '%s' "$1" | LC_ALL=C sed 's/[^ -~]/?/g'
+    # Run-collapsing (#642 b S2): a multi-byte UTF-8 approot degrades
+    # to one '?' per character, not per byte.
+    printf '%s' "$1" | LC_ALL=C sed 's/[^ -~][^ -~]*/?/g'
 }
 
 # ddev_migrate_export <dev-user> <opencode-user> <opencode-group> <root> [root ...]
@@ -388,8 +390,9 @@ ddev_migrate_export() {
     if [ -n "$dm_outside" ]; then
         echo "  WARNING: $(printf '%s\n' "$dm_outside" | grep -c .) registered ddev project(s)""\
  are OUTSIDE the given roots — NOT exported:"
-        # Names are registry-derived: scrubbed for display (#642 a S1).
-        printf '%s\n' "$dm_outside" | LC_ALL=C sed -e 's/[^ -~]/?/g' -e 's/^/    /'
+        # Names are registry-derived: scrubbed for display (#642 a S1),
+        # run-collapsing like the helper (#642 b S2).
+        printf '%s\n' "$dm_outside" | LC_ALL=C sed -e 's/[^ -~][^ -~]*/?/g' -e 's/^/    /'
     fi
 
     dm_stamp=$(date +%Y%m%d-%H%M%S)
@@ -898,7 +901,7 @@ ddev_migrate_import() {
         if [ -d "${dm_dir:?}/manifest.conf" ]; then
             rm -f "$_ddp_p" 2>/dev/null || true
             echo "    warn: dump manifest path is a directory — could not republish""\
- after dropping $_ddp_n — a re-run will re-import it" >&2
+ after dropping $_ddp_show — a re-run will re-import it" >&2
             return 0
         fi
         # Rename-only publish: replaces a planted manifest.conf link
@@ -907,7 +910,7 @@ ddev_migrate_import() {
         mv -f "$_ddp_p" "${dm_dir:?}/manifest.conf" 2>/dev/null || {
             rm -f "$_ddp_p" 2>/dev/null || true
             echo "    warn: could not republish the dump manifest after""\
- dropping $_ddp_n — a re-run will re-import it" >&2
+ dropping $_ddp_show — a re-run will re-import it" >&2
             return 0
         }
         return 0
