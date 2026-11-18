@@ -677,16 +677,49 @@ mkdir -p "$_s4root/proj"
     esac
 ) >"$WORK/s4-sweep.out" 2>&1 || true
 
+# Sweep completion — a dead getfacl probe is unknown too (rc 2), and the
+# restructured capture still honors a named ACL entry with x. The 0700 dir
+# keeps the %A arm from short-circuiting so both reach the getfacl arm.
+_s4gbin="$WORK/s4getfaclfail"
+_s4gbin2="$WORK/s4getfaclgrant"
+mkdir -p "$_s4gbin" "$_s4gbin2" "$WORK/s4acl/proj"
+cat >"$_s4gbin/getfacl" <<'GFAILEOF'
+#!/bin/sh
+exit 1
+GFAILEOF
+cat >"$_s4gbin2/getfacl" <<'GGRANTEOF'
+#!/bin/sh
+printf 'user:named-user:r-x\n'
+GGRANTEOF
+chmod +x "$_s4gbin/getfacl" "$_s4gbin2/getfacl"
+chmod 700 "$WORK/s4acl"
+(
+    . "$UI_LIB"
+    . "$STATUS_CORE"
+    PATH="$_s4gbin:$PATH"
+    export PATH
+    _s4rc=0
+    _st_ancestor_grants_x "$WORK/s4acl" || _s4rc=$?
+    [ "$_s4rc" -eq 2 ] && echo G-GETFACL-RC2-OK
+    case "$(_st_root_blocker "$WORK/s4acl/proj")" in
+        unknown:*) echo G-BLOCKER-UNKNOWN-OK ;;
+    esac
+    PATH="$_s4gbin2:$PATH"
+    _st_ancestor_grants_x "$WORK/s4acl" && echo G-GETFACL-GRANT-OK
+) >"$WORK/s4-getfacl.out" 2>&1 || true
+
 _s4_ok=0
 for _want in S1-EMPTY-RC2-OK S1-GROUPS-RC2-OK S2-GROUPW-RC2-OK S2-WORLDW-OK \
-    S2-NONGROUPW-GREEN-OK S4-BLOCKER-UNKNOWN-OK; do
-    if grep -q "$_want" "$WORK/s4-s1.out" "$WORK/s4-s2.out" "$WORK/s4-sweep.out"; then
+    S2-NONGROUPW-GREEN-OK S4-BLOCKER-UNKNOWN-OK G-GETFACL-RC2-OK \
+    G-BLOCKER-UNKNOWN-OK G-GETFACL-GRANT-OK; do
+    if grep -q "$_want" "$WORK/s4-s1.out" "$WORK/s4-s2.out" "$WORK/s4-sweep.out" \
+        "$WORK/s4-getfacl.out"; then
         _s4_ok=$((_s4_ok + 1))
     else
         fail "group-probe failure pin: missing $_want"
     fi
 done
-[ "$_s4_ok" -eq 6 ] && pass "group-probe failure helpers: 6/6 (#594 S1/S2 + sweep)"
+[ "$_s4_ok" -eq 9 ] && pass "group-probe failure helpers: 9/9 (#594 S1/S2 + sweep)"
 
 # S2 section — id -nG fails mid-run; the group-writable socket must render
 # the uncounted unknown rows and never the counted green "not agent-reachable".
@@ -703,9 +736,10 @@ _s4out=$(
     ) 2>&1
 ) || true
 if printf '%s' "$_s4out" | grep -qF 'unknown — cannot resolve root groups (id -nG failed)' &&
-    printf '%s' "$_s4out" | grep -qF 'unknown (cannot stat the socket)' &&
+    printf '%s' "$_s4out" | grep -qF 'unknown (cannot resolve agent groups)' &&
+    ! printf '%s' "$_s4out" | grep -qF 'cannot stat the socket' &&
     ! printf '%s' "$_s4out" | grep -qF 'not agent-reachable'; then
-    pass "id -nG failure: unknown groups + socket rows, never counted green (#594 S2)"
+    pass "id -nG failure: groups row + cause-named socket row, never counted green (#594 S2)"
 else
     fail "id -nG failure section (out=$(printf '%s' "$_s4out" | head -5))"
 fi
@@ -735,10 +769,12 @@ fi
 
 if live_src "$STATUS_CORE" | grep -qF 'ssr_grp=$(stat -c %G "$1" 2>/dev/null) || return 2' &&
     live_src "$STATUS_CORE" | grep -qF 'sra_groups=$(id -nG "$OPENCODE_USER" 2>/dev/null) || sra_groups_rc=$?' &&
-    live_src "$STATUS_CORE" | grep -qF 'status_sock_agent_reachable "$sra_s" "$sra_groups" "$sra_groups_rc"'; then
-    pass "source wiring: group probes capture their own rc (#594)"
+    live_src "$STATUS_CORE" | grep -qF 'status_sock_agent_reachable "$sra_s" "$sra_groups" "$sra_groups_rc"' &&
+    live_src "$STATUS_CORE" | grep -qF '_stx_acl=$(getfacl -p "$1" 2>/dev/null) || return 2' &&
+    live_src "$STATUS_CORE" | grep -qF 'ui_kv "socket" "$sra_s — unknown (cannot resolve agent groups)"'; then
+    pass "source wiring: group/ACL probes capture their own rc, socket row names the cause (#594)"
 else
-    fail "source wiring: group probes capture their own rc (#594)"
+    fail "source wiring: group/ACL probes capture their own rc, socket row names the cause (#594)"
 fi
 
 # --- 1d. live ddev version probe (issue #56) -------------------------------------

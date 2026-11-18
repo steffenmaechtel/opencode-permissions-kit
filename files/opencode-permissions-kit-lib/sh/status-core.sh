@@ -666,10 +666,11 @@ EOF
 # writes group:<group> entries; a foreign named entry is almost
 # certainly a manual traversal fix). Mask reduction is ignored — the
 # warning would only be a false negative then.
-# rc 2 = a stat probe failed (#594 class sweep: the #569 M2 sweep covered
-# stat %a, but stat %A / %G fold a dead probe into the counted "blocks
-# traversal" warning in exactly the same way). _st_root_blocker turns rc 2
-# into an uncounted unknown row, never a counted verdict.
+# rc 2 = a probe failed (#594 class sweep: the #569 M2 sweep covered
+# stat %a, but stat %A / %G — and getfacl — fold a dead probe into the
+# counted "blocks traversal" warning in exactly the same way).
+# _st_root_blocker turns rc 2 into an uncounted unknown row, never a
+# counted verdict.
 _st_ancestor_grants_x() {
     _stx_mode=$(stat -c %A "$1" 2>/dev/null) || return 2
     # other x: literal x or the sticky form t (/tmp); group x: literal x
@@ -677,7 +678,11 @@ _st_ancestor_grants_x() {
     case "$_stx_mode" in
         ?????????x | ?????????t) return 0 ;;
     esac
-    getfacl -p "$1" 2>/dev/null | grep -qE '^(user|group):[^:]+:..x' && return 0
+    # #594 sweep completion: getfacl is a probe too — a dead ACL probe
+    # must not fold into the counted blocker verdict (rc 1); it is
+    # unknown (rc 2), same discipline as the stat arms.
+    _stx_acl=$(getfacl -p "$1" 2>/dev/null) || return 2
+    printf '%s' "$_stx_acl" | grep -qE '^(user|group):[^:]+:..x' && return 0
     _stx_grp=$(stat -c %G "$1" 2>/dev/null) || return 2
     if [ "$_stx_grp" = "$OPENCODE_GROUP" ]; then
         case "$_stx_mode" in ??????x??? | ??????s???) return 0 ;; esac
@@ -1530,8 +1535,14 @@ status_section_root_equiv() {
             sra_finding=true
         elif [ "$sra_s_rc" -eq 2 ]; then
             # #569 M2 class sweep: uncounted unknown, never a counted green
-            # over a probe that never ran
-            ui_kv "socket" "$sra_s — unknown (cannot stat the socket)"
+            # over a probe that never ran. #594: rc 2 has two causes now —
+            # name the one the caller knows (a dead id -nG probe is not a
+            # socket-stat failure; the groups row above already names it).
+            if [ "$sra_groups_rc" -ne 0 ]; then
+                ui_kv "socket" "$sra_s — unknown (cannot resolve agent groups)"
+            else
+                ui_kv "socket" "$sra_s — unknown (cannot stat the socket)"
+            fi
         else
             ui_kv_ok "socket" "$sra_s — present, not agent-reachable"
         fi
