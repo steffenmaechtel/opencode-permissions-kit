@@ -10,7 +10,10 @@ Did you stumble over anything?
 
 If yes, create a GitHub issue with title prefix "Docs: " and labels
 "from-reflection" + "prio:med" + "internal workflow/tests" (exact
-repo labels).
+repo labels). The issue body narrates the incident step by step —
+what happened, in which order, the observable state (session
+records, logs, opencode.db where useful) — so a later session can
+re-derive the case without guessing (maintainer directive, #620).
 
 If the reflection finds nothing real, say exactly that in chat and
 create nothing.
