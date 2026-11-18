@@ -948,9 +948,10 @@ p10_lane_c_hits() { # $1 root, $2 scope; loud on scan death (#519:
     # workflows, line-length: explicit lists; sandbox-policy: an
     # explicit tests/e2e '*.sh' walk -- prunes basename dumps since
     # #596 (find -prune arm, closing the #593 b B2 latent false-red:
-    # a readable dump with an unguarded rm-suffix shape no longer
-    # reaches check 3, container-ownership shielding is no longer
-    # load-bearing there).
+    # the historical green was content luck, not container ownership
+    # -- dumps are readable on rootless/local checkouts, and a dumped
+    # .sh with an unguarded rm-suffix shape would have false-redded
+    # check 3, #628 a M2).
     _c_rc=0
     grep -rn "RM-[0-9][0-9][0-9][0-9]" \
         --include="*.md" --include="*.sh" --include="*.py" --include="*.yml" \

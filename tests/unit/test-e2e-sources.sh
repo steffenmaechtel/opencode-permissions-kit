@@ -151,8 +151,8 @@ check_live "lib.sh fetches the installer to a temp name first (#485 F30)" "$LIB"
     -qF -- '-o "$_oc_ins_tmp"'
 check_live "lib.sh moves the fetched installer into place atomically (#485 F30)" "$LIB" \
     -qF 'mv -f "$_oc_ins_tmp" "$OC_INSTALLER"'
-check_live "lib.sh chmods the landed installer world-readable (#601)" "$LIB" \
-    -qF 'chmod 644 "$OC_INSTALLER"'
+check_live "lib.sh chmods the fetched installer temp world-readable before the mv (#601, #628 a M1)" "$LIB" \
+    -qF 'chmod 644 "$_oc_ins_tmp"'
 
 # Behavioral drive of the real e2e_resolve_cache against a fake curl:
 # the lib copy's OC_CACHE_DIR is rewritten into scratch (the ONE
@@ -236,11 +236,12 @@ INSTCURL
         fail "installer cache: empty cached installer treated as fresh (rc=$_rc)"
     fi
     # #601 failure arm: a chmod that cannot land 644 must remove the
-    # file (the next run refetches) and fail loud — never persist an
-    # unreadable installer behind a green rc. Driven with an
-    # always-failing fake chmod ahead of the fake-curl bin dir; the
-    # FAIL line is a console progress line (echo -> stdout, like the
-    # neighboring fetch arms), so the drive captures stdout.
+    # temp (the next run refetches; nothing ever lands at the final
+    # name — #628 a M1 moved the chmod before the mv) and fail loud.
+    # Driven with an always-failing fake chmod ahead of the fake-curl
+    # bin dir; the FAIL line is a console progress line (echo ->
+    # stdout, like the neighboring fetch arms), so the drive captures
+    # stdout.
     mkdir -p "$INSTWORK/bin2"
     printf '#!/bin/sh\n# fake chmod: always fails (the #601 failure-arm drive)\nexit 1\n' \
         >"$INSTWORK/bin2/chmod"
@@ -254,11 +255,13 @@ INSTCURL
             sh -c '. "$1"; e2e_resolve_cache' _ "$INSTWORK/lib.sh" \
             >"$INSTWORK/chmod-fail.out" 2>/dev/null
     ) || _rc=$?
+    _ins_tmp2="$(find "$INSTWORK/cache" -name 'install.sh.tmp.*' 2>/dev/null || true)"
     if [ "$_rc" -ne 0 ] && [ ! -e "$INSTWORK/cache/install.sh" ] &&
+        [ -z "$_ins_tmp2" ] &&
         grep -q 'cannot make the fetched installer readable' "$INSTWORK/chmod-fail.out"; then
-        pass "installer cache: chmod failure removes the installer and fails loud (#601)"
+        pass "installer cache: chmod failure cleans the temp and fails loud, nothing lands (#601, #628 a M1)"
     else
-        fail "installer cache: chmod failure must remove the installer and fail loud (rc=$_rc, install.sh: $([ -e "$INSTWORK/cache/install.sh" ] && echo left))"
+        fail "installer cache: chmod failure must clean the temp and fail loud (rc=$_rc, install.sh: $([ -e "$INSTWORK/cache/install.sh" ] && echo left), tmp:$_ins_tmp2)"
     fi
 fi
 rm -rf "$INSTWORK"

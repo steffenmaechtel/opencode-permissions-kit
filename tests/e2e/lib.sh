@@ -453,23 +453,28 @@ e2e_resolve_cache() {
                 echo "  ${RED}FAIL${NC}  cannot fetch opencode installer"
                 exit 1
             }
-        mv -f "$_oc_ins_tmp" "$OC_INSTALLER" ||
-            {
-                rm -f "$_oc_ins_tmp"
-                echo "  ${RED}FAIL${NC}  cannot move fetched installer into place"
-                exit 1
-            }
         # #601: mktemp hands the temp 0600 and mv preserves the mode —
         # on a rootless docker backend the container's dev user maps to
         # a subuid != the file owner, so bash on a 0600 install.sh dies
         # "Permission denied" (run.sh section 1, surfaced behind a
-        # misleading "network issue?" fallback). World-readable like
-        # the rest of the cache; a failed chmod removes the file so the
-        # next run refetches instead of persisting the unreadable mode.
-        chmod 644 "$OC_INSTALLER" ||
+        # misleading "network issue?" fallback). The chmod lands on the
+        # TEMP before the mv (#628 a M1): a kill between the two then
+        # leaves temp debris only (never install.sh — the #485 F30
+        # doctrine), not a persisted 0600 file that [ ! -s ] would keep
+        # honoring. World-readable like the rest of the cache (the
+        # binary path rides upstream archive modes instead — the
+        # asymmetry is recorded as #628 a M3); a failed chmod removes
+        # the temp so the next run refetches.
+        chmod 644 "$_oc_ins_tmp" ||
             {
-                rm -f "$OC_INSTALLER"
+                rm -f "$_oc_ins_tmp"
                 echo "  ${RED}FAIL${NC}  cannot make the fetched installer readable"
+                exit 1
+            }
+        mv -f "$_oc_ins_tmp" "$OC_INSTALLER" ||
+            {
+                rm -f "$_oc_ins_tmp"
+                echo "  ${RED}FAIL${NC}  cannot move fetched installer into place"
                 exit 1
             }
     fi

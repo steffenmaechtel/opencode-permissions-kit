@@ -345,12 +345,14 @@ sfx_scan() {
     # #596: prune basename dumps from the traversal — e2e run evidence
     # (tests/e2e/dumps/<label>-<ts>/, the container's whole /tmp via
     # docker cp) holds dumped .sh files of exactly the name class this
-    # walk collects; a readable dump with an unguarded rm-suffix shape
-    # false-redded check 3 (the find filters below select what is
-    # PRINTED, not what is descended — only container ownership kept
-    # the walk out so far). Basename-scoped at any depth, mirroring
-    # pin10 lane c's --exclude-dir=dumps (#587, PR #593): living e2e
-    # scripts stay in the walk.
+    # walk collects. The walk has READ the dumps on rootless/local
+    # checkouts all along (opencode-owned, world-readable here) — what
+    # kept check 3 green was content: no dumped .sh carried an
+    # unguarded rm-suffix shape yet (#628 a M2), not the container
+    # ownership that shields rootful-CI hosts. The find filters below
+    # select what is PRINTED, not what is descended. Basename-scoped at
+    # any depth, mirroring pin10 lane c's --exclude-dir=dumps
+    # (#587, PR #593): living e2e scripts stay in the walk.
     find "$_sx_dir" -name dumps -prune -o \
         \( -name "${2:-test-*.sh}" -o -path '*/lib/*.sh' \) ! -name 'test-sandbox-policy.sh' -print |
         sort >"$_sx_list"
