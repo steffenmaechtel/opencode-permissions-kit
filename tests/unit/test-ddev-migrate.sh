@@ -624,6 +624,76 @@ check "refused names: the loop CONTINUES (a later project's start still runs)" \
 check "refused names: the wave still finishes (poweroff ran, no abort)" \
     sh -c "grep -q 'ddev:poweroff' \"\$1\"" _ "$WORK/ddev-run-e.log"
 
+# --- 4e3. option-shaped names: dash-leading registry keys never reach ddev
+# argv (#635) ------------------------------------------------------------
+# The scanner admits a `--all:` key (probe-verified against the awk),
+# and the loop's acting arms pass $dm_n by bare name with no `--`
+# separator: without the gate the fake ddev logs `start --all` — the
+# REAL ddev flag for every registered project at once — and export-db
+# runs with `--all` in flag position (unknown-flag on real ddev, but
+# the gate must not rely on ddev rejecting it). The in-dir operand
+# `--all.sql.gz` stays untouched: refusal happens at the loop top,
+# before any acting arm.
+cat >>"$WORK/devhome/.ddev/project_list.yaml" <<'YML'
+  --all:
+    approot: /var/tmp/opencode-ddev-mig-roots/vhosts/alpha
+YML
+OUTD=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev-run-d.log" \
+    DDEV_MIG_DEV_HOME="$WORK/devhome" \
+    PATH="$WORK/bin:$PATH" \
+    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null 2>&1) || true
+case "$OUTD" in
+    *"REFUSED — option-shaped project name (--all)"*)
+        pass "dash-leading registry name refused loudly, before any acting arm (#635)"
+        ;;
+    *) fail "dash-leading registry name must be refused loudly (got: $OUTD) (#635)" ;;
+esac
+check_absent "refused dash name: ddev start never sees it as a flag" \
+    "$WORK/ddev-run-d.log" -q 'ddev:start --all'
+check_absent "refused dash name: export-db never sees it as a flag" \
+    "$WORK/ddev-run-d.log" -q 'ddev:export-db --all'
+check_absent "refused dash name: stop never sees it as a flag" \
+    "$WORK/ddev-run-d.log" -q 'ddev:stop --all'
+check "refused dash name: FAIL entry lands in the manifest (the failed-list carrier)" \
+    sh -c "grep -q '^FAIL|--all|' \"\$1\"" _ "$DUMP_DIR/manifest.conf"
+check_fail "refused dash name: no OK line is written for it" \
+    sh -c "grep -q '^OK|--all|' \"\$1\"" _ "$DUMP_DIR/manifest.conf"
+check_fail "refused dash name: no in-dir operand is created for it" \
+    test -e "$DUMP_DIR/--all.sql.gz"
+check "refused dash name: the loop CONTINUES (a later project's start still runs)" \
+    sh -c "grep -q 'ddev:start nodbrt' \"\$1\"" _ "$WORK/ddev-run-d.log"
+check "refused dash name: the wave still finishes (poweroff ran, no abort)" \
+    sh -c "grep -q 'ddev:poweroff' \"\$1\"" _ "$WORK/ddev-run-d.log"
+
+# Display-scrub leg (#642 a S1): an ESC-carrying registry key must be
+# REFUSED with a SCRUBBED name in the operator output (escape bytes
+# forge transcript lines — the uninstall-core pr-00263 a F9 class),
+# while the manifest FAIL line keeps the RAW name (data currency:
+# grep -F operands, repair guidance).
+printf -- '  -%s[2Kevil:\n    approot: /var/tmp/opencode-ddev-mig-roots/vhosts/alpha\n' \
+    "$(printf '\033')" >>"$WORK/devhome/.ddev/project_list.yaml"
+OUTESCR=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev-run-esc.log" \
+    DDEV_MIG_DEV_HOME="$WORK/devhome" \
+    PATH="$WORK/bin:$PATH" \
+    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null 2>&1) || true
+case "$OUTESCR" in
+    *"$(printf '\033')"*)
+        fail "raw escape byte reached the operator output (#642 a S1)"
+        ;;
+    *) pass "operator output carries no raw escape byte (#642 a S1)" ;;
+esac
+if printf '%s' "$OUTESCR" | grep -qF 'option-shaped project name (-?[2Kevil)'; then
+    pass "REFUSED line shows the SCRUBBED name (#642 a S1)"
+else
+    fail "REFUSED line must show the scrubbed name (#642 a S1)"
+fi
+_esckey="-$(printf '\033')[2Kevil"
+if grep -qF -- "FAIL|${_esckey}|" "$DUMP_DIR/manifest.conf" 2>/dev/null; then
+    pass "manifest FAIL line keeps the RAW name — display-only scrub (#642 a S1)"
+else
+    fail "manifest FAIL line must keep the raw name (#642 a S1)"
+fi
+
 # --- 4f. the seed's owner arm refuses a manifest the dev does not own (0.0.44d F4/C3) --
 # The manifest in $DUMP_DIR is owned by the CURRENT user; running the
 # export with dm_dev=nobody (an existing unrelated user) must hit the
@@ -803,7 +873,7 @@ check_absent "D3/Y1: the drop never redirects into the dump dir" \
 # the reachable arms (grep-rc2 via 5c, publish-mv and mktemp here,
 # the dir-guard via the U1 leg).
 check_live "X3: mktemp-drop arm warns (static presence)" "$MIG" -qF 'cannot stage the manifest drop for'
-check_live "X3: grep-rc2 arm warns (static presence)" "$MIG" -qF 'could not drop $_ddp_n from the dump manifest'
+check_live "X3: grep-rc2 arm warns (static presence)" "$MIG" -qF 'could not drop $_ddp_show from the dump manifest'
 check_live "X3: residual-mv arm warns (static presence)" "$MIG" -qF 'could not update the residual manifest for'
 check_live "X3: mktemp-publish arm warns (static presence)" "$MIG" -qF 'cannot stage the manifest republish for'
 check_live "X3: copy arm warns (static presence)" "$MIG" -qF 'could not copy the residual manifest for'
@@ -857,6 +927,7 @@ printf 'B\n' >"$_w5b/dumps/b.sql.gz"
         'dm_manifest=$(mktemp)' \
         'dm_resid=$(mktemp)'
     printf 'cat "$1/manifest.conf" >"$dm_manifest" && cat "$dm_manifest" >"$dm_resid"\n'
+    sed -n '/^_ddev_migrate_show()/,/^}/p' "$MIG"
     sed -n '/^    _dmi_drop_publish()/,/^    }/p' "$MIG"
     sed -n "/while IFS='|' read -r dm_st dm_n dm_ar dm_f; do/,/done <\"\$dm_manifest\"/p" "$MIG"
     printf 'rm -f "$dm_manifest" "$dm_resid"\n'
@@ -922,6 +993,7 @@ printf 'A\n' >"$_w5x2/dumps/a.sql.gz"
         'dm_manifest=$(mktemp)' \
         'dm_resid=$(mktemp)'
     printf 'cat "$1/manifest.conf" >"$dm_manifest" && cat "$dm_manifest" >"$dm_resid"\n'
+    sed -n '/^_ddev_migrate_show()/,/^}/p' "$MIG"
     sed -n '/^    _dmi_drop_publish()/,/^    }/p' "$MIG"
     sed -n "/while IFS='|' read -r dm_st dm_n dm_ar dm_f; do/,/done <\"\$dm_manifest\"/p" "$MIG"
     printf 'rm -f "$dm_manifest" "$dm_resid"\n'
@@ -955,6 +1027,7 @@ printf 'A\n' >"$_w5v2/dumps/a.sql.gz"
         'dm_manifest=$(mktemp)' \
         'dm_resid=$(mktemp)'
     printf 'cat "$1/manifest.conf" >"$dm_manifest" && cat "$dm_manifest" >"$dm_resid"\n'
+    sed -n '/^_ddev_migrate_show()/,/^}/p' "$MIG"
     sed -n '/^    _dmi_drop_publish()/,/^    }/p' "$MIG"
     sed -n "/while IFS='|' read -r dm_st dm_n dm_ar dm_f; do/,/done <\"\$dm_manifest\"/p" "$MIG"
     printf 'rm -f "$dm_manifest" "$dm_resid"\n'
@@ -983,6 +1056,7 @@ printf 'A\n' >"$_w5u1/dumps/a.sql.gz"
         'dm_manifest=$1/manifest.staged' \
         'dm_resid=$(mktemp)'
     printf 'cat "$dm_manifest" >"$dm_resid"\n'
+    sed -n '/^_ddev_migrate_show()/,/^}/p' "$MIG"
     sed -n '/^    _dmi_drop_publish()/,/^    }/p' "$MIG"
     sed -n "/while IFS='|' read -r dm_st dm_n dm_ar dm_f; do/,/done <\"\$dm_manifest\"/p" "$MIG"
     printf 'rm -f "$dm_resid"\n'
@@ -1008,6 +1082,7 @@ printf 'A\n' >"$_w5v3/dumps/a.sql.gz"
         'dm_manifest=$1/manifest.staged' \
         'dm_resid=$1/resid'
     printf 'cat "$dm_manifest" >"$dm_resid"\n'
+    sed -n '/^_ddev_migrate_show()/,/^}/p' "$MIG"
     sed -n '/^    _dmi_drop_publish()/,/^    }/p' "$MIG"
     sed -n "/while IFS='|' read -r dm_st dm_n dm_ar dm_f; do/,/done <\"\$dm_manifest\"/p" "$MIG"
 } >"$_w5v3/run.sh"
@@ -1041,6 +1116,7 @@ cp "$_w5c/dumps/manifest.conf" "$_w5c/dumps/manifest.staged"
         'dm_manifest=$1/manifest.staged' \
         'dm_resid=$1/resid.unreadable'
     printf 'cat "$dm_manifest" >"$dm_resid" && chmod 000 "$dm_resid"\n'
+    sed -n '/^_ddev_migrate_show()/,/^}/p' "$MIG"
     sed -n '/^    _dmi_drop_publish()/,/^    }/p' "$MIG"
     sed -n "/while IFS='|' read -r dm_st dm_n dm_ar dm_f; do/,/done <\"\$dm_manifest\"/p" "$MIG"
 } >"$_w5c/run.sh"
@@ -1633,6 +1709,99 @@ else
     pass "import: closing cleanup hint has no resolved binary path (#568 b Y3)"
 fi
 rm -rf "${_w5j:?}"
+
+# --- 4c4. the project NAME: a dash-shaped manifest name is REFUSED before
+# any ddev hop (#635) — argv option injection --------------------------------
+# $dm_n rides `start`/`import-db` argv by bare name; `start` really
+# carries `--all` (measured against ddev's source at 319fa3d3d — the
+# fact table lives in internal/records/ddev-cli-contract.md), so a
+# forged OK line with a dash name would start every opencode-side
+# project. The sudo shim records every hop's argv and fails — the
+# discriminator is WHAT reached the hop, not its rc: the log file
+# exists from the start, so an empty log is "no hop", never a
+# missing-file accident. The dump operand is REACHABLE and regular on
+# purpose: without the gate the pre-hop flow passes every operand
+# check (the #420 a A10 reachability rule), so the red comes from the
+# gate's own assertion.
+_w5k="$(work_new)"
+mkdir -p "$_w5k/bin" "$_w5k/dump"
+printf '#!/bin/sh\necho 0\n' >"$_w5k/bin/id"
+chmod +x "$_w5k/bin/id"
+printf '#!/bin/sh\necho "sudo:$*" >> "%s/sudo.log"\nexit 1\n' "$_w5k" >"$_w5k/bin/sudo"
+chmod +x "$_w5k/bin/sudo"
+: >"$_w5k/sudo.log"
+printf 'OK|--all|/roots/alpha|alpha.sql.gz\n' >"$_w5k/dump/manifest.conf"
+printf 'DASH-DUMP\n' >"$_w5k/dump/alpha.sql.gz"
+_w5k_out=$(PATH="$_w5k/bin:$PATH" sh -c \
+    '. "$1" && _ddev_migrate_bin() { echo /usr/bin/true; } && ddev_migrate_import "$2"' \
+    _ "$MIG" "$_w5k/dump" 2>&1) || true
+case "$_w5k_out" in
+    *"REFUSED — option-shaped project name"*)
+        pass "import: a dash-shaped manifest name is refused loudly (#635)"
+        ;;
+    *)
+        fail "import: a dash-shaped manifest name must be refused (got: $_w5k_out) (#635)"
+        ;;
+esac
+case "$_w5k_out" in
+    *"failed: --all"*)
+        pass "import: the refused dash name lands in the failed list, rc degrades (#635)"
+        ;;
+    *)
+        fail "import: the refused dash name must land in the failed list (got: $_w5k_out) (#635)"
+        ;;
+esac
+check_absent "import: the dash name never reaches a ddev hop as a flag" \
+    "$_w5k/sudo.log" -q 'start --all'
+check_absent "import: no import-db hop for the dash name either" \
+    "$_w5k/sudo.log" -q 'import-db --all'
+case "$_w5k_out" in
+    *"importing --all"*)
+        fail "import: the pre-hop echo must not run for the dash name (#635)"
+        ;;
+    *)
+        pass "import: no importing echo for the dash name (#635)"
+        ;;
+esac
+rm -rf "${_w5k:?}"
+
+# b S1 (#642): an ESC-carrying NON-dash name passes the import name
+# gate, imports, and reaches _dmi_drop_publish — the warn arms must
+# print the SCRUBBED name (the round-a sweep missed the two
+# continuation-wrapped sites here; this pin closes that gap). The
+# dir-guard arm is driven deterministically (a directory planted at
+# the manifest path — no privilege dependence, unlike the read-only
+# 555 legs).
+_w5s1="$(work_new)"
+mkdir -p "$_w5s1/dumps/manifest.conf" "$_w5s1/tmp"
+printf 'OK|%s|127.0.0.1|a.sql.gz\n' "evil$(printf '\033')[2Kcancel" >"$_w5s1/dumps/manifest.staged"
+printf 'A\n' >"$_w5s1/dumps/a.sql.gz"
+{
+    printf '%s\n' \
+        'dm_dir=$1' 'dm_bin=ddev' 'dm_oc=x' 'dm_oc_h=/h' 'dm_oc_i=1' '' \
+        'dm_extra=' 'dm_ok=0' 'dm_failed=""' \
+        'sudo() { return 0; }' \
+        'dm_manifest=$1/manifest.staged' \
+        'dm_resid=$(mktemp)'
+    printf 'cat "$dm_manifest" >"$dm_resid"\n'
+    sed -n '/^_ddev_migrate_show()/,/^}/p' "$MIG"
+    sed -n '/^    _dmi_drop_publish()/,/^    }/p' "$MIG"
+    sed -n "/while IFS='|' read -r dm_st dm_n dm_ar dm_f; do/,/done <\"\$dm_manifest\"/p" "$MIG"
+    printf 'rm -f "$dm_resid"\n'
+} >"$_w5s1/run.sh"
+_w5s1_out="$(TMPDIR="$_w5s1/tmp" sh "$_w5s1/run.sh" "$_w5s1/dumps" 2>&1)" || true
+case "$_w5s1_out" in
+    *"$(printf '\033')"*)
+        fail "drop-publish warn carries a raw escape byte (#642 b S1)"
+        ;;
+    *) pass "drop-publish warn output carries no raw escape byte (#642 b S1)" ;;
+esac
+if printf '%s' "$_w5s1_out" | grep -qF 'after dropping evil?[2Kcancel'; then
+    pass "dir-guard warn shows the SCRUBBED name (#642 b S1)"
+else
+    fail "dir-guard warn must show the scrubbed name (#642 b S1)"
+fi
+rm -rf "${_w5s1:?}"
 
 # static: the import loop builds HOME via getent and rides conditional
 # backend vars as single quoted arguments (0.0.43a F6/F12).
