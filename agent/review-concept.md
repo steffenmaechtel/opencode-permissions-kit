@@ -125,7 +125,11 @@ back):
   scaffolding twice wrote a fabricated second URL into the log (an
   unrelated comment id, then a GraphQL node id), and the log is the
   seam check's substrate — a polluted log invites a false seam pass
-  (pr-00605). (RM-0175)
+  (pr-00605). Where the harness's shell scanner refuses command
+  substitution, the same contract holds piped: `gh pr comment …
+  --body-file <f> | tee -a posted.log` — the URL is still the
+  posting command's own stdout, teed, never reconstructed (#623
+  item 3). (RM-0175)
 - The loop cap (default 6) is a hard brake, not a target: from round 5
   on, the loop status reports the distance to the cap; reaching the cap
   hands the case to the maintainer instead of starting another round.
