@@ -680,9 +680,14 @@ _st_ancestor_grants_x() {
     esac
     # #594 sweep completion: getfacl is a probe too — a dead ACL probe
     # must not fold into the counted blocker verdict (rc 1); it is
-    # unknown (rc 2), same discipline as the stat arms.
-    _stx_acl=$(getfacl -p "$1" 2>/dev/null) || return 2
-    printf '%s' "$_stx_acl" | grep -qE '^(user|group):[^:]+:..x' && return 0
+    # unknown (rc 2), same discipline as the stat arms. Exception (#621
+    # a S1): a host WITHOUT getfacl (acl package lost post-install) must
+    # not go audit-blind — the section degrades deliberately to stat-only
+    # verdicts with one disclosed row instead.
+    if command -v getfacl >/dev/null 2>&1; then
+        _stx_acl=$(getfacl -p "$1" 2>/dev/null) || return 2
+        printf '%s' "$_stx_acl" | grep -qE '^(user|group):[^:]+:..x' && return 0
+    fi
     _stx_grp=$(stat -c %G "$1" 2>/dev/null) || return 2
     if [ "$_stx_grp" = "$OPENCODE_GROUP" ]; then
         case "$_stx_mode" in ??????x??? | ??????s???) return 0 ;; esac
@@ -724,6 +729,10 @@ status_section_projects() {
     ui_section "Projects ($_st_pc)"
 
     if [ -f "$PROJECTS_CONF" ] && [ -s "$PROJECTS_CONF" ]; then
+        # (#621 a S1): a missing getfacl degrades the audit deliberately
+        # to stat-only verdicts — one disclosed uncounted row, never silence.
+        command -v getfacl >/dev/null 2>&1 ||
+            ui_kv "ACL probe" "unavailable (getfacl missing) — traversal verdicts are stat-only"
         while IFS= read -r root; do
             [ -z "$root" ] && continue
             # Symlinked root (review a X4, issue #245): a link's mode is
@@ -756,8 +765,10 @@ status_section_projects() {
             case "$_st_block" in
                 unknown:*)
                     # #594: uncounted unknown, never the counted
-                    # "blocks traversal" warning over a probe that died
-                    ui_kv "$root" "traversal unknown — cannot stat an ancestor (probe failed)"
+                    # "blocks traversal" warning over a probe that died.
+                    # (#621 a M2) rc 2 fires from stat AND ACL probes —
+                    # the row names the class, not one tool.
+                    ui_kv "$root" "traversal unknown — an ancestor probe failed (stat or ACL)"
                     ;;
                 "")
                     ;;
@@ -1405,8 +1416,9 @@ status_groups_hits() {
 # rc 2 = a probe failed (#569 M2 class sweep, third instance; #594 widened
 # it to the second stat and to the caller's id -nG probe): the caller renders
 # an uncounted unknown row. An empty group name must never degenerate the
-# comparison to *" "* (false red on an empty list, false green otherwise),
-# and an id -nG failure must never render a group-writable socket green with
+# comparison to *" "* — the padding spaces matched ANY groups list, so a
+# dead probe always rendered the counted red (uniformly a false red,
+# #621 a Q2), and an id -nG failure must never render a group-writable socket green with
 # the comparison never run. <groups-probe-rc> defaults to 0 for callers that
 # probed groups independently (unit helpers).
 status_sock_agent_reachable() {

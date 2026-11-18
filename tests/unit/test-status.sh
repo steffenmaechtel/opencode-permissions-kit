@@ -629,9 +629,9 @@ chmod 660 "$_s4sock"
 _s4grp=$(id -gn)
 
 # S1 — second stat failure returns rc 2 for an empty AND a non-empty groups
-# list: the old empty ssr_grp made *" "* match "  " (false red on an empty
-# list) and miss a real group name (false green when the socket's group IS
-# among the agent's groups).
+# list: the old empty ssr_grp made *" "* match ANY list (the padding
+# spaces guarantee a space), so a dead %G always rendered the counted red
+# AGENT-REACHABLE — uniformly a false red, never a false green (#621 a Q2).
 (
     . "$UI_LIB"
     . "$STATUS_CORE"
@@ -708,18 +708,50 @@ chmod 700 "$WORK/s4acl"
     _st_ancestor_grants_x "$WORK/s4acl" && echo G-GETFACL-GRANT-OK
 ) >"$WORK/s4-getfacl.out" 2>&1 || true
 
+# (#621 a Q1) — the ancestry stat %G rc-2 arm, pinned behaviorally: %A
+# succeeds without other-x, getfacl succeeds with only base entries (no
+# named grant), %G dies -> rc 2, and the blocker carries the unknown marker.
+_s4g2bin="$WORK/s4statgfail"
+_s4g3bin="$WORK/s4getfaclbase"
+mkdir -p "$_s4g2bin" "$_s4g3bin" "$WORK/s4aclg/proj"
+cat >"$_s4g2bin/stat" <<'STGEOF'
+#!/bin/sh
+case "$1 $2" in
+    "-c %G") exit 1 ;;
+esac
+exec "$_real_stat" "$@"
+STGEOF
+cat >"$_s4g3bin/getfacl" <<'GFNLEOF'
+#!/bin/sh
+printf 'user::rwx\ngroup::---\nother::---\n'
+GFNLEOF
+chmod +x "$_s4g2bin/stat" "$_s4g3bin/getfacl"
+chmod 700 "$WORK/s4aclg"
+(
+    . "$UI_LIB"
+    . "$STATUS_CORE"
+    PATH="$_s4g2bin:$_s4g3bin:$PATH"
+    export PATH
+    _s4rc=0
+    _st_ancestor_grants_x "$WORK/s4aclg" || _s4rc=$?
+    [ "$_s4rc" -eq 2 ] && echo A-G-RC2-OK
+    case "$(_st_root_blocker "$WORK/s4aclg/proj")" in
+        unknown:*) echo A-G-BLOCKER-UNKNOWN-OK ;;
+    esac
+) >"$WORK/s4-aclg.out" 2>&1 || true
+
 _s4_ok=0
 for _want in S1-EMPTY-RC2-OK S1-GROUPS-RC2-OK S2-GROUPW-RC2-OK S2-WORLDW-OK \
     S2-NONGROUPW-GREEN-OK S4-BLOCKER-UNKNOWN-OK G-GETFACL-RC2-OK \
-    G-BLOCKER-UNKNOWN-OK G-GETFACL-GRANT-OK; do
+    G-BLOCKER-UNKNOWN-OK G-GETFACL-GRANT-OK A-G-RC2-OK A-G-BLOCKER-UNKNOWN-OK; do
     if grep -q "$_want" "$WORK/s4-s1.out" "$WORK/s4-s2.out" "$WORK/s4-sweep.out" \
-        "$WORK/s4-getfacl.out"; then
+        "$WORK/s4-getfacl.out" "$WORK/s4-aclg.out"; then
         _s4_ok=$((_s4_ok + 1))
     else
         fail "group-probe failure pin: missing $_want"
     fi
 done
-[ "$_s4_ok" -eq 9 ] && pass "group-probe failure helpers: 9/9 (#594 S1/S2 + sweep)"
+[ "$_s4_ok" -eq 11 ] && pass "group-probe failure helpers: 11/11 (#594 S1/S2 + sweep)"
 
 # S2 section — id -nG fails mid-run; the group-writable socket must render
 # the uncounted unknown rows and never the counted green "not agent-reachable".
@@ -760,21 +792,55 @@ _s4out3=$(
         status_section_projects
     ) 2>&1
 ) || true
-if printf '%s' "$_s4out3" | grep -qF 'traversal unknown — cannot stat an ancestor (probe failed)' &&
+if printf '%s' "$_s4out3" | grep -qF 'traversal unknown — an ancestor probe failed (stat or ACL)' &&
     ! printf '%s' "$_s4out3" | grep -qF 'blocks traversal'; then
     pass "ancestry stat failure: uncounted unknown, never counted blocker (#594 sweep)"
 else
     fail "ancestry stat failure section (out=$(printf '%s' "$_s4out3" | head -5))"
 fi
 
+# (#621 a S1) — a host without getfacl: the audit degrades disclosed, not
+# blind — stat-only verdicts stay counted, the unknown row stays away, and
+# the section names the missing probe once.
+_s4min="$WORK/s4minpath"
+mkdir -p "$_s4min" "$WORK/s4aclmin/proj"
+ln -s "$(command -v stat)" "$_s4min/stat"
+ln -s "$(command -v grep)" "$_s4min/grep"
+ln -s "$(command -v dirname)" "$_s4min/dirname"
+chmod 700 "$WORK/s4aclmin"
+_s4minconf="$WORK/s4-min-projects.conf"
+printf '%s\n' "$WORK/s4aclmin/proj" >"$_s4minconf"
+_s4out4=$(
+    (
+        set +e
+        . "$UI_LIB"
+        . "$STATUS_CORE"
+        OPENCODE_USER=root
+        PROJECTS_CONF="$_s4minconf"
+        PATH="$_s4min"
+        export PATH
+        status_section_projects
+    ) 2>&1
+) || true
+if printf '%s' "$_s4out4" | grep -qF 'unavailable (getfacl missing) — traversal verdicts are stat-only' &&
+    printf '%s' "$_s4out4" | grep -qF 'blocks traversal' &&
+    ! printf '%s' "$_s4out4" | grep -qF 'traversal unknown'; then
+    pass "getfacl-less host: disclosed stat-only degradation, counted blocker stays (#621 a S1)"
+else
+    fail "getfacl-less section (out=$(printf '%s' "$_s4out4" | head -5))"
+fi
+
 if live_src "$STATUS_CORE" | grep -qF 'ssr_grp=$(stat -c %G "$1" 2>/dev/null) || return 2' &&
     live_src "$STATUS_CORE" | grep -qF 'sra_groups=$(id -nG "$OPENCODE_USER" 2>/dev/null) || sra_groups_rc=$?' &&
     live_src "$STATUS_CORE" | grep -qF 'status_sock_agent_reachable "$sra_s" "$sra_groups" "$sra_groups_rc"' &&
     live_src "$STATUS_CORE" | grep -qF '_stx_acl=$(getfacl -p "$1" 2>/dev/null) || return 2' &&
-    live_src "$STATUS_CORE" | grep -qF 'ui_kv "socket" "$sra_s — unknown (cannot resolve agent groups)"'; then
-    pass "source wiring: group/ACL probes capture their own rc, socket row names the cause (#594)"
+    live_src "$STATUS_CORE" | grep -qF 'ui_kv "socket" "$sra_s — unknown (cannot resolve agent groups)"' &&
+    live_src "$STATUS_CORE" | grep -qF '_stx_grp=$(stat -c %G "$1" 2>/dev/null) || return 2' &&
+    live_src "$STATUS_CORE" | grep -qF 'if command -v getfacl >/dev/null 2>&1; then' &&
+    live_src "$STATUS_CORE" | grep -qF 'traversal unknown — an ancestor probe failed (stat or ACL)'; then
+    pass "source wiring: group/ACL probes capture their own rc, rows name the cause (#594, #621 a Q1/S1/M2)"
 else
-    fail "source wiring: group/ACL probes capture their own rc, socket row names the cause (#594)"
+    fail "source wiring: group/ACL probes capture their own rc, rows name the cause (#594, #621 a Q1/S1/M2)"
 fi
 
 # --- 1d. live ddev version probe (issue #56) -------------------------------------
