@@ -85,7 +85,12 @@ sessions, one per PR).
   free id, meta format per the rules-meta design record
   ([internal/records/rules-meta.md](../internal/records/rules-meta.md));
   a NEW conventions section joins the audit's ACTIVE_SECTIONS list,
-  and the regenerated INDEX.md rides the same wave. (RM-0141)
+  and the regenerated INDEX.md rides the same wave; a meta crossing a
+  bucket boundary (the ref's first three ID digits change, 017x →
+  018x) creates its new bucket directory — the audit resolves every
+  ref by those digits, and a meta copied from its id-neighbors into
+  the old bucket reddens with a no-meta-at path (#623 item 2, one
+  gate cycle). (RM-0141)
 - Run the rules-meta suite while editing agent/ rule files —
   `sh tests/unit/test-rules-meta.sh` completes in seconds and reds
   on misplaced rule refs before the full gate does. (RM-0142)

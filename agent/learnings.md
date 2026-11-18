@@ -315,6 +315,22 @@ empty-match greps (`grep … || true` where empty output is rc 1), `IFS= read
   the failure mode) lives in review-concept.md; this is the
   proposal-side arm: BEFORE ranking or recommending, replay the
   incident under the sketch (#620).
+- **A surprising probe result is a harness suspect before it is a
+  semantics finding** (2026-11-18, #623 item 1): a probe pair read
+  "bash -nt DETECTED / dash missed" — one interpretation step from a
+  false shell-semantics rule — and the clean re-probe (variables set
+  INSIDE the shell under test, PATH never stripped of the
+  interpreter) showed dash detects 50 ms write gaps fine: the
+  single-quoted test expression had run with its variable unexported,
+  so dash compared a nonexistent `/c` against `/m3`; a sibling bug in
+  the same session hard-overrode PATH until `sh` itself vanished. The
+  near-miss is the inverse of codified-unprobed (#578 §3): probed
+  with a broken probe whose output CONFIRMED the expected story — the
+  surprise direction matched a plausible prior, so the harness went
+  unexamined. A surprising result re-runs as a minimal self-contained
+  script before it is believed, and the corrected re-probe lands in
+  the wave's provenance (the docs-loop's probe-before-codify duty,
+  surprise arm).
 
 ## When a rule fails
 

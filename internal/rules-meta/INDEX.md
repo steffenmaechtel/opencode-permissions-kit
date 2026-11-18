@@ -8,12 +8,12 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**180 metas · 177 active · 3 retired · 4 review-pending · next due 2026-11-17**
+**180 metas · 177 active · 3 retired · 6 review-pending · next due 2026-11-17**
 
 ## Actionable
 
 - **Review pending:** RM-0177, RM-0178, RM-0179, RM-0180
-- **Amended — pending:** none
+- **Amended — pending:** RM-0141 (2026-11-18), RM-0175 (2026-11-18)
 
 ## AGENTS.md
 
@@ -151,7 +151,7 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0141](0/1/4/RM-0141.md) | New rule bullets in audit-scope | active | approved | 1m | 2026-12-15 |
+| [RM-0141](0/1/4/RM-0141.md) | New rule bullets in audit-scope | active | **amended — pending** | 1m | 2026-12-15 |
 | [RM-0142](0/1/4/RM-0142.md) | Run the rules-meta suite while | active | approved | 1m | 2026-12-15 |
 | [RM-0143](0/1/4/RM-0143.md) | New text cites its source | active | approved | 1m | 2026-12-15 |
 | [RM-0144](0/1/4/RM-0144.md) | learnings.md additions carry era-marked | active | approved | 1m | 2026-12-15 |
@@ -178,7 +178,7 @@
 | [RM-0122](0/1/2/RM-0122.md) | Scope brake (binding in | active | approved | 1m | 2026-11-28 |
 | [RM-0123](0/1/2/RM-0123.md) | Scope budget (autonomous commissions): the | active | approved | 1m | 2026-11-28 |
 | [RM-0138](0/1/3/RM-0138.md) | A fix-wave re-review is itself | active | approved | 1m | 2026-12-07 |
-| [RM-0175](0/1/7/RM-0175.md) | The posted.log entry is | active | approved | 1m | 2026-12-17 |
+| [RM-0175](0/1/7/RM-0175.md) | The posted.log entry is | active | **amended — pending** | 1m | 2026-12-17 |
 
 ### The loop and the stop rule
 
