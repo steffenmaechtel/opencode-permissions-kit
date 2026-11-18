@@ -41,6 +41,12 @@ classifies each:
 | covered | existing text already says it — close citing the ref |
 | reject  | deliberately not adopted — rationale recorded |
 
+Triage reads the issue's full TIMELINE, never only the body — a
+maintainer comment posted after filing is triage input (class
+override or added demand): the 2026-11-18 batch triaged #620 from
+its body and missed the overnight item-1 reject plus the issue-detail
+demand, both sitting in comments (disclosed in PR #622's amendment).
+
 The ledger posts as one append-only comment per issue BEFORE waves
 open, so the maintainer can veto class assignments cheaply. An issue
 closes only when every item has a final disposition (the `Closes`/

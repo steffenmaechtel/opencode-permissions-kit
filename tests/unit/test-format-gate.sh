@@ -370,7 +370,10 @@ _smf="$(work_new)" || {
 }
 if [ -d "$_smf" ]; then
     mkdir -p "$_smf/bin"
-    for _sm_t in sha256sum awk rm mkdir chmod mv bash cat; do
+    # enumerate fallback arms too (#616 S1 residue): the block's
+    # sha256sum->shasum fallback needs shasum in the controlled PATH or
+    # macOS-class hosts (shasum-but-no-sha256sum) false-red every arm
+    for _sm_t in sha256sum shasum awk rm mkdir chmod mv bash cat; do
         _sm_w="$(command -v "$_sm_t" 2>/dev/null || true)"
         [ -n "$_sm_w" ] && ln -s "$_sm_w" "$_smf/bin/$_sm_t"
     done
@@ -397,7 +400,13 @@ SMCURL
     # the shipped pin (the evil arm models an UNoverridden run) and the
     # stub payload's real digest (the ok arm rides the override seam)
     _sm_pin="$(sed -n 's/^SM_SHA256="\${SM_SHA256:-\([0-9a-f]*\)}"$/\1/p' scripts/shellmetrics.sh)"
-    _sm_sha="$(sha256sum "$_smf/payload" | awk '{print $1}')"
+    # host-side digest with the same fallback (#616): the suite host may
+    # itself be the shasum-only class (§5's shape)
+    if command -v sha256sum >/dev/null 2>&1; then
+        _sm_sha="$(sha256sum "$_smf/payload" | awk '{print $1}')"
+    else
+        _sm_sha="$(shasum -a 256 "$_smf/payload" | awk '{print $1}')"
+    fi
     if [ -n "$_sm_block" ] && [ "${#_sm_pin}" -eq 64 ]; then
         pass "shellmetrics fetch block extractable, SM_SHA256 pin literal well-formed (B3)"
     else

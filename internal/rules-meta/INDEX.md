@@ -8,11 +8,11 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**176 metas · 173 active · 3 retired · 0 review-pending · next due 2026-11-17**
+**180 metas · 177 active · 3 retired · 4 review-pending · next due 2026-11-17**
 
 ## Actionable
 
-- **Review pending:** none
+- **Review pending:** RM-0177, RM-0178, RM-0179, RM-0180
 - **Amended — pending:** none
 
 ## AGENTS.md
@@ -103,6 +103,14 @@
 | [RM-0137](0/1/3/RM-0137.md) | Scratch receivers in harness-sourcing suites… | active | approved | 1m | 2026-12-06 |
 | [RM-0151](0/1/5/RM-0151.md) | The decision rule for writing NEW | active | approved | 1m | 2026-12-15 |
 | [RM-0173](0/1/7/RM-0173.md) | A harness env override consumed | active | approved | 1m | 2026-12-17 |
+| [RM-0179](0/1/7/RM-0179.md) | The controlled PATH of an | active | **pending** | 1m | 2026-12-18 |
+
+### Never-write pins (unit suites)
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0177](0/1/7/RM-0177.md) | A never-write pin asserts mtime, | active | **pending** | 1m | 2026-12-18 |
+| [RM-0178](0/1/7/RM-0178.md) | The pin's red path never | active | **pending** | 1m | 2026-12-18 |
 
 ### Referencing review findings
 
@@ -116,6 +124,7 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0116](0/1/1/RM-0116.md) | Every RM key appears at exactly three sites | active | approved | 1m | 2026-11-24 |
+| [RM-0180](0/1/8/RM-0180.md) | Citation-FIXING waves are the prime | active | **pending** | 1m | 2026-12-18 |
 
 ### Standing prose: history, not rosters
 

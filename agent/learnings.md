@@ -152,7 +152,14 @@ most HIGHs of any class; run 2: 9 findings, of which the corpus's ONLY HIGH
 
 Before any new root operation on agent-writable (shared) trees, walk the
 inventory questions — and when touching an existing site, check it still
-passes:
+passes. The walk's scope includes every dereferencing act the wave's own
+diff ADDS to a touched site: "the finding's site" is not the boundary —
+a fix's new chown/chgrp/mv acts re-open the class the fix closes (PR
+#606: round a's S1 fix passed its gates, round b found the M3 fix's
+restore acts unpaired, B1). Pair each new act with its
+immediately-preceding check; enumerating the acts (awk, stat, chmod,
+chown, chgrp, mv, rm) against their checks is the shape that finally
+found nothing left:
 
 1. `[ -L ]` on **every** path component (gates that check only the final
    component are bypassed via parents — `0.0.39h F2`, reopened by
@@ -297,6 +304,17 @@ empty-match greps (`grep … || true` where empty output is rc 1), `IFS= read
   (`tests/fixtures/opencode-deny-all-pre570.jsonc`, commit 5ec21c02)
   or a weighed `fetch-depth: 0` (rejected there for cost); sweep
   marker: "history-dependent pin".
+- **Walk process proposals through the incident's states, not beside
+  them** (2026-11-18, #577): a process-sketch option is ranked only
+  after replaying the incident's exact state sequence under it — the
+  scratch-worktree-as-default sketch looked strictly safer until the
+  worst-case walkthrough showed it relocates the wipe instead of
+  preventing it (sabotage target and quick fix share ONE file;
+  maintainer counter-example, #577 option-2 comment), and it was
+  demoted in the option paper. The code-side sibling (review through
+  the failure mode) lives in review-concept.md; this is the
+  proposal-side arm: BEFORE ranking or recommending, replay the
+  incident under the sketch (#620).
 
 ## When a rule fails
 
