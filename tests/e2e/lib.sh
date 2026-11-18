@@ -459,6 +459,19 @@ e2e_resolve_cache() {
                 echo "  ${RED}FAIL${NC}  cannot move fetched installer into place"
                 exit 1
             }
+        # #601: mktemp hands the temp 0600 and mv preserves the mode —
+        # on a rootless docker backend the container's dev user maps to
+        # a subuid != the file owner, so bash on a 0600 install.sh dies
+        # "Permission denied" (run.sh section 1, surfaced behind a
+        # misleading "network issue?" fallback). World-readable like
+        # the rest of the cache; a failed chmod removes the file so the
+        # next run refetches instead of persisting the unreadable mode.
+        chmod 644 "$OC_INSTALLER" ||
+            {
+                rm -f "$OC_INSTALLER"
+                echo "  ${RED}FAIL${NC}  cannot make the fetched installer readable"
+                exit 1
+            }
     fi
 
     echo "  Using opencode $OC_VERSION (cache: $OC_BIN)"
