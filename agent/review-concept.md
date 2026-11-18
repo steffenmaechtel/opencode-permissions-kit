@@ -41,6 +41,18 @@ trigger's name and in frozen history.
 
 - A diff of ~2.5k lines is the upper bound one review pass digests;
   cut rounds smaller. (RM-0057)
+- The round diff range is `<merge-base>..HEAD`, re-derived at staging
+  time — never `master..HEAD`: the two-dot diff compares endpoints,
+  so a master advance mid-session (the maintainer merges a parallel
+  wave — and with git worktrees sharing `refs/heads`, a master pull
+  in the OTHER worktree moves the ref under a session that never
+  pulls itself) surfaces as phantom deletions and a line count that
+  reverts master's advance instead of showing the round's material,
+  and can push the diff into a wrong tier. The merge-base range is
+  immune whichever side moved master; the log-vs-diff divergence
+  (`git log master..HEAD` shows the wave's own commits only) is the
+  tell (PR #642 round a pre-flight: a 16-file +265/−100 endpoint
+  diff over a one-commit wave, #649). (RM-0184)
 
 ## The PR-native loop
 
@@ -596,8 +608,15 @@ Review-relevant code touched this round: yes/no → …
   progress`), and closure/merge waits for the finished state — a
   "green" claim over a running check is true of nothing (PR #531's
   closing summary claimed both pushes green while push 2 still ran;
-  the correction comment followed when the lane failed).
-  (RM-0154)
+  the correction comment followed when the lane failed). Completed
+  alone is not sufficient either: right after a push, `gh pr checks`
+  can serve the PREVIOUS push's completed runs — the assertion keys
+  on the CURRENT commit's runs (fresh run IDs for the pushed HEAD),
+  never on whatever completed list the CLI happens to serve first;
+  the check NAME list is identical across pushes and carries no
+  commit identity, the run URLs do (PR #642 pushes 2–4: the watch
+  reported 7/7 from push 1's run IDs over push 2's commit, caught by
+  keying on run identity, #650). (RM-0154)
 - Size guard: GitHub caps one comment at ~64k characters; a comment
   that would exceed ~60k is SPLIT into part 1/2 (each part with its
   own marker and a `"part":1|2` field) — content is NEVER trimmed to

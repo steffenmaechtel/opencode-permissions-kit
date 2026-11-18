@@ -111,7 +111,14 @@ inherits an UNVERIFIED claim as if audited — issue #594's own
 pr-00621 round a Q2 (#626). For the shipping wave, an issue's
 mechanism claims are claim-audit objects like any other: verify, do
 not inherit (the docs-loop's re-probe duty for mechanism claims is
-the rule-text sibling).
+the rule-text sibling). Subagent research summaries are the same
+arm's second carrier (2026-11-18, PR #642): a delegated researcher's
+external-tool claims read authoritative enough to skip the audit —
+re-measure every claim against the primary source (the local clone
+where one exists) before it enters shipped comments, docs or
+records; the wave's shipped comment went in only after re-measuring
+every claim at the local clone, and the pre-verification draft's
+hedge was exactly the unaudited remainder.
 
 ### L4 — Pins must discriminate, and sit before the summary gate
 *Class: `test-vacuous` — run 1: 37 findings; run 2: 45 findings, 4 MED/HIGH,
