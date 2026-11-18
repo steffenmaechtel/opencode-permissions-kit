@@ -8,12 +8,12 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**180 metas · 177 active · 3 retired · 6 review-pending · next due 2026-11-17**
+**182 metas · 179 active · 3 retired · 9 review-pending · next due 2026-11-17**
 
 ## Actionable
 
-- **Review pending:** RM-0177, RM-0178, RM-0179, RM-0180
-- **Amended — pending:** RM-0141 (2026-11-18), RM-0175 (2026-11-18)
+- **Review pending:** RM-0177, RM-0178, RM-0179, RM-0180, RM-0181, RM-0182
+- **Amended — pending:** RM-0044 (2026-11-18), RM-0141 (2026-11-18), RM-0175 (2026-11-18)
 
 ## AGENTS.md
 
@@ -81,6 +81,7 @@
 | [RM-0148](0/1/4/RM-0148.md) | The death arm is EXECUTED | active | approved | 1m | 2026-12-15 |
 | [RM-0149](0/1/4/RM-0149.md) | The empty-scan-set leg fails | active | approved | 1m | 2026-12-15 |
 | [RM-0150](0/1/5/RM-0150.md) | Detector rc semantics are per-tool | active | approved | 1m | 2026-12-15 |
+| [RM-0181](0/1/8/RM-0181.md) | The channel is a property | active | **pending** | 1m | 2026-12-18 |
 
 ### Named-cause failure guards (shipped runners)
 
@@ -99,7 +100,7 @@
 | [RM-0017](0/0/1/RM-0017.md) | Code extracted from shipped scripts and eval'd… | active | approved | 6m | 2027-05-17 |
 | [RM-0042](0/0/4/RM-0042.md) | Mutation check — a mutating verb | active | approved | 1m | 2026-11-17 |
 | [RM-0043](0/0/4/RM-0043.md) | Real-tree ratchet — any path-shaped | active | approved | 1m | 2026-11-17 |
-| [RM-0044](0/0/4/RM-0044.md) | rm suffix guard — any rm invocation | active | approved | 1m | 2026-11-17 |
+| [RM-0044](0/0/4/RM-0044.md) | rm suffix guard — any rm invocation | active | **amended — pending** | 1m | 2026-11-17 |
 | [RM-0137](0/1/3/RM-0137.md) | Scratch receivers in harness-sourcing suites… | active | approved | 1m | 2026-12-06 |
 | [RM-0151](0/1/5/RM-0151.md) | The decision rule for writing NEW | active | approved | 1m | 2026-12-15 |
 | [RM-0173](0/1/7/RM-0173.md) | A harness env override consumed | active | approved | 1m | 2026-12-17 |
@@ -157,6 +158,7 @@
 | [RM-0144](0/1/4/RM-0144.md) | learnings.md additions carry era-marked | active | approved | 1m | 2026-12-15 |
 | [RM-0145](0/1/4/RM-0145.md) | Shipped content is English and | active | approved | 1m | 2026-12-15 |
 | [RM-0167](0/1/6/RM-0167.md) | A wave codifying a reflection | active | approved | 1m | 2026-12-17 |
+| [RM-0182](0/1/8/RM-0182.md) | The wave's own new prose | active | **pending** | 1m | 2026-12-18 |
 
 ## agent/review-concept.md
 
