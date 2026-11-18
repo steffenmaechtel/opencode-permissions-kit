@@ -501,12 +501,13 @@ ddev_migrate_export() {
         # content (project_list.yaml or the legacy project_info block —
         # agent-ownable files, scanned with no name validation; the
         # root filter constrains only the approot). A name carrying a
-        # slash or a bare `..` redirects EVERY "$DD_MIG_DUMP_DIR/$dm_n"
-        # operand out of the dump dir: the symlink/regular-file gates
-        # below inspect the ESCAPED path (an out-of-dir REGULAR file
-        # passes both), and the acting arms follow it — export-db's
-        # --file= write as the dev user, the root rm -f in the failure
-        # arms. ddev's own [a-z0-9-] project-name validation is
+        # slash or a bare `..` redirects every dump-dir operand
+        # "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" out of the dump dir: the
+        # symlink/regular-file gates below inspect the ESCAPED path
+        # (an out-of-dir REGULAR file passes both), and the acting
+        # arms follow it — export-db's --file= write as the dev user,
+        # the root rm -f in the failure arms, the $DM_STAGE err
+        # redirect. ddev's own [a-z0-9-] project-name validation is
         # external behavior, unverifiable from this repo; this gate
         # closes the class kit-side. Bare `..` builds an in-dir
         # "...sql.gz" operand (no traversal) — refused at the pattern
