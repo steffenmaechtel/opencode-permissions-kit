@@ -444,13 +444,18 @@ _fsb_pass() {
 # issue #644):
 #
 #   <project root>   sticky +t — the wholesale arm of the attack
-#                     (mv .git .git.old && mkdir .git/hooks/…) dies here:
-#                     renaming or unlinking a developer-owned TOP-LEVEL
-#                     entry requires the directory owner. Cost: the
+#                     (mv .git .git.old && mkdir .git/hooks/…) dies
+#                     here: renaming or unlinking a developer-owned
+#                     TOP-LEVEL entry requires the directory owner.
+#                     The SAME sticky bit goes on every directory that
+#                     directly contains a .git (nested repos included —
+#                     the install default scans parent roots like
+#                     /var/www/vhosts, whose sticky alone would not
+#                     protect a .git one level down). Cost: the
 #                     agent cannot rename/delete developer-owned
-#                     top-level entries (content edits unaffected —
-#                     sticky never blocks writes; renames inside
-#                     subdirectories unaffected).
+#                     top-level entries of those directories (content
+#                     edits unaffected — sticky never blocks writes;
+#                     renames inside subdirectories unaffected).
 #   .git              sticky +t only — mode and group stay (the agent
 #                     keeps creating lockfiles, objects, refs and worktree
 #                     registrations; it can no longer unlink or rename
@@ -758,6 +763,16 @@ _fsb_heal_git() {
     while IFS= read -r _fsh_gd; do
         [ -n "$_fsh_gd" ] || continue
         printf '  git heal: %s (hooks/config pinned developer-owned, issue #644)\n' "$_fsh_gd" >&2
+        # Sticky the .git's DIRECT parent (#655 a C1): the baseline root
+        # above carries its own sticky, but a scan root (the install
+        # default is a parent like /var/www/vhosts) is NOT the parent of
+        # every .git beneath it — the wholesale swap dies on the direct
+        # parent's bit, so pin it per gitdir (nested repos included).
+        # The ==root arm is already stickied by the driver above and
+        # would only produce skip noise here.
+        _fshg_parent=$(dirname "$_fsh_gd")
+        [ "$_fshg_parent" = "$_fsh_root" ] ||
+            _fsb_heal_sticky "$_fsh_root" "$_fshg_parent"
         _fsb_heal_gitdir "$_fsh_root" "$_fsh_owner" "$2" "$_fsh_gd"
     done <"$_fsh_list"
     rm -f "$_fsh_list"

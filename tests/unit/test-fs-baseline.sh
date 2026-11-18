@@ -89,8 +89,10 @@ HGGRP="$(id -gn)"
 HGME="$(id -u)"
 mkdir -p "$HG/proj/.git/hooks" "$HG/proj/.git/refs/heads" "$HG/proj/.git/objects" \
     "$HG/proj/.git/logs/refs" "$HG/proj/.git/worktrees/wt1" \
-    "$HG/proj/.git/modules/sub/hooks" "$HG/proj/.git/modules/nohooks"
+    "$HG/proj/.git/modules/sub/hooks" "$HG/proj/.git/modules/nohooks" \
+    "$HG/proj/nested/.git/hooks"
 printf 'cfg\n' >"$HG/proj/.git/config"
+printf 'nc\n' >"$HG/proj/nested/.git/config"
 printf 'sm\n' >"$HG/proj/.git/modules/sub/config"
 printf 'nh\n' >"$HG/proj/.git/modules/nohooks/config"
 printf 's\n' >"$HG/proj/.git/hooks/pre-commit.sample"
@@ -107,6 +109,10 @@ chmod 700 "$HG/proj/.git" "$HG/proj/.git/hooks"
 HGOUT="$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$HG/proj" "$HGGRP" 2>&1)"
 assert_eq "heal: project root sticky (sharing mode stays, #655 a C1)" "3775" \
     "$(stat -c %a "$HG/proj")"
+assert_eq "heal: NESTED .git parent sticky (scan roots are parents — the bit belongs on the direct parent, #655 a C1)" \
+    "3775" "$(stat -c %a "$HG/proj/nested")"
+assert_eq "heal: nested .git healed like any other" "644" \
+    "$(stat -c %a "$HG/proj/nested/.git/config")"
 assert_eq "heal: .git keeps sharing mode + sticky (dirs pass then +t)" "3770" \
     "$(stat -c %a "$HG/proj/.git")"
 assert_eq "heal: .git/config 644" "644" "$(stat -c %a "$HG/proj/.git/config")"
