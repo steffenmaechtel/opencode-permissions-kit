@@ -63,7 +63,7 @@ chmod 600 "$WORK/proj/file.txt" "$WORK/proj/.git/config"
 OUT="$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$WORK/proj" "$GRP" 2>&1)"
 
 # --- 1. final state -------------------------------------------------------------
-assert_eq "root dir: group + setgid + group rwx (700 -> 2770)" "2770" \
+assert_eq "root dir: group + setgid + group rwx + sticky (700 -> 3770, #655 a C1)" "3770" \
     "$(stat -c %a "$WORK/proj")"
 assert_eq "subdir carries setgid" "2770" "$(stat -c %a "$WORK/proj/sub")"
 assert_eq ".git shared and sticky-healed (issue #17 + #651)" "3770" "$(stat -c %a "$WORK/proj/.git")"
@@ -89,10 +89,13 @@ HGGRP="$(id -gn)"
 HGME="$(id -u)"
 mkdir -p "$HG/proj/.git/hooks" "$HG/proj/.git/refs/heads" "$HG/proj/.git/objects" \
     "$HG/proj/.git/logs/refs" "$HG/proj/.git/worktrees/wt1" \
-    "$HG/proj/.git/modules/sub/hooks"
+    "$HG/proj/.git/modules/sub/hooks" "$HG/proj/.git/modules/nohooks"
 printf 'cfg\n' >"$HG/proj/.git/config"
 printf 'sm\n' >"$HG/proj/.git/modules/sub/config"
+printf 'nh\n' >"$HG/proj/.git/modules/nohooks/config"
 printf 's\n' >"$HG/proj/.git/hooks/pre-commit.sample"
+printf '#!/bin/sh\n' >"$HG/proj/.git/hooks/planted-pre-commit"
+chmod 755 "$HG/proj/.git/hooks/planted-pre-commit"
 printf 'i\n' >"$HG/proj/.git/index"
 printf 'h\n' >"$HG/proj/.git/HEAD"
 printf 'r\n' >"$HG/proj/.git/refs/heads/main"
@@ -102,6 +105,8 @@ printf 'wh\n' >"$HG/proj/.git/worktrees/wt1/HEAD"
 printf 'log\n' >"$HG/proj/.git/logs/HEAD"
 chmod 700 "$HG/proj/.git" "$HG/proj/.git/hooks"
 HGOUT="$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$HG/proj" "$HGGRP" 2>&1)"
+assert_eq "heal: project root sticky (sharing mode stays, #655 a C1)" "3775" \
+    "$(stat -c %a "$HG/proj")"
 assert_eq "heal: .git keeps sharing mode + sticky (dirs pass then +t)" "3770" \
     "$(stat -c %a "$HG/proj/.git")"
 assert_eq "heal: .git/config 644" "644" "$(stat -c %a "$HG/proj/.git/config")"
@@ -136,6 +141,24 @@ assert_eq "heal: module config pinned 644" "644" \
     "$(stat -c %a "$HG/proj/.git/modules/sub/config")"
 assert_eq "heal: module hooks pinned, no group write" "2755" \
     "$(stat -c %a "$HG/proj/.git/modules/sub/hooks")"
+assert_eq "heal: modules CONTAINER pinned (sticky on the parent — gates wholesale child swaps, #655 a C2)" \
+    "3755" "$(stat -c %a "$HG/proj/.git/modules")"
+assert_eq "heal: container owner is the developer (#655 a C2)" "$HGME" \
+    "$(stat -c %u "$HG/proj/.git/modules")"
+assert_eq "heal: hooks-LESS module gitdir pinned too (marker-free enumeration, #655 a C3)" \
+    "3755" "$(stat -c %a "$HG/proj/.git/modules/nohooks")"
+assert_eq "heal: hooks-less module config pinned (#655 a C3)" "644" \
+    "$(stat -c %a "$HG/proj/.git/modules/nohooks/config")"
+if printf '%s\n' "$HGOUT" | grep -qF 'non-sample entries'; then
+    pass "heal: non-sample hook content surfaces as a warn (metadata pinning preserves it, #655 a C1)"
+else
+    fail "heal: non-sample hook content surfaces as a warn (metadata pinning preserves it, #655 a C1)"
+fi
+if printf '%s\n' "$HGOUT" | grep -qF "non-sample entries in $HG/proj/.git/hooks"; then
+    pass "heal: the warn names the hooks directory (inspect-and-remove pointer)"
+else
+    fail "heal: the warn names the hooks directory (inspect-and-remove pointer)"
+fi
 if getfacl -p "$HG/proj/.git/hooks" 2>/dev/null | grep -q '^default:'; then
     fail "heal: default ACLs stripped from .git/hooks (they would re-grant group write)"
 else
@@ -157,9 +180,54 @@ HGRC2=0
 FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$HG/proj" "$HGGRP" \
     >/dev/null 2>&1 || HGRC2=$?
 assert_eq "heal: idempotent re-run rc 0" "0" "$HGRC2"
-assert_eq "heal: idempotent re-run state stable (config/hooks/.git/worktrees)" \
-    "644/2755/3770/3775" \
-    "$(stat -c %a "$HG/proj/.git/config")/$(stat -c %a "$HG/proj/.git/hooks")/$(stat -c %a "$HG/proj/.git")/$(stat -c %a "$HG/proj/.git/worktrees")"
+assert_eq "heal: idempotent re-run state stable (root/config/hooks/.git/worktrees)" \
+    "3775/644/2755/3770/3775" \
+    "$(stat -c %a "$HG/proj")/$(stat -c %a "$HG/proj/.git/config")/$(stat -c %a "$HG/proj/.git/hooks")/$(stat -c %a "$HG/proj/.git")/$(stat -c %a "$HG/proj/.git/worktrees")"
+
+# Trailing-slash root (#655 a C4): the belt accepts the spelling; the
+# heal must normalize before the component walk — pre-fix, the walk
+# voided and the config stayed unpinned (group-writable). Drive the
+# driver directly so the belt is out of the picture.
+HG4="$WORK/healslash"
+mkdir -p "$HG4/proj2/.git/hooks"
+printf 'c\n' >"$HG4/proj2/.git/config"
+printf 'h\n' >"$HG4/proj2/.git/hooks/pre-commit.sample"
+FS_SUDO="" sh -c '. "$1" && _fsb_heal_git "$2/" "$3"' _ "$LIB" "$HG4/proj2" "$HGGRP" >/dev/null 2>&1
+assert_eq "heal: trailing-slash root still pins (walk normalized, #655 a C4)" "644" \
+    "$(stat -c %a "$HG4/proj2/.git/config")"
+# Sticky assertion, not absolute mode: this host's /tmp grants group
+# write through default ACLs at mkdir time (1775, not 1755) — the
+# direct-driver pin cares about the sticky bit alone (leading 1).
+case "$(stat -c %a "$HG4/proj2")" in
+    1*)
+        pass "heal: trailing-slash root sticky applies"
+        ;;
+    *)
+        fail "heal: trailing-slash root sticky applies (got $(stat -c %a "$HG4/proj2"))"
+        ;;
+esac
+
+# Root swapped to a symlink before the heal (#655 a C5): refused loud —
+# the empty-scan silent no-op must not happen. _FSB_ERRORS is the
+# observable (the belt refuses this shape earlier at the fs_baseline_root
+# level, so the driver is driven directly).
+HG5="$WORK/healswap"
+mkdir -p "$HG5/real/.git"
+ln -s "$HG5/real" "$HG5/link"
+HG5OUT="$(FS_SUDO="" sh -c '. "$1" && _FSB_ERRORS=0 && _fsb_heal_git "$2" "$3" && echo "ERRS=$_FSB_ERRORS"' \
+    _ "$LIB" "$HG5/link" "$HGGRP" 2>&1)"
+if printf '%s\n' "$HG5OUT" | grep -qF 'ERRS=1'; then
+    pass "heal: symlinked root counts as an error (no silent no-op, #655 a C5)"
+else
+    fail "heal: symlinked root counts as an error (no silent no-op, #655 a C5) — got: $HG5OUT"
+fi
+if printf '%s\n' "$HG5OUT" | grep -qF 'root became a symlink'; then
+    pass "heal: the C5 refusal names the cause"
+else
+    fail "heal: the C5 refusal names the cause"
+fi
+
+rm -rf "$HG" "$HGS" "$HGF" "$HGFSTUB" "$HG4" "$HG5"
 
 # A symlinked operand never gets pinned (the follow would write through
 # the link — the L5 class): a config swapped for a link is skipped with
@@ -241,8 +309,8 @@ _idem_rc=0
 FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$WORK/proj" "$GRP" >/dev/null 2>&1 ||
     _idem_rc=$?
 assert_eq "idempotent re-run exits 0" "0" "$_idem_rc"
-assert_eq "re-run is idempotent (modes stable)" \
-    "2770 2770 660" \
+assert_eq "re-run is idempotent (modes stable; root keeps sticky, #655 a C1)" \
+    "3770 2770 660" \
     "$(stat -c %a "$WORK/proj") $(stat -c %a "$WORK/proj/sub") $(stat -c %a "$WORK/proj/file.txt")"
 
 # --- 5. empty/missing root is a silent no-op ----------------------------------------
@@ -797,7 +865,7 @@ mkdir -p "$W23NPBIN" "$W23NP/proj"
 chmod 700 "$W23NP/proj"
 printf 'nopy\n' >"$W23NP/proj/f"
 chmod 600 "$W23NP/proj/f"
-for _t in sh find cat chgrp chmod setfacl chown mktemp dirname stat getfacl grep rm xargs; do
+for _t in sh find cat chgrp chmod setfacl chown mktemp dirname stat getfacl grep rm xargs wc; do
     ln -s "$(command -v "$_t")" "$W23NPBIN/$_t"
 done
 W23NPRC=0
@@ -818,7 +886,7 @@ mkdir -p "$W23NPBIN2"
 # reset the fixture the 11b run already baselined: the loud abort must
 # leave the file at 600, proving no pass ran at all
 chmod 600 "$W23NP/proj/f"
-for _t in sh find chgrp chmod setfacl chown mktemp dirname stat getfacl grep rm xargs; do
+for _t in sh find chgrp chmod setfacl chown mktemp dirname stat getfacl grep rm xargs wc; do
     ln -s "$(command -v "$_t")" "$W23NPBIN2/$_t"
 done
 W23CATRC=0

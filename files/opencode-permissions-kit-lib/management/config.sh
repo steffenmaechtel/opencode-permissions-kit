@@ -623,16 +623,15 @@ git_config_status() {
     if grep -qE '^[[:space:]]*"\.git/config"' "$f" 2>/dev/null; then
         ui_kv "git-config" "ON — protected (soft-only — agent tools blocked)" "$UI_GREEN"
         ui_detail "$f"
-        ui_detail "git operations are unaffected — git only reads .git/config; commits and pushes never write it"
     elif grep -q '//SECURE_GIT' "$f" 2>/dev/null; then
         ui_kv "git-config" "OFF — access allowed (agent tools may edit git config)"
         ui_detail "$f (markers present, rules inactive)"
-        ui_detail "git operations are unaffected — git only reads .git/config; commits and pushes never write it"
     else
         ui_kv "git-config" "OFF — access allowed (agent tools may edit git config)"
         ui_detail "$f"
-        ui_detail "git operations are unaffected — git only reads .git/config; commits and pushes never write it"
     fi
+    ui_detail "plain commits/pushes only read .git/config — the exceptions (push -u tracking write,"
+    ui_detail "repo-scope git config, submodule add) are the .git heal's documented costs"
 }
 
 git_config_apply() {

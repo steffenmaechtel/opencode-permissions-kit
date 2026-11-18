@@ -115,7 +115,7 @@ E 'touch /var/www/vhosts/ddev-mig/.ddev/.webimageBuild'
 # Group-baseline fixtures: a pre-install tree (dir + file, dev-owned 644)
 # plus a real dev-owned git repo (.git 700, config 600) that must become
 # group-accessible so the agent-git check below is meaningful.
-E 'sudo git init -q /var/www/vhosts/perm-check && sudo sh -c "cd /var/www/vhosts/perm-check && git -c user.email=dev@example.com -c user.name=dev commit -q --allow-empty -m init" && sudo mkdir -p /var/www/vhosts/perm-check/sub && sudo chown -R dev:dev /var/www/vhosts/perm-check && printf "old\n" | sudo tee /var/www/vhosts/perm-check/existing-file.txt >/dev/null && sudo chmod 700 /var/www/vhosts/perm-check/.git && sudo chmod 600 /var/www/vhosts/perm-check/.git/config'
+E 'sudo git init -q /var/www/vhosts/perm-check && sudo sh -c "cd /var/www/vhosts/perm-check && git -c user.email=dev@example.com -c user.name=dev commit -q --allow-empty -m init" && sudo mkdir -p /var/www/vhosts/perm-check/sub && sudo mkdir -p /var/www/vhosts/perm-check/.git/modules/sub && printf "m\n" | sudo tee /var/www/vhosts/perm-check/.git/modules/sub/config >/dev/null && sudo chown -R dev:dev /var/www/vhosts/perm-check && printf "old\n" | sudo tee /var/www/vhosts/perm-check/existing-file.txt >/dev/null && sudo chmod 700 /var/www/vhosts/perm-check/.git && sudo chmod 600 /var/www/vhosts/perm-check/.git/config'
 # The log is written by root (version gate) AND dev (export loop): dev owns
 # it, world-writable so both may append.
 E 'touch /tmp/fake-ddev.log && chmod 666 /tmp/fake-ddev.log'
@@ -212,14 +212,22 @@ check "2c: baseline runs with live per-pass progress (issue #14)" \
     E 'grep -q "group baseline on /var/www/vhosts" /tmp/install-out.log && grep -q "entries — done" /tmp/install-out.log'
 check "2c: .git dir shared + sticky-healed (dev-owned, setgid + group-writable + sticky, #651)" \
     E 'test "$(stat -c %U:%G:%a /var/www/vhosts/perm-check/.git)" = "dev:opencode:3770"'
-check "2c: .git/config healed dev-owned, no group write (issue #17 shared it; #651 re-narrows)" \
+check "2c: project root sticky (wholesale .git swap dies on it, #655 a C1)" \
+    E 'test "$(stat -c %a /var/www/vhosts/perm-check)" = "3775"'
+check "2c: heal — .git/config healed dev-owned, no group write (issue #17 shared it; #651 re-narrows)" \
     E 'test "$(stat -c %U:%G:%a /var/www/vhosts/perm-check/.git/config)" = "dev:opencode:644"'
 check "2c: heal — .git/hooks dev-owned, no group write (#651)" \
     E 'test "$(stat -c %U:%G:%a /var/www/vhosts/perm-check/.git/hooks)" = "dev:opencode:2755"'
+check "2c: heal — modules container pinned (sticky parent gates child swaps, #655 a C2)" \
+    E 'test "$(stat -c %U:%G:%a /var/www/vhosts/perm-check/.git/modules)" = "dev:opencode:3755"'
 check_fail "2c: heal — agent CANNOT plant a hook (sticky .git + dev-owned hooks dir, #644/#651)" \
     E 'sudo -u opencode -H touch /var/www/vhosts/perm-check/.git/hooks/planted'
 check_fail "2c: heal — agent CANNOT rewrite .git/config (lock+rename dies on sticky, #644/#651)" \
     E 'sudo -u opencode -H git -C /var/www/vhosts/perm-check config core.fsmonitor /tmp/opk-probe'
+check_fail "2c: heal — agent CANNOT wholesale-swap .git (root sticky, #655 a C1/C6)" \
+    E 'sudo -u opencode -H mv /var/www/vhosts/perm-check/.git /var/www/vhosts/perm-check/.git.old'
+check_fail "2c: heal — agent CANNOT wholesale-swap a module gitdir (container sticky, #655 a C2/C6)" \
+    E 'sudo -u opencode -H mv /var/www/vhosts/perm-check/.git/modules/sub /var/www/vhosts/perm-check/.git/modules/sub.old'
 check "2c: git safe.directory '*' set for the opencode user (issue #17)" \
     E 'sudo -u opencode -H git config --global --get-all safe.directory 2>/dev/null | grep -qFx "*"'
 check "2c: agent git can read the dev-owned repository (no dubious ownership)" \

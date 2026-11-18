@@ -443,24 +443,40 @@ _fsb_pass() {
 # git-config-write and rename-away probes all blocked — evidence in
 # issue #644):
 #
+#   <project root>   sticky +t — the wholesale arm of the attack
+#                     (mv .git .git.old && mkdir .git/hooks/…) dies here:
+#                     renaming or unlinking a developer-owned TOP-LEVEL
+#                     entry requires the directory owner. Cost: the
+#                     agent cannot rename/delete developer-owned
+#                     top-level entries (content edits unaffected —
+#                     sticky never blocks writes; renames inside
+#                     subdirectories unaffected).
 #   .git              sticky +t only — mode and group stay (the agent
 #                     keeps creating lockfiles, objects, refs and worktree
 #                     registrations; it can no longer unlink or rename
 #                     over the developer-owned entries below)
-#   .git/config       developer-owned 644, ACLs stripped — git only READS
-#                     it for commit/push; a write goes through
-#                     lock+rename, and the sticky bit kills the rename
+#   .git/config       developer-owned 644, ACLs stripped — plain
+#                     commits/pushes only READ it (the first-push `-u`
+#                     tracking write is a documented cost below); any
+#                     write goes through lock+rename, and the sticky
+#                     bit kills the rename
 #   .git/hooks        developer-owned 755, ACLs stripped — no planting;
 #                     the .sample files stay readable for everyone. The
 #                     directory setgid bit SURVIVES a numeric chmod on
 #                     Linux (measured — root included): harmless here,
 #                     it only steers group inheritance of NEW entries,
 #                     and without group write there are none.
-#   .git/modules      developer-owned, sticky, no group write — every
-#                     gitdir beneath it (submodule gitdirs, nested
-#                     included, found by their hooks dir) pinned the
-#                     same way: dir 3755-in-practice (setgid rides
-#                     along, see hooks above), config 644, hooks 755
+#   .git/modules      the container and every gitdir beneath it pinned
+#                     developer-owned, sticky, no group write: the
+#                     container 3755-in-practice (its sticky bit is the
+#                     one that gates wholesale-replacing a child — the
+#                     bit belongs on the PARENT, #655 a C2), every
+#                     DIRECT child dir of any dir named modules pinned
+#                     marker-free (a hooks-less planted gitdir is
+#                     pinned too, #655 a C3): dir 3755-in-practice
+#                     (setgid rides along, see hooks above), config
+#                     644, hooks 755; nested modules
+#                     (modules/<a>/modules/<b>) ride the same find
 #   .git/worktrees    sticky +t only (registrations stay
 #                     agent-manageable — `git worktree add` by the agent
 #                     keeps working); each registration's commondir and
@@ -481,14 +497,24 @@ _fsb_pass() {
 # Accepted workflow costs (shipped with #651): repo-scope `git config`
 # and `git submodule add` fail for the agent (both write .git/config) —
 # including the tracking write of a first `git push -u`, so agents push
-# without -u (git push origin <branch>; the transfer itself is
-# unaffected — live-confirmed in the pilot session, PR #654 wave);
-# agent-side `git gc` can hit the sticky bit renaming packed-refs;
-# merges inside agent-created worktrees keep working (their gitdir
-# retains create rights — only the two pointer files are pinned).
+# without -u (git push origin <branch>; the transfer itself completes —
+# field-reported 2026-11-18 and recorded in issue #644); the agent
+# cannot rename or delete developer-owned TOP-LEVEL entries (project
+# root sticky, #655 a C1); agent-side `git gc` can hit the sticky bit
+# renaming packed-refs; merges inside agent-created worktrees keep
+# working (their gitdir retains create rights — only the two pointer
+# files are pinned); a repo the agent cloned INTO a developer-owned
+# project tree is healed to the root's owner as well — the agent loses
+# repo-config writes in its own nested clone (#655 a S3; work in the
+# main checkout or an agent-owned root instead).
 # Residual: the .git POINTER FILE inside agent worktree trees stays
 # agent-writable (a delete+recreate sidesteps any pin) — #652 documents,
-# #653 detects. This is a deliberate scoped exception to the repo's
+# #653 detects. Same for content planted BEFORE the heal: metadata
+# pinning preserves a planted hook file's exec bit and content (the
+# heal warns about non-sample entries it finds; removal is a human
+# decision), and a .git.old-style pre-existing swap is not detected
+# here — #653's detection arm covers both. This is a deliberate scoped
+# exception to the repo's
 # soft-only security rule (AGENTS.md, Rules): OS-level narrowing on .git
 # internals ddev
 # never touches, decided with the maintainer in #651.
@@ -588,32 +614,66 @@ _fsb_heal_gitdir() {
     _fsb_heal_sticky "$1" "$_fshg_gd"
     _fsb_heal_pin "$1" "$2" "$3" "$_fshg_gd/config" 644
     _fsb_heal_pin "$1" "$2" "$3" "$_fshg_gd/hooks" 755
-    # Submodule gitdirs: every hooks dir below the gitdir marks a gitdir
-    # (git init always ships one; worktree registrations carry none —
-    # their hooks resolve from this common dir). Pinned 1755 so a module
-    # gitdir cannot be replaced wholesale (rename-over of a dev-owned
-    # entry dies on the sticky bit); nested modules
-    # (modules/<a>/modules/<b>) ride the same find.
-    _fshg_hl=$(mktemp "${TMPDIR:-/tmp}/opk-fsb-heal.XXXXXXXX") || {
+    # Content-persistence visibility (#644, #655 a C1): the heal pins
+    # METADATA — a hook file planted before it keeps its exec bit and
+    # content. One warn line naming the count (informational, uncounted
+    # — removal stays a human decision; the #653 detection surface
+    # automates the report). Deliberately unpinned: LOW/INFO visibility,
+    # pin-cost budget (agent/conventions.md).
+    if [ -d "$_fshg_gd/hooks" ] && [ ! -L "$_fshg_gd/hooks" ]; then
+        # wc-guarded: a missing wc (restricted PATH) degrades to "no
+        # warn" instead of aborting the caller's set -e — the warn is
+        # informational, never load-bearing.
+        _fshg_ns=$(_fsb_sudo find "$_fshg_gd/hooks" -mindepth 1 -maxdepth 1 \
+            ! -name '*.sample' -print 2>/dev/null | wc -l 2>/dev/null || printf '0')
+        if [ "${_fshg_ns:-0}" -gt 0 ] 2>/dev/null; then
+            printf '  warn: git heal: %s non-sample entries in %s/hooks — remove manually (issue #644)\n' \
+                "$_fshg_ns" "$_fshg_gd" >&2
+        fi
+    fi
+    # Submodule gitdirs, marker-free (#655 a C3): every dir named
+    # `modules` under the gitdir is a container (nested modules
+    # modules/<a>/modules/<b> ride the same find); each container is
+    # PINNED 1755 — the container's own sticky bit is what gates
+    # wholesale-replacing a child gitdir, and it sat on the never-pinned
+    # parent before (#655 a C2) — and every DIRECT child dir of a
+    # container is pinned gitdir-style (dir 1755, config 644, hooks 755
+    # when present). Marker-free on purpose: keying on a hooks dir let a
+    # hooks-less planted gitdir escape pinning silently.
+    _fshg_ml=$(mktemp "${TMPDIR:-/tmp}/opk-fsb-heal.XXXXXXXX") || {
         printf '  error: mktemp failed (is $TMPDIR writable?) — the git heal cannot scan %s\n' \
             "$_fshg_gd" >&2
         _FSB_ERRORS=$((_FSB_ERRORS + 1))
         return 0
     }
     if command -v _tmp_track >/dev/null 2>&1; then
-        _tmp_track "$_fshg_hl"
+        _tmp_track "$_fshg_ml"
     fi
-    _fsb_sudo find "$_fshg_gd" -type d -name hooks -print >"$_fshg_hl" ||
-        _fsb_heal_err "$_fshg_gd" "the hooks scan (find)"
-    while IFS= read -r _fshg_h; do
-        [ -n "$_fshg_h" ] || continue
-        _fshg_m=$(dirname "$_fshg_h")
-        [ "$_fshg_m" = "$_fshg_gd" ] && continue
+    _fsb_sudo find "$_fshg_gd" -type d -name modules -print >"$_fshg_ml" ||
+        _fsb_heal_err "$_fshg_gd" "the modules scan (find)"
+    while IFS= read -r _fshg_m; do
+        [ -n "$_fshg_m" ] || continue
         _fsb_heal_pin "$1" "$2" "$3" "$_fshg_m" 1755
-        _fsb_heal_pin "$1" "$2" "$3" "$_fshg_m/config" 644
-        _fsb_heal_pin "$1" "$2" "$3" "$_fshg_h" 755
-    done <"$_fshg_hl"
-    rm -f "$_fshg_hl"
+        _fshg_cl=$(mktemp "${TMPDIR:-/tmp}/opk-fsb-heal.XXXXXXXX") || {
+            printf '  error: mktemp failed (is $TMPDIR writable?) — the git heal cannot scan %s\n' \
+                "$_fshg_m" >&2
+            _FSB_ERRORS=$((_FSB_ERRORS + 1))
+            continue
+        }
+        if command -v _tmp_track >/dev/null 2>&1; then
+            _tmp_track "$_fshg_cl"
+        fi
+        _fsb_sudo find "$_fshg_m" -mindepth 1 -maxdepth 1 -type d -print >"$_fshg_cl" ||
+            _fsb_heal_err "$_fshg_m" "the module-gitdir scan (find)"
+        while IFS= read -r _fshg_c; do
+            [ -n "$_fshg_c" ] || continue
+            _fsb_heal_pin "$1" "$2" "$3" "$_fshg_c" 1755
+            _fsb_heal_pin "$1" "$2" "$3" "$_fshg_c/config" 644
+            _fsb_heal_pin "$1" "$2" "$3" "$_fshg_c/hooks" 755
+        done <"$_fshg_cl"
+        rm -f "$_fshg_cl"
+    done <"$_fshg_ml"
+    rm -f "$_fshg_ml"
     # Worktree registrations: sticky over the collection (an agent may
     # add its own registrations and remove its own — sticky keeps every
     # developer-owned registration un-replaceable), and the two
@@ -643,30 +703,62 @@ _fsb_heal_gitdir() {
     return 0
 }
 
-# _fsb_heal_git <root> <group>: enumerate every .git directory under the
-# root and heal it. Newline-separated iteration (find -print): the kit's
-# root gates reject whitespace roots, and a newline inside a path below
-# the root splits into two clean misses — the component walk skips both
-# halves with a warn (attacker noise, never a legit checkout).
+# _fsb_heal_git <root> <group>: sticky the project root (#655 a C1 —
+# the wholesale .git swap dies on it), enumerate every .git directory
+# under the root and heal it. Newline-separated iteration (find -print):
+# the kit's root gates reject whitespace roots; a newline inside a path
+# below the root splits into two halves — half 2 fails the root-prefix
+# case and skips with a warn, half 1 runs its ops on a nonexistent
+# path, which counts as errors and reddens the baseline (fail-loud — or
+# against an attacker-created sibling dir, heals IN-TREE: the attacker
+# loses its own plant). Attacker noise either way, never a legit
+# checkout (#655 a C7).
 _fsb_heal_git() {
-    _fsh_owner=$(_fsb_sudo stat -c %u "$1" 2>/dev/null) || {
-        _fsb_heal_err "$1" "the owner probe (stat)"
+    # Root normalization (#655 a C4, the _fsb_pass shape): the belt
+    # accepts a single-trailing-slash spelling, and the component walk
+    # strips the root prefix by string match — with the slash kept, the
+    # walk silently voided for every operand.
+    _fsh_root=$1
+    while [ "${_fsh_root%/}" != "$_fsh_root" ]; do
+        _fsh_root=${_fsh_root%/}
+    done
+    # Heal-entry root recheck (#655 a C5): a root swapped for a symlink
+    # between the passes and the heal turns the scan into an empty
+    # silent no-op — refuse that loud instead (parity with the passes'
+    # #421 batch-head recheck).
+    if [ -L "$_fsh_root" ]; then
+        _fsb_heal_err "$_fsh_root" "the heal entry recheck (root became a symlink)"
         return 0
-    }
+    fi
+    if ! _fsh_owner=$(_fsb_sudo stat -c %u "$_fsh_root" 2>/dev/null); then
+        # Diagnostic rerun (#244 c S3 shape): stderr flows to the user,
+        # the rc is discarded — the counted error below is the loud
+        # part (#655 a S1).
+        _fsb_sudo stat -c %u "$_fsh_root" >/dev/null || true
+        _fsb_heal_err "$_fsh_root" "the owner probe (stat)"
+        return 0
+    fi
+    # Project-root sticky (#655 a C1): the wholesale arm — mv .git
+    # .git.old && mkdir .git — renames a TOP-LEVEL entry, and the bit
+    # that gates that sits on the ROOT. Applied even when no .git is
+    # found: uniform, and a later clone lands protected. Sharing mode
+    # and group stay — the dirs pass re-adds its group bits every run
+    # and +t survives it (g+rwxs never touches the sticky column).
+    _fsb_sudo chmod +t "$_fsh_root" || _fsb_heal_err "$_fsh_root" "chmod +t (project root)"
     _fsh_list=$(mktemp "${TMPDIR:-/tmp}/opk-fsb-heal.XXXXXXXX") || {
-        printf '  error: mktemp failed (is $TMPDIR writable?) — the git heal cannot run under %s\n' "$1" >&2
+        printf '  error: mktemp failed (is $TMPDIR writable?) — the git heal cannot run under %s\n' "$_fsh_root" >&2
         _FSB_ERRORS=$((_FSB_ERRORS + 1))
         return 0
     }
     if command -v _tmp_track >/dev/null 2>&1; then
         _tmp_track "$_fsh_list"
     fi
-    _fsb_sudo find "$1" -type d -name .git -print >"$_fsh_list" ||
-        _fsb_heal_err "$1" "the .git scan (find)"
+    _fsb_sudo find "$_fsh_root" -type d -name .git -print >"$_fsh_list" ||
+        _fsb_heal_err "$_fsh_root" "the .git scan (find)"
     while IFS= read -r _fsh_gd; do
         [ -n "$_fsh_gd" ] || continue
         printf '  git heal: %s (hooks/config pinned developer-owned, issue #644)\n' "$_fsh_gd" >&2
-        _fsb_heal_gitdir "$1" "$_fsh_owner" "$2" "$_fsh_gd"
+        _fsb_heal_gitdir "$_fsh_root" "$_fsh_owner" "$2" "$_fsh_gd"
     done <"$_fsh_list"
     rm -f "$_fsh_list"
     return 0

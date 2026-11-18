@@ -114,7 +114,11 @@ expect the reported paths to exist locally.
   mirrors). (RM-0102)
 - The security model is deliberately **soft-only** — never re-introduce
   OS-level deny ACLs. Background: `internal/records/ddev-working.md`,
-  current model: `docs/concepts/security-model.md`. (RM-0103)
+  current model: `docs/concepts/security-model.md`. Sanctioned exception
+  (#651, PR #655): the `.git` heal — sticky bit + developer-ownership
+  narrowing on `.git` metadata that the group baseline would otherwise
+  leave agent-writable (`fs-baseline.sh`); no deny ACLs involved, ddev
+  never touches the narrowed entries. (RM-0103)
 - **The kit never edits user-owned system config on its own — above all
   `/etc/wsl.conf`.** Install/update only *show* snippets or name opt-in
   commands the user runs themselves; `opk wsl-add-opencode-1-fix` is the

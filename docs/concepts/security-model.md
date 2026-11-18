@@ -55,32 +55,47 @@ agent must be able to commit), but every baseline run *re-narrows the
 execution-bearing metadata* OS-side, because the developer's git executes
 from agent-writable surfaces there:
 
-- `.git` gets the sticky bit; `.git/config` and `.git/hooks` (and the
-  submodule `modules/*` gitdirs, and the worktree `commondir`/`gitdir`
-  pointer files) are pinned **developer-owned, no group write, no extended
+- The **project root** gets the sticky bit (the wholesale arm —
+  `mv .git .git.old && mkdir .git` — dies on it), `.git` gets the sticky
+  bit, and `.git/config` and `.git/hooks` (and the `modules` containers
+  with their gitdirs, and the worktree `commondir`/`gitdir` pointer
+  files) are pinned **developer-owned, no group write, no extended
   ACLs**.
-- Why that works: git *reads* the config for commit/push but writes it
-  through lock+rename — and the sticky bit kills the rename over a
-  developer-owned entry. A planted hook (or `core.fsmonitor`,
-  `core.hooksPath` override, diff-driver registration) can no longer be
-  written by the agent at all, while the agent's add/commit/branch/push
-  workflow stays fully green (verified live, evidence in issue #644).
+- Why that works: the sticky bit sits on the PARENT of whatever must
+  not be replaced — renaming or unlinking an entry needs write on its
+  parent directory, and a developer-owned entry in a sticky parent is
+  untouchable for the agent. Git *reads* the config for plain
+  commits/pushes but writes it through lock+rename — that rename dies
+  on the sticky bit. Planted hooks, `core.fsmonitor`, `core.hooksPath`
+  overrides and diff-driver registrations can no longer be placed or
+  rewritten by the agent, while the agent's add/commit/branch/push
+  workflow stays green (live evidence in issue #644, including the
+  field report on `push -u`).
 - This is OS-level narrowing — the one place the kit deliberately steps
-  out of the pure soft model, scoped to `.git` internals that ddev never
-  touches. Workflow costs accepted with it: repo-scope `git config` and
-  `git submodule add` fail for the agent (both write `.git/config`) —
-  including the tracking write of a first `git push -u`, so agents push
-  without `-u` (`git push origin <branch>`; the transfer itself is
-  unaffected); agent-side `git gc` can hit the sticky bit on
-  `packed-refs`.
+  out of the pure soft model, scoped to `.git` internals (and the
+  project root's sticky bit) that ddev never touches. Workflow costs
+  accepted with it: repo-scope `git config` and `git submodule add`
+  fail for the agent (both write `.git/config`) — including the
+  tracking write of a first `git push -u`, so agents push without `-u`
+  (`git push origin <branch>`; the transfer itself completes —
+  field-reported 2026-11-18, recorded in issue #644); the agent cannot
+  rename or delete developer-owned *top-level* entries (project-root
+  sticky — content edits and subdirectory renames are unaffected);
+  agent-side `git gc` can hit the sticky bit on `packed-refs`.
 - What it does **not** close: the `.git` pointer *file* inside
   agent-created worktree trees (delete+recreate sidesteps a pin — work in
-  the protected main checkout, not in agent worktrees), and agent-owned
-  trees as a whole. The full post-heal residual inventory lands with
-  issue #652 once the heal is piloted.
-- The heal deliberately survives `opk uninstall` — the uninstall revert
-  walks never touch ownership or the sticky bit, and a healed `.git`
-  protects the solo developer too.
+  the protected main checkout, not in agent worktrees), agent-owned
+  trees as a whole, and CONTENT planted before the heal — metadata
+  pinning preserves a planted hook file's exec bits and contents (the
+  heal warns about non-sample files it finds in `hooks/`; inspection
+  and removal stay human decisions). The full post-heal residual
+  inventory lands with issue #652 once the heal is piloted.
+- The heal survives `opk uninstall` where it matters: the revert walks
+  never touch the sticky bit or the **uid** of pinned entries (their
+  *group* is reverted to the developer's login group by the gid-matched
+  chown pass — protection unaffected either way: no group write in
+  either group), and a healed `.git` keeps protecting the solo
+  developer.
 
 ## Download integrity (SHA256SUMS)
 

@@ -7,14 +7,16 @@ deny blocks opencode's **tools** (read/edit + a `*.git/config*` bash
 tripwire) — a bash-spawned `cat .git/config` is not OS-blocked (soft-only,
 see the [security model](../concepts/security-model.md)).
 
-**Git operations are unaffected either way:** git only *reads*
-`.git/config` — commits, pushes and branch operations never write it.
-Turning the deny on does not stop the agent from committing or pushing
-(a misconception worth heading off — the toggle gates opencode's own
-tools, not the git binary). Since the `.git` heal (issue [#644](
-https://github.com/steffenmaechtel/opencode-permissions-kit/issues/644))
-the config file is additionally pinned developer-owned OS-side by every
-group-baseline run — see the [security model](../concepts/security-model.md).
+**What the toggle does not touch:** git itself. Plain commits, plain
+pushes and branch operations only *read* `.git/config` — but the
+exceptions are real and documented: a first `git push -u`, a
+`git branch --set-upstream-to`, repo-scope `git config` and
+`git submodule add` all *write* it, and under the `.git` heal (issue
+[#644](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/644))
+those writes fail with `Operation not permitted` while the operation's
+core work (the transfer, the commit) completes. Agents push without
+`-u`; the full cost list lives in the
+[security model](../concepts/security-model.md).
 
 ## Switch it on or off
 
@@ -41,13 +43,15 @@ shows:
 ```text
   git-config     ON — protected (soft-only — agent tools blocked)
      /home/opencode/.config/opencode/opencode.jsonc
-     git operations are unaffected — git only reads .git/config; commits and pushes never write it
+     plain commits/pushes only read .git/config — the exceptions (push -u tracking write,
+     repo-scope git config, submodule add) are the .git heal's documented costs
 ```
 
 ```text
   git-config     OFF — access allowed (agent tools may edit git config)
      /home/opencode/.config/opencode/opencode.jsonc
-     git operations are unaffected — git only reads .git/config; commits and pushes never write it
+     plain commits/pushes only read .git/config — the exceptions (push -u tracking write,
+     repo-scope git config, submodule add) are the .git heal's documented costs
 ```
 
 ## When to enable
@@ -65,7 +69,10 @@ shows:
 ## Disable all hooks for your user (defense in depth)
 
 Independent of the kit, you can stop YOUR git from executing any hook
-from any repository — git-config(1) endorses the redirect:
+from any repository — git-config(1) documents the redirect (framing it
+as expert/per-command use; the standing global form below is our
+deliberate recommendation — on a kit machine the trade is usually
+right):
 
 ```bash
 git config --global core.hooksPath /dev/null
