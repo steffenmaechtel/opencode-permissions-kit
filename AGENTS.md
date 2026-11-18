@@ -20,7 +20,11 @@ this repository — the router. Detail lives next to its audience:
 - `.agents/skills/` — loadable procedures for on-demand workflows
   (opencode loads them by description match): the session EXECUTING a
   review pass loads the `opk-review-pass` skill first — rules stay in
-  agent/, the skill carries the choreography only (issue #178)
+  agent/, the skill carries the choreography only (issue #178). When
+  the loader fails (`Unable to load skill`), read
+  `.agents/skills/<id>/SKILL.md` directly and proceed — the file
+  carries the full contract; a skill's sibling files live in the same
+  directory it names (#620).
 - [internal/reviews/README.md](internal/reviews/README.md) — review
   corpus archive: tag `review-corpus` is the authoritative record
   (citation resolution); the archived corpus's birth-PR timelines carry

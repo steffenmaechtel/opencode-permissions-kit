@@ -15,6 +15,11 @@
 #      backticks and bold markers stripped, wrapped lines joined,
 #      whitespace squeezed; the needle is the quote's first five
 #      words (plain-text rendering, the established meta practice).
+#      The quote-prefix haystack is fence-skipping BY DECISION
+#      (#618 a A2): the needle pairs with rule prose, so fenced
+#      content of the rule file is not a pairing target -- unlike
+#      inv10's content-inclusive haystack (hay_join); the asymmetry
+#      between the two transforms is deliberate, not an oversight.
 #      Retired metas are exempt (the retire rule): retirement removes the
 #      rule bullet, so neither anchor-quote pairing nor quote
 #      findability can hold.
@@ -98,6 +103,7 @@ ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#interactive-prompts-yn"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#script-output-style"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#shell-security-untrusted-input"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#test-sandbox-unit-suites"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#never-write-pins-unit-suites"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#referencing-review-findings"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#referencing-house-rules-rm-keys"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#fail-loud-detector-sweeps"
@@ -176,7 +182,8 @@ hay_join() { # file -> single line for the inv10 haystack -- fenced
     # dropping fenced lines was that carve-out leaking into the
     # haystack builder. norm_join (fence-skipping) stays inv5's
     # quote-findability transform: the quote: needle pairs with
-    # rule prose.
+    # rule prose -- the two transforms' asymmetry is deliberate
+    # (see inv 5's spec note, #618 a A2).
     awk 'BEGIN { ORS = "" }
         { gsub(/`/, ""); gsub(/\*/, ""); printf "%s ", $0 }' "$1" |
         tr -s ' \t' ' '

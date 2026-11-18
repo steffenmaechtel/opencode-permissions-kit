@@ -574,6 +574,15 @@ review host):
   /mnt/wsl mounts, pr-00590 round a T1). An assert whose outcome
   depends on ambient host state is environment-dependent — learnings
   L4's marking duty applies. (RM-0173)
+- The controlled PATH of an extracted-block run enumerates EVERYTHING
+  the run can reach, not just the block's first-line externals:
+  (i) fallback arms inside the pinned block (the sha256sum→shasum
+  macOS class), (ii) every external the STUBS call internally (a stub
+  body's `cat` outside the PATH kills every arm, rc 127), and
+  (iii) every variable the block expands in message strings is set by
+  the runner even on failure paths — unset under `set -u`, the die
+  line dies with `parameter not set` instead of its message (all
+  three probed 2026-11-18, #616). (RM-0179)
 
 Enforced by `tests/unit/test-sandbox-policy.sh`, three checks over every
 unit suite (backslash-continued commands are joined first; full-comment
@@ -609,6 +618,25 @@ The suite self-probes all three checks (continuation-split `rm`, inert
 and quoted and redirect-glued literals, the unguarded suffix shapes —
 flag orders, bare `rm`, multi-operand — vs the guarded ones, a clean
 sandboxed control) so the guard itself cannot rot silently.
+
+## Never-write pins (unit suites)
+
+A pin proving a staged run never wrote a real-tree file (the INDEX
+parity leg's kill-window residual, #572 T2) — both rules born in that
+suite's own wave and review round (issue #616):
+
+- A never-write pin asserts mtime, not bytes: a staged regeneration of
+  identical content is byte-invisible, so `cmp` stays green over the
+  exact violation it exists to catch. Copy the target to a marker
+  before the run and arm the red with `[ "$TARGET" -nt "$MARKER" ]` —
+  the copy stamps the marker, and `-nt` detects the in-place write
+  under bash and dash alike, sub-second (probed 2026-11-18, #616).
+  (RM-0177)
+- The pin's red path never repairs the real tree: a failure handler
+  that restores incoming bytes (`cp "$TMP.in" "$INDEX"`) re-opens the
+  write window the pin guards. Fail with the drift visible — the suite
+  exits 1 either way, and the tree keeps the evidence for the
+  operator. (RM-0178)
 
 ## Referencing review findings
 
@@ -653,6 +681,12 @@ Citations in new text name the file and section, never the bare ID:
   generated indexes sit outside the count; of the living files under
   `internal/reviews/`, the README is covered while the
   machine-generated legacy-index is exempt. (RM-0116)
+- Citation-FIXING waves are the prime fourth-site authors: rewording a
+  comment that cites a rule invites writing the bare ID into the new
+  text (a #606 a Q5 fix did exactly that; the rules-meta pin caught it
+  at gate time, one cycle paid). Grep the ID tree-wide before
+  committing to the reword, and cite by file + section + item in the
+  replacement text. (RM-0180)
 
 ## Referencing, not restating
 
