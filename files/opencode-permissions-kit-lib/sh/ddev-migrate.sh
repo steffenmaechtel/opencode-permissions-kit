@@ -344,8 +344,9 @@ ddev_migrate_has_db() {
 # value stays the data currency (manifest lines, grep -F operands,
 # argv, paths).
 _ddev_migrate_show() {
-    # Run-collapsing (#642 b S2): a multi-byte UTF-8 approot degrades
-    # to one '?' per character, not per byte.
+    # Run-collapsing (#642 b S2): non-printable bytes degrade to one
+    # '?' per RUN — a multi-byte UTF-8 character (and any adjacent
+    # ones) share a single '?', not one per byte or per character.
     printf '%s' "$1" | LC_ALL=C sed 's/[^ -~][^ -~]*/?/g'
 }
 
