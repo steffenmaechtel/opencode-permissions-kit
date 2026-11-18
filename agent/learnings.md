@@ -116,8 +116,8 @@ arm's second carrier (2026-11-18, PR #642): a delegated researcher's
 external-tool claims read authoritative enough to skip the audit —
 re-measure every claim against the primary source (the local clone
 where one exists) before it enters shipped comments, docs or
-records; the wave's ddev-CLI fact table went in only after
-re-measuring at the local clone, and the pre-verification draft's
+records; the wave's shipped comment went in only after re-measuring
+every claim at the local clone, and the pre-verification draft's
 hedge was exactly the unaudited remainder.
 
 ### L4 — Pins must discriminate, and sit before the summary gate
