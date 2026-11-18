@@ -666,15 +666,30 @@ EOF
 # writes group:<group> entries; a foreign named entry is almost
 # certainly a manual traversal fix). Mask reduction is ignored — the
 # warning would only be a false negative then.
+# rc 2 = a probe failed (#594 class sweep: the #569 M2 sweep covered
+# stat %a, but stat %A / %G — and getfacl — fold a dead probe into the
+# counted "blocks traversal" warning in exactly the same way).
+# _st_root_blocker turns rc 2 into an uncounted unknown row, never a
+# counted verdict.
 _st_ancestor_grants_x() {
-    _stx_mode=$(stat -c %A "$1" 2>/dev/null) || return 1
+    _stx_mode=$(stat -c %A "$1" 2>/dev/null) || return 2
     # other x: literal x or the sticky form t (/tmp); group x: literal x
     # or the setgid form s (the kit's own 2775 dirs).
     case "$_stx_mode" in
         ?????????x | ?????????t) return 0 ;;
     esac
-    getfacl -p "$1" 2>/dev/null | grep -qE '^(user|group):[^:]+:..x' && return 0
-    if [ "$(stat -c %G "$1" 2>/dev/null)" = "$OPENCODE_GROUP" ]; then
+    # #594 sweep completion: getfacl is a probe too — a dead ACL probe
+    # must not fold into the counted blocker verdict (rc 1); it is
+    # unknown (rc 2), same discipline as the stat arms. Exception (#621
+    # a S1): a host WITHOUT getfacl (acl package lost post-install) must
+    # not go audit-blind — the section degrades deliberately to stat-only
+    # verdicts with one disclosed row instead.
+    if command -v getfacl >/dev/null 2>&1; then
+        _stx_acl=$(getfacl -p "$1" 2>/dev/null) || return 2
+        printf '%s' "$_stx_acl" | grep -qE '^(user|group):[^:]+:..x' && return 0
+    fi
+    _stx_grp=$(stat -c %G "$1" 2>/dev/null) || return 2
+    if [ "$_stx_grp" = "$OPENCODE_GROUP" ]; then
         case "$_stx_mode" in ??????x??? | ??????s???) return 0 ;; esac
     fi
     return 1
@@ -685,7 +700,14 @@ _st_ancestor_grants_x() {
 _st_root_blocker() {
     _str_d=$(dirname "$1")
     while [ -n "$_str_d" ] && [ "$_str_d" != "/" ]; do
-        if ! _st_ancestor_grants_x "$_str_d"; then
+        _str_rc=0
+        _st_ancestor_grants_x "$_str_d" || _str_rc=$?
+        if [ "$_str_rc" -eq 2 ]; then
+            # #594: a failed stat never becomes the counted blocker warning
+            echo "unknown: $_str_d"
+            return 0
+        fi
+        if [ "$_str_rc" -ne 0 ]; then
             echo "$_str_d"
             return 0
         fi
@@ -707,6 +729,10 @@ status_section_projects() {
     ui_section "Projects ($_st_pc)"
 
     if [ -f "$PROJECTS_CONF" ] && [ -s "$PROJECTS_CONF" ]; then
+        # (#621 a S1): a missing getfacl degrades the audit deliberately
+        # to stat-only verdicts — one disclosed uncounted row, never silence.
+        command -v getfacl >/dev/null 2>&1 ||
+            ui_kv "ACL probe" "unavailable (getfacl missing) — traversal verdicts are stat-only"
         while IFS= read -r root; do
             [ -z "$root" ] && continue
             # Symlinked root (review a X4, issue #245): a link's mode is
@@ -736,10 +762,21 @@ status_section_projects() {
             # reaching the root at all (EACCES; ddev then claims "a project
             # cannot be created in the DDEV source code").
             _st_block=$(_st_root_blocker "$root")
-            if [ -n "$_st_block" ]; then
-                ui_atten "$root" "unreachable for $OPENCODE_USER — $_st_block blocks traversal""\
+            case "$_st_block" in
+                unknown:*)
+                    # #594: uncounted unknown, never the counted
+                    # "blocks traversal" warning over a probe that died.
+                    # (#621 a M2) rc 2 fires from stat AND ACL probes —
+                    # the row names the class, not one tool.
+                    ui_kv "$root" "traversal unknown — an ancestor probe failed (stat or ACL)"
+                    ;;
+                "")
+                    ;;
+                *)
+                    ui_atten "$root" "unreachable for $OPENCODE_USER — $_st_block blocks traversal""\
  (fix: sudo opk config refresh)"
-            fi
+                    ;;
+            esac
         done <"$PROJECTS_CONF"
     else
         ui_atten "(none configured)" "run config.sh projects add <path>"
@@ -1372,17 +1409,26 @@ status_groups_hits() {
     return 0
 }
 
-# status_sock_agent_reachable <socket-path> <agent-groups>: exit 0 when the
-# agent user can plausibly connect — socket world-writable, or group-writable
-# with its group among <agent-groups>. Pure stat math, works unprivileged.
-# rc 2 = the stat itself failed (#569 M2 class sweep, third instance): the
-# caller renders an uncounted unknown row — the old single-rc shape folded
-# a dead probe into the counted green "not agent-reachable".
+# status_sock_agent_reachable <socket-path> <agent-groups> [groups-probe-rc]:
+# exit 0 when the agent user can plausibly connect — socket world-writable,
+# or group-writable with its group among <agent-groups>. Pure stat math,
+# works unprivileged.
+# rc 2 = a probe failed (#569 M2 class sweep, third instance; #594 widened
+# it to the second stat and to the caller's id -nG probe): the caller renders
+# an uncounted unknown row. An empty group name must never degenerate the
+# comparison to *" "* — the padding spaces matched ANY groups list, so a
+# dead probe always rendered the counted red (uniformly a false red,
+# #621 a Q2), and an id -nG failure must never render a group-writable socket green with
+# the comparison never run. <groups-probe-rc> defaults to 0 for callers that
+# probed groups independently (unit helpers).
 status_sock_agent_reachable() {
     ssr_mode=$(stat -c %a "$1" 2>/dev/null) || return 2
     [ $((0$ssr_mode & 0002)) -ne 0 ] && return 0
     if [ $((0$ssr_mode & 0020)) -ne 0 ]; then
-        ssr_grp=$(stat -c %G "$1" 2>/dev/null)
+        if [ "${3:-0}" -ne 0 ]; then
+            return 2
+        fi
+        ssr_grp=$(stat -c %G "$1" 2>/dev/null) || return 2
         case " $2 " in *" $ssr_grp "*) return 0 ;; esac
     fi
     return 1
@@ -1445,7 +1491,16 @@ status_section_root_equiv() {
     # Groups that are root-equivalent (or credential-equivalent) if the AGENT
     # user is a member. The kit never adds them — this catches later manual
     # grants (usermod -aG docker opencode "to make something work").
-    sra_groups=$(id -nG "$OPENCODE_USER" 2>/dev/null || true)
+    # #594 S2: id -nG is a probe too (the installed=true gate only proves it
+    # worked moments before). Capture its own rc — never `|| true` — so an
+    # NSS hiccup cannot turn an empty group list into a counted green. The
+    # rc is passed to the socket helper so group-writable sockets fail loud
+    # as unknown instead of falling into "present, not agent-reachable".
+    sra_groups_rc=0
+    sra_groups=$(id -nG "$OPENCODE_USER" 2>/dev/null) || sra_groups_rc=$?
+    if [ "$sra_groups_rc" -ne 0 ]; then
+        ui_kv "groups" "unknown — cannot resolve $OPENCODE_USER groups (id -nG failed)"
+    fi
     sra_finding=false
     # shellcheck disable=SC2086  # word splitting intended: group lists
     sra_red=$(status_groups_hits "$sra_groups" \
@@ -1485,15 +1540,21 @@ status_section_root_equiv() {
         sra_r=$(readlink -f "$sra_s" 2>/dev/null || echo "$sra_s")
         case " $sra_seen " in *" $sra_r "*) continue ;; esac
         sra_seen="$sra_seen $sra_r"
-        status_sock_agent_reachable "$sra_s" "$sra_groups"
+        status_sock_agent_reachable "$sra_s" "$sra_groups" "$sra_groups_rc"
         sra_s_rc=$?
         if [ "$sra_s_rc" -eq 0 ]; then
             ui_kv_bad "socket" "$sra_s — AGENT-REACHABLE (root-equivalent daemon)"
             sra_finding=true
         elif [ "$sra_s_rc" -eq 2 ]; then
             # #569 M2 class sweep: uncounted unknown, never a counted green
-            # over a probe that never ran
-            ui_kv "socket" "$sra_s — unknown (cannot stat the socket)"
+            # over a probe that never ran. #594: rc 2 has two causes now —
+            # name the one the caller knows (a dead id -nG probe is not a
+            # socket-stat failure; the groups row above already names it).
+            if [ "$sra_groups_rc" -ne 0 ]; then
+                ui_kv "socket" "$sra_s — unknown (cannot resolve agent groups)"
+            else
+                ui_kv "socket" "$sra_s — unknown (cannot stat the socket)"
+            fi
         else
             ui_kv_ok "socket" "$sra_s — present, not agent-reachable"
         fi
