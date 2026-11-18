@@ -119,7 +119,11 @@ unstaged edits, and the post-restore check greps the construct the fix
 introduced, never rc alone — rc 0 holds for the pre- and post-fix version
 both, the wipe is invisible to rc by construction (rule sharpened
 2026-11-10 in AGENTS.md Testing; restated in
-[review-concept.md](review-concept.md) "Verification duty"). Two more shapes to
+[review-concept.md](review-concept.md) "Verification duty"). A mid-cycle quick
+fix in the sabotaged file itself is secured by the unconditional
+pre-restore copy — the 2026-11-16 recurrence (PR #568 round c Z3,
+same-file wipe) closed 2026-11-18 as #577 option 2.a (AGENTS.md
+Testing). Two more shapes to
 check: (a) the pin block sits **before** the suite's summary exit gate, or
 its FAIL cannot fail the suite (`0.0.44c C1`, fail-but-green; confirmed at
 scale by `pr-00211 b W13` / `c W5`: an `set -e` abort mid-suite skips every
@@ -312,9 +316,15 @@ and on 2026-11-10 took this section's first escalation path: wording
 sharpened (AGENTS.md Testing — per-cycle invariant, content-based
 restore verification, amend indicator) and restated in
 [review-concept.md](review-concept.md) "Verification duty" plus L4 and
-Keep doing here. Incidents outside the round comments belong in
-AGENTS.md — restated in the pages the working session reads, not one
-page alone.
+Keep doing here. The class then recurred a SECOND time after that
+sharpening (2026-11-16, PR #568 round c Z3 — a mid-cycle quick fix in
+the sabotaged file, a state where commit and stash cannot secure), and
+the 2026-11-18 escalation changed the process shape instead of
+sharpening the demand again: a sanctioned securing move (the
+unconditional pre-restore copy) so the safe path is also the cheap one
+(#577 option 2.a, AGENTS.md Testing). Incidents outside the round
+comments belong in AGENTS.md — restated in the pages the working
+session reads, not one page alone.
 
 ## Era & next-run notes (issue #175 pre-pass, closed 2026-10-22)
 

@@ -691,7 +691,12 @@ Four places carry review knowledge, each with exactly one job:
   alike, the wipe is invisible to rc by construction; an `--amend`
   that commits nothing new after an edit means the edit was already
   wiped). Restores reset the file to its index state — every edit
-  since the last commit or stage is silently lost. Why: PR #441 round
+  since the last commit or stage is silently lost. A mid-cycle quick
+  fix (worst case: pin and sabotaged construct share one file —
+  committing would bake the sabotage in, `git stash` mixes both) is
+  secured by the unconditional pre-restore copy out of the tree, with
+  recovery re-applying only the fix hunks from that copy (recurrence
+  2026-11-16: PR #568 round c Z3; #577 option 2.a). Why: PR #441 round
   b D1. The full rule and incident chain: AGENTS.md Testing;
   [learnings.md](learnings.md) L4. (RM-0139)
 

@@ -170,7 +170,23 @@ a PER-CYCLE invariant, not one-time phase preparation: every single
 sabotage cycle starts from a verified-clean tree (`git status
 --porcelain` empty for the target file) — the PR-#441 loss happened in
 the SECOND cycle, after a fresh edit had landed uncommitted between two
-cycles. And sabotage by
+cycles. **Quick fix between cycles (worst case: pin and sabotaged
+construct share one file).** A cycle that stays green on the sabotaged
+pin (the pin is unsound) invites a quick fix in the working tree
+mid-cycle — and in that state neither securing move applies: committing
+bakes the sabotage into the commit, and `git stash` mixes fix and
+sabotage in one stash (recurred 2026-11-16 in PR #568 round c Z3: a
+`git restore` wiped an uncommitted canary-leg fix in the same test
+file). Sanctioned move: before EVERY sabotage restore (`git checkout
+--` / `git restore`), copy the file out of the tree — `cp -- "$S"
+/tmp/opencode/<case>/pre-restore.$(basename "$S")` (unconditional —
+never assess whether you are in quick-fix mode; the latest copy wins by
+design). If the post-restore content verification finds the fix gone
+(grep the fix's construct alongside the pin's), recover by re-applying
+ONLY the fix hunks from the `diff` of the copy against the restored
+file — never copy the whole file back (it re-imports the sabotage). The
+copy is the securing step: no mid-cycle gate + commit is owed; the fix
+rides the wave's regular gate chain (#577 option 2.a). And sabotage by
 *deleting* the construct, not commenting it out: un-ridden grep-count
 pins (absence pins, bare control arms) still count commented lines, so
 a commented-out sabotage can pass green. And the sabotage must keep
