@@ -592,6 +592,155 @@ else
     fail "section wiring: unknown rows for stat-failed probes (#569)"
 fi
 
+# --- 1c4. #594: group-probe failures are unknown, never counted verdicts --------
+# The root-equiv lane's two group probes (the helper's second stat %G and
+# the section's id -nG) used to fold a dead probe into a counted red/green.
+# The class sweep also covers the ancestry stat %A / %G whose failure used
+# to render the counted "blocks traversal" warning. Every failure path is
+# executed here through PATH stubs, observed through the shipped helpers.
+_s4bin="$WORK/s4statstub"
+_s4ibin="$WORK/s4idstub"
+mkdir -p "$_s4bin" "$_s4ibin"
+_real_stat=$(command -v stat)
+_real_id=$(command -v id)
+cat >"$_s4bin/stat" <<STUBEOF
+#!/bin/sh
+case "\$1 \$2" in
+    "-c %G" | "-c %A") exit 1 ;;
+esac
+exec "$_real_stat" "\$@"
+STUBEOF
+cat >"$_s4ibin/id" <<STUBEOF
+#!/bin/sh
+[ "\$1" = "-nG" ] && exit 1
+exec "$_real_id" "\$@"
+STUBEOF
+chmod +x "$_s4bin/stat" "$_s4ibin/id"
+
+# A real group-writable socket with a resolvable group name.
+_s4sock="$WORK/s4-group.sock"
+python3 - "$_s4sock" <<'PYEOF'
+import socket, sys
+s = socket.socket(socket.AF_UNIX)
+s.bind(sys.argv[1])
+s.listen(1)
+PYEOF
+chmod 660 "$_s4sock"
+_s4grp=$(id -gn)
+
+# S1 — second stat failure returns rc 2 for an empty AND a non-empty groups
+# list: the old empty ssr_grp made *" "* match "  " (false red on an empty
+# list) and miss a real group name (false green when the socket's group IS
+# among the agent's groups).
+(
+    . "$UI_LIB"
+    . "$STATUS_CORE"
+    PATH="$_s4bin:$PATH"
+    export PATH
+    _s4rc=0
+    status_sock_agent_reachable "$_s4sock" "" || _s4rc=$?
+    [ "$_s4rc" -eq 2 ] && echo S1-EMPTY-RC2-OK
+    _s4rc=0
+    status_sock_agent_reachable "$_s4sock" "$_s4grp" || _s4rc=$?
+    [ "$_s4rc" -eq 2 ] && echo S1-GROUPS-RC2-OK
+) >"$WORK/s4-s1.out" 2>&1 || true
+
+# S2 helper — the groups-probe rc argument alone (real stat, no stub) must
+# turn the group arm into rc 2, while a world-writable socket stays visibly
+# reachable and a non-group-writable one stays a valid counted green.
+(
+    . "$UI_LIB"
+    . "$STATUS_CORE"
+    _s4rc=0
+    status_sock_agent_reachable "$_s4sock" "$_s4grp" 1 || _s4rc=$?
+    [ "$_s4rc" -eq 2 ] && echo S2-GROUPW-RC2-OK
+    chmod 666 "$_s4sock"
+    status_sock_agent_reachable "$_s4sock" "" 1 && echo S2-WORLDW-OK
+    chmod 644 "$_s4sock"
+    _s4rc=0
+    status_sock_agent_reachable "$_s4sock" "$_s4grp" 1 || _s4rc=$?
+    [ "$_s4rc" -eq 1 ] && echo S2-NONGROUPW-GREEN-OK
+    chmod 660 "$_s4sock"
+) >"$WORK/s4-s2.out" 2>&1 || true
+
+# Sweep helper — a failed ancestry stat returns the distinct "unknown:"
+# marker rather than the counted blocker path.
+_s4root="$WORK/s4root"
+mkdir -p "$_s4root/proj"
+(
+    . "$UI_LIB"
+    . "$STATUS_CORE"
+    PATH="$_s4bin:$PATH"
+    export PATH
+    case "$(_st_root_blocker "$_s4root/proj")" in
+        unknown:*) echo S4-BLOCKER-UNKNOWN-OK ;;
+    esac
+) >"$WORK/s4-sweep.out" 2>&1 || true
+
+_s4_ok=0
+for _want in S1-EMPTY-RC2-OK S1-GROUPS-RC2-OK S2-GROUPW-RC2-OK S2-WORLDW-OK \
+    S2-NONGROUPW-GREEN-OK S4-BLOCKER-UNKNOWN-OK; do
+    if grep -q "$_want" "$WORK/s4-s1.out" "$WORK/s4-s2.out" "$WORK/s4-sweep.out"; then
+        _s4_ok=$((_s4_ok + 1))
+    else
+        fail "group-probe failure pin: missing $_want"
+    fi
+done
+[ "$_s4_ok" -eq 6 ] && pass "group-probe failure helpers: 6/6 (#594 S1/S2 + sweep)"
+
+# S2 section — id -nG fails mid-run; the group-writable socket must render
+# the uncounted unknown rows and never the counted green "not agent-reachable".
+_s4out=$(
+    (
+        set +e
+        . "$UI_LIB"
+        . "$STATUS_CORE"
+        OPENCODE_USER=root
+        ROOT_EQUIV_SOCKS="$_s4sock"
+        PATH="$_s4ibin:$PATH"
+        export PATH
+        status_section_root_equiv
+    ) 2>&1
+) || true
+if printf '%s' "$_s4out" | grep -qF 'unknown — cannot resolve root groups (id -nG failed)' &&
+    printf '%s' "$_s4out" | grep -qF 'unknown (cannot stat the socket)' &&
+    ! printf '%s' "$_s4out" | grep -qF 'not agent-reachable'; then
+    pass "id -nG failure: unknown groups + socket rows, never counted green (#594 S2)"
+else
+    fail "id -nG failure section (out=$(printf '%s' "$_s4out" | head -5))"
+fi
+
+# Sweep section — a failed ancestry stat renders the uncounted unknown row
+# and never the counted "blocks traversal" warning.
+_s4projects="$WORK/s4-projects.conf"
+printf '%s\n' "$_s4root/proj" >"$_s4projects"
+_s4out3=$(
+    (
+        set +e
+        . "$UI_LIB"
+        . "$STATUS_CORE"
+        OPENCODE_USER=root
+        PROJECTS_CONF="$_s4projects"
+        PATH="$_s4bin:$PATH"
+        export PATH
+        status_section_projects
+    ) 2>&1
+) || true
+if printf '%s' "$_s4out3" | grep -qF 'traversal unknown — cannot stat an ancestor (probe failed)' &&
+    ! printf '%s' "$_s4out3" | grep -qF 'blocks traversal'; then
+    pass "ancestry stat failure: uncounted unknown, never counted blocker (#594 sweep)"
+else
+    fail "ancestry stat failure section (out=$(printf '%s' "$_s4out3" | head -5))"
+fi
+
+if live_src "$STATUS_CORE" | grep -qF 'ssr_grp=$(stat -c %G "$1" 2>/dev/null) || return 2' &&
+    live_src "$STATUS_CORE" | grep -qF 'sra_groups=$(id -nG "$OPENCODE_USER" 2>/dev/null) || sra_groups_rc=$?' &&
+    live_src "$STATUS_CORE" | grep -qF 'status_sock_agent_reachable "$sra_s" "$sra_groups" "$sra_groups_rc"'; then
+    pass "source wiring: group probes capture their own rc (#594)"
+else
+    fail "source wiring: group probes capture their own rc (#594)"
+fi
+
 # --- 1d. live ddev version probe (issue #56) -------------------------------------
 # DDEV_VERSION in install.conf is an install-time stamp; status.sh must
 # report the LIVE binary version instead (the stale stamp showed 1.25.3
