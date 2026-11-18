@@ -210,10 +210,16 @@ check "2c: recursive group baseline — group is opencode everywhere" \
     E 'test "$(stat -c %G /var/www/vhosts/perm-check/existing-file.txt)" = "opencode"'
 check "2c: baseline runs with live per-pass progress (issue #14)" \
     E 'grep -q "group baseline on /var/www/vhosts" /tmp/install-out.log && grep -q "entries — done" /tmp/install-out.log'
-check "2c: .git dir gets the group baseline (dev-owned, setgid + group-writable)" \
-    E 'test "$(stat -c %U:%G:%a /var/www/vhosts/perm-check/.git)" = "dev:opencode:2770"'
-check "2c: .git/config group-writable, stays dev-owned (issue #17)" \
-    E 'test "$(stat -c %U:%G:%a /var/www/vhosts/perm-check/.git/config)" = "dev:opencode:660"'
+check "2c: .git dir shared + sticky-healed (dev-owned, setgid + group-writable + sticky, #651)" \
+    E 'test "$(stat -c %U:%G:%a /var/www/vhosts/perm-check/.git)" = "dev:opencode:3770"'
+check "2c: .git/config healed dev-owned, no group write (issue #17 shared it; #651 re-narrows)" \
+    E 'test "$(stat -c %U:%G:%a /var/www/vhosts/perm-check/.git/config)" = "dev:opencode:644"'
+check "2c: heal — .git/hooks dev-owned, no group write (#651)" \
+    E 'test "$(stat -c %U:%G:%a /var/www/vhosts/perm-check/.git/hooks)" = "dev:opencode:2755"'
+check_fail "2c: heal — agent CANNOT plant a hook (sticky .git + dev-owned hooks dir, #644/#651)" \
+    E 'sudo -u opencode -H touch /var/www/vhosts/perm-check/.git/hooks/planted'
+check_fail "2c: heal — agent CANNOT rewrite .git/config (lock+rename dies on sticky, #644/#651)" \
+    E 'sudo -u opencode -H git -C /var/www/vhosts/perm-check config core.fsmonitor /tmp/opk-probe'
 check "2c: git safe.directory '*' set for the opencode user (issue #17)" \
     E 'sudo -u opencode -H git config --global --get-all safe.directory 2>/dev/null | grep -qFx "*"'
 check "2c: agent git can read the dev-owned repository (no dubious ownership)" \
