@@ -309,7 +309,8 @@ have live examples: L2's wording was sharpened twice after the class
 returned (#214 5 above), L1/L4's pin-placement shape became a
 suite-mechanics rule (pins before the summary gate), and the sabotage-vs-
 uncommitted-tree class gained the pre-restore copy as a sanctioned securing
-move after surviving two sharpenings (#577 option 2.a). The sabotage-vs-
+move after the class survived the 2026-10 rule and its 2026-11-10
+sharpening (#577 option 2.a). The sabotage-vs-
 uncommitted-tree incident (2026-10) never entered a review snapshot — it
 lived as an AGENTS.md Testing rule alone until the class recurred anyway
 (2026-11; roughly every third session, maintainer estimate). The
