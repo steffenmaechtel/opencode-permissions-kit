@@ -1833,6 +1833,26 @@ if [ "$F3RC" -eq 0 ] && printf '%s' "$F3OUT" | grep -q 'no dump directories'; th
 else
     fail "list exits 0 and reports none when empty (#211 a F3, rc $F3RC)"
 fi
+# #646 (PR #642 round c S2): listed entry names come from the
+# agent-owned dump dir (finalize hands it to the opencode user) — a
+# hostile rename can put terminal-escape bytes into a name, and the
+# raw ls output would let them forge/clear transcript lines. The
+# listing must carry the scrubbed form (run-collapsing, like
+# sh/ddev-migrate.sh's _ddev_migrate_show) and no raw escape byte.
+printf 'x' >"$F3ROOT/ddev-migration-20261020-1200/evil$(printf '\033')[2Kclean.sql"
+F3RC=0
+F3OUT="$(DDEV_MIG_BACKUP_ROOT="$F3ROOT" "$BIN_MIG" list 2>&1)" || F3RC=$?
+case "$F3OUT" in
+    *"$(printf '\033')"*)
+        fail "raw escape byte reached the list output (#646)"
+        ;;
+    *) pass "list output carries no raw escape byte (#646)" ;;
+esac
+if printf '%s' "$F3OUT" | grep -qF 'evil?[2Kclean.sql'; then
+    pass "list shows the SCRUBBED entry name (#646)"
+else
+    fail "list must show the scrubbed entry name (#646)"
+fi
 rm -rf "$F3ROOT"
 
 # --- Summary ------------------------------------------------------------------------

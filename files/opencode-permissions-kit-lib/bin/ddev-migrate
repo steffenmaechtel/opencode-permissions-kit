@@ -26,7 +26,14 @@ case "${1:-}" in
             [ -d "$dm_d" ] || continue
             dm_found=1
             echo "$dm_d:"
-            ls -1 "$dm_d" 2>/dev/null | sed 's/^/    /'
+            # Entry names inside a finalized dump dir are agent-owned
+            # (finalize hands the dir to the opencode user): a hostile
+            # rename can put terminal-escape bytes into a name, and raw
+            # ls output would let them forge/clear transcript lines —
+            # scrub for display, run-collapsing like sh/ddev-migrate.sh
+            # (#646, from PR #642 round c S2; the #642 a S1 /
+            # pr-00263 a F9 transcript-forgery class).
+            ls -1 "$dm_d" 2>/dev/null | LC_ALL=C sed -e 's/[^ -~][^ -~]*/?/g' -e 's/^/    /'
         done
         # rc 0 means "listed fine" regardless of whether dumps exist
         # (#211 a F3): the bare `&& echo` tail made the case arm's rc
