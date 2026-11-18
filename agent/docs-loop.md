@@ -136,11 +136,12 @@ sessions, one per PR).
   own fresh bullet instead of the wave's amended check-3 bullet —
   all caught by review, none by the wave itself, #632, #636, #641).
   (RM-0182)
-- The self-application sweep is section-scoped by wording;
-  same-mechanism rule texts in OTHER files are the class sweep's job
-  (learnings L2), and doc waves owe it tree-wide: grep the edited
-  rule's distinctive vocabulary across the whole tree with no path
-  filters, and record the grep pattern itself in the ledger, never
+- The self-application sweep's sibling-read is section-scoped by
+  wording; same-mechanism rule texts in OTHER files are the class
+  sweep's job (learnings L2), and doc waves owe it tree-wide: grep
+  the edited rule's distinctive vocabulary across the whole tree
+  with no path filters, and record the grep pattern itself in the
+  ledger, never
   only the site list — a filtered grep's silent exclusions are
   invisible in a site list (pr-00640 round a Q2/Q3: the root-run
   rename left the standing-review rule's unit and meta in

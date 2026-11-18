@@ -159,7 +159,7 @@
 | [RM-0145](0/1/4/RM-0145.md) | Shipped content is English and | active | approved | 1m | 2026-12-15 |
 | [RM-0167](0/1/6/RM-0167.md) | A wave codifying a reflection | active | approved | 1m | 2026-12-17 |
 | [RM-0182](0/1/8/RM-0182.md) | The wave's own new prose | active | **pending** | 1m | 2026-12-18 |
-| [RM-0183](0/1/8/RM-0183.md) | The self-application sweep is section-scoped | active | **pending** | 1m | 2026-12-18 |
+| [RM-0183](0/1/8/RM-0183.md) | The self-application sweep's sibling-read is | active | **pending** | 1m | 2026-12-18 |
 
 ## agent/review-concept.md
 
