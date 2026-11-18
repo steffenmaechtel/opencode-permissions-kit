@@ -66,9 +66,10 @@ OUT="$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$WORK/p
 assert_eq "root dir: group + setgid + group rwx (700 -> 2770)" "2770" \
     "$(stat -c %a "$WORK/proj")"
 assert_eq "subdir carries setgid" "2770" "$(stat -c %a "$WORK/proj/sub")"
-assert_eq ".git included in the baseline (issue #17)" "2770" "$(stat -c %a "$WORK/proj/.git")"
+assert_eq ".git shared and sticky-healed (issue #17 + #651)" "3770" "$(stat -c %a "$WORK/proj/.git")"
 assert_eq "file gets group rw (600 -> 660)" "660" "$(stat -c %a "$WORK/proj/file.txt")"
-assert_eq ".git/config gets group rw" "660" "$(stat -c %a "$WORK/proj/.git/config")"
+assert_eq ".git/config healed developer-owned, no group write (#651)" "644" \
+    "$(stat -c %a "$WORK/proj/.git/config")"
 assert_eq "group applied everywhere" "$GRP" "$(stat -c %G "$WORK/proj/sub")"
 if getfacl -p "$WORK/proj/sub" 2>/dev/null | grep -q '^default:group:.*:rwx'; then
     pass "default ACL g:<group>:rwx set on directories"
@@ -76,7 +77,138 @@ else
     fail "default ACL g:<group>:rwx set on directories"
 fi
 
-# --- 2. symlink safety ----------------------------------------------------------
+# --- 1b. .git metadata heal (#644, wave #651) ------------------------------------------
+# The heal pins the execution-bearing .git entries developer-owned after
+# the sharing passes. Unit pins assert the STATE (modes, owners,
+# ACL-free, sticky); the uid-separation BLOCKING (an opencode-uid write
+# bouncing off a developer-owned sticky entry) is e2e/pilot territory —
+# a same-uid unit run cannot see ownership walls (the live battery is
+# the evidence in issue #644).
+HG="$WORK/healproj"
+HGGRP="$(id -gn)"
+HGME="$(id -u)"
+mkdir -p "$HG/proj/.git/hooks" "$HG/proj/.git/refs/heads" "$HG/proj/.git/objects" \
+    "$HG/proj/.git/logs/refs" "$HG/proj/.git/worktrees/wt1" \
+    "$HG/proj/.git/modules/sub/hooks"
+printf 'cfg\n' >"$HG/proj/.git/config"
+printf 'sm\n' >"$HG/proj/.git/modules/sub/config"
+printf 's\n' >"$HG/proj/.git/hooks/pre-commit.sample"
+printf 'i\n' >"$HG/proj/.git/index"
+printf 'h\n' >"$HG/proj/.git/HEAD"
+printf 'r\n' >"$HG/proj/.git/refs/heads/main"
+printf '..\n' >"$HG/proj/.git/worktrees/wt1/commondir"
+printf '..\n' >"$HG/proj/.git/worktrees/wt1/gitdir"
+printf 'wh\n' >"$HG/proj/.git/worktrees/wt1/HEAD"
+printf 'log\n' >"$HG/proj/.git/logs/HEAD"
+chmod 700 "$HG/proj/.git" "$HG/proj/.git/hooks"
+HGOUT="$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$HG/proj" "$HGGRP" 2>&1)"
+assert_eq "heal: .git keeps sharing mode + sticky (dirs pass then +t)" "3770" \
+    "$(stat -c %a "$HG/proj/.git")"
+assert_eq "heal: .git/config 644" "644" "$(stat -c %a "$HG/proj/.git/config")"
+assert_eq "heal: .git/config owner is the developer (root-derived)" "$HGME" \
+    "$(stat -c %u "$HG/proj/.git/config")"
+assert_eq "heal: .git/hooks 755 shape, no group write (dir setgid rides along, harmless)" "2755" \
+    "$(stat -c %a "$HG/proj/.git/hooks")"
+assert_eq "heal: .git/hooks owner is the developer" "$HGME" "$(stat -c %u "$HG/proj/.git/hooks")"
+# The umask-644 fixture files (not pre-tightened to 600 — the healed
+# invariant is group rw, not a specific absolute mode): files pass g+rw
+# lands on 664, and the heal must NOT touch these agent-workflow files.
+assert_eq "heal: hook sample files stay shared (no execution surface)" "664" \
+    "$(stat -c %a "$HG/proj/.git/hooks/pre-commit.sample")"
+assert_eq "heal: index keeps group rw (agent workflow file)" "664" \
+    "$(stat -c %a "$HG/proj/.git/index")"
+assert_eq "heal: HEAD keeps group rw" "664" "$(stat -c %a "$HG/proj/.git/HEAD")"
+assert_eq "heal: refs keep group rw" "664" "$(stat -c %a "$HG/proj/.git/refs/heads/main")"
+assert_eq "heal: logs keep group rw" "664" "$(stat -c %a "$HG/proj/.git/logs/HEAD")"
+assert_eq "heal: worktrees collection sticky, still group-writable (agent adds its own)" "3775" \
+    "$(stat -c %a "$HG/proj/.git/worktrees")"
+assert_eq "heal: registration dir keeps group rw (merge-state files must appear)" "2775" \
+    "$(stat -c %a "$HG/proj/.git/worktrees/wt1")"
+assert_eq "heal: commondir pointer pinned 644" "644" \
+    "$(stat -c %a "$HG/proj/.git/worktrees/wt1/commondir")"
+assert_eq "heal: gitdir pointer pinned 644" "644" \
+    "$(stat -c %a "$HG/proj/.git/worktrees/wt1/gitdir")"
+assert_eq "heal: worktree HEAD keeps group rw" "664" \
+    "$(stat -c %a "$HG/proj/.git/worktrees/wt1/HEAD")"
+assert_eq "heal: module gitdir sticky, no group write (setgid rides along)" "3755" \
+    "$(stat -c %a "$HG/proj/.git/modules/sub")"
+assert_eq "heal: module config pinned 644" "644" \
+    "$(stat -c %a "$HG/proj/.git/modules/sub/config")"
+assert_eq "heal: module hooks pinned, no group write" "2755" \
+    "$(stat -c %a "$HG/proj/.git/modules/sub/hooks")"
+if getfacl -p "$HG/proj/.git/hooks" 2>/dev/null | grep -q '^default:'; then
+    fail "heal: default ACLs stripped from .git/hooks (they would re-grant group write)"
+else
+    pass "heal: default ACLs stripped from .git/hooks (they would re-grant group write)"
+fi
+if getfacl -p "$HG/proj/.git/config" 2>/dev/null | grep -qE '^(group:[^:]|default:)'; then
+    fail "heal: no extended ACL entries survive on .git/config"
+else
+    pass "heal: no extended ACL entries survive on .git/config"
+fi
+if printf '%s\n' "$HGOUT" | grep -q 'git heal:'; then
+    pass "heal: one progress line per healed .git"
+else
+    fail "heal: one progress line per healed .git"
+fi
+# Idempotence of the heal cycle: the sharing passes re-grant, the heal
+# re-narrows — the end state must be byte-stable across runs.
+HGRC2=0
+FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$HG/proj" "$HGGRP" \
+    >/dev/null 2>&1 || HGRC2=$?
+assert_eq "heal: idempotent re-run rc 0" "0" "$HGRC2"
+assert_eq "heal: idempotent re-run state stable (config/hooks/.git/worktrees)" \
+    "644/2755/3770/3775" \
+    "$(stat -c %a "$HG/proj/.git/config")/$(stat -c %a "$HG/proj/.git/hooks")/$(stat -c %a "$HG/proj/.git")/$(stat -c %a "$HG/proj/.git/worktrees")"
+
+# A symlinked operand never gets pinned (the follow would write through
+# the link — the L5 class): a config swapped for a link is skipped with
+# the named warn, the run stays green, and the link TARGET outside the
+# tree keeps its mode.
+HGS="$WORK/healsym"
+mkdir -p "$HGS/proj/.git" "$HGS/outside"
+printf 't\n' >"$HGS/outside/target"
+chmod 600 "$HGS/outside/target"
+ln -s "$HGS/outside/target" "$HGS/proj/.git/config"
+HGSOUT="$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$HGS/proj" "$HGGRP" 2>&1)"
+HGSRC=$?
+assert_eq "heal: symlinked config skips without failing the baseline" "0" "$HGSRC"
+if printf '%s\n' "$HGSOUT" | grep -qF 'git heal skipped'; then
+    pass "heal: the skip names the operand (warn, not silence)"
+else
+    fail "heal: the skip names the operand (warn, not silence)"
+fi
+assert_eq "heal: symlink target outside the tree untouched" "600" \
+    "$(stat -c %a "$HGS/outside/target")"
+
+# A failing heal op fails the WHOLE baseline loud (the F10 contract):
+# a PATH-stubbed chown passes the tool probe but dies per operand —
+# the summary must refuse "applied".
+HGF="$WORK/healfail"
+HGFSTUB="$WORK/healfail-bin"
+mkdir -p "$HGF/proj/.git/hooks" "$HGFSTUB"
+printf 'c\n' >"$HGF/proj/.git/config"
+cat >"$HGFSTUB/chown" <<'EOF'
+#!/bin/sh
+echo "chown stub: deliberate failure" >&2
+exit 1
+EOF
+chmod +x "$HGFSTUB/chown"
+HGFOUT="$(PATH="$HGFSTUB:$PATH" FS_SUDO="" \
+    sh -c '. "$1" && fs_baseline_root "$2" "$3" && echo BASELINE-RC0' \
+    _ "$LIB" "$HGF/proj" "$HGGRP" 2>&1 || true)"
+if printf '%s\n' "$HGFOUT" | grep -q BASELINE-RC0; then
+    fail "heal: a failing heal op must fail the baseline (loud, not green)"
+else
+    pass "heal: a failing heal op must fail the baseline (loud, not green)"
+fi
+if printf '%s\n' "$HGFOUT" | grep -qF 'git heal: chown'; then
+    pass "heal: the failing op is named (chown)"
+else
+    fail "heal: the failing op is named (chown)"
+fi
+rm -rf "$HG" "$HGS" "$HGF" "$HGFSTUB"
+
 # A bare `chgrp <link>` follows the TARGET; chgrp -R (the old code) did
 # not. The pass must skip symlinks entirely — the link's TARGET (here a
 # root-owned system file) keeps its group. NB: plain stat(1) lstats a
@@ -665,7 +797,7 @@ mkdir -p "$W23NPBIN" "$W23NP/proj"
 chmod 700 "$W23NP/proj"
 printf 'nopy\n' >"$W23NP/proj/f"
 chmod 600 "$W23NP/proj/f"
-for _t in sh find cat chgrp chmod setfacl mktemp dirname stat getfacl grep rm xargs; do
+for _t in sh find cat chgrp chmod setfacl chown mktemp dirname stat getfacl grep rm xargs; do
     ln -s "$(command -v "$_t")" "$W23NPBIN/$_t"
 done
 W23NPRC=0
@@ -686,7 +818,7 @@ mkdir -p "$W23NPBIN2"
 # reset the fixture the 11b run already baselined: the loud abort must
 # leave the file at 600, proving no pass ran at all
 chmod 600 "$W23NP/proj/f"
-for _t in sh find chgrp chmod setfacl mktemp dirname stat getfacl grep rm xargs; do
+for _t in sh find chgrp chmod setfacl chown mktemp dirname stat getfacl grep rm xargs; do
     ln -s "$(command -v "$_t")" "$W23NPBIN2/$_t"
 done
 W23CATRC=0
