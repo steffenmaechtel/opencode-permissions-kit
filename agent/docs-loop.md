@@ -119,7 +119,9 @@ sessions, one per PR).
   new text coins greps in its target, every new name is
   collision-checked against the target file's existing headings and
   leads, every count is reconciled with the cited source's full
-  body, and every new clause is read against the sibling text of the
+  body, every incident compression is re-read against the record the
+  wave itself consulted, and every new clause is read against the
+  sibling text of the
   section it lands in — scope models, phrasing, contradictions: two
   half-true descriptions of one mechanism give a reader opposite
   answers (pr-00629 round a A1–A3: a grep-dead pointer written into the
@@ -128,8 +130,23 @@ sessions, one per PR).
   the same wave's amended check-3 bullet in conventions.md carried
   two opposite scope models unreconciled — the fresh sweep's
   enumeration covered names, pointers and counts, not phrase-level
-  consistency, so it could not catch its own wave's sibling edit —
-  all caught by review, none by the wave itself, #632, #636). (RM-0182)
+  consistency, so it could not catch its own wave's sibling edit;
+  pr-00640 round a Q1: the pr-00634 A1 evidence had been verified at
+  its ref and still drifted in the compression — naming the sweep's
+  own fresh bullet instead of the wave's amended check-3 bullet —
+  all caught by review, none by the wave itself, #632, #636, #641).
+  (RM-0182)
+- The self-application sweep is section-scoped by wording;
+  same-mechanism rule texts in OTHER files are the class sweep's job
+  (learnings L2), and doc waves owe it tree-wide: grep the edited
+  rule's distinctive vocabulary across the whole tree with no path
+  filters, and record the grep pattern itself in the ledger, never
+  only the site list — a filtered grep's silent exclusions are
+  invisible in a site list (pr-00640 round a Q2/Q3: the root-run
+  rename left the standing-review rule's unit and meta in
+  review-concept.md split, and the SHA256SUMS sweep's internal/
+  noise filter hid release-handling.md; both caught by review round
+  a, fixed in its fix wave, #641). (RM-0183)
 
 ## Closure — and the next cycle
 
