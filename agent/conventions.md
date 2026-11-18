@@ -643,13 +643,15 @@ lines are skipped):
    helper scripts (`tests/e2e/**/*.sh`). The same `:?` standard
    applies to shipped code's `rm` var+suffix sites, root context
    included: new sites must not regress it (convention, enforced by
-   review — the unit guard's scan deliberately stops at tests/). And the scan is a line grammar over
-    TOKENS, not statements — MESSAGE PROSE on a live line can match
-    too: a literal `rm` inside a fail/pass message, with only
-    single-space-separated words up to a quoted `"$VAR/suffix"`
-    literal, walks the same middle and tail (the #601 chmod arm's
-    fail message tripped it, one red cycle, PR #628 — say `remove` in
-    prose near quoted path literals, #630). (RM-0044)
+   review — the unit guard's scan deliberately stops at tests/). The statement scoping is chain-based,
+    not a parse — an unquoted semicolon or redirect boundary breaks
+    the chain, but every token INSIDE the span is walked: MESSAGE
+    PROSE on a live line can match too — a literal `rm` inside a
+    fail/pass message, with only single-space-separated words between
+    it and a quoted `"$VAR/suffix"` literal, walks the same middle and
+    tail (the #601 chmod arm's fail message tripped it, one red cycle,
+    PR #628 — say `remove` in prose near quoted path literals, #630).
+    (RM-0044)
 
 The suite self-probes all three checks (continuation-split `rm`, inert
 and quoted and redirect-glued literals, the unguarded suffix shapes —
