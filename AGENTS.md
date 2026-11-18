@@ -268,10 +268,13 @@ a stale `SHA256SUMS` (issue #478), so the regeneration must land in
 the log before the suite reads it (#524 §1 paid one red gate for the
 order); `make sums` itself is idempotent (no-op output when the
 manifest is already fresh). When the wave stages by explicit path
-(the co-edit-safe form below), `SHA256SUMS` must be named in the same
-`git add` — the chain regenerates the file, the path list does not
-know that (twice amended in one session, pr-00599 commits 8f7cae87
-and c09f13f2; issue #602). The entry-checksum blocks in README and
+(the co-edit-safe form below), the **repo-root** `SHA256SUMS` must be
+named in the same `git add` — the manifest lives at the repository
+root, not under `files/` (a guessed `files/SHA256SUMS` pathspec-kills
+the chain at the add, exit 128, after the gates already ran green;
+#637, PR #633), and the chain regenerates the file, which the path
+list does not know (twice amended in one session, pr-00599 commits
+8f7cae87 and c09f13f2; issue #602). The entry-checksum blocks in README and
 `docs/getting-started.md` are the ONE checksum artifact mid-cycle
 waves never touch: `make release-sums` rewrites them from the tree's
 `files/install.sh` **release PR only** (issue #492) — a mid-cycle
@@ -301,11 +304,20 @@ once swept the maintainer's template file into a commit, #528 §2).
 
 Both e2e suites are part of the definition of done for changes to
 `install.sh`, `update.sh`, the wrapper, or backend provisioning — and for
-semantics changes (rc contracts, traps, sudoers, provisioning) to any other
-root-run script (`uninstall.sh`, `opk`, `fs-baseline.sh`, …): those owe both
-suites in the wave itself. Message- or comment-only changes to root-run
-scripts may ride to the release gate; a later session that runs both suites
+semantics changes (rc contracts, traps, sudoers, provisioning) and
+behavioral changes (new refusal/skip/abort arms, changed control
+flow) to any other root-run code (`uninstall.sh`, `opk`,
+`fs-baseline.sh`, the `sh/*.sh` libs the installer sources — they run
+as root during install, `ddev-migrate.sh` being the worked example,
+PR #633): those owe both suites in the wave itself. Message- or
+comment-only changes to root-run code may ride to the release
+gate; a later session that runs both suites
 green on a committed tree discharges the debt (record tree SHA + counts).
+Suite per class: `run.sh`'s fake-ddev tier drives the sourced-lib
+install path; `run-ddev.sh`'s DD15 leg is the real-ddev tier for
+`ddev-migrate` (its loop registers normal-shaped names only — a
+name-shape gate is invisible to it and stays unit-pinned; #638,
+PR #633).
 **Run them in parallel when the precondition holds — not sequentially**
 (the suites are disjoint: per-suite containers, images and fixtures;
 sequential runs cost the other suite's full runtime for no benefit).
