@@ -335,6 +335,18 @@ ddev_migrate_has_db() {
     return 0
 }
 
+# _ddev_migrate_show <value>
+# Sanitized-for-DISPLAY form of a registry/manifest-derived string:
+# every byte outside printable ASCII becomes '?'. Escape bytes in a
+# tampered name, approot or dump operand must not forge transcript
+# lines at the very messages that report the tampering (#642 a S1,
+# the uninstall-core pr-00263 a F9 class). Display only — the raw
+# value stays the data currency (manifest lines, grep -F operands,
+# argv, paths).
+_ddev_migrate_show() {
+    printf '%s' "$1" | LC_ALL=C sed 's/[^ -~]/?/g'
+}
+
 # ddev_migrate_export <dev-user> <opencode-user> <opencode-group> <root> [root ...]
 # Creates a fresh dump directory, exports every eligible project's
 # database as the dev user, powers the old daemon down, then hands the
@@ -376,7 +388,8 @@ ddev_migrate_export() {
     if [ -n "$dm_outside" ]; then
         echo "  WARNING: $(printf '%s\n' "$dm_outside" | grep -c .) registered ddev project(s)""\
  are OUTSIDE the given roots — NOT exported:"
-        printf '%s\n' "$dm_outside" | sed 's/^/    /'
+        # Names are registry-derived: scrubbed for display (#642 a S1).
+        printf '%s\n' "$dm_outside" | LC_ALL=C sed -e 's/[^ -~]/?/g' -e 's/^/    /'
     fi
 
     dm_stamp=$(date +%Y%m%d-%H%M%S)
@@ -495,7 +508,11 @@ ddev_migrate_export() {
     # after ONE project per run (production finding: 12 databases, one
     # dump per export invocation, resume picked up the next each time).
     printf '%s\n' "$dm_list" | while IFS='|' read -r dm_n dm_ar; do
-        echo "  exporting $dm_n ($dm_ar) ..."
+        # Display forms are scrubbed (#642 a S1) — the raw $dm_n/$dm_ar
+        # stay the data currency for manifest lines and operands.
+        dm_show=$(_ddev_migrate_show "$dm_n")
+        dm_ashow=$(_ddev_migrate_show "$dm_ar")
+        echo "  exporting $dm_show ($dm_ashow) ..."
         # Name-shape gate (#612, the export-side twin of the import
         # operand gate #568 a D5 / PR #606): $dm_n is REGISTRY-derived
         # content (project_list.yaml or the legacy project_info block —
@@ -507,9 +524,11 @@ ddev_migrate_export() {
         # (an out-of-dir REGULAR file passes both), and the acting
         # arms follow it — export-db's --file= write as the dev user,
         # the root rm -f in the failure arms, the $DM_STAGE err
-        # redirect. ddev's own [a-z0-9-] project-name validation is
-        # external behavior, unverifiable from this repo; this gate
-        # closes the class kit-side. Bare `..` builds an in-dir
+        # redirect. ddev's own project-name validation refuses these
+        # shapes too (measured against ddev's source at 319fa3d3d —
+        # internal/records/ddev-cli-contract.md; the option-shapes note
+        # below carries the detail); this gate closes the class
+        # kit-side. Bare `..` builds an in-dir
         # "...sql.gz" operand (no traversal) — refused at the pattern
         # level anyway, same shape hardening as the import gate.
         # Option shapes (#635, the argv arm of the same gate): a
@@ -517,9 +536,11 @@ ddev_migrate_export() {
         # start/export-db/stop below address projects by bare name with
         # no `--` separator — and ddev's cobra CLI parses flags in that
         # position: `start` and `stop` really carry `--all`
-        # (cmd/ddev/cmd/start.go / stop.go — every registered project at
-        # once; the one-at-a-time discipline exists for RAM, see the
-        # stop comment below), so a forged registry key `--all` reaches
+        # (cmd/ddev/cmd/start.go / stop.go — start: every registered
+        # project; stop: every running or container-stopped one —
+        # fleet-wide either way, and the one-at-a-time discipline
+        # exists for RAM, see the stop comment below), so a forged
+        # registry key `--all` reaches
         # exactly that arm as the dev user. ddev-side a `--`
         # end-of-options separator WOULD work (pflag terminates flag
         # parsing at `--`), but the name would have to move after every
@@ -529,8 +550,9 @@ ddev_migrate_export() {
         # find requested project" over a name ddev itself can never
         # register: ValidateProjectName enforces RFC 1123 hostname
         # labels (pkg/ddevapp/config.go), which never start with a
-        # dash — verified against ddev's source, so the refusal has no
-        # false-positive arm. The sibling gate in ddev-hosts.sh
+        # dash — measured at 319fa3d3d (fact table:
+        # internal/records/ddev-cli-contract.md), so the refusal has
+        # no false-positive arm. The sibling gate in ddev-hosts.sh
         # (0.0.39g Q6) made the same call for `ddev hostname`: refuse
         # the dash shape, never trust it into argv.
         # Per-project refusal like the operand gates below: FAIL entry
@@ -538,13 +560,13 @@ ddev_migrate_export() {
         # with the other projects.
         case "$dm_n" in
             */* | ..)
-                echo "    REFUSED — project name escapes the dump dir ($dm_n) — tampering? Repair the registry and re-run" >&2
+                echo "    REFUSED — project name escapes the dump dir ($dm_show) — tampering? Repair the registry and re-run" >&2
                 _dm_manifest_drop "$dm_n"
                 _dm_manifest_add "FAIL|$dm_n|$dm_ar|"
                 continue
                 ;;
             -*)
-                echo "    REFUSED — option-shaped project name ($dm_n) — tampering? Repair the registry and re-run" >&2
+                echo "    REFUSED — option-shaped project name ($dm_show) — tampering? Repair the registry and re-run" >&2
                 _dm_manifest_drop "$dm_n"
                 _dm_manifest_add "FAIL|$dm_n|$dm_ar|"
                 continue
@@ -576,7 +598,7 @@ ddev_migrate_export() {
             dm_refuse="not a regular file"
         fi
         if [ -n "$dm_refuse" ]; then
-            echo "    REFUSED: $DD_MIG_DUMP_DIR/$dm_n.sql.gz is $dm_refuse — tampering? Remove it and re-run" >&2
+            echo "    REFUSED: $DD_MIG_DUMP_DIR/$dm_show.sql.gz is $dm_refuse — tampering? Remove it and re-run" >&2
             _dm_manifest_drop "$dm_n"
             _dm_manifest_add "FAIL|$dm_n|$dm_ar|"
             continue
@@ -631,7 +653,7 @@ ddev_migrate_export() {
             --file="$DD_MIG_DUMP_DIR/$dm_n.sql.gz" </dev/null >"$dm_err" 2>&1 &&
             [ ! -L "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" ] &&
             [ -s "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" ]; then
-            echo "    dump: $DD_MIG_DUMP_DIR/$dm_n.sql.gz"
+            echo "    dump: $DD_MIG_DUMP_DIR/$dm_show.sql.gz"
             _dm_manifest_add "OK|$dm_n|$dm_ar|$dm_n.sql.gz"
         elif grep -q "service db does not exist" "$dm_err" 2>/dev/null; then
             # Runtime twin of omit_containers: the db service never came up
@@ -641,7 +663,7 @@ ddev_migrate_export() {
             _dm_manifest_add "SKIP|$dm_n|$dm_ar|no-db-service"
         else
             rm -f "${DD_MIG_DUMP_DIR:?}/$dm_n.sql.gz" 2>/dev/null || true
-            echo "    FAILED: ddev export-db — no dump for $dm_n"
+            echo "    FAILED: ddev export-db — no dump for $dm_show"
             _dm_manifest_add "FAIL|$dm_n|$dm_ar|"
         fi
         rm -f "$dm_err" 2>/dev/null || true
@@ -649,7 +671,7 @@ ddev_migrate_export() {
         # machine may hold dozens of ddev projects — running them all at
         # once would exhaust RAM. Volumes are kept by plain `ddev stop`.
         _ddev_migrate_run_as "$dm_dev" "$dm_bin" stop "$dm_n" </dev/null >/dev/null 2>&1 ||
-            echo "    NOTE: ddev stop failed — stop $dm_n manually to free its resources"
+            echo "    NOTE: ddev stop failed — stop $dm_show manually to free its resources"
     done
 
     # One poweroff stops every project AND the old ddev-router: the ports
@@ -835,8 +857,10 @@ ddev_migrate_import() {
     # already succeeded.
     _dmi_drop_publish() {
         _ddp_n=$1
+        # display form scrubbed (#642 a S1) — manifest-derived name
+        _ddp_show=$(_ddev_migrate_show "$_ddp_n")
         _ddp_g=$(mktemp 2>/dev/null) || {
-            echo "    warn: cannot stage the manifest drop for $_ddp_n —""\
+            echo "    warn: cannot stage the manifest drop for $_ddp_show —""\
  a re-run will re-import it" >&2
             return 0
         }
@@ -845,25 +869,25 @@ ddev_migrate_import() {
         grep -v -F "OK|$_ddp_n|" "$dm_resid" >"$_ddp_g" 2>/dev/null || _ddp_rc=$?
         if [ "$_ddp_rc" -ge 2 ]; then
             rm -f "$_ddp_g" 2>/dev/null || true
-            echo "    warn: could not drop $_ddp_n from the dump manifest —""\
+            echo "    warn: could not drop $_ddp_show from the dump manifest —""\
  a re-run will re-import it" >&2
             return 0
         fi
         mv -f "$_ddp_g" "$dm_resid" 2>/dev/null || {
             rm -f "$_ddp_g" 2>/dev/null || true
-            echo "    warn: could not update the residual manifest for $_ddp_n —""\
+            echo "    warn: could not update the residual manifest for $_ddp_show —""\
  a re-run will re-import it" >&2
             return 0
         }
         _ddp_p=$(mktemp 2>/dev/null) || {
-            echo "    warn: cannot stage the manifest republish for $_ddp_n —""\
+            echo "    warn: cannot stage the manifest republish for $_ddp_show —""\
  a re-run will re-import it" >&2
             return 0
         }
         command -v _tmp_track >/dev/null 2>&1 && _tmp_track "$_ddp_p"
         cat "$dm_resid" >"$_ddp_p" 2>/dev/null || {
             rm -f "$_ddp_p" 2>/dev/null || true
-            echo "    warn: could not copy the residual manifest for $_ddp_n —""\
+            echo "    warn: could not copy the residual manifest for $_ddp_show —""\
  a re-run will re-import it" >&2
             return 0
         }
@@ -927,6 +951,11 @@ ddev_migrate_import() {
     dm_failed=""
     while IFS='|' read -r dm_st dm_n dm_ar dm_f; do
         [ "$dm_st" = "OK" ] && [ -n "$dm_n" ] && [ -n "$dm_ar" ] && [ -n "$dm_f" ] || continue
+        # Display forms are scrubbed (#642 a S1) — the raw fields stay
+        # the data currency (manifest drops, argv, operand paths).
+        dm_show=$(_ddev_migrate_show "$dm_n")
+        dm_ashow=$(_ddev_migrate_show "$dm_ar")
+        dm_fshow=$(_ddev_migrate_show "$dm_f")
         # Project-name gate (#635, the import twin of the export loop's
         # name gate above): $dm_n is manifest-derived (agent-ownable
         # after finalize) and reaches ddev argv by bare name — start and
@@ -939,7 +968,7 @@ ddev_migrate_import() {
         # and re-runs.
         case "$dm_n" in
             -*)
-                echo "  $dm_n: REFUSED — option-shaped project name — tampering? Repair the manifest and re-run"
+                echo "  $dm_show: REFUSED — option-shaped project name — tampering? Repair the manifest and re-run"
                 dm_failed="$dm_failed $dm_n"
                 continue
                 ;;
@@ -967,23 +996,23 @@ ddev_migrate_import() {
         # removes the link (or repairs the manifest) and re-imports.
         case "$dm_f" in
             */* | ..)
-                echo "  $dm_n: REFUSED — dump operand escapes the dump dir ($dm_f) — tampering? Repair the manifest and re-run"
+                echo "  $dm_show: REFUSED — dump operand escapes the dump dir ($dm_fshow) — tampering? Repair the manifest and re-run"
                 dm_failed="$dm_failed $dm_n"
                 continue
                 ;;
         esac
         if [ -L "$dm_dir/$dm_f" ]; then
-            echo "  $dm_n: REFUSED — dump operand is a symlink ($dm_dir/$dm_f) — tampering? Remove it and re-run"
+            echo "  $dm_show: REFUSED — dump operand is a symlink ($dm_dir/$dm_fshow) — tampering? Remove it and re-run"
             dm_failed="$dm_failed $dm_n"
             continue
         fi
         [ -f "$dm_dir/$dm_f" ] ||
             {
-                echo "  $dm_n: dump missing ($dm_dir/$dm_f)"
+                echo "  $dm_show: dump missing ($dm_dir/$dm_fshow)"
                 dm_failed="$dm_failed $dm_n"
                 continue
             }
-        echo "  importing $dm_n ($dm_ar) ..."
+        echo "  importing $dm_show ($dm_ashow) ..."
         # </dev/null: this loop's stdin IS the staged manifest copy
         # ($dm_manifest, the root temp — S6) — ddev reads stdin and
         # would consume it mid-iteration (same class as the
@@ -993,7 +1022,7 @@ ddev_migrate_import() {
             sudo -u "$dm_oc" env "HOME=$dm_oc_h" "XDG_RUNTIME_DIR=/run/user/$dm_oc_i" \
                 ${dm_extra:+"$dm_extra"} sh -c 'cd / && exec "$@"' migrate-import "$dm_bin" import-db "$dm_n" --file="$dm_dir/$dm_f" \
                 </dev/null >/dev/null 2>&1; then
-            echo "    imported: $dm_f"
+            echo "    imported: $dm_fshow"
             # Resume discipline (#568 a D3, reworked #568 b Y1/X2/X3):
             # drop the imported project's line via the root-staged
             # helper above — a re-run after partial failure must retry
@@ -1019,7 +1048,7 @@ ddev_migrate_import() {
 
     echo ""
     echo "  imported $dm_ok database(s) from $dm_dir"
-    [ -n "$dm_failed" ] && echo "  failed:$dm_failed — dumps stay in $dm_dir (retry anytime;""\
+    [ -n "$dm_failed" ] && echo "  failed:$(_ddev_migrate_show "$dm_failed") — dumps stay in $dm_dir (retry anytime;""\
  already-imported projects are skipped)"
     echo "  old containers/volumes remain in the dev daemon; remove them with:"
     # Placeholder, never the interpolated $dm_bin (#568 b Y3, the

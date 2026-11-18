@@ -41,7 +41,7 @@ legitimate.
 **Project names are RFC 1123 hostname labels** — every label starts
 and ends with `[a-zA-Z0-9]`, hyphens interior only
 (`pkg/ddevapp/config.go:32` hostRegex, enforced by
-`ValidateProjectName` at :482 through `ValidateConfig` and at project
+`ValidateProjectName` at :483 through `ValidateConfig` and at project
 creation). Measured against the regex: `--all`, `-x`, `-foo`, `foo-`,
 `my_project` never match; `my-project`, `9foo`, `a--b` do. Corollary:
 a dash-leading registry key or manifest name can never be a real ddev
@@ -50,8 +50,9 @@ project — refusing it has no false-positive arm.
 **`ddev start` and `ddev stop` really carry `--all` (`-a`)** —
 `cmd/ddev/cmd/start.go:230` ("Start all projects"), `stop.go:155`
 (stop and remove all running projects): a bare dash argument in name
-position silently changes semantics to every registered project at
-once (the export loop's one-at-a-time discipline exists for RAM).
+position silently changes semantics fleet-wide — start hits every
+registered project, stop every running or container-stopped one (the
+export loop's one-at-a-time discipline exists for RAM).
 
 **`ddev export-db` / `ddev import-db` have no `--all`** — their
 `Args:` is `cobra.RangeArgs(0, 1)` (count only; `export-db.go:40`,
@@ -65,8 +66,10 @@ at name lookup. A `--`-based fix would have been VIABLE; the rejection
 grounds are operand order and signal quality, not parser support (§4).
 
 **Name resolution goes through `getRequestedProjects`** —
-`cmd/ddev/cmd/utils.go:19-86`, called by all four subcommands; misses
-fail with `could not find requested project '<name>'` (:72).
+`cmd/ddev/cmd/utils.go:16` (the exported wrapper;
+`getRequestedProjectsExtended` at :22), called by all four
+subcommands; misses fail with
+`could not find requested project '<name>'` (:72).
 `ddev stop --unlist` skips config validation (`stop.go:93`) — that
 bypasses checking an already-catalogued project, never the creation
 of a dash-leading name.
@@ -74,13 +77,9 @@ of a dash-leading name.
 ## 4. What the kit concluded (#635)
 
 Both migrate name gates refuse dash-leading names instead of passing
-`--` separators. The separator would work ddev-side, but the name
-would have to move after every flag (`export-db <name> --file=` — a
-`--` in front of the name swallows that flag as a positional), and
-the run would end in ddev's "could not find requested project" over a
-name ddev itself can never register, instead of a loud tamper signal.
-The full rationale — including the ddev-hosts.sh 0.0.39g Q6 sibling
-precedent — lives in the gate comments in
+`--` separators — the full rationale (operand order under `--file=`,
+the no-false-positive arm, the ddev-hosts.sh 0.0.39g Q6 sibling
+precedent) lives in the gate comments in
 `files/opencode-permissions-kit-lib/sh/ddev-migrate.sh` (export loop
-and import loop); it is not restated here. Design context for the
+and import loop) and is not restated here. Design context for the
 migration flow itself: [ddev-migration.md](ddev-migration.md).

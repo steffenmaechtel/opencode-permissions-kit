@@ -665,6 +665,35 @@ check "refused dash name: the loop CONTINUES (a later project's start still runs
 check "refused dash name: the wave still finishes (poweroff ran, no abort)" \
     sh -c "grep -q 'ddev:poweroff' \"\$1\"" _ "$WORK/ddev-run-d.log"
 
+# Display-scrub leg (#642 a S1): an ESC-carrying registry key must be
+# REFUSED with a SCRUBBED name in the operator output (escape bytes
+# forge transcript lines — the uninstall-core pr-00263 a F9 class),
+# while the manifest FAIL line keeps the RAW name (data currency:
+# grep -F operands, repair guidance).
+printf -- '  -%s[2Kevil:\n    approot: /var/tmp/opencode-ddev-mig-roots/vhosts/alpha\n' \
+    "$(printf '\033')" >>"$WORK/devhome/.ddev/project_list.yaml"
+OUTESCR=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev-run-esc.log" \
+    DDEV_MIG_DEV_HOME="$WORK/devhome" \
+    PATH="$WORK/bin:$PATH" \
+    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null 2>&1) || true
+case "$OUTESCR" in
+    *"$(printf '\033')"*)
+        fail "raw escape byte reached the operator output (#642 a S1)"
+        ;;
+    *) pass "operator output carries no raw escape byte (#642 a S1)" ;;
+esac
+if printf '%s' "$OUTESCR" | grep -qF 'option-shaped project name (-?[2Kevil)'; then
+    pass "REFUSED line shows the SCRUBBED name (#642 a S1)"
+else
+    fail "REFUSED line must show the scrubbed name (#642 a S1)"
+fi
+_esckey="-$(printf '\033')[2Kevil"
+if grep -qF -- "FAIL|${_esckey}|" "$DUMP_DIR/manifest.conf" 2>/dev/null; then
+    pass "manifest FAIL line keeps the RAW name — display-only scrub (#642 a S1)"
+else
+    fail "manifest FAIL line must keep the raw name (#642 a S1)"
+fi
+
 # --- 4f. the seed's owner arm refuses a manifest the dev does not own (0.0.44d F4/C3) --
 # The manifest in $DUMP_DIR is owned by the CURRENT user; running the
 # export with dm_dev=nobody (an existing unrelated user) must hit the
@@ -844,7 +873,7 @@ check_absent "D3/Y1: the drop never redirects into the dump dir" \
 # the reachable arms (grep-rc2 via 5c, publish-mv and mktemp here,
 # the dir-guard via the U1 leg).
 check_live "X3: mktemp-drop arm warns (static presence)" "$MIG" -qF 'cannot stage the manifest drop for'
-check_live "X3: grep-rc2 arm warns (static presence)" "$MIG" -qF 'could not drop $_ddp_n from the dump manifest'
+check_live "X3: grep-rc2 arm warns (static presence)" "$MIG" -qF 'could not drop $_ddp_show from the dump manifest'
 check_live "X3: residual-mv arm warns (static presence)" "$MIG" -qF 'could not update the residual manifest for'
 check_live "X3: mktemp-publish arm warns (static presence)" "$MIG" -qF 'cannot stage the manifest republish for'
 check_live "X3: copy arm warns (static presence)" "$MIG" -qF 'could not copy the residual manifest for'
@@ -898,6 +927,7 @@ printf 'B\n' >"$_w5b/dumps/b.sql.gz"
         'dm_manifest=$(mktemp)' \
         'dm_resid=$(mktemp)'
     printf 'cat "$1/manifest.conf" >"$dm_manifest" && cat "$dm_manifest" >"$dm_resid"\n'
+    sed -n '/^_ddev_migrate_show()/,/^}/p' "$MIG"
     sed -n '/^    _dmi_drop_publish()/,/^    }/p' "$MIG"
     sed -n "/while IFS='|' read -r dm_st dm_n dm_ar dm_f; do/,/done <\"\$dm_manifest\"/p" "$MIG"
     printf 'rm -f "$dm_manifest" "$dm_resid"\n'
@@ -963,6 +993,7 @@ printf 'A\n' >"$_w5x2/dumps/a.sql.gz"
         'dm_manifest=$(mktemp)' \
         'dm_resid=$(mktemp)'
     printf 'cat "$1/manifest.conf" >"$dm_manifest" && cat "$dm_manifest" >"$dm_resid"\n'
+    sed -n '/^_ddev_migrate_show()/,/^}/p' "$MIG"
     sed -n '/^    _dmi_drop_publish()/,/^    }/p' "$MIG"
     sed -n "/while IFS='|' read -r dm_st dm_n dm_ar dm_f; do/,/done <\"\$dm_manifest\"/p" "$MIG"
     printf 'rm -f "$dm_manifest" "$dm_resid"\n'
@@ -996,6 +1027,7 @@ printf 'A\n' >"$_w5v2/dumps/a.sql.gz"
         'dm_manifest=$(mktemp)' \
         'dm_resid=$(mktemp)'
     printf 'cat "$1/manifest.conf" >"$dm_manifest" && cat "$dm_manifest" >"$dm_resid"\n'
+    sed -n '/^_ddev_migrate_show()/,/^}/p' "$MIG"
     sed -n '/^    _dmi_drop_publish()/,/^    }/p' "$MIG"
     sed -n "/while IFS='|' read -r dm_st dm_n dm_ar dm_f; do/,/done <\"\$dm_manifest\"/p" "$MIG"
     printf 'rm -f "$dm_manifest" "$dm_resid"\n'
@@ -1024,6 +1056,7 @@ printf 'A\n' >"$_w5u1/dumps/a.sql.gz"
         'dm_manifest=$1/manifest.staged' \
         'dm_resid=$(mktemp)'
     printf 'cat "$dm_manifest" >"$dm_resid"\n'
+    sed -n '/^_ddev_migrate_show()/,/^}/p' "$MIG"
     sed -n '/^    _dmi_drop_publish()/,/^    }/p' "$MIG"
     sed -n "/while IFS='|' read -r dm_st dm_n dm_ar dm_f; do/,/done <\"\$dm_manifest\"/p" "$MIG"
     printf 'rm -f "$dm_resid"\n'
@@ -1049,6 +1082,7 @@ printf 'A\n' >"$_w5v3/dumps/a.sql.gz"
         'dm_manifest=$1/manifest.staged' \
         'dm_resid=$1/resid'
     printf 'cat "$dm_manifest" >"$dm_resid"\n'
+    sed -n '/^_ddev_migrate_show()/,/^}/p' "$MIG"
     sed -n '/^    _dmi_drop_publish()/,/^    }/p' "$MIG"
     sed -n "/while IFS='|' read -r dm_st dm_n dm_ar dm_f; do/,/done <\"\$dm_manifest\"/p" "$MIG"
 } >"$_w5v3/run.sh"
@@ -1082,6 +1116,7 @@ cp "$_w5c/dumps/manifest.conf" "$_w5c/dumps/manifest.staged"
         'dm_manifest=$1/manifest.staged' \
         'dm_resid=$1/resid.unreadable'
     printf 'cat "$dm_manifest" >"$dm_resid" && chmod 000 "$dm_resid"\n'
+    sed -n '/^_ddev_migrate_show()/,/^}/p' "$MIG"
     sed -n '/^    _dmi_drop_publish()/,/^    }/p' "$MIG"
     sed -n "/while IFS='|' read -r dm_st dm_n dm_ar dm_f; do/,/done <\"\$dm_manifest\"/p" "$MIG"
 } >"$_w5c/run.sh"
@@ -1675,14 +1710,15 @@ else
 fi
 rm -rf "${_w5j:?}"
 
-# --- 4c5. the project NAME: a dash-shaped manifest name is REFUSED before
+# --- 4c4. the project NAME: a dash-shaped manifest name is REFUSED before
 # any ddev hop (#635) — argv option injection --------------------------------
 # $dm_n rides `start`/`import-db` argv by bare name; `start` really
-# carries `--all` (verified against ddev's source — cmd/ddev/cmd/
-# start.go), so a forged OK line with a dash name would start every
-# opencode-side project. The sudo shim records every hop's argv and
-# fails — the discriminator is WHAT reached the hop, not its rc: the
-# log file exists from the start, so an empty log is "no hop", never a
+# carries `--all` (measured against ddev's source at 319fa3d3d — the
+# fact table lives in internal/records/ddev-cli-contract.md), so a
+# forged OK line with a dash name would start every opencode-side
+# project. The sudo shim records every hop's argv and fails — the
+# discriminator is WHAT reached the hop, not its rc: the log file
+# exists from the start, so an empty log is "no hop", never a
 # missing-file accident. The dump operand is REACHABLE and regular on
 # purpose: without the gate the pre-hop flow passes every operand
 # check (the #420 a A10 reachability rule), so the red comes from the
