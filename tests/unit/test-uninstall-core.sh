@@ -16,7 +16,8 @@
 # orchestration is e2e territory (category 3, no coverage promise).
 # Covers:
 #   - sourcing purity: definitions only, zero top-level side effects
-#   - all 19 section/helper functions defined by sourcing
+#   - all section/helper functions defined by sourcing (count derives
+#     from the _defs list — never hardcoded)
 #   - the pairing guard (#413, #452): real lib passes, truncated lib dies
 #     loud, and both completeness riders (every core call the entry
 #     makes AND every function the lib defines — comment-stripped,
@@ -73,7 +74,7 @@ un_sudoers_remove un_wrapper_remove un_cli_remove un_xdg_open_remove
 un_tui_plugins_remove un_wsl_bridge_remove un_git_heal_remove un_library_remove
 un_umask_remove
 un_group_membership_remove un_projects_revert un_config_dirs_remove
-un_audit_log_remove un_user_remove _un_revert_chown"
+un_audit_log_remove un_user_remove _un_revert_chown un_link_owned"
 _missing=""
 for _fn in $_defs; do
     sh -c '. "$1" && command -v "$2" >/dev/null' _ "$LIB" "$_fn" 2>/dev/null ||
@@ -2072,6 +2073,91 @@ if printf '%s' "$_out" | grep -qF 'git heal hooks not active (no core.hooksPath 
     pass "git-heal removal: absent value is a clean no-op (#671)"
 else
     fail "git-heal removal: absent arm broken (out=$_out)"
+fi
+
+# --- #662 S3: kit-ownership gate on the fixed /usr/local/bin names ---------------
+# un_link_owned is the discriminator (functional, real symlinks in the
+# scratch — the /usr/local/bin literals themselves are outside the unit
+# sandbox by policy): every era pointed INSIDE the kit library tree
+# ($LIBDIR/wrapper, $LIBDIR/kit, $LIBDIR/bin/*), dangling included
+# (readlink reads the link, not the target); a foreign target, a
+# regular file and an absent path must all refuse.
+mkdir -p "$WORK/s3link"
+ln -s /usr/local/lib/opencode-permissions-kit/bin/opk "$WORK/s3link/cur"
+ln -s /usr/local/lib/opencode-permissions-kit/kit "$WORK/s3link/legacy"
+ln -s /usr/local/lib/opencode-permissions-kit/bin/gone "$WORK/s3link/dangling"
+ln -s /usr/local/lib/opencode-permissions-kit-evil/x "$WORK/s3link/evilwin"
+ln -s /usr/local/lib/opencode-permissions-kit/../evil "$WORK/s3link/dotdot"
+ln -s /usr/local/bin/other "$WORK/s3link/foreign"
+: >"$WORK/s3link/regfile"
+_s3_owned=0
+for _s3_p in cur legacy dangling dotdot; do
+    un_link_owned "$WORK/s3link/$_s3_p" || _s3_owned=1
+done
+if [ "$_s3_owned" -eq 0 ]; then
+    pass "un_link_owned: kit-internal targets of every era (dangling included) are kit-owned (#662 S3)"
+else
+    fail "un_link_owned must accept kit-internal targets of every era (#662 S3)"
+fi
+# The prefix is prefix-PLUS-SLASH: a sibling tree name
+# (/usr/local/lib/opencode-permissions-kit-evil/…) shares the stem but
+# not the literal `/` boundary — it must be refused (a `*`-glob prefix
+# without the slash WOULD match it). `..` segments stay inside the
+# literal prefix → owned, harmless (rm removes the link NAME, never
+# follows the target). Pinned per review a A3: the discriminating
+# boundary the header comment asserts.
+if un_link_owned "$WORK/s3link/evilwin"; then
+    fail "un_link_owned must refuse sibling-name targets (prefix-plus-slash boundary, #662 S3 / review a A3)"
+else
+    pass "un_link_owned refuses sibling-name targets (prefix-plus-slash boundary) (#662 S3 / review a A3)"
+fi
+if un_link_owned "$WORK/s3link/foreign" ||
+    un_link_owned "$WORK/s3link/regfile" ||
+    un_link_owned "$WORK/s3link/absent"; then
+    fail "un_link_owned must refuse foreign targets, regular files, absent paths (#662 S3)"
+else
+    pass "un_link_owned refuses foreign targets, regular files, absent paths (#662 S3)"
+fi
+# Section-level skip arm, host-state-independent direction: with the
+# gate answering NOT owned, no rm may fire whatever the host has at
+# the literal paths (foreign file present or absent alike). The owned
+# direction is pinned structurally below — driving it for real would
+# need the literals in the sandbox.
+: >"$WORK/s3-skip.log"
+(
+    DRY_RUN=false
+    sudo() { printf 'sudo %s\n' "$*" >>"$WORK/s3-skip.log"; }
+    log() { :; }
+    trace() { :; }
+    un_link_owned() { return 1; }
+    un_wrapper_remove
+    un_cli_remove
+) >/dev/null 2>&1
+if [ ! -s "$WORK/s3-skip.log" ]; then
+    pass "wrapper/cli removal: not kit-owned means no rm fires, host state irrelevant (#662 S3)"
+else
+    fail "wrapper/cli removal must not fire on not-owned paths: $(cat "$WORK/s3-skip.log") (#662 S3)"
+fi
+# Wiring (structural, comment-stripped, function-scoped — the
+# source-counting shape): each section's fixed-path rm sits INSIDE its
+# un_link_owned gate (gate line precedes the un_rc_q rm line) and
+# carries the left-untouched arm.
+_s3_wiring_ok=1
+for _s3_fn in un_wrapper_remove un_cli_remove; do
+    _s3_src_s="$(extract_func "$LIB" "$_s3_fn" | sed 's/^[[:space:]]*#.*$//')"
+    _s3_gate_ln="$(printf '%s\n' "$_s3_src_s" | grep -nF 'un_link_owned' | head -1 | cut -d: -f1)"
+    _s3_rm_ln="$(printf '%s\n' "$_s3_src_s" | grep -nF 'un_rc_q "rm' | head -1 | cut -d: -f1)"
+    if [ -z "$_s3_gate_ln" ] || [ -z "$_s3_rm_ln" ] ||
+        [ "$_s3_gate_ln" -ge "$_s3_rm_ln" ]; then
+        _s3_wiring_ok=0
+    fi
+    printf '%s\n' "$_s3_src_s" | grep -qF 'is not kit-owned — left untouched.' ||
+        _s3_wiring_ok=0
+done
+if [ "$_s3_wiring_ok" -eq 1 ]; then
+    pass "wrapper/cli removal: every fixed-path rm gated by un_link_owned, skip arm present (#662 S3)"
+else
+    fail "wrapper/cli removal wiring: rm must sit inside the ownership gate (#662 S3)"
 fi
 
 if [ "$failures" -gt 0 ]; then

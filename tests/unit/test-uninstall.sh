@@ -132,8 +132,6 @@ fi
 PLAN="$(PATH="$WORK:$PATH" FAKE_SUDO_LOG="$WORK/log" sh "$UNINSTALL" --yes --dry-run 2>/dev/null || true)"
 for want in \
     "/etc/sudoers.d/opencode-permissions-kit" \
-    "/usr/local/bin/opencode" \
-    "/usr/local/bin/opk" \
     "/usr/local/lib/opencode-permissions-kit" \
     "/etc/profile.d/opencode-permissions-kit-umask.sh" \
     "/etc/opencode-permissions-kit"; do
@@ -141,6 +139,43 @@ for want in \
         pass "dry-run plans removal of $want"
     else
         fail "dry-run plans removal of $want"
+    fi
+done
+# The wrapper/cli names are KIT-OWNERSHIP-gated since #662 S3 (like the
+# xdg-open shim before them, which was never in the list above): their
+# [DRY] rows exist only for kit-owned links, so a bare CI runner (no
+# kit, names absent) plans NOTHING there and a foreign file at a name
+# plans a skip, not a removal. Two-arm, host-state-conditional on the
+# SAME predicate the shipped gate uses (symlink into the kit lib tree):
+# kit-owned → the row must be planned; anything else (absent, foreign
+# file, foreign link) → the row must NOT be. Both arms fail loud in both
+# directions — a gate broken to never plan reds on kit hosts, one broken
+# to plan unconditionally reds on bare runners.
+_tu_owned_link() { # <path>: mirrors un_link_owned (uninstall-core.sh)
+    [ -L "$1" ] || return 1
+    case "$(readlink "$1" 2>/dev/null || true)" in
+        /usr/local/lib/opencode-permissions-kit/*) return 0 ;;
+    esac
+    return 1
+}
+for gated in /usr/local/bin/opencode /usr/local/bin/opk; do
+    if _tu_owned_link "$gated"; then
+        # End-anchored needle (review b B1): the unanchored form
+        # substring-matches the legacy-alias row ("rm -f /usr/local/bin/
+        # opencode" prefixes ".../opencode-permissions-kit"), which
+        # false-greens this arm on alias-bearing hosts and false-reds
+        # the not-owned arm.
+        if printf '%s\n' "$PLAN" | grep -q -- "rm -f $gated\$"; then
+            pass "dry-run plans removal of kit-owned $gated (#662 S3)"
+        else
+            fail "dry-run plans removal of kit-owned $gated (#662 S3)"
+        fi
+    else
+        if printf '%s\n' "$PLAN" | grep -q -- "rm -f $gated\$"; then
+            fail "dry-run must not plan removal of non-kit-owned $gated (#662 S3)"
+        else
+            pass "dry-run plans nothing for non-kit-owned/absent $gated (#662 S3)"
+        fi
     fi
 done
 if printf '%s' "$PLAN" | grep -qF 'userdel -r'; then

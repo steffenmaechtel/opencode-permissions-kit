@@ -754,7 +754,24 @@ done
 }
 # Old-library fallback (pre-0.0.39h deployed copy): no walker yet — fail
 # open like the pre-gate behavior, the writes above still refuse via
-# staged_write itself.
+# staged_write itself. Deliberate and disclosed (#662 S1): the fail-open
+# stub needs a legacy (<0.0.39h — only 0.0.39g ever shipped staged_write
+# without the walker — the weeks-old alpha cohort, shrinking with every
+# update) or truncated deployed lib AND an agent-planted parent link to
+# matter, and the ops behind the update-side gates (the tui.json
+# refresh, sync_tui_registration, tui_plugin_sync_user) are kit-side
+# fixed-path mkdir/ln/chown/rm -rf, the staged_write family
+# (cp/chown/chmod/mv on a staged temp) and the kit-owned
+# tui-register.py via python3 -I (agent-home paths only as data
+# operands, #249 guards the interpreter env) — no root exec of agent
+# content. A fetched/streamed run re-execs
+# from the fresh tree (walker present); the deployed-only shapes (stdin
+# --only-binary, direct deployed invocation) hit the LIBDIR fallback —
+# current libs carry the walker there too, pre-0.0.39g libs refuse via
+# the staged_write stub above. Fail-closed was considered (the install
+# twin, install.sh, fails CLOSED — but install.sh always runs fresh
+# code) and declined: a semantic change to root-run code (both e2e
+# suites) for a near-dead path.
 command -v agent_home_sane >/dev/null 2>&1 || agent_home_sane() { return 0; }
 
 # Shared sudoers pipeline (render + visudo validation + install): one

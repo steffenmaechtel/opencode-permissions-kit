@@ -16,7 +16,10 @@ Run it as your default user (it asks for `sudo` where needed). Options:
 
 - the `opencode` user (and its usergroup)
 - the kit library under `/usr/local/lib/opencode-permissions-kit/` and the
-  `/usr/local/bin/opencode` wrapper
+  `/usr/local/bin/opencode` wrapper (plus the `opk` /
+  `opencode-permissions-kit` CLI names) — symlink removal is
+  ownership-gated: a foreign file that replaced one of those names is
+  detected and left untouched
 - sudoers rules, profile scripts, project ACLs/setgid
 - legacy kit artifacts, if present (the old `/etc/opencode/` conf dir, the
   `/usr/local/lib/opencode/` library, legacy sudoers/profile symlinks) —

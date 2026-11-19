@@ -775,6 +775,24 @@ opencode_version_line() {
 
 install_binary() {
     local src="$1" current new
+    # Trust model (#662 S2, deliberate): the candidate arrives from the
+    # upstream channels (npm registry / GitHub releases, fetch_opencode_
+    # version) with TLS as the only trust anchor — no digest or signature
+    # check, mirroring the official installer's model. Digest pinning was
+    # considered and declined: the kit resolves *latest* at runtime, and a
+    # pinned digest means a pinned version — that kills the resolution
+    # (the kit's own SHA256SUMS standard works because the kit controls
+    # its release artifacts; upstream's don't stand still). Fetched bytes
+    # execute as ROOT at every probe of the opencode binary in the
+    # update path — this run's fresh candidate below; the freshly
+    # deployed $SYSTEM_BIN (opencode_version_line right after the
+    # deploy, the major re-stamp, the xdg-shim redeploy's version
+    # read); the pre-upgrade probes of the OLD deployed binary (same
+    # trust class: upstream-built bytes from an earlier fetch); and
+    # the install-side probes (install-core.sh) — wrapper-mediated
+    # runs are the opencode user. A follow-up could drop that delta
+    # by probing as the opencode user (runuser), covering every
+    # $SYSTEM_BIN probe; not pursued here.
     if _opk_timeout_ok; then
         timeout 30 "$src" --version >/dev/null 2>&1 || return 1
     else
