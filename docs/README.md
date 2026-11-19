@@ -29,6 +29,7 @@ kit fits your setup.
 - [Use dev-owned projects](how-to/dev-owned-projects.md)
 - [Use JetBrains IDEs](how-to/jetbrains-ides.md)
 - [Harden `.git/config`](how-to/secure-git-config.md)
+- [Keep the agent's git workflow green](how-to/git-heal-hooks.md)
 - [Update the kit and the binary](how-to/update.md)
 - [Uninstall](how-to/uninstall.md)
 

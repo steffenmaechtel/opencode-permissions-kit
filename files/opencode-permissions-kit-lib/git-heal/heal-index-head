@@ -1,0 +1,219 @@
+#!/bin/sh
+# heal-index-head -- opencode permissions kit, git heal hooks (#671).
+#
+# Re-pins a repository's .git/index and .git/HEAD to the agent user
+# after a developer git operation flipped their ownership: git writes
+# both files through lock+rename, so the renamed file carries the
+# acting uid and ownership floats with the last writer. Under the
+# sticky .git (the #651 heal) the agent then cannot rename over the
+# foreign-owned entries ever again -- its main-checkout workflow
+# (git add / git switch) locks out (issue #671).
+#
+# Runs as ROOT: invoked by the developer-side post-* hooks
+# (git-heal/hooks/) through a narrow sudoers grant (templates/
+# sudoers.template). Never breaks the caller's git operation: every
+# skip is a logged no-op and the script exits 0; only argument and
+# allowlist violations exit loud BEFORE anything is touched.
+#
+# L5 discipline (agent/learnings.md, root ops on agent-writable
+# trees): the gitdir argument is allowlisted literally, then again on
+# the realpath-resolved form (a symlinked gitdir must not smuggle an
+# outside path past the literal check); the gitdir SHAPE is verified
+# (HEAD + objects/ -- a worktree registration has neither and is
+# rejected by construction); every operand is [ -L ]-gated and
+# hardlinked operands are skipped (a hardlink planted at .git/index
+# would chown the shared inode -- protected_hardlinks is the kernel's
+# line, the nlink check here is the kit's); chown(1) runs with -h so a
+# last-instant symlink swap can only ever chown the link inode, never
+# the target it points at.
+#
+# Test overrides (unit suite only, never set in production):
+#   GH_LIBDIR         base for the default log path
+#                     (default /usr/local/lib/opencode-permissions-kit)
+#   GH_LOG            explicit log path (default $GH_LIBDIR/git-heal/heal.log)
+#   GH_PROJECTS_CONF  allowlist source
+#                     (default /etc/opencode-permissions-kit/projects.conf)
+#   GH_AGENT_USER     agent user (default: OPENCODE_USER from
+#                     install.conf, else the literal "opencode")
+#   GH_ALLOW_NONROOT  relax the root gate (tests chown to the running
+#                     user, which is a permitted no-op chown)
+#   GH_CONF_RELAX     relax the conf-line system-path/agent-home arms
+#                     (unit scratch zones live under /tmp, which the
+#                     arms refuse; like every GH_* override this never
+#                     survives sudo's env_reset in production)
+set -u
+
+_gh_lib="${GH_LIBDIR:-/usr/local/lib/opencode-permissions-kit}"
+_gh_log="${GH_LOG:-$_gh_lib/git-heal/heal.log}"
+_gh_conf="${GH_PROJECTS_CONF:-/etc/opencode-permissions-kit/projects.conf}"
+
+say() { printf '[opk git-heal] %s\n' "$*" >&2; }
+
+if [ "$(id -u)" -ne 0 ] && [ "${GH_ALLOW_NONROOT:-}" != "1" ]; then
+    say "must run as root (via sudo)"
+    exit 1
+fi
+
+[ $# -eq 1 ] || {
+    say "usage: $0 <gitdir>"
+    exit 1
+}
+gd=$1
+case "$gd" in
+    /*) ;;
+    *)
+        say "refused: not an absolute path: $gd"
+        exit 1
+        ;;
+esac
+
+# Agent user: OPENCODE_USER from install.conf (doctor-style sed read,
+# never a source of a root-owned file), literal fallback like every
+# kit lib carries for the canonical user. Resolved BEFORE the
+# allowlist: the conf-line gate's agent-home arm needs it.
+_gh_agent="${GH_AGENT_USER:-$(sed -n 's/^OPENCODE_USER=//p' \
+    /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -n 1)}"
+_gh_agent="${_gh_agent:-opencode}"
+
+# _gh_root_ok <line>: reader-side conf-line gate (files.md contract:
+# every consumer that runs root operations over the roots re-validates
+# each line — the uninstall-core reader mirror, #243/#418/#247
+# precedent, extended to the heal in #674 a A1). rc 0: the line is a
+# usable root, normalized (trailing slashes stripped) in _gh_root_norm.
+# Refused lines say why (the hook-safe loud form — a skip line, never
+# an exit) and rc 1. The system-path and agent-home arms sit behind
+# GH_CONF_RELAX (unit scratch zones live under /tmp); the form arms
+# (absolute, dot/empty segment, whitespace) never relax — a malformed
+# line is refused in every mode.
+_gh_root_ok() {
+    _gh_ro="$1"
+    case "$_gh_ro" in
+        /*) ;;
+        *)
+            say "skip (conf): not an absolute root: $_gh_ro"
+            return 1
+            ;;
+    esac
+    case "$_gh_ro" in
+        *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]*)
+            say "skip (conf): malformed root (dot, empty segment, or whitespace): $_gh_ro"
+            return 1
+            ;;
+    esac
+    while :; do
+        case "$_gh_ro" in
+            */) _gh_ro="${_gh_ro%/}" ;;
+            *) break ;;
+        esac
+    done
+    # "/" strips to empty: a system path by any spelling (#674 b D1 —
+    # this arm refused silently before, contradicting the loud-refusal
+    # contract two lines up). Loud in every mode: it sits before the
+    # GH_CONF_RELAX guard on purpose.
+    [ -n "$_gh_ro" ] || {
+        say "skip (conf): system path is never a project root: /"
+        return 1
+    }
+    if [ "${GH_CONF_RELAX:-}" != "1" ]; then
+        _gh_ah=$(getent passwd "$_gh_agent" 2>/dev/null | cut -d: -f6) || true
+        if [ "$_gh_ro" = "/home/$_gh_agent" ] ||
+            { [ -n "$_gh_ah" ] && [ "$_gh_ro" = "$_gh_ah" ]; }; then
+            say "skip (conf): agent home is never a project root: $_gh_ro"
+            return 1
+        fi
+        case "$_gh_ro" in
+            # The writer's FHS-complete blocklist (sh/path-sane.sh
+            # project_path_sane — same arms as every reader mirror).
+            / | /bin | /bin/* | /boot | /boot/* | /dev | /dev/* | /etc | /etc/* | /home | /lib* | \
+                /media | /media/* | /mnt | /mnt/* | /opt | /opt/* | /proc | /proc/* | /root | /root/* | \
+                /run | /run/* | /sbin | /sbin/* | /srv | /srv/* | /sys | /sys/* | /tmp | /tmp/* | /var/tmp/* | \
+                /usr | /usr/* | /var | /var/tmp | /var/account | /var/account/* | /var/backups | \
+                /var/backups/* | /var/cache | /var/cache/* | /var/crash | /var/crash/* | /var/games | \
+                /var/games/* | /var/lib | /var/lib/* | /var/local | /var/local/* | /var/lock | \
+                /var/lock/* | /var/log | /var/log/* | /var/mail | /var/mail/* | /var/opt | \
+                /var/opt/* | /var/run | /var/run/* | /var/spool | /var/spool/* | /var/yp | /var/yp/*)
+                say "skip (conf): system path is never a project root: $_gh_ro"
+                return 1
+                ;;
+        esac
+    fi
+    _gh_root_norm="$_gh_ro"
+    return 0
+}
+
+# allowlisted <path>: rc 0 when <path> equals or sits under a root
+# listed in the projects config (one absolute root per line; # and
+# empty lines ignored — projects.conf format; every line runs the
+# _gh_root_ok reader gate first, so a hand-edited system/scratch/
+# agent-home line never authorizes a heal).
+_gh_allowlisted() {
+    _gh_p="$1"
+    [ -f "$_gh_conf" ] || return 1
+    while IFS= read -r _gh_root; do
+        case "$_gh_root" in '' | '#'*) continue ;; esac
+        _gh_root_ok "$_gh_root" || continue
+        case "$_gh_p" in
+            "$_gh_root_norm" | "$_gh_root_norm"/*) return 0 ;;
+        esac
+    done <"$_gh_conf"
+    return 1
+}
+
+_gh_allowlisted "$gd" ||
+    {
+        say "refused: $gd outside kit-managed roots"
+        exit 1
+    }
+
+# Resolve symlinks, then re-check the allowlist on the RESOLVED path.
+gd=$(realpath -- "$gd" 2>/dev/null) || {
+    say "realpath failed: $1"
+    exit 1
+}
+_gh_allowlisted "$gd" ||
+    {
+        say "refused after realpath: $gd"
+        exit 1
+    }
+
+[ -d "$gd" ] || {
+    say "not a directory: $gd"
+    exit 1
+}
+# Gitdir shape: a COMMON gitdir carries HEAD and objects/. A worktree
+# registration dir has neither -> rejected here by construction (and
+# it needs no healing: registration dirs are non-sticky by heal
+# design, #655 -- only the common gitdir's index/HEAD matter).
+if [ ! -e "$gd/HEAD" ] || [ ! -d "$gd/objects" ]; then
+    say "not a (common) gitdir shape: $gd"
+    exit 1
+fi
+
+for f in index HEAD; do
+    p="$gd/$f"
+    [ -L "$p" ] && {
+        say "skip (symlink): $p"
+        continue
+    }
+    [ -e "$p" ] || continue
+    # Hardlink gate: nlink > 1 means the entry shares its inode -- a
+    # chown here would re-own the other name(s) too. A planted
+    # .git/index hardlink is the attack shape; protected_hardlinks
+    # already makes creating one hard, this makes exploiting one
+    # impossible.
+    [ "$(stat -c %h -- "$p" 2>/dev/null)" = "1" ] || {
+        say "skip (hardlink, nlink>1): $p"
+        continue
+    }
+    # chown -h: even if the operand were swapped to a symlink in the
+    # check-to-act window, -h chowns the link inode itself, never the
+    # target it points at (L5: re-check paired with the act).
+    if chown -h "$_gh_agent:$_gh_agent" -- "$p" 2>/dev/null; then
+        printf '%s caller_uid=%s gitdir=%s healed %s\n' \
+            "$(date '+%F %T')" "${SUDO_UID:-?}" "$gd" "$f" >>"$_gh_log" 2>/dev/null ||
+            say "healed $p but could not append $_gh_log"
+    else
+        say "chown failed: $p"
+    fi
+done
+exit 0

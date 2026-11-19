@@ -198,7 +198,7 @@ fi
 # wiring cause.
 doctor_pairing_guard() {
     for _dpg in doctor_cli doctor_all doctor_walkup doctor_opk_dispatcher \
-        doctor_daemon_user doctor_ranges doctor_header doctor_policy \
+        doctor_daemon_user doctor_git_heal doctor_ranges doctor_header doctor_policy \
         doctor_detect doctor_scan_trees doctor_fix doctor_summary \
         _doctor_usage doctor_cntrl_bad doctor_show_sanitize \
         _doctor_all_cleanup _doctor_cleanup doctor_userns_ranges \
@@ -230,6 +230,7 @@ doctor_opk_dispatcher
 doctor_daemon_user
 doctor_ranges
 doctor_header
+doctor_git_heal
 doctor_policy
 doctor_detect
 doctor_scan_trees

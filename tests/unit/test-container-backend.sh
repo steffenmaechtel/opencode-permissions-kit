@@ -225,8 +225,17 @@ check "update.sh KIT_FILES has NO ddev-transaction.sh" \
     sh -c '! grep -Fq "ddev-transaction.sh" "$1" && ! grep -Fq "ddev-transaction.sh" "$2"' _ "$UPDATE" "$UPDATE_CORE"
 check "update.sh KIT_FILES has NO ddev shim" \
     sh -c '! grep -Eq "opencode-permissions-kit-lib/bin/ddev([[:space:]]|$)" "$1" && ! grep -Eq "opencode-permissions-kit-lib/bin/ddev([[:space:]]|$)" "$2"' _ "$UPDATE" "$UPDATE_CORE"
-check "update.sh KIT_FILES has NO git hooks" \
-    sh -c '! grep -Fq "hooks/post-" "$1" && ! grep -Fq "hooks/post-" "$2"' _ "$UPDATE" "$UPDATE_CORE"
+# The pre-0.0.29 hook machinery (top-level hooks/ dir + global
+# core.hooksPath re-assert) is gone; #671 re-introduces hooks
+# DELIBERATELY as the git heal subsystem under git-heal/hooks/. The
+# pin discriminates on the path: the legacy location must stay absent
+# while the heal hooks ride KIT_FILES (presence pinned too).
+check "update.sh KIT_FILES has NO legacy top-level hooks/ (pre-0.0.29)" \
+    sh -c '! grep -Eq "opencode-permissions-kit-lib/hooks/" "$1" && ! grep -Eq "opencode-permissions-kit-lib/hooks/" "$2"' _ "$UPDATE" "$UPDATE_CORE"
+check_live "update.sh KIT_FILES ships the git heal hooks (#671)" "$UPDATE" \
+    -Fq 'opencode-permissions-kit-lib/git-heal/hooks/post-index-change'
+check_live "update.sh KIT_FILES ships the heal script (#671)" "$UPDATE" \
+    -Fq 'opencode-permissions-kit-lib/git-heal/heal-index-head'
 check_live "update.sh re-stamps OPENCODE_GROUP to the opencode usergroup" "$UPDATE_CORE" \
     -Fq 'echo "OPENCODE_GROUP=$NEW_OPENCODE_GROUP"'
 check "update.sh strips no legacy keys on re-stamp (cleanup done)" \

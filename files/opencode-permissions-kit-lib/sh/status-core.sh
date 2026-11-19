@@ -392,6 +392,104 @@ status_section_core() {
     fi
 }
 
+# === Git heal hooks (issue #671) ==================================================
+# The hook-heal state row + per-root lockout rows. The heal hooks
+# (activated by `opk git-heal on` through the developer's global
+# core.hooksPath) re-pin .git/index and .git/HEAD to the agent user
+# after every developer git operation that flipped their ownership
+# (git writes both via lock+rename, so ownership floats with the last
+# writer; under the sticky .git of the #651 heal the agent can never
+# re-take ownership itself -- its main-checkout git add / git switch
+# locks out). GH_GITCONFIG is a unit-test override for the developer's
+# global gitconfig path (doctor's twin row uses the same override).
+status_section_git_heal() {
+    ui_section "Git heal hooks"
+    # Kit pieces first (version-skew => counted warn, the #165 class:
+    # never green over a check that cannot run).
+    _st_gh_ok=1
+    [ -f "$LIBDIR/git-heal/heal-index-head" ] || _st_gh_ok=0
+    for _st_gh_h in post-merge post-checkout post-rewrite post-index-change; do
+        [ -f "$LIBDIR/git-heal/hooks/$_st_gh_h" ] || _st_gh_ok=0
+    done
+    [ "$_st_gh_ok" = 1 ] ||
+        ui_kv_warn "kit pieces" "incomplete under $LIBDIR/git-heal (fix: sudo opk update)"
+    # State: read the developer's global gitconfig directly (status runs
+    # unsudoed as the invoking user -- normally the developer).
+    _st_gh_home=$(getent passwd "$DEFAULT_USER" 2>/dev/null | cut -d: -f6)
+    _st_gh_gc="${GH_GITCONFIG:-$_st_gh_home/.gitconfig}"
+    _st_gh_state=unknown
+    if [ -n "$_st_gh_home" ] && [ -r "$_st_gh_gc" ]; then
+        _st_gh_cur=$(git config -f "$_st_gh_gc" core.hooksPath 2>/dev/null || true)
+        if [ -z "$_st_gh_cur" ]; then
+            _st_gh_state=off
+        elif [ "$_st_gh_cur" = "$LIBDIR/git-heal/hooks" ]; then
+            _st_gh_state=on
+        else
+            _st_gh_state=foreign
+        fi
+    fi
+    case "$_st_gh_state" in
+        on)
+            ui_kv_ok "git-heal" "ON — developer git ops re-pin index/HEAD to $OPENCODE_USER"
+            ;;
+        off)
+            ui_kv "git-heal" "OFF — 'sudo opk git-heal on' keeps the agent's main-checkout"
+            ui_detail "git workflow (git add / git switch) green across developer checkouts/pulls"
+            ;;
+        foreign)
+            ui_kv "git-heal" "OFF — core.hooksPath holds a foreign value ($_st_gh_cur)"
+            ui_detail "the heal hooks are not in effect; 'sudo opk git-heal on' would retake the path"
+            ;;
+        unknown)
+            ui_kv "git-heal" "unknown — cannot read the developer's global gitconfig"
+            ;;
+    esac
+    # Per-gitdir lockout rows: dev-owned index/HEAD under a sticky .git
+    # lock the agent out of the main checkout until the heal hooks
+    # fire (state off/foreign: they never will) or the next developer
+    # git operation re-pins them (state on: transient by design). The
+    # enumeration mirrors the on-sweep's RECURSION (#674 a C3: every
+    # .git under each conf root — conf roots are scan roots, config.sh
+    # parent registration; the literal <root>/.git would miss every
+    # nested repo), deliberately NOT its conf-line reader gate
+    # (#674 b D2): status is display-only, no root operation — it
+    # renders the conf as written (bounded display residual; the
+    # sanctioned writer refuses such lines).
+    [ -f "$PROJECTS_CONF" ] || return 0
+    # Loud but never fatal (#674 b D3): a swallowed mktemp failure
+    # would silently drop the lockout rows this section exists to
+    # show (the on-sweep twin fails loud).
+    _st_gh_list=$(mktemp) || {
+        ui_kv_warn "git-heal" "lockout rows unavailable (mktemp failed)"
+        return 0
+    }
+    while IFS= read -r _st_gh_root; do
+        case "$_st_gh_root" in '' | '#'*) continue ;; esac
+        [ -d "$_st_gh_root" ] || continue
+        # Loud on partial failure (#674 c E4): an unreadable subtree
+        # silently loses its lockout rows otherwise — one notice per
+        # affected root keeps the section honest.
+        find "$_st_gh_root" -type d -name .git >>"$_st_gh_list" 2>/dev/null ||
+            ui_detail "git-heal: lockout rows may be incomplete under $_st_gh_root (unreadable)"
+    done <"$PROJECTS_CONF"
+    while IFS= read -r _st_gh_gd; do
+        [ -n "$_st_gh_gd" ] || continue
+        for _st_gh_f in index HEAD; do
+            _st_gh_own=$(stat -c %U "$_st_gh_gd/$_st_gh_f" 2>/dev/null) || continue
+            if [ "$_st_gh_own" != "$OPENCODE_USER" ]; then
+                if [ "$_st_gh_state" = on ]; then
+                    ui_kv "lockout" "$_st_gh_gd/$_st_gh_f is $_st_gh_own-owned (transient —"
+                    ui_detail "the next developer git operation heals it)"
+                else
+                    ui_kv_warn "lockout" "$_st_gh_gd/$_st_gh_f is $_st_gh_own-owned — agent git"
+                    ui_detail "locked there; 'sudo opk git-heal on' heals and keeps it healed"
+                fi
+            fi
+        done
+    done <"$_st_gh_list"
+    rm -f "$_st_gh_list"
+}
+
 # === Security advisories (issue #107) ============================================
 # Two sources, two jobs: the SHIPPED database (sh/advisories.sh) is the
 # curated truth — channel-qualified, ranges refined to the patched

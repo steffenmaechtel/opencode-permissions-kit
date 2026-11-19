@@ -209,7 +209,7 @@ fi
 # status-core.sh's function definitions (the test-suite completeness
 # riders enforce both directions).
 status_pairing_guard() {
-    for _spg in status_section_core status_section_advisories \
+    for _spg in status_section_core status_section_git_heal status_section_advisories \
         status_section_projects status_section_backend status_section_ddev \
         status_section_wsl2 status_section_root_equiv \
         status_section_leak_scan status_section_management \
@@ -230,6 +230,7 @@ status_pairing_guard || exit 1
 
 # --- sections, in report order (output order is user-visible) -----------------
 status_section_core
+status_section_git_heal
 status_section_advisories
 status_section_projects
 status_section_backend

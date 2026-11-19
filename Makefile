@@ -11,6 +11,7 @@
     test-opencode-as-opencode \
     test-as-opencode-core \
     test-fs-baseline \
+    test-git-heal-core \
     test-staged-write \
     test-parser \
     test-template-bash-rules \
@@ -177,6 +178,7 @@ help:
 	@echo "  make test-opencode-as-opencode  Run wrapper (opencode-as-opencode) validation tests"
 	@echo "  make test-as-opencode-core      Run wrapper core lib (as-opencode-core.sh) tests"
 	@echo "  make test-fs-baseline  Run group-baseline progress tests (issue #14)"
+	@echo "  make test-git-heal-core  Run git heal hooks tests (#671)"
 	@echo "  make test-staged-write  Run symlink-safe write / handover gate tests (0.0.39g)"
 	@echo "  make test-parser   Run JSONC parser edge-case tests"
 	@echo "  make test-template-bash-rules  Run template bash rule tests"
@@ -290,6 +292,7 @@ test: lint \
       test-release \
       test-fetch-integrity \
       test-fs-baseline \
+      test-git-heal-core \
       test-staged-write \
       test-uninstall \
       test-uninstall-core \
@@ -674,6 +677,10 @@ test-fetch-integrity:
 test-fs-baseline:
 	@echo "=== Group-Baseline Progress Tests ==="
 	@./tests/unit/test-fs-baseline.sh
+
+test-git-heal-core:
+	@echo "=== Git Heal Hooks Tests (#671) ==="
+	@./tests/unit/test-git-heal-core.sh
 
 test-staged-write:
 	@echo "=== Symlink-Safe Write / Handover Gate Tests (0.0.39g) ==="

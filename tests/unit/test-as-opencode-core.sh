@@ -210,4 +210,38 @@ else
     fail "functions called by opencode-as-opencode but absent from the guard:$_pg_missing (#457)"
 fi
 
+# --- 5. wrapper_validate_cwd behavior: the "/" conf line fails CLOSED -----------
+# (#674 c E1 — the D1 class's one fail-open variant before the guard:
+# root_clean="" matched every absolute cwd). Function-level: source
+# the lib, set the conf, cd into a scratch project, read $VALID.
+mkdir -p "$WORK/val/root/proj"
+printf '%s\n' "/" >"$WORK/val/conf"
+_vc=$( (
+    . "$LIB"
+    PROJECTS_CONF="$WORK/val/conf"
+    cd "$WORK/val/root/proj" || exit 9
+    wrapper_validate_cwd
+    printf '%s' "$VALID"
+) 2>/dev/null)
+if [ "$_vc" = "false" ]; then
+    pass "wrapper: bare / conf line validates no cwd (membership guard stays closed)"
+else
+    fail "wrapper: / conf line fail-open (VALID=$_vc)"
+fi
+# Positive arm with a trailing slash: the strip still normalizes a
+# legitimate spelling and the registered root validates its project.
+printf '%s\n' "$WORK/val/root/" >"$WORK/val/conf"
+_vc=$( (
+    . "$LIB"
+    PROJECTS_CONF="$WORK/val/conf"
+    cd "$WORK/val/root/proj" || exit 9
+    wrapper_validate_cwd
+    printf '%s' "$VALID"
+) 2>/dev/null)
+if [ "$_vc" = "true" ]; then
+    pass "wrapper: trailing-slash root still validates its project cwd"
+else
+    fail "wrapper: positive validation arm (VALID=$_vc)"
+fi
+
 suite_done "as-opencode-core lib tests"

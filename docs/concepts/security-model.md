@@ -70,9 +70,39 @@ from agent-writable surfaces there:
   commits/pushes but writes it through lock+rename — that rename dies
   on the sticky bit. Planted hooks, `core.fsmonitor`, `core.hooksPath`
   overrides and diff-driver registrations can no longer be placed or
-  rewritten by the agent, while the agent's add/commit/branch/push
-  workflow stays green (live evidence in issue #644, including the
-  field report on `push -u`).
+  rewritten by the agent. The agent's commit/push workflow stays green
+  on files the heal pinned; `index` and `HEAD` were deliberately left
+  floating (the agent must stage and switch branches), which has its
+  own cost — see the **git heal hooks** below.
+- **The git heal hooks** (issue
+  [#671](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/671)):
+  git rewrites `.git/index` and `.git/HEAD` through lock+rename too, so
+  their ownership floats with the last writer — and a sticky `.git`
+  blocks the agent from renaming over a developer-owned entry ever
+  again. The first developer checkout or pull after a merge therefore
+  locks the agent's staging and branch operations (`git add`, `git
+  switch`) out of the main checkout; the baseline cannot close that
+  (every developer git operation re-flips the ownership, and lifecycle
+  re-heals would only ping-pong). The closure is opt-in and
+  maintainer-side: `opk git-heal on` points the developer's global
+  `core.hooksPath` at the kit-owned hook directory
+  (`git-heal/hooks/`), whose `post-merge`, `post-checkout`,
+  `post-rewrite` and `post-index-change` bodies re-pin `index`/`HEAD`
+  to the agent user after every developer git operation, via a narrow
+  root heal (`git-heal/heal-index-head`) behind a sudoers grant. The
+  carrier set is measured, not assumed: `post-index-change` fires on
+  EVERY index write — mutating commands (`add`, `reset`, `read-tree`)
+  and refreshing `git status` runs on a stale cache (IDE refreshes
+  while the agent edits) alike — but not on a fresh-cache status that
+  writes nothing, which is exactly the no-flip case; pull/merge
+  (including fast-forward) rides `post-merge`, checkouts/switches ride
+  `post-checkout` (there is no `post-reset` hook in git;
+  `post-index-change` is that family's real carrier). The global
+  `core.hooksPath` doubles as defense in depth: repo hooks stop
+  executing for the developer (the effect the `/dev/null` form in
+  [secure git config](../how-to/secure-git-config.md) documents), and
+  the kit's own hooks are the only ones left — root-owned, outside the
+  agent's reach. See [the git heal hooks how-to](../how-to/git-heal-hooks.md).
 - This is OS-level narrowing — the one place the kit deliberately steps
   out of the pure soft model, scoped to `.git` internals (and the
   project root's sticky bit) that ddev never touches. Workflow costs

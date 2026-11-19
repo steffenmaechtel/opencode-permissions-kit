@@ -70,7 +70,8 @@ fi
 
 _defs="prompt_yn run_q un_rc_q un_opencode_user_gate un_context_load
 un_sudoers_remove un_wrapper_remove un_cli_remove un_xdg_open_remove
-un_tui_plugins_remove un_wsl_bridge_remove un_library_remove un_umask_remove
+un_tui_plugins_remove un_wsl_bridge_remove un_git_heal_remove un_library_remove
+un_umask_remove
 un_group_membership_remove un_projects_revert un_config_dirs_remove
 un_audit_log_remove un_user_remove _un_revert_chown"
 _missing=""
@@ -78,8 +79,11 @@ for _fn in $_defs; do
     sh -c '. "$1" && command -v "$2" >/dev/null' _ "$LIB" "$_fn" 2>/dev/null ||
         _missing="$_missing $_fn"
 done
+# Count derived from the list, never hardcoded (#595): the next list
+# edit cannot desync the message.
+_ndefs="$(printf '%s\n' $_defs | wc -w | tr -d ' ')"
 if [ -z "$_missing" ]; then
-    pass "all 6 helpers + 13 section functions defined by sourcing"
+    pass "all $_ndefs helper/section functions defined by sourcing"
 else
     fail "functions missing after sourcing:$_missing"
 fi
@@ -120,7 +124,7 @@ fi
 # (un_projects_revert is indented inside its conf guard — pinned separately
 # by the projects-guard pin right below)
 _order="un_context_load un_sudoers_remove un_wrapper_remove un_cli_remove
-un_xdg_open_remove un_tui_plugins_remove un_wsl_bridge_remove
+un_xdg_open_remove un_tui_plugins_remove un_wsl_bridge_remove un_git_heal_remove
 un_library_remove un_umask_remove un_user_remove
 un_config_dirs_remove un_audit_log_remove"
 _prev=0
@@ -2027,6 +2031,47 @@ if [ "${_unc_pi:-0}" -ge 1 ]; then
 else
     echo "  ${RED}FAIL${NC}  the tui unregister must run python3 -I (#249)"
     failures=$((failures + 1))
+fi
+
+# --- un_git_heal_remove (#671): kit-owned hooksPath only --------------------------
+# Three arms at function level, each in its own scratch HOME (git
+# config --global is HOME-relative): the kit's own value is unset and
+# reported, a foreign value is named and NEVER touched, an absent
+# value is a clean no-op. DRY_RUN=false so un_rc_q executes for real.
+_ghu_run() { # <home>
+    (
+        HOME="$1"
+        export HOME
+        DRY_RUN=false
+        YES=false
+        log() { echo "log: $*"; }
+        trace() { :; }
+        un_git_heal_remove
+    ) 2>&1
+}
+mkdir -p "$WORK/ghu1" "$WORK/ghu2" "$WORK/ghu3"
+git config --file "$WORK/ghu1/.gitconfig" \
+    core.hooksPath /usr/local/lib/opencode-permissions-kit/git-heal/hooks
+_out=$(_ghu_run "$WORK/ghu1" || true)
+if printf '%s' "$_out" | grep -qF 'core.hooksPath unset (git heal hooks off)' &&
+    ! grep -qF 'hooksPath' "$WORK/ghu1/.gitconfig"; then
+    pass "git-heal removal: the kit's own core.hooksPath is unset (#671)"
+else
+    fail "git-heal removal: own-value unset broken (out=$_out gc=$(cat "$WORK/ghu1/.gitconfig" 2>/dev/null))"
+fi
+git config --file "$WORK/ghu2/.gitconfig" core.hooksPath /dev/null
+_out=$(_ghu_run "$WORK/ghu2" || true)
+if printf '%s' "$_out" | grep -qF 'foreign value (/dev/null) — left untouched' &&
+    grep -qF 'hooksPath = /dev/null' "$WORK/ghu2/.gitconfig"; then
+    pass "git-heal removal: a foreign core.hooksPath stays untouched (#671)"
+else
+    fail "git-heal removal: foreign leg failed (out=$_out gc=$(cat "$WORK/ghu2/.gitconfig" 2>/dev/null))"
+fi
+_out=$(_ghu_run "$WORK/ghu3" || true)
+if printf '%s' "$_out" | grep -qF 'git heal hooks not active (no core.hooksPath set)'; then
+    pass "git-heal removal: absent value is a clean no-op (#671)"
+else
+    fail "git-heal removal: absent arm broken (out=$_out)"
 fi
 
 if [ "$failures" -gt 0 ]; then

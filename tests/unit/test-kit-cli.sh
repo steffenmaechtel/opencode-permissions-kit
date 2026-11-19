@@ -927,6 +927,8 @@ for _f24_s in config update; do
     printf '#!/bin/sh\necho "%s-stub-ran"\n' "$_f24_s" >"$F24/lib/management/$_f24_s.sh"
 done
 cp "$OCCORE" "$F24/lib/sh/openchamber-core.sh"
+cp "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/git-heal-core.sh" \
+    "$F24/lib/sh/git-heal-core.sh"
 : >"$F24/lib/sh/wsl-browser-bridge.sh"
 printf '#!/bin/sh\necho "SUDO-CALLED $*" >> "%s/sudo.log"\nexit 0\n' "$F24" >"$F24/sbin/sudo"
 chmod +x "$F24/sbin/sudo"
@@ -967,6 +969,7 @@ _f24_check OPK_MGMT_ROOT update
 _f24_check OPK_UPGRADE_ROOT upgrade-opencode
 _f24_check OPK_WSLFIX_ROOT wsl-add-opencode-1-fix
 _f24_check OPK_OPENCHAMBER_ROOT openchamber-secure
+_f24_check OPK_GITHEAL_ROOT git-heal on
 
 # --- ensure-shared: short heal wrapper (issue #159) ----------------------------
 # The real helper (bin/ddev-as-opencode) is stubbed with an argument

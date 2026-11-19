@@ -248,6 +248,31 @@ if [ "$_rootless_ok" = true ]; then
 fi
 
 echo ""
+echo "--- RL2b. Git heal hooks (#671) ---"
+# A dev-owned repo under the managed root, baselined like a real
+# project add: the full lockout -> opt-in -> hook-heal cycle.
+E 'sudo git init -q /var/www/vhosts/rl-gh && sudo sh -c "cd /var/www/vhosts/rl-gh && git -c user.email=dev@example.com -c user.name=dev commit -q --allow-empty -m init" && sudo chown -R dev:dev /var/www/vhosts/rl-gh'
+E 'sudo opk config projects add /var/www/vhosts/rl-gh'
+check "RL2b: git-heal pieces deployed (heal script + four hooks, #671)" \
+    E 'test -x /usr/local/lib/opencode-permissions-kit/git-heal/heal-index-head && test -x /usr/local/lib/opencode-permissions-kit/git-heal/hooks/post-index-change'
+check "RL2b: sudoers carries the heal grant (dev -> root -> exact script, #671)" \
+    E 'sudo grep -q "^dev ALL=(root) NOPASSWD: /usr/local/lib/opencode-permissions-kit/git-heal/heal-index-head \*$" /etc/sudoers.d/opencode-permissions-kit'
+check "RL2b: developer checkout flips index+HEAD dev-owned (lockout state, #671)" \
+    E 'cd /var/www/vhosts/rl-gh && git checkout -q -b rl671-flip && test "$(stat -c %U .git/index)" = "dev" && test "$(stat -c %U .git/HEAD)" = "dev"'
+check_fail "RL2b: agent git add DIES on the dev-owned index (sticky .git, #671)" \
+    E 'sudo -u opencode -H sh -c "echo x > /var/www/vhosts/rl-gh/agent-file.txt && git -C /var/www/vhosts/rl-gh add agent-file.txt"'
+check "RL2b: opk git-heal on (sudo, dev gitconfig + heal sweep)" \
+    E 'sudo opk git-heal on | grep -q "git heal hooks active"'
+check "RL2b: the on-sweep healed the lockout (index+HEAD agent-owned)" \
+    E 'test "$(stat -c %U /var/www/vhosts/rl-gh/.git/index)" = "opencode" && test "$(stat -c %U /var/www/vhosts/rl-gh/.git/HEAD)" = "opencode"'
+check "RL2b: agent git add is green again after the heal" \
+    E 'sudo -u opencode -H git -C /var/www/vhosts/rl-gh add agent-file.txt'
+check "RL2b: the post-checkout hook re-heals the NEXT developer git op" \
+    E 'cd /var/www/vhosts/rl-gh && git checkout -q master && test "$(stat -c %U .git/index)" = "opencode" && test "$(stat -c %U .git/HEAD)" = "opencode"'
+check "RL2b: opk git-heal status reports ON" \
+    E 'sudo opk git-heal status | grep -q "git-heal: ON"'
+
+echo ""
 echo "--- RL3. Wrapper dispatch + socket-check sudoers fallback (ab19025) ---"
 # This is the exact scenario from the bug: the wrapper runs as the DEVELOPER,
 # but the rootless socket lives in the opencode user's 0700 /run/user/<uid>.

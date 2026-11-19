@@ -422,6 +422,41 @@ kit-owned lines only; your own entries stay)" "n")" = "y" ]; then
     fi
 }
 
+# Git heal hooks removal (#671): unset the developer's global
+# core.hooksPath BEFORE un_library_remove deletes the hook dir it
+# points at -- a dangling core.hooksPath fails every git operation of
+# the developer with "cannot change to '<dir>'". Kit-owned value only:
+# a foreign core.hooksPath is reported and left untouched (the
+# consent discipline of issue #100 -- never modify bytes the kit did
+# not write).
+# Runs as the invoking user (uninstall's own uid -- the developer),
+# so `git config --global` needs no sudo hop.
+un_git_heal_remove() {
+    echo ""
+    echo "--- Removing git heal hooks ---"
+    _un_gh_dir="/usr/local/lib/opencode-permissions-kit/git-heal/hooks"
+    _un_gh_cur=$(git config --global core.hooksPath 2>/dev/null || true)
+    if [ "$_un_gh_cur" = "$_un_gh_dir" ]; then
+        _un_partial=""
+        _un_revert_failed=0
+        un_rc_q "unset core.hooksPath" git config --global --unset core.hooksPath
+        if [ -z "$_un_partial" ]; then
+            echo "core.hooksPath unset (git heal hooks off)."
+            log "git heal hooks: core.hooksPath unset"
+        else
+            echo "WARN: could not unset core.hooksPath ($_un_partial) — remove manually:" >&2
+            echo "       git config --global --unset core.hooksPath" >&2
+            log "git heal hooks: core.hooksPath unset FAILED ($_un_partial)"
+        fi
+    elif [ -n "$_un_gh_cur" ]; then
+        echo "core.hooksPath holds a foreign value ($_un_gh_cur) — left untouched."
+        log "git heal hooks: foreign core.hooksPath left in place"
+    else
+        echo "git heal hooks not active (no core.hooksPath set)."
+        log "git heal hooks: none active"
+    fi
+}
+
 # Library + legacy library/symlink removal section.
 un_library_remove() {
     echo ""

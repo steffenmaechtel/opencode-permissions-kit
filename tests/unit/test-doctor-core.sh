@@ -65,7 +65,7 @@ fi
 
 # --- 2. every section entry point + helper is defined by sourcing -----------------
 _defs="doctor_cli doctor_all doctor_walkup doctor_opk_dispatcher
-doctor_daemon_user doctor_ranges doctor_header doctor_policy
+doctor_daemon_user doctor_git_heal doctor_ranges doctor_header doctor_policy
 doctor_detect doctor_scan_trees doctor_fix doctor_summary
 _doctor_usage _doctor_all_cleanup _doctor_cleanup doctor_cntrl_bad
 doctor_show_sanitize doctor_userns_ranges doctor_load_policy
@@ -286,6 +286,56 @@ if printf '%s' "$_out" | grep -qF 'detect (propose opk.json entries from ownersh
     pass "header: detect mode row"
 else
     fail "header: detect mode row broken (out=$_out)"
+fi
+
+# --- 5b. git heal hooks row at function level (#671) -------------------------------
+# doctor_git_heal renders the heal state (from the developer's global
+# gitconfig via the documented GH_GITCONFIG override, kit pieces via
+# GH_LIBDIR) and classifies THIS project's main-checkout lockout:
+# dev-owned index under heal-off is a counted warn with the fix hint,
+# under heal-on a transient row, agent-owned renders nothing.
+_dgh_stage() {
+    _dgh_repo_lib="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib"
+    mkdir -p "$WORK/dgh/lib/git-heal/hooks" "$WORK/dgh/devhome" "$WORK/dgh/proj"
+    cp "$_dgh_repo_lib/git-heal/heal-index-head" "$WORK/dgh/lib/git-heal/"
+    for _dgh_h in post-merge post-checkout post-rewrite post-index-change; do
+        cp "$_dgh_repo_lib/git-heal/hooks/$_dgh_h" "$WORK/dgh/lib/git-heal/hooks/"
+    done
+    git -C "$WORK/dgh/proj" init -q
+    : >"$WORK/dgh/proj/.git/index"
+    : >"$WORK/dgh/proj/.git/HEAD"
+    : >"$WORK/dgh/devhome/.gitconfig"
+    printf 'DEFAULT_USER=%s\nOPENCODE_USER=opencode-dgh-agent\n' "$(id -un)" \
+        >"$WORK/dgh/install.conf"
+}
+_dgh_run() {
+    (
+        PATH="$STUB:$PATH"
+        export PATH NO_COLOR=1 GH_GITCONFIG="$WORK/dgh/devhome/.gitconfig" \
+            GH_LIBDIR="$WORK/dgh/lib"
+        . "$UI_LIB"
+        . "$LIB"
+        INSTALL_CONF="$WORK/dgh/install.conf"
+        DOCTOR_ROOT="$WORK/dgh/proj"
+        DOCTOR_USER=opencode-dgh-agent
+        doctor_git_heal
+    ) 2>&1
+}
+_dgh_stage
+_out=$(_dgh_run || true)
+if printf '%s' "$_out" | grep -q "git-heal.*OFF -- 'sudo opk git-heal on'" &&
+    printf '%s' "$_out" | grep -q "index/HEAD.*$WORK/dgh/proj/.git/index is $(id -un)-owned -- agent git"; then
+    pass "doctor git-heal: OFF state + counted lockout warn with fix hint"
+else
+    fail "doctor git-heal: OFF/lockout rows broken (out=$(printf '%s' "$_out" | head -4))"
+fi
+git config -f "$WORK/dgh/devhome/.gitconfig" core.hooksPath "$WORK/dgh/lib/git-heal/hooks"
+_out=$(_dgh_run || true)
+if printf '%s' "$_out" | grep -q 'git-heal.*ON -- developer git ops re-pin' &&
+    printf '%s' "$_out" | grep -q 'transient'; then
+    pass "doctor git-heal: ON state classifies dev-owned index as transient"
+else
+    fail "doctor git-heal: ON rows broken (out=$(printf '%s' "$_out" | head -4))"
 fi
 
 # --- sweep floor: doctor-core's python3 sites run -I (#249) ------------------------

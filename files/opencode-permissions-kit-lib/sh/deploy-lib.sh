@@ -74,7 +74,7 @@ lib_deploy() {
         return 1
     fi
     _dl_sudo mkdir -p "$_dl_lib/bin" "$_dl_lib/sh" "$_dl_lib/py" "$_dl_lib/tui" \
-        "$_dl_lib/management" "$_dl_lib/templates" || return 1
+        "$_dl_lib/management" "$_dl_lib/templates" "$_dl_lib/git-heal/hooks" || return 1
     while IFS=' ' read -r _dl_rel _dl_mode; do
         case "$_dl_rel" in '' | '#'*) continue ;; esac
         _dl_src="$_dl_root/$_dl_rel"
@@ -134,6 +134,19 @@ opencode-permissions-kit-lib/bin/opk 755
 opencode-permissions-kit-lib/bin/setup-container-backend 755
 opencode-permissions-kit-lib/bin/socket-check 755
 opencode-permissions-kit-lib/bin/xdg-open 755
+# git-heal/ -- the git heal hooks subsystem (#671): heal-index-head is
+# executed by path (the developer-side post-* hooks sudo into it via
+# the sudoers grant; it runs as root and chowns .git/index + .git/HEAD
+# back to the agent user), the four hook bodies are executed by git
+# itself through the developer's global core.hooksPath (`opk git-heal
+# on`) -- identical bytes, the filename selects the event. 755 by the
+# exec-bit rule; the hooks dir must exist because core.hooksPath
+# points at it. The core lib is sh/git-heal-core.sh (sourced, below).
+opencode-permissions-kit-lib/git-heal/heal-index-head 755
+opencode-permissions-kit-lib/git-heal/hooks/post-checkout 755
+opencode-permissions-kit-lib/git-heal/hooks/post-index-change 755
+opencode-permissions-kit-lib/git-heal/hooks/post-merge 755
+opencode-permissions-kit-lib/git-heal/hooks/post-rewrite 755
 # py/
 opencode-permissions-kit-lib/py/jsonc-parser.py 755
 opencode-permissions-kit-lib/py/tui-register.py 755
@@ -152,6 +165,9 @@ opencode-permissions-kit-lib/sh/ddev-migrate.sh 644
 opencode-permissions-kit-lib/sh/ddev-terminal.sh 644
 opencode-permissions-kit-lib/sh/deploy-lib.sh 644
 opencode-permissions-kit-lib/sh/fs-baseline.sh 644
+# git-heal-core.sh: the opk git-heal subcommand (#671), sourced by
+# bin/opk through its SELF-resolved $LIBDIR (the openchamber-core shape)
+opencode-permissions-kit-lib/sh/git-heal-core.sh 644
 opencode-permissions-kit-lib/sh/git-check.sh 644
 opencode-permissions-kit-lib/sh/log.sh 644
 # path-sane.sh: the project-root policy gate (issue #216) — bounds the

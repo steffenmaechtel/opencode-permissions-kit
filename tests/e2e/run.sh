@@ -232,6 +232,31 @@ check "2c: git safe.directory '*' set for the opencode user (issue #17)" \
     E 'sudo -u opencode -H git config --global --get-all safe.directory 2>/dev/null | grep -qFx "*"'
 check "2c: agent git can read the dev-owned repository (no dubious ownership)" \
     E 'sudo -u opencode -H git -C /var/www/vhosts/perm-check log --oneline -1 >/dev/null 2>&1'
+# --- 2c/#671: the git heal hooks — deploy, lockout, on, heal, roundtrip ---
+check "2c: git-heal pieces deployed by the install (heal script + four hooks, #671)" \
+    E 'test -x /usr/local/lib/opencode-permissions-kit/git-heal/heal-index-head && test -x /usr/local/lib/opencode-permissions-kit/git-heal/hooks/post-merge && test -x /usr/local/lib/opencode-permissions-kit/git-heal/hooks/post-checkout && test -x /usr/local/lib/opencode-permissions-kit/git-heal/hooks/post-rewrite && test -x /usr/local/lib/opencode-permissions-kit/git-heal/hooks/post-index-change'
+check "2c: sudoers carries the heal grant (dev -> root -> exact script, #671)" \
+    E 'sudo grep -q "^dev ALL=(root) NOPASSWD: /usr/local/lib/opencode-permissions-kit/git-heal/heal-index-head \*$" /etc/sudoers.d/opencode-permissions-kit'
+check "2c: #671 — developer checkout flips index+HEAD dev-owned (lockout state)" \
+    E 'cd /var/www/vhosts/perm-check && git checkout -q -b e2e-671-flip && test "$(stat -c %U .git/index)" = "dev" && test "$(stat -c %U .git/HEAD)" = "dev"'
+check_fail "2c: #671 — agent git add DIES on the dev-owned index (sticky .git)" \
+    E 'sudo -u opencode -H sh -c "echo x > /var/www/vhosts/perm-check/agent-file.txt && git -C /var/www/vhosts/perm-check add agent-file.txt"'
+check "2c: #671 — opk git-heal on (sudo, dev gitconfig + heal sweep)" \
+    E 'sudo opk git-heal on | grep -q "git heal hooks active"'
+check "2c: #671 — dev global core.hooksPath points at the kit hook dir" \
+    E 'test "$(git config --global core.hooksPath)" = "/usr/local/lib/opencode-permissions-kit/git-heal/hooks"'
+check "2c: #671 — the on-sweep healed the lockout (index+HEAD agent-owned again)" \
+    E 'test "$(stat -c %U /var/www/vhosts/perm-check/.git/index)" = "opencode" && test "$(stat -c %U /var/www/vhosts/perm-check/.git/HEAD)" = "opencode"'
+check "2c: #671 — agent git add is green again after the heal" \
+    E 'sudo -u opencode -H git -C /var/www/vhosts/perm-check add agent-file.txt'
+check "2c: #671 — the post-checkout hook re-heals the NEXT dev git op" \
+    E 'cd /var/www/vhosts/perm-check && git checkout -q master && test "$(stat -c %U .git/index)" = "opencode" && test "$(stat -c %U .git/HEAD)" = "opencode"'
+check "2c: #671 — the heal audit log recorded the hook-driven heals" \
+    E 'test -s /usr/local/lib/opencode-permissions-kit/git-heal/heal.log && grep -q "gitdir=/var/www/vhosts/perm-check/.git" /usr/local/lib/opencode-permissions-kit/git-heal/heal.log'
+check "2c: #671 — agent staging survives the dev flip + hook heal roundtrip" \
+    E 'sudo -u opencode -H sh -c "echo y >> /var/www/vhosts/perm-check/agent-file.txt && git -C /var/www/vhosts/perm-check add agent-file.txt && git -C /var/www/vhosts/perm-check reset -q HEAD -- agent-file.txt"'
+check "2c: #671 — opk git-heal status reports ON" \
+    E 'sudo opk git-heal status | grep -q "git-heal: ON"'
 # Remove the fake binary: section 3 asserts no ddev shadow exists at
 # /usr/local/bin/ddev (the soft-only kit ships no shim).
 E 'sudo rm -f /usr/local/bin/ddev'
