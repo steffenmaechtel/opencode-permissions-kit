@@ -1322,11 +1322,16 @@ update_finalize_install_conf() {
 update_finalize_tui_files() {
     # --- TUI mode display user files (internal/records/_archive/design/plan-ui-tui-opencode.md) ---------
     # Same only-if-absent-or-kit-written policy as install.sh (marker key
-    # _opencode_permissions_kit): user edits survive updates. The write goes
-    # through the shared staged_write helper (review 0.0.39g S1 — sourced
-    # early, see the top of this script): the target dir is agent-owned, root
-    # cp/chown must never follow a planted symlink; a user-managed symlink at
-    # the destination is skipped, never written through.
+    # _opencode_permissions_kit) — for the tui.json FILES: user edits
+    # survive updates. The danger theme copy below is the install.sh twin
+    # without a marker (#661 P6): it refreshes UNCONDITIONALLY whenever
+    # the sibling tui.json gate passes — a hand-customized deployed danger
+    # theme is overwritten (deliberate, see install.sh step 8c). The write
+    # goes through the shared staged_write helper (review 0.0.39g S1 —
+    # sourced early, see the top of this script): the target dir is
+    # agent-owned, root cp/chown must never follow a planted symlink; a
+    # user-managed symlink at the destination is skipped, never written
+    # through.
     OC_TUI_DIR="/home/$OPENCODE_USER/.config/opencode"
     OC_TUI_CONF="$OC_TUI_DIR/tui.json"
     # Chain gate BEFORE mkdir -p (review 0.0.39h F2): a linked PARENT

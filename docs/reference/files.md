@@ -127,7 +127,11 @@ probes, and the ddev-as-opencode helper; keeps `DOCKER_HOST` and
 
 `tui.json` is kit-managed for the mode registration only — the user's own
 theme choice is never touched. The plugin dir carries the kit-mode-2x
-registration; it is skipped when user-managed symlinks are present.
+registration; it is skipped when user-managed symlinks are present. The
+danger theme file carries no marker (unlike the `tui.json` templates): it
+is refreshed on every install/update, so customizations of the deployed
+danger theme do not survive (the bypass warning look stays current; the
+deny-all lockout still guards either way).
 
 ## /usr/local/
 

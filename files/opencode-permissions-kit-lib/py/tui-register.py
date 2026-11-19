@@ -61,10 +61,15 @@ def load(path):
     # read_config): the platform default is locale-dependent, and a
     # 7-bit-locale host used to fail register/unregister with rc 1
     # whenever cli.json carried non-ASCII (an entry with a non-ASCII
-    # path). The write path pins its codec too now (#513 A4, the
-    # fdopen site below) — latent belt: json.dump's default
-    # ensure_ascii=True keeps the temp file pure ASCII today.
-    with open(path, "r", encoding="utf-8") as f:
+    # path). utf-8-SIG, like the parser's read paths since #661 P2: a
+    # leading BOM (Windows-edited cli.json) survives plain utf-8 and
+    # used to die at json.loads — here a loud refusal, but an
+    # unnecessary one; the BOM is formatting and drops on the next
+    # rewrite (the docstring's byte-formatting caveat covers it). The
+    # write path pins its codec too now (#513 A4, the fdopen site
+    # below) — latent belt: json.dump's default ensure_ascii=True keeps
+    # the temp file pure ASCII today.
+    with open(path, "r", encoding="utf-8-sig") as f:
         raw = f.read()
     try:
         return json.loads(raw)
@@ -99,10 +104,25 @@ def main(argv):
     path, mode, plugin = args
 
     data = {}
+    # No cross-process lock around this read-modify-write (issue #661 P4,
+    # deliberate): cli.json's real concurrent writer is the live 2.x TUI
+    # persisting user preferences, and it takes no advisory lock — flock
+    # here could only order kit-vs-kit runs (install/update/uninstall run
+    # sequentially and interactively; today only unregister writes), never
+    # kit-vs-TUI, and locking the replaced inode would not even exclude a
+    # second kit process after os.replace. A lost update is accepted
+    # either way; what the write path below guarantees instead is
+    # ATOMICITY (mkstemp + fsync + os.replace — no torn cli.json, the
+    # corruption class that matters for user-owned state).
     if os.path.exists(path):
         try:
             data = load(path)
-        except (OSError, ValueError) as e:
+        # RecursionError since #661 P3: a deeply nested cli.json used to
+        # escape as a raw traceback — it is a RuntimeError, not a
+        # ValueError. load()'s own arm stays JSONDecodeError-only (it
+        # RETRIES with the comment stripper; retrying a recursion overflow
+        # is pointless), so this arm is where both json.loads calls land.
+        except (OSError, ValueError, RecursionError) as e:
             print(f"tui-register: cannot parse {path}: {e}", file=sys.stderr)
             return 1
     if not isinstance(data, dict):

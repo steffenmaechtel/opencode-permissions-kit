@@ -20,7 +20,6 @@ Usage:
 """
 import fnmatch
 import json
-import re
 import sys
 
 # Output side of the same locale pin (#485 F22): deny patterns are paths
@@ -61,7 +60,11 @@ def strip_jsonc_comments(text):
     URLs like "https://opencode.ai/..."). Trailing commas (",}") are legal
     JSONC — editors and users rely on them — but strict json.loads rejects
     them, so a comma whose next non-whitespace character closes the object
-    or array is dropped."""
+    or array is dropped. An UNTERMINATED block comment (a trailing "/*"
+    truncated at EOF) raises json.JSONDecodeError instead of being
+    silently dropped: every other truncation shape fails loud, and a
+    silently accepted prefix would report a truncated config's deny
+    patterns as if complete (#661 P7)."""
     out = []
     i = 0
     n = len(text)
@@ -91,6 +94,15 @@ def strip_jsonc_comments(text):
             i += 2
             while i + 1 < n and not (text[i] == '*' and text[i + 1] == '/'):
                 i += 1
+            if i + 1 >= n:
+                # Unterminated /* ... EOF (#661 P7). Raised as
+                # json.JSONDecodeError deliberately — a plain ValueError
+                # would escape load_config's except arms below as a raw
+                # traceback (they catch the ValueError SUBclasses only).
+                # The twin peek loop in the trailing-comma arm needs no
+                # own guard: this main loop visits every non-string
+                # character, so the unterminated comment raises here.
+                raise json.JSONDecodeError("unterminated block comment", text, i)
             i += 2
             continue
         if ch == ',':
@@ -129,10 +141,16 @@ def read_config(config_path):
     PYTHONCOERCECLOCALE=0, or an exotic non-C locale) any non-ASCII
     config used to raise UnicodeDecodeError here — which escaped
     load_config's except arms as a raw traceback. doctor-core.sh's
-    embedded python already pinned encoding="utf-8"; this matches it."""
+    embedded python already pinned encoding="utf-8"; this matches it.
+    The codec is utf-8-SIG, not plain utf-8 (#661 P2): a leading U+FEFF
+    (Windows editors write one — the kit's WSL audience) survives plain
+    utf-8 decoding AND comment stripping, so json.loads used to die on
+    a byte-perfect-looking config. utf-8-sig strips the BOM when present
+    and decodes identically when absent — both read paths, the stdin
+    pipe included."""
     if config_path == '-':
-        return sys.stdin.buffer.read().decode('utf-8')
-    with open(config_path, 'r', encoding='utf-8') as f:
+        return sys.stdin.buffer.read().decode('utf-8-sig')
+    with open(config_path, 'r', encoding='utf-8-sig') as f:
         return f.read()
 
 
@@ -144,7 +162,10 @@ def load_config(config_path):
     config used to surface as a raw OSError traceback while parse errors
     got the polished message — 0.0.39g Q4) and on undecodable bytes —
     UnicodeDecodeError is a ValueError sibling of JSONDecodeError that
-    used to escape these arms (#485 F22)."""
+    used to escape these arms (#485 F22). RecursionError rides the
+    JSONDecodeError arm (#661 P3): a deeply nested document used to
+    escape as a raw traceback (RecursionError is a RuntimeError, not a
+    ValueError — no other arm here catches it)."""
     try:
         return json.loads(strip_jsonc_comments(read_config(config_path)))
     except OSError as e:
@@ -153,7 +174,7 @@ def load_config(config_path):
     except UnicodeDecodeError as e:
         print(f"Error decoding {config_path} as UTF-8: {e}", file=sys.stderr)
         sys.exit(1)
-    except json.JSONDecodeError as e:
+    except (json.JSONDecodeError, RecursionError) as e:
         print(f"Error parsing {config_path}: {e}", file=sys.stderr)
         sys.exit(1)
 
@@ -181,6 +202,12 @@ def extract_patterns(config_path):
     if isinstance(permission, dict):
         for tool in ('read', 'edit'):
             rules = permission.get(tool, {})
+            # Per-tool STRING shorthands ("read": "deny") fail the dict
+            # isinstance below and yield zero patterns — the status scan
+            # then prints its green "no matches" row. Deliberate (#661
+            # P12, disclosed): a blanket deny has no concrete paths to
+            # enumerate, same family as the whole-section "*" exclusion
+            # in the module docstring — a wording gap, not a missed scan.
             if isinstance(rules, dict):
                 for pattern, act in rules.items():
                     if act == 'deny' and pattern != '*':
@@ -240,6 +267,15 @@ def extract_tools(config_path):
     config = load_config(config_path)
 
     if isinstance(config, list):
+        # List shape = `opencode debug config` Entry[] (opencode 2.x).
+        # Disclosed premise arm (#661 P11): entries whose info.permissions
+        # is absent or not a list yield no rules, the tool loop prints
+        # nothing at rc 0 — and the exit-3 guard below is UNREACHABLE for
+        # list shapes (it only fires on non-list, non-dict top levels).
+        # A real Entry[] without any permissions would therefore read as
+        # "no container tools" and silently turn the wrapper's
+        # auto-detect off for the session; the triggering premise (2.x
+        # emitting permission-less documents) is unverifiable in-repo.
         rules = _debug_entry_rules(config)
         whole = None
     elif not isinstance(config, dict) or (config_path == '-' and 'permission' not in config and 'permissions' not in config):

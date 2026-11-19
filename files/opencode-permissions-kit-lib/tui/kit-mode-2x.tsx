@@ -21,8 +21,13 @@
 // and bypass detection compares the process user (os.userInfo — the
 // real uid, immune to env spoofing) against install.conf's OPENCODE_USER.
 // Colors follow the user's own theme tokens (text.subdued /
-// text.feedback.info.default / text.feedback.error.default). Everything
-// is defensive: a broken plugin must never take the TUI down.
+// text.feedback.info.default / text.feedback.error.default), read
+// through optional chaining (#661 P5): a theme lacking the nested token
+// paths used to throw into render()'s catch and render the WARNING row
+// as NOTHING — exactly in the bypass case the row exists for. A missing
+// token now degrades to the default color (fg undefined), the row still
+// renders. Everything is defensive: a broken plugin must never take the
+// TUI down.
 //
 // Deployed to /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx.
 // REGISTRATION on 2.x is the plugins/<name>/ directory symlink
@@ -80,11 +85,12 @@ export default Plugin.define({
         if (bypass) {
           return (
             <box paddingLeft={2}>
-              <text fg={theme.text.feedback.error.default}>{WARNING}</text>
+              <text fg={theme?.text?.feedback?.error?.default}>{WARNING}</text>
             </box>
           )
         }
-        const color = mode === "with ddev/docker" ? theme.text.feedback.info.default : theme.text.subdued
+        const color =
+          mode === "with ddev/docker" ? theme?.text?.feedback?.info?.default : theme?.text?.subdued
         const prefix = version ? `opencode-permissions-kit (${version})` : "opencode-permissions-kit"
         return (
           <box paddingLeft={2}>
