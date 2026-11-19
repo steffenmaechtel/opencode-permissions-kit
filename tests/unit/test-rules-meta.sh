@@ -1184,7 +1184,7 @@ _active_check() { # $1: audit script, $2: findings out-file
 # Boundary (round a D3): the pin reads entry files directly; the audit
 # slugs headings only inside its SCOPE_FILES loop -- an entry whose
 # file left SCOPE_FILES but kept a valid heading stays pin-green yet
-# audit-inert. 33/33 entries sit in SCOPE_FILES today (no live
+# audit-inert. All entries sit in SCOPE_FILES today (no live
 # divergence); disclosed here so the next reader does not re-derive it.
 _active_check "$REPO_ROOT/scripts/rules-audit.sh" "$WORK/p11"
 if [ -s "$WORK/p11" ]; then

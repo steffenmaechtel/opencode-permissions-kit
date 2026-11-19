@@ -370,21 +370,42 @@ empty-match greps (`grep … || true` where empty output is rc 1), `IFS= read
   script before it is believed, and the corrected re-probe lands in
   the wave's provenance (the docs-loop's probe-before-codify duty,
   surprise arm).
-- **Typographic anchors: switch to the shortest special-char-free
-  anchor, never re-aim longer from memory** (2026-11-18, PR #634
-  wave; the same trust-the-file family as the two 2026-11-15
-  bullets above in this list) — when an
-  edit-tool oldString misses on a line carrying typographic
-  characters (em-dash, apostrophe) despite an apparently exact copy,
-  re-read the target region and switch to the shortest anchor that
-  avoids the special characters entirely; do not keep re-trying
-  longer reconstructions from memory. Two live instances in one
-  session: a failure pair on agent/conventions.md (two visually
-  byte-identical oldStrings no-matched, `od -c` showed standard
-  UTF-8; the special-char-free short anchor matched first try) and,
-  as contrast, an em-dash-rich meta-body edit that matched
-  immediately — the trigger is not simply the character class (root
-  cause unidentified, #636).
+- **oldString anchors: verify the anchor bytes, never reconstruct
+  from the numbered read view** (2026-11-18, PR #634 wave; sharpened
+  2026-11-19, PR #668 wave — the same trust-the-file family as the
+  two 2026-11-15 bullets above in this list) — an edit-tool oldString
+  is never reconstructed from the read view alone, whatever the
+  character class: the numbered read's `NNN: ` prefix adjoins the content's
+  indent, so leading-whitespace counts are not visually recoverable
+  (a 3-space read that was 2-space, a 2-space read that was
+  flush-left), and a wrap point reconstructed from memory puts a
+  phrase believed at line start mid-line. On any miss — and before
+  the first attempt on an indented or wrapped target — verify the
+  anchor bytes (`sed -n Np <file> | od -c`, or anchor on
+  byte-verified unique text) instead of re-aiming longer
+  reconstructions from memory. Three failed edits in one wave, all on
+  plain-ASCII anchor lines, all recovered by the byte check (PR
+  #668, #669); the 2026-11-18 failure pair's typographic-character
+  theory (em-dash, apostrophe — #636) was one historical suspicion,
+  not the trigger. When the anchor line does carry typographic
+  characters, the shortest special-char-free anchor remains the
+  cheapest recovery.
+- **Consumer sweeps key on the data the consumers assert, not the
+  producer's message names** (2026-11-19, PR #680 round a B1 HIGH) —
+  a wave that changes a producer's output shape sweeps the consumers
+  by what THEY pin: path literals, row prefixes, exact bytes; a sweep
+  grepping the producer's message or success-label names concludes
+  "no coupling" while a sibling suite holds the pin (the #662 plan
+  rows: the consumer suite pinned the dry-run rows by the bare
+  `/usr/local/bin/opencode` and `/usr/local/bin/opk` path literals,
+  end-anchored — the message-name sweep
+  found nothing). And "local make test green" is evidence only for
+  hosts shaped like the local one — the dev host had the kit
+  installed, so both rows printed and the pins held; the bare CI
+  runner redden them (environment-dependent suites are L4's marking
+  duty, `0.0.46a F2`). The fidelity twin — the coupling hides in a
+  sibling unit suite, not e2e — is told in
+  [test-fidelity.md](test-fidelity.md) §2.
 
 ## When a rule fails
 

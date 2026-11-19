@@ -8,12 +8,12 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**186 metas · 183 active · 3 retired · 15 review-pending · next due 2026-11-17**
+**189 metas · 186 active · 3 retired · 19 review-pending · next due 2026-11-17**
 
 ## Actionable
 
-- **Review pending:** RM-0177, RM-0178, RM-0179, RM-0180, RM-0181, RM-0182, RM-0183, RM-0184, RM-0185, RM-0186
-- **Amended — pending:** RM-0044 (2026-11-18), RM-0113 (2026-11-18), RM-0141 (2026-11-18), RM-0175 (2026-11-18), RM-0154 (2026-11-19)
+- **Review pending:** RM-0177, RM-0178, RM-0179, RM-0180, RM-0181, RM-0182, RM-0183, RM-0184, RM-0185, RM-0186, RM-0187, RM-0188, RM-0189
+- **Amended — pending:** RM-0044 (2026-11-18), RM-0113 (2026-11-18), RM-0141 (2026-11-18), RM-0175 (2026-11-18), RM-0154 (2026-11-19), RM-0150 (2026-11-20)
 
 ## AGENTS.md
 
@@ -80,8 +80,9 @@
 | [RM-0147](0/1/4/RM-0147.md) | Call sites consume the rc | active | approved | 1m | 2026-12-15 |
 | [RM-0148](0/1/4/RM-0148.md) | The death arm is EXECUTED | active | approved | 1m | 2026-12-15 |
 | [RM-0149](0/1/4/RM-0149.md) | The empty-scan-set leg fails | active | approved | 1m | 2026-12-15 |
-| [RM-0150](0/1/5/RM-0150.md) | Detector rc semantics are per-tool | active | approved | 1m | 2026-12-15 |
+| [RM-0150](0/1/5/RM-0150.md) | Detector rc semantics are per-tool | active | **amended — pending** | 1m | 2026-12-15 |
 | [RM-0181](0/1/8/RM-0181.md) | The channel is a property | active | **pending** | 1m | 2026-12-18 |
+| [RM-0187](0/1/8/RM-0187.md) | An absence assertion over captured | active | **pending** | 1m | 2026-12-20 |
 
 ### Named-cause failure guards (shipped runners)
 
@@ -132,6 +133,13 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0157](0/1/5/RM-0157.md) | enumerates them as history | active | approved | 1m | 2026-12-16 |
+| [RM-0188](0/1/8/RM-0188.md) | A capability claim over | active | **pending** | 1m | 2026-12-20 |
+
+### Wave-record claims: classes, not counts
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0189](0/1/8/RM-0189.md) | An exhaustive claim in | active | **pending** | 1m | 2026-12-20 |
 
 ### Docs code blocks (paste-safe commands)
 

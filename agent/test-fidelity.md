@@ -39,6 +39,15 @@ rc and passed from the wrong arm (issue #626; the stub idiom and the
 arm-discrimination duty live in conventions.md, "Quoting-aware test
 machinery").
 
+A sweep-side twin of the same thesis: the fidelity gap also hides
+couplings from the wave's own consumer sweep — pinned by path
+literals in a sibling unit suite, invisible to a grep keyed on the
+producer's message names, green on every host shaped like the
+developer's (a kit installed) and red only on the bare CI runner
+(PR #680 round a B1, HIGH). The data-key discipline lives in
+[learnings.md](learnings.md) ("Keep doing — with era-marked
+evidence").
+
 ### 2.1 stdin semantics — the `b14a198` class
 
 The production bug: `ddev-migrate export` looped over projects via
