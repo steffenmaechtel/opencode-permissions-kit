@@ -1,13 +1,39 @@
 #!/bin/sh
-# heal-index-head -- opencode permissions kit, git heal hooks (#671).
+# heal-index-head -- opencode permissions kit, git heal hooks (#671,
+# operand set widened in #678).
 #
-# Re-pins a repository's .git/index and .git/HEAD to the agent user
-# after a developer git operation flipped their ownership: git writes
-# both files through lock+rename, so the renamed file carries the
-# acting uid and ownership floats with the last writer. Under the
-# sticky .git (the #651 heal) the agent then cannot rename over the
-# foreign-owned entries ever again -- its main-checkout workflow
-# (git add / git switch) locks out (issue #671).
+# Re-pins a repository's agent-workflow .git metadata to the agent
+# user after a developer git operation flipped its ownership: git
+# rewrites these files through lock+rename, so the renamed file
+# carries the acting uid and ownership floats with the last writer.
+# Under the sticky .git (the #651 heal) the agent then cannot rename
+# over the foreign-owned entries ever again -- its main-checkout
+# workflow locks out.
+#
+# Operand set (every entry MEASURED in #678's two-uid carrier matrix;
+# non-carriers are deliberately absent):
+#   index, HEAD          staging/branching family (#671: git add /
+#                        git switch lockouts)
+#   ORIG_HEAD            written by merge/pull (incl. --ff-only),
+#                        reset, rebase; a dev flip hard-blocks the
+#                        agent's merge/pull (rc 128, the live incident)
+#   REBASE_HEAD          rebase's pseudo-ref -- same lock+rename
+#                        class, missing from #678's draft list
+#   packed-refs          pack-refs/gc/prune-of-packed rewrite it; a
+#                        dev flip soft-breaks agent gc (silent
+#                        no-pack behind rc 0)
+#   MERGE_HEAD, MERGE_MSG, MERGE_MODE, AUTO_MERGE, CHERRY_PICK_HEAD,
+#   REVERT_HEAD          dev-left conflict state; unhealed it is
+#                        un-escapable for the agent (abort/quit/
+#                        conclude all rc-0-lie with the state stuck).
+#                        Carriers measured: post-index-change fires
+#                        on the resolution add with the set present,
+#                        post-rewrite fires with REBASE_HEAD present.
+#   NOT healed, on measurement: FETCH_HEAD and COMMIT_EDITMSG
+#   (in-place writes never flip), logs/** (append into a non-sticky
+#   dir), loose refs (non-sticky refs/), config (the deliberate #651
+#   developer-owned pin), rebase-merge/ + rebase-apply/ directories
+#   (rmdir residual documented in docs/how-to/git-heal-hooks.md).
 #
 # Runs as ROOT: invoked by the developer-side post-* hooks
 # (git-heal/hooks/) through a narrow sudoers grant (templates/
@@ -189,7 +215,12 @@ if [ ! -e "$gd/HEAD" ] || [ ! -d "$gd/objects" ]; then
     exit 1
 fi
 
-for f in index HEAD; do
+# The measured operand set (header comment): existence-gated, so the
+# sequencer files cost nothing when absent; every entry runs the same
+# gates ([ -L ] skip, nlink, chown -h) and audits one line per heal.
+for f in index HEAD ORIG_HEAD REBASE_HEAD packed-refs \
+    MERGE_HEAD MERGE_MSG MERGE_MODE AUTO_MERGE \
+    CHERRY_PICK_HEAD REVERT_HEAD; do
     p="$gd/$f"
     [ -L "$p" ] && {
         say "skip (symlink): $p"

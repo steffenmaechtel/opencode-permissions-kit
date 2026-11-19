@@ -10,7 +10,7 @@ c49b1ae4bafda33b445cb6fc80704ca94c2b26c121b6b5f6a9b5a04a10cab284  files/opencode
 69c02f385e399d4644cfe02b4df9e9e532a6735ac6b862185f6222d135e3cb49  files/opencode-permissions-kit-lib/bin/setup-container-backend
 72e2b48893c03886b5ba0680cf6b419d7185e84cf2cbe6b12df536652d25db1f  files/opencode-permissions-kit-lib/bin/socket-check
 9f21f5a57ff8c03d0aa913753530a53eb8bdbfd956371d941e6431a2a7dc2913  files/opencode-permissions-kit-lib/bin/xdg-open
-67dc326db9a3f4c97345499ddbc0459d3dbd1b6533260860fa26ab9376db4225  files/opencode-permissions-kit-lib/git-heal/heal-index-head
+f57786d91922026d61e02b1090455f0861c1e0b2de1a15c86f0551182c2245f6  files/opencode-permissions-kit-lib/git-heal/heal-index-head
 71091440a1cd4d6b5adcbae23cc46a5f59edcf919b31e54785a9f17d429ef9e4  files/opencode-permissions-kit-lib/git-heal/hooks/post-checkout
 71091440a1cd4d6b5adcbae23cc46a5f59edcf919b31e54785a9f17d429ef9e4  files/opencode-permissions-kit-lib/git-heal/hooks/post-index-change
 71091440a1cd4d6b5adcbae23cc46a5f59edcf919b31e54785a9f17d429ef9e4  files/opencode-permissions-kit-lib/git-heal/hooks/post-merge
@@ -32,7 +32,7 @@ aae98b75c43ac5959cebbd793114ba6187533790d4e18fb8a363870ae78ebd7a  files/opencode
 48bcd868a49cf11246a3d34cc1f707338309b68402a3893254a383d1c3c1630b  files/opencode-permissions-kit-lib/sh/doctor-core.sh
 74359dd6e1754c8acf4596a091fc10f4118aae4e1645b394be68c234c2e3d0cc  files/opencode-permissions-kit-lib/sh/fs-baseline.sh
 80579d6005c882c689086a3af913ccdf686059905451f43b496aa74005fd0b41  files/opencode-permissions-kit-lib/sh/git-check.sh
-40f04dd3240407a63fc32cb08ea3e3ec8b1b015cb1274327e97b9dc9c1dcd472  files/opencode-permissions-kit-lib/sh/git-heal-core.sh
+4e86be06493fa2921f6ef06c871d0589161a275a0b9f540711265a56cbb7acef  files/opencode-permissions-kit-lib/sh/git-heal-core.sh
 6a350a24e0711079dfc318b70e477ed0cebb5c26929107a58a73df8c03b369a7  files/opencode-permissions-kit-lib/sh/handover-core.sh
 b0548eaa2a6505eda766486884c82dcfb2e645d7a0ed2af7292730b7ddd33cb3  files/opencode-permissions-kit-lib/sh/install-core.sh
 575266d6e05f87e5b5444464538ab3c222931bf5d5753d44695308aac067c3bf  files/opencode-permissions-kit-lib/sh/log.sh

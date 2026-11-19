@@ -6,15 +6,20 @@ the agent out of the shared main checkout.
 ## The problem this solves
 
 The [`.git` heal](../concepts/security-model.md) pins `.git/config` and
-`.git/hooks` developer-owned under a sticky `.git` — but `.git/index`
-and `.git/HEAD` must stay writable by both sides, and git rewrites both
-files through lock+rename: whichever user last ran a rewriting git
-operation owns them. After a developer checkout or pull the files are
-developer-owned, and the sticky bit then blocks the agent from ever
-writing them again — `git add` dies with `fatal: unable to write new
-index file`, `git switch` with `error: couldn't set 'HEAD'`. The lockout
-persists until someone with root re-owns the files (issue
-[#671](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/671)).
+`.git/hooks` developer-owned under a sticky `.git` — but the agent's
+workflow metadata must stay writable by both sides, and git rewrites
+those files through lock+rename: whichever user last ran a rewriting git
+operation owns them. After a developer checkout or pull `.git/index`
+and `.git/HEAD` are developer-owned, and the sticky bit then blocks the
+agent from ever writing them again — `git add` dies with `fatal: unable
+to write new index file`, `git switch` with `error: couldn't set 'HEAD'`
+— and after a developer merge/pull/reset/rebase `.git/ORIG_HEAD` is
+developer-owned too, killing the agent's merge and pull with
+`fatal: update_ref failed for ref 'ORIG_HEAD'` (issue
+[#671](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/671),
+widened in
+[#678](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/678)).
+The lockout persists until someone with root re-owns the files.
 
 ## The fix: heal hooks on the developer side
 
@@ -41,10 +46,10 @@ This is opt-in and idempotent; install and update never activate it.
 From then on four identical hooks — `post-merge`, `post-checkout`,
 `post-rewrite`, `post-index-change` — run after your git operations in
 every repository your user touches, and for kit-managed roots they
-re-pin `index`/`HEAD` to the agent user via the root heal. Outside
-kit-managed roots they are silent no-ops (no sudo call, no output).
-They never fail your git operation: if the heal cannot run (sudo
-unavailable), you get one stderr line and the operation completes.
+re-pin the measured operand set to the agent user via the root heal.
+Outside kit-managed roots they are silent no-ops (no sudo call, no
+output). They never fail your git operation: if the heal cannot run
+(sudo unavailable), you get one stderr line and the operation completes.
 
 The carrier set is measured, not assumed: `post-index-change` fires on
 every index write — mutating commands (`add`, `reset`, `read-tree`) and
@@ -53,7 +58,11 @@ agent edits) alike — but not on a fresh-cache status that writes
 nothing, which is exactly the case where nothing flipped. Pull/merge
 (including fast-forward) rides `post-merge`; checkouts and switches
 ride `post-checkout`. There is no `post-reset` hook in git;
-`post-index-change` covers that whole family.
+`post-index-change` covers that whole family. The #678 measurement
+added the conflict-state carriers: the resolution `git add` fires
+`post-index-change` with the full `MERGE_*`/`CHERRY_PICK_HEAD` set
+present, and `post-rewrite` fires at rebase conclusion with
+`REBASE_HEAD` still present.
 
 ## Turn it off, inspect it
 
@@ -78,10 +87,31 @@ line reader-side (a hand-edited system path, scratch prefix or agent
 home never authorizes a heal), re-checks the real path
 after symlink resolution, verifies the gitdir shape (a worktree
 registration is rejected), skips symlinked and hardlinked operands, and
-changes nothing but the ownership of `index` and `HEAD`. Every healed
-file appends one audit line to
+changes nothing but the ownership of the measured operand set —
+`index`, `HEAD`, `ORIG_HEAD`, `REBASE_HEAD`, `packed-refs` and the
+conflict pseudo-refs (`MERGE_HEAD`, `MERGE_MSG`, `MERGE_MODE`,
+`AUTO_MERGE`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`), each only when it
+exists. Every healed file appends one audit line to
 `/usr/local/lib/opencode-permissions-kit/git-heal/heal.log` — a full
 heal of `index` + `HEAD` writes two lines.
+
+Deliberately NOT healed (measured in #678, not assumed):
+`FETCH_HEAD` and `COMMIT_EDITMSG` are written in place and never flip
+ownership; reflogs under `logs/` append into a non-sticky directory;
+loose refs live in the non-sticky `refs/` tree; `.git/config` stays
+developer-owned as the deliberate #651 pin; and the `rebase-merge/` /
+`rebase-apply/` directories are left alone — the agent can always
+empty them, only their final `rmdir` needs the sticky `.git`, so an
+aborted rebase can leave an empty directory behind (cosmetic litter,
+removable by the developer with a plain `rmdir`).
+
+Two timing residuals of the widened set, both bounded by "the next
+developer git operation": a conflict state your developer abandons
+without staging a resolution is only healed when the next
+index-writing developer operation fires a hook (a mere refreshing
+`git status` qualifies), and a `packed-refs` flip heals on the same
+cadence — agent `gc` in between degrades to a stderr warning with no
+packing (no lockout).
 
 ## Limits
 

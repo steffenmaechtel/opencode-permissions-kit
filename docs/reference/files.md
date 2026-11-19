@@ -162,7 +162,7 @@ sudo — see [the how-to](../how-to/git-heal-hooks.md)).
 | `/usr/local/lib/opencode-permissions-kit/bin/cwd-check` | Headless serve cwd probe (readable-for-opencode check) |
 | `/usr/local/lib/opencode-permissions-kit/bin/browser-bridge` | WSL browser bridge stand-in source (`wsl/` tree) |
 | `/usr/local/lib/opencode-permissions-kit/bin/xdg-open` | xdg-open fallback shim → `bin/browser-bridge` |
-| `/usr/local/lib/opencode-permissions-kit/git-heal/heal-index-head` | Root heal: index+HEAD -> agent user (#671) |
+| `/usr/local/lib/opencode-permissions-kit/git-heal/heal-index-head` | Root heal: measured operand set (#671, #678) |
 | `/usr/local/lib/opencode-permissions-kit/git-heal/hooks/` | The four heal hook bodies (`opk git-heal on`) |
 | `/usr/local/lib/opencode-permissions-kit/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe` | WSL bridge |
 | `/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh` | Sourced `ddev()` terminal function |

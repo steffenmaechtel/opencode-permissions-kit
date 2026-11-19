@@ -295,6 +295,72 @@ else
 fi
 git -C "$WORK/repo3" read-tree HEAD 2>/dev/null
 
+# --- 3b. heal-index-head: the #678 widened operand set ------------------------------
+# The measured carriers heal with the same audit contract; proven
+# non-carriers stay untouched even when present (discrimination arm).
+
+for _op in ORIG_HEAD REBASE_HEAD packed-refs MERGE_HEAD MERGE_MSG \
+    MERGE_MODE AUTO_MERGE CHERRY_PICK_HEAD REVERT_HEAD; do
+    : >"$WORK/repo3/.git/$_op"
+done
+rm -f "$LOG" && : >"$LOG"
+_hr_rc=0
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 GH_AGENT_USER="$(id -un)" GH_PROJECTS_CONF="$CONF" \
+    GH_LOG="$LOG" "$HEAL" "$WORK/repo3/.git" 2>&1) || _hr_rc=$?
+_lines=$(grep -c 'healed' "$LOG" || true)
+if [ "$_hr_rc" -eq 0 ] && [ "$_lines" -eq 11 ] &&
+    grep -qF 'healed ORIG_HEAD' "$LOG" &&
+    grep -qF 'healed REBASE_HEAD' "$LOG" &&
+    grep -qF 'healed packed-refs' "$LOG" &&
+    grep -qF 'healed MERGE_HEAD' "$LOG" &&
+    grep -qF 'healed CHERRY_PICK_HEAD' "$LOG" &&
+    grep -qF 'healed REVERT_HEAD' "$LOG"; then
+    pass "heal: the #678 operand set heals per existing file (11 audit lines)"
+else
+    fail "heal: widened-set arm (rc=$_hr_rc lines=$_lines log=$(cat "$LOG"))"
+fi
+
+# Gates apply to the widened set exactly as to index/HEAD: a symlinked
+# ORIG_HEAD is skipped loudly, the other operands still heal.
+rm -f "${WORK:?}/repo3/.git/ORIG_HEAD"
+ln -s /dev/null "$WORK/repo3/.git/ORIG_HEAD"
+rm -f "$LOG" && : >"$LOG"
+_hr_rc=0
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 GH_AGENT_USER="$(id -un)" GH_PROJECTS_CONF="$CONF" \
+    GH_LOG="$LOG" "$HEAL" "$WORK/repo3/.git" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] &&
+    printf '%s' "$_hr_out" | grep -qF 'skip (symlink)' &&
+    ! grep -qF 'healed ORIG_HEAD' "$LOG" &&
+    grep -qF 'healed REBASE_HEAD' "$LOG"; then
+    pass "heal: symlink gate holds for the widened set (ORIG_HEAD skipped)"
+else
+    fail "heal: widened symlink arm (rc=$_hr_rc out=$_hr_out log=$(cat "$LOG"))"
+fi
+rm -f "${WORK:?}/repo3/.git/ORIG_HEAD"
+
+# Proven non-carriers are NOT healed even when present: FETCH_HEAD and
+# COMMIT_EDITMSG write in place and never flip (measured #678) -- the
+# operand list must not grow them by accident.
+: >"$WORK/repo3/.git/FETCH_HEAD"
+: >"$WORK/repo3/.git/COMMIT_EDITMSG"
+rm -f "$LOG" && : >"$LOG"
+_hr_rc=0
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 GH_AGENT_USER="$(id -un)" GH_PROJECTS_CONF="$CONF" \
+    GH_LOG="$LOG" "$HEAL" "$WORK/repo3/.git" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] &&
+    ! grep -qF 'healed FETCH_HEAD' "$LOG" &&
+    ! grep -qF 'healed COMMIT_EDITMSG' "$LOG" &&
+    grep -qF 'healed index' "$LOG"; then
+    pass "heal: measured non-carriers (FETCH_HEAD, COMMIT_EDITMSG) stay untouched"
+else
+    fail "heal: non-carrier arm (rc=$_hr_rc log=$(cat "$LOG"))"
+fi
+rm -f "${WORK:?}/repo3/.git/FETCH_HEAD" "${WORK:?}/repo3/.git/COMMIT_EDITMSG"
+for _op in REBASE_HEAD packed-refs MERGE_HEAD MERGE_MSG \
+    MERGE_MODE AUTO_MERGE CHERRY_PICK_HEAD REVERT_HEAD; do
+    rm -f "${WORK:?}/repo3/.git/$_op"
+done
+
 _hr_rc=0
 _hr_out=$(env GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 GH_AGENT_USER=nosuchuser-gh GH_PROJECTS_CONF="$CONF" \
     GH_LOG="$LOG" "$HEAL" "$WORK/repo3/.git" 2>&1) || _hr_rc=$?

@@ -3,7 +3,9 @@
 #
 # The `opk git-heal` subcommand's logic (issue #671): the on/off/status
 # toggle for the git heal hooks. The hooks themselves (git-heal/hooks/,
-# four identical post-* bodies) re-pin .git/index and .git/HEAD to the
+# four identical post-* bodies) re-pin the measured operand set
+# (index, HEAD, ORIG_HEAD, REBASE_HEAD, packed-refs and the conflict
+# pseudo-refs — heal-index-head's header, widened in #678) to the
 # agent user after every developer git operation that flipped their
 # ownership (git lock+rename -- under the sticky .git of the #651 heal
 # the agent can never re-take ownership itself, its main-checkout
@@ -357,11 +359,12 @@ _git_heal_status() {
     else
         ui_detail "kit pieces INCOMPLETE under $(_ghc_libdir)/git-heal — run 'opk update'"
     fi
-    # Per-gitdir lockout rows: dev-owned index/HEAD under a sticky .git
+    # Per-gitdir lockout rows: dev-owned operands under a sticky .git
     # lock the agent out until the heal hooks fire (off/foreign) or
     # the next developer git operation re-pins them (on: transient —
     # the same classification the opk status / doctor rows render,
-    # #674 a C7). The enumeration mirrors the on-sweep's RECURSION
+    # #674 a C7). The row set mirrors heal-index-head's operand list
+    # (#678 widening; existence-gated — absent files render nothing). The enumeration mirrors the on-sweep's RECURSION
     # (#674 a C3: every .git under each conf root — conf roots are
     # scan roots, config.sh parent registration; the literal
     # <root>/.git would miss every nested repo), deliberately NOT its
@@ -391,7 +394,9 @@ _git_heal_status() {
     done <"$_ghc_stt_conf"
     while IFS= read -r _ghc_stt_gd; do
         [ -n "$_ghc_stt_gd" ] || continue
-        for _ghc_stt_f in index HEAD; do
+        for _ghc_stt_f in index HEAD ORIG_HEAD REBASE_HEAD packed-refs \
+            MERGE_HEAD MERGE_MSG MERGE_MODE AUTO_MERGE \
+            CHERRY_PICK_HEAD REVERT_HEAD; do
             _ghc_stt_own=$(stat -c %U "$_ghc_stt_gd/$_ghc_stt_f" 2>/dev/null) || continue
             if [ "$_ghc_stt_own" != "$_ghc_stt_agent" ]; then
                 if [ "$_ghc_stt_state" = on ]; then
