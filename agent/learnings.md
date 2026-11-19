@@ -396,8 +396,9 @@ empty-match greps (`grep … || true` where empty output is rc 1), `IFS= read
   by what THEY pin: path literals, row prefixes, exact bytes; a sweep
   grepping the producer's message or success-label names concludes
   "no coupling" while a sibling suite holds the pin (the #662 plan
-  rows: the consumer suite pinned the dry-run rows by
-  `"/usr/local/bin/opencode"` path literals, the message-name sweep
+  rows: the consumer suite pinned the dry-run rows by the bare
+  `/usr/local/bin/opencode` and `/usr/local/bin/opk` path literals,
+  end-anchored — the message-name sweep
   found nothing). And "local make test green" is evidence only for
   hosts shaped like the local one — the dev host had the kit
   installed, so both rows printed and the pins held; the bare CI

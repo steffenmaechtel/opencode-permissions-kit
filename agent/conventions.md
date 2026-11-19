@@ -802,17 +802,18 @@ until round a B2, fixed in 6e13493b).
 - An exhaustive claim in a wave record — a PR body's "the two sites",
   "the only point where", "every probe of X around the copy", or a
   shipped comment's count over sites — either enumerates by OPEN
-  CLASS over the code's real taxonomy ("every probe of the opencode
-  binary in the update path — fresh candidate, freshly deployed, old
-  deployed (same trust class)") or cites the grep that derives it; a
-  bare count or an "only/every + narrow scope" phrasing is review
-  debt that the next round's finer scope refutes — every count-based
-  and scope-narrowed rewording of one loop's claims fell this way,
-  while the class-scoped enumeration survived every round (PR #680
-  rounds a–c, #683). Standing prose carries the
-  same discipline under "Standing prose: history, not rosters" above;
-  tracker-state claims in PR bodies are the round-comment contract's
-  own rule (review-concept.md). (RM-0189)
+  CLASS over the code's real taxonomy or cites the grep that derives
+  it; a bare count or an "only/every + narrow scope" phrasing is
+  review debt that the next round's finer scope refutes — every
+  count-based and scope-narrowed rewording of one loop's claims fell
+  this way, while the class-scoped enumeration survived every round
+  (the update path's root-exec comment, unchanged since: every probe
+  of the opencode binary enumerated by trust class — the run's fresh
+  candidate, the freshly deployed binary, the OLD deployed binary,
+  install-side; sh/update-core.sh, PR #680 rounds a–c, #683).
+  Standing prose carries the same discipline under "Standing prose:
+  history, not rosters" above; tracker-state claims in PR bodies are
+  the round-comment contract's own rule (review-concept.md). (RM-0189)
 
 ## Docs code blocks (paste-safe commands)
 
