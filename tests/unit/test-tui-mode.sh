@@ -183,8 +183,8 @@ check "2x plugin session row has bottom padding (does not hug the terminal edge)
     grep -q 'paddingBottom={1}' "$PLUGIN2X"
 check "2x plugin rows have left padding (aligned with the TUI content)" \
     grep -q 'paddingLeft={2}' "$PLUGIN2X"
-check "2x plugin colors follow theme tokens (subdued/info/error)" \
-    grep -q 'text.subdued' "$PLUGIN2X" && grep -q 'feedback.info.default' "$PLUGIN2X" && grep -q 'feedback.error.default' "$PLUGIN2X"
+check "2x plugin colors follow theme tokens via optional chaining (subdued/info/error, #661 P5)" \
+    grep -qF 'theme?.text?.subdued' "$PLUGIN2X" && grep -qF 'theme?.text?.feedback?.info?.default' "$PLUGIN2X" && grep -qF 'theme?.text?.feedback?.error?.default' "$PLUGIN2X"
 check "2x plugin render is defensive (try/catch)" \
     grep -q 'catch' "$PLUGIN2X"
 check_live "install.sh fetch list includes the 2x plugin" "$INSTALL" \
@@ -282,8 +282,8 @@ check "first-run cli.json parses and carries the plugin entry" \
 # #485 F23: locale-hardened read — a 7-bit-locale host (LC_ALL=C with
 # PYTHONUTF8=0 AND PYTHONCOERCECLOCALE=0, the finding's measured
 # trigger) used to fail register/unregister with rc 1 whenever cli.json
-# carried non-ASCII; open() now pins encoding="utf-8" like
-# jsonc-parser's read_config. The write side pins its codec too now
+# carried non-ASCII; load() now pins encoding="utf-8-sig" (BOM-tolerant
+# since the #661 P2 sweep) like jsonc-parser's read_config. The write side pins its codec too now
 # (#513 A4 — see the source pin below; json.dump's default
 # ensure_ascii=True keeps the temp file ASCII, which is also why the
 # parse probes below are locale-independent). Octal fixture
@@ -318,6 +318,31 @@ check "unregister: the non-ASCII user entry still intact (F23)" \
 # comment-stripped: only the live construct satisfies it).
 check_live "tui-register write side pins utf-8 (#513 A4, latent belt)" "$REGISTER" \
     -qF 'with os.fdopen(fd, "w", encoding="utf-8") as f:'
+
+# #661 P2 sweep (same shape as jsonc-parser's read paths): a BOM'd
+# cli.json — Windows-edited user state — used to die at json.loads (the
+# BOM survives the comment-strip fallback too); load() reads utf-8-sig
+# now, so register parses it and appends the kit entry. Octal escapes
+# (dash printf has no \xHH): \357\273\277 = EF BB BF.
+printf '\357\273\277{"plugins": ["user-pkg"]}\n' >"$T2X/bom-cli.json"
+check "register: BOM'd cli.json parses (P2 utf-8-sig)" \
+    python3 "$REGISTER" "$T2X/bom-cli.json" register /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx
+check "BOM'd cli.json: user entry intact, kit entry appended (P2)" \
+    sh -c 'python3 -c "import json,sys; d=json.load(open(sys.argv[1], encoding=\"utf-8-sig\")); assert \"user-pkg\" in d[\"plugins\"]; assert any(isinstance(e,dict) and e[\"package\"].endswith(\"kit-mode-2x.tsx\") for e in d[\"plugins\"])" "$1"' _ "$T2X/bom-cli.json"
+
+# #661 P3: a deeply nested cli.json used to escape main()'s
+# (OSError, ValueError) arm as a raw traceback — RecursionError is a
+# RuntimeError, not a ValueError. The widened arm prints the polished
+# refusal instead.
+python3 -c 'print("[" * 200000 + "]" * 200000)' >"$T2X/deep-cli.json"
+check_no "register: deeply nested cli.json refused rc 1 (P3)" \
+    python3 "$REGISTER" "$T2X/deep-cli.json" register /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx
+_deep_err=$(python3 "$REGISTER" "$T2X/deep-cli.json" register /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx 2>&1 >/dev/null || true)
+if echo "$_deep_err" | grep -q 'cannot parse' && ! echo "$_deep_err" | grep -q 'Traceback'; then
+    pass "register: nested refusal carries the diagnostic, no traceback (P3)"
+else
+    fail "register: nested refusal carries the diagnostic, no traceback (P3) (err=$_deep_err)"
+fi
 
 # --- shared per-user sync (sh/tui-plugin.sh, 0.0.41e wave) ----------------------
 # tui_plugin_sync_user replaces the twin inline bodies in install.sh

@@ -639,6 +639,15 @@ else
     fail "0.0.39h F10: opk handover refuses symlinked operands + rechecks between the ops"
 fi
 check_live "0.0.39i F4: opk handover --dry-run previews the symlink refuse" "$HOCORE_SW" -qF "would refuse"
+# #675 a M1 (the #661 P2 class swept to the opk.json readers): the
+# inline policy reader reads utf-8-sig — a BOM'd hand-edited opk.json
+# parses instead of exiting rc 1 that the caller misreads as "unreadable
+# opk.json". Source-shape pin only: the reader is INLINE (no extractable
+# function), and driving the full handover flow for one decode tolerance
+# exceeds the LOW-pin budget (conventions.md "Pin-cost budget"); the
+# doctor twin carries the behavioral pin (test-doctor.sh, BOM'd fixture).
+check_live "#675 a M1: handover opk.json reader reads utf-8-sig (BOM)" "$HOCORE_SW" \
+    -qF 'encoding="utf-8-sig"'
 check_absent "0.0.39h F12: no 1;33 color definition remains repo-wide (files/)" \
     "$REPO/files" -rq "1;33"
 
