@@ -520,11 +520,13 @@ _fsb_pass() {
 # project tree is healed to the root's owner as well — the agent loses
 # repo-config writes in its own nested clone (#655 a S3; work in the
 # main checkout or an agent-owned root instead).
-# index/HEAD lockout (#671): .git/index and .git/HEAD stay deliberately
-# UNpinned here — git rewrites both via lock+rename, so their ownership
-# floats with the last writer, and after a developer checkout/pull they
-# land developer-owned: the sticky .git then blocks the agent's staging
-# and branch operations (git add, git switch) until ownership returns.
+# Heal-operand lockout (#671, widened #678): the heal's operand
+# metadata (.git/index, .git/HEAD and the #678 carriers) stays
+# deliberately UNpinned here — git rewrites it via lock+rename, so
+# ownership floats with the last writer, and after a developer
+# checkout/pull the files land developer-owned: the sticky .git then
+# blocks the agent's staging and branch operations (git add, git
+# switch) until ownership returns.
 # The baseline cannot close that (every developer git op re-flips it);
 # the git heal hooks close it instead — maintainer-side post-merge/
 # post-checkout/post-rewrite/post-index-change hooks that re-pin the
