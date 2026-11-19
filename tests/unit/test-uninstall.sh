@@ -160,13 +160,18 @@ _tu_owned_link() { # <path>: mirrors un_link_owned (uninstall-core.sh)
 }
 for gated in /usr/local/bin/opencode /usr/local/bin/opk; do
     if _tu_owned_link "$gated"; then
-        if printf '%s' "$PLAN" | grep -qF -- "rm -f $gated"; then
+        # End-anchored needle (review b B1): the unanchored form
+        # substring-matches the legacy-alias row ("rm -f /usr/local/bin/
+        # opencode" prefixes ".../opencode-permissions-kit"), which
+        # false-greens this arm on alias-bearing hosts and false-reds
+        # the not-owned arm.
+        if printf '%s\n' "$PLAN" | grep -q -- "rm -f $gated\$"; then
             pass "dry-run plans removal of kit-owned $gated (#662 S3)"
         else
             fail "dry-run plans removal of kit-owned $gated (#662 S3)"
         fi
     else
-        if printf '%s' "$PLAN" | grep -qF -- "rm -f $gated"; then
+        if printf '%s\n' "$PLAN" | grep -q -- "rm -f $gated\$"; then
             fail "dry-run must not plan removal of non-kit-owned $gated (#662 S3)"
         else
             pass "dry-run plans nothing for non-kit-owned/absent $gated (#662 S3)"

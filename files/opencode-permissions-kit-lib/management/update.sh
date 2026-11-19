@@ -758,9 +758,13 @@ done
 # stub needs a legacy (<0.0.39h — only 0.0.39g ever shipped staged_write
 # without the walker — the weeks-old alpha cohort, shrinking with every
 # update) or truncated deployed lib AND an agent-planted parent link to
-# matter, and the ops behind the update-side gate are a fixed-suffix
-# mkdir plus the staged_write family (cp/chown/chmod/mv on a staged
-# temp) — no root exec of agent content. A fetched/streamed run re-execs
+# matter, and the ops behind the update-side gates (the tui.json
+# refresh, sync_tui_registration, tui_plugin_sync_user) are kit-side
+# fixed-path mkdir/ln/chown/rm -rf, the staged_write family
+# (cp/chown/chmod/mv on a staged temp) and the kit-owned
+# tui-register.py via python3 -I (agent-home paths only as data
+# operands, #249 guards the interpreter env) — no root exec of agent
+# content. A fetched/streamed run re-execs
 # from the fresh tree (walker present); the deployed-only shapes (stdin
 # --only-binary, direct deployed invocation) hit the LIBDIR fallback —
 # current libs carry the walker there too, pre-0.0.39g libs refuse via

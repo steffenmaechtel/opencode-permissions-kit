@@ -783,12 +783,13 @@ install_binary() {
     # pinned digest means a pinned version — that kills the resolution
     # (the kit's own SHA256SUMS standard works because the kit controls
     # its release artifacts; upstream's don't stand still). Fetched bytes
-    # execute as ROOT at three points in the update path: the pre-copy
-    # candidate probes below, the post-copy opencode_version_line probe
-    # of the freshly deployed binary, and the install-side stamp probes
-    # (install-core.sh) — wrapper-mediated runs are the opencode user.
-    # A follow-up could drop that delta by probing as the opencode user
-    # (runuser), covering ALL three points; not pursued here.
+    # execute as ROOT at every probe of $SYSTEM_BIN around the copy: the
+    # pre-copy candidate probes below, opencode_version_line right after
+    # the deploy, the major re-stamp and the xdg-shim redeploy's version
+    # read later in the update path, and the install-side probes
+    # (install-core.sh) — wrapper-mediated runs are the opencode user. A
+    # follow-up could drop that delta by probing as the opencode user
+    # (runuser), covering every $SYSTEM_BIN probe; not pursued here.
     if _opk_timeout_ok; then
         timeout 30 "$src" --version >/dev/null 2>&1 || return 1
     else

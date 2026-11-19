@@ -19,7 +19,7 @@ fb9142f9a61917d33799885993b16db664ce6eefdd7bfc9b45bbd797e9b312c0  files/opencode
 f494db50a2fe6de42837d4eacb72b4cef79d0c934dc78df9d503be89d4a66213  files/opencode-permissions-kit-lib/management/doctor.sh
 a935e90ea3ddbc8403bb6b12d24630ffe33230ab0c3c791989eb5f485f460827  files/opencode-permissions-kit-lib/management/status.sh
 9a4f4da5f4560ac61807442042fcbb82f8d40180efbdc12f63fa7b3b6b503270  files/opencode-permissions-kit-lib/management/uninstall.sh
-3c2cb87ceec9a6342bf7dc5575e5d932e6b051d703ef3b6baf56c0daec9e441d  files/opencode-permissions-kit-lib/management/update.sh
+6ca7545c4f9ffb0e2a8c133cb28735b14e1120067bab35f5defc333580c2feb5  files/opencode-permissions-kit-lib/management/update.sh
 f547a32d7ad24391f5c9ebd143506d46140d8981af2ce5b6574c7c9cce6f8d4b  files/opencode-permissions-kit-lib/py/jsonc-parser.py
 d9f9fb0aae130f10c300153b745f4768b9a763e07f82298f6f156a671a07e37a  files/opencode-permissions-kit-lib/py/tui-register.py
 dcb8b17188cab386608f95f5e4b2fe3ae0a0cf87e624c4661be08074f32fa1e8  files/opencode-permissions-kit-lib/sh/advisories.sh
@@ -48,7 +48,7 @@ fad05f89bafafa38dec4258cb16c5e252d545d76d1a7f998cb47ab9c7ba8e97c  files/opencode
 fc51c07b906b60867ec0eadddefc296111ec208a87d4e8e020b8cc8757415e5e  files/opencode-permissions-kit-lib/sh/ui.sh
 5d561bc5a518852dcc017466a0ced376dfef1f30644f66a0f2e5d8d8f4fba77f  files/opencode-permissions-kit-lib/sh/uninstall-core.sh
 b84c5ae854e30e7286c258f7108e1bced15d9cba829e872e35e3197a9c869f2f  files/opencode-permissions-kit-lib/sh/update-check.sh
-fd031719143d3bc1e8dbe1864cd6e404c03e9ab6027a3b5000350b9fd68339d8  files/opencode-permissions-kit-lib/sh/update-core.sh
+0f5dea32dd8a3ad1a4534dd745c57f0ce04afde0f4859a8650ad00d142199c39  files/opencode-permissions-kit-lib/sh/update-core.sh
 49cf2952831b66edadf452762cad54d762477348cb0725ee1e11f9a199c8f8c5  files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh
 2fc5c12cfc89bfdb42bbf0b52f30a9432e9642a6383fe626ed4b87895d66218b  files/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc
 10ff06c6570c70a6dc251eab0cdcdf52f522d3de997b220070110d92c29c6d01  files/opencode-permissions-kit-lib/templates/opencode.jsonc
