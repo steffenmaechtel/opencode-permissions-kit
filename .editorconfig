@@ -22,3 +22,18 @@ indent_style = space
 indent_size = 4
 shell_variant = dash
 switch_case_indent = true
+
+# Extensionless git heal hooks (#671): heal-index-head (run via the
+# sudoers grant) and the hook bodies (run through core.hooksPath) --
+# same settings as bin/* above, editorconfig's * does not cross "/".
+[files/opencode-permissions-kit-lib/git-heal/*]
+indent_style = space
+indent_size = 4
+shell_variant = dash
+switch_case_indent = true
+
+[files/opencode-permissions-kit-lib/git-heal/hooks/*]
+indent_style = space
+indent_size = 4
+shell_variant = dash
+switch_case_indent = true

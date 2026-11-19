@@ -37,6 +37,24 @@ CURUID="$(id -u)"
 # range maps them — exactly the two verdicts the suite needs.
 printf 'OPENCODE_USER=root\nVERSION=9.9.9\n' >"$CONF"
 
+# doctor_git_heal (#671) seams, exported for every end-to-end run: a
+# scratch library with the heal pieces staged (the real /usr/local/lib
+# on a kit-managed host may predate #671 — the pieces-warn would turn
+# every healthy-fixture rc to 2) and a gitconfig the section can read
+# (state off, neutral row). No fixture carries a .git, so the lockout
+# classification stays out of the rc contract entirely.
+mkdir -p "$WORK/gh/lib/git-heal/hooks"
+cp "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/git-heal/heal-index-head" \
+    "$WORK/gh/lib/git-heal/"
+for _dgh_h in post-merge post-checkout post-rewrite post-index-change; do
+    cp "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/git-heal/hooks/$_dgh_h" \
+        "$WORK/gh/lib/git-heal/hooks/"
+done
+: >"$WORK/gh/gitconfig"
+GH_LIBDIR="$WORK/gh/lib"
+GH_GITCONFIG="$WORK/gh/gitconfig"
+export GH_LIBDIR GH_GITCONFIG
+
 # mkmap <pid> <uid_map-row>...  — fixture process with a uid_map
 mkmap() {
     _mk_pid="$1"

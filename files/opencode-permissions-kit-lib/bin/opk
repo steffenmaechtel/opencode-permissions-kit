@@ -195,6 +195,13 @@ Commands:
                                      logins alive on a hardened /mnt/c for
                                      open@10 versions (1.x < 1.18.33,
                                      2.x < 2.0.18)
+   git-heal <on|off|status>          Toggle the git heal hooks (#671): on
+                                      sets YOUR global core.hooksPath to the
+                                      kit's heal hooks (repo hooks stay off
+                                      for you), re-renders sudoers and heals
+                                      kit-managed main checkouts once; off
+                                      removes only the kit-owned value;
+                                      status reports state and lockout risks
   uninstall [--yes] [--dry-run] [--debug]   Remove the kit (runs as your user)
   --version                       Print the deployed kit version and exit
   help                            Show this help
@@ -417,6 +424,35 @@ $LIBDIR/sh/openchamber-core.sh) — is the kit installed?"
             ui_detail "check the errors above (permissions, disk space); /etc/wsl.conf is untouched"
             exit 1
         fi
+        ;;
+    git-heal)
+        # The git heal hooks toggle (issue #671): `on` sets the
+        # developer's global core.hooksPath to the kit's heal hook dir
+        # (repo hooks stay off for the developer -- the secure-git-config
+        # /dev/null trade, plus the heal), re-renders sudoers (the grant
+        # line) and heals kit-managed main checkouts once; `off` removes
+        # only the kit-owned hooksPath value; `status` reports state and
+        # lockout risks. Explicit consent like wsl-add-opencode-1-fix
+        # (the issue #100 consent family): install/update never activate
+        # the hooks.
+        # The arm's logic lives in sh/git-heal-core.sh (the #346 wave
+        # shape). Checkout-first by construction: LIBDIR is SELF-resolved,
+        # so a checkout opk runs the checkout's core. Pairing guard: a
+        # version-skewed lib (the function missing) refuses loud instead
+        # of printing not-found and continuing -- bin/opk sets no set -e.
+        GIT_HEAL_CORE="$LIBDIR/sh/git-heal-core.sh"
+        if [ -f "$GIT_HEAL_CORE" ]; then
+            # shellcheck disable=SC1090
+            . "$GIT_HEAL_CORE"
+        else
+            ui_error "git-heal: git-heal-core.sh not found (expected $LIBDIR/sh/git-heal-core.sh) — is the kit installed?"
+            exit 1
+        fi
+        command -v git_heal_cli >/dev/null 2>&1 || {
+            ui_error "git-heal: git-heal-core.sh is version-skewed (git_heal_cli missing) — refusing to run"
+            exit 1
+        }
+        git_heal_cli "$@"
         ;;
     handover)
         # Generic ownership switch between the two kit users (mixed-

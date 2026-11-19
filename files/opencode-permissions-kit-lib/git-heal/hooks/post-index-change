@@ -1,0 +1,73 @@
+#!/bin/sh
+# post-* hook -- opencode permissions kit, git heal hooks (#671).
+#
+# After a developer git operation rewrote .git/index and/or .git/HEAD
+# (ownership flip via lock+rename), trigger the narrow root heal so
+# the agent user keeps its main-checkout workflow (git add / git
+# switch). This body is installed four times -- post-merge,
+# post-checkout, post-rewrite, post-index-change -- with identical
+# bytes; the filename selects the git event:
+#
+#   post-merge         pull/merge, including fast-forward pulls
+#   post-checkout      every checkout/switch (both -b and cross-commit)
+#   post-rewrite       rebase / am
+#   post-index-change  EVERY index write: mutating commands (add,
+#                      reset, read-tree) AND refreshing `git status`
+#                      runs on a stale cache (IDE refreshes while the
+#                      agent edits). It does not fire when a
+#                      fresh-cache status writes nothing -- exactly
+#                      the no-flip case, so nothing is missed.
+#
+# (There is no post-reset hook in git; post-index-change is that
+# family's real carrier -- measured live, #671 pilot.)
+#
+# The developer's global core.hooksPath (set by `opk git-heal on`)
+# makes this run for EVERY repository of that user: the allowlist
+# check below is a hard no-op outside kit-managed roots (no sudo
+# call, no output). Never fails the git op: every path out is
+# exit 0.
+#
+# Test overrides (unit suite only, never set in production):
+#   GH_LIBDIR         base for the heal script (default
+#                     /usr/local/lib/opencode-permissions-kit)
+#   GH_PROJECTS_CONF  allowlist source (default
+#                     /etc/opencode-permissions-kit/projects.conf)
+set -u
+
+GH_LIBDIR="${GH_LIBDIR:-/usr/local/lib/opencode-permissions-kit}"
+HEAL="$GH_LIBDIR/git-heal/heal-index-head"
+CONF="${GH_PROJECTS_CONF:-/etc/opencode-permissions-kit/projects.conf}"
+
+# Common gitdir of the repo the hook fires in (for a worktree that is
+# the MAIN .git -- exactly the gitdir whose index/HEAD matter). The
+# plain form without --path-format keeps git 2.30 (the kit's tested
+# floor) working; relative results resolve through cd + pwd -P.
+cdg=$(git rev-parse --git-common-dir 2>/dev/null) || exit 0
+[ -n "$cdg" ] || exit 0
+case "$cdg" in
+    /*) ;;
+    *) cdg=$(cd -- "$cdg" 2>/dev/null && pwd -P) || exit 0 ;;
+esac
+
+# Hard no-op outside kit-managed roots (fast path -- no sudo spawn
+# for any unrelated repository of the developer).
+_gh_hit=0
+if [ -f "$CONF" ]; then
+    while IFS= read -r _gh_root; do
+        case "$_gh_root" in '' | '#'*) continue ;; esac
+        case "$cdg" in
+            "$_gh_root" | "$_gh_root"/*)
+                _gh_hit=1
+                break
+                ;;
+        esac
+    done <"$CONF"
+fi
+[ "$_gh_hit" = 1 ] || exit 0
+
+if command -v sudo >/dev/null 2>&1 && sudo -n "$HEAL" "$cdg" 2>/dev/null; then
+    exit 0
+fi
+printf '[opk git-heal %s] heal skipped (sudo unavailable or failed) -- agent main-checkout workflow may be locked\n' \
+    "${0##*/}" >&2
+exit 0

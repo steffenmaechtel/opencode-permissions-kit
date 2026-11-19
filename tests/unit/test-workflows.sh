@@ -49,7 +49,10 @@ TMP_RUNS="$(work_new_file)" || {
 # The must-be-755 set: everything CI, make targets, or the kit invoke by
 # path (shebang entry points). Derived from disk globs so the growth
 # axes — new unit tests, new bin/ commands, new scripts/ helpers — are
-# enforced automatically. Everything else (sourced sh/ libs, py/ called
+# enforced automatically. The git-heal/ axis (#671): heal-index-head
+# runs via the sudoers grant, the hooks/ bodies run through the
+# developer's core.hooksPath — both executed by path, never sourced.
+# Everything else (sourced sh/ libs, py/ called
 # via python3, umask.sh via profile.d, ux demos and e2e fixtures run
 # via `sh`, data templates) must stay 100644 — enforced by the inverse
 # check below: a tracked file may only be 100755 if it is in this set.
@@ -63,6 +66,8 @@ collect_required_755() {
         "$REPO"/scripts/*.sh \
         "$REPO"/files/install.sh \
         "$REPO"/files/opencode-permissions-kit-lib/bin/* \
+        "$REPO"/files/opencode-permissions-kit-lib/git-heal/heal-index-head \
+        "$REPO"/files/opencode-permissions-kit-lib/git-heal/hooks/* \
         "$REPO"/files/opencode-permissions-kit-lib/management/*.sh; do
         [ -f "$f" ] || continue
         printf '%s\n' "${f#"$REPO"/}"

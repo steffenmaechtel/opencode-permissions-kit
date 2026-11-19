@@ -44,6 +44,31 @@ This is the **only** kit command that writes `/etc/wsl.conf` — install and
 update never touch the file. The command is idempotent. `opk uninstall`
 asks before removing the block again (`--yes` assumes yes).
 
+## git-heal
+
+Toggle the git heal hooks (sudo — the command elevates itself):
+
+```bash
+sudo opk git-heal on      # activate (idempotent)
+sudo opk git-heal off     # deactivate
+sudo opk git-heal status  # state, kit pieces, lockout risks
+```
+
+`on` keeps the agent's git workflow in the shared main checkout green:
+developer git operations rewrite `.git/index` and `.git/HEAD` (git
+lock+rename — ownership follows the last writer), and under the sticky
+`.git` of the `.git` heal the agent cannot re-take ownership itself.
+The hooks re-pin both files to the agent user after every developer git
+operation, via a narrow root heal behind a sudoers grant. `on` sets your
+global `core.hooksPath` to the kit's root-owned hook dir (repo hooks
+stop executing for you — the `core.hooksPath /dev/null` trade plus the
+heal), re-renders sudoers and heals kit-managed main checkouts once.
+`off` unsets the value again — only if it holds the kit's path; a
+foreign value is never touched. Explicit consent: install/update never
+activate the hooks. `opk uninstall` unsets the kit-owned value before
+removing the library. Manual steps and limits:
+[the how-to](../how-to/git-heal-hooks.md).
+
 ## The `opk` command
 
 After installation, one command manages everything (works from anywhere):
@@ -62,6 +87,7 @@ opk handover me .gotmp # mixed-owner tree -> yours again
 opk ensure-shared      # re-assert group-write on ./.ddev (ddev share fix)
 opk openchamber-secure # pin OpenChamber to the kit wrapper
 opk wsl-add-opencode-1-fix   # opt in to the WSL browser-bridge carrier
+sudo opk git-heal on   # opt in to the git heal hooks (#671)
 opk uninstall
 opk help        # commands + arguments overview
 opk --version   # the deployed kit version

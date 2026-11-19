@@ -202,7 +202,8 @@ fi
 un_pairing_guard() {
     for _npg in un_context_load prompt_yn un_sudoers_remove \
         un_wrapper_remove un_cli_remove un_xdg_open_remove \
-        un_tui_plugins_remove un_wsl_bridge_remove un_library_remove \
+        un_tui_plugins_remove un_wsl_bridge_remove un_git_heal_remove \
+        un_library_remove \
         un_umask_remove un_user_remove un_projects_revert \
         un_config_dirs_remove un_audit_log_remove \
         _un_revert_chown run_q un_group_membership_remove \
@@ -237,6 +238,7 @@ un_cli_remove
 un_xdg_open_remove
 un_tui_plugins_remove
 un_wsl_bridge_remove
+un_git_heal_remove
 un_library_remove
 un_umask_remove
 un_user_remove

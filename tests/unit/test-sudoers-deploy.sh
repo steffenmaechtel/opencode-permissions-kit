@@ -99,6 +99,21 @@ check "happy path: symlink points at CONFDIR/sudoers" \
     sh -c "[ \"\$(readlink \"$SDD/opencode-permissions-kit\")\" = \"$CONF/sudoers\" ]"
 check "happy path: visudo ran on the rendered file" test -s "$VISUDO_RUNS"
 
+# --- 1b. the git heal grant line renders (#671) ----------------------------
+# The template must carry the heal grant exactly once, RunAs root
+# (every other kit grant runs as the opencode user), naming the exact
+# heal script path with the any-args wildcard the hooks need (they
+# pass the resolved gitdir).
+check "git-heal grant: RunAs-root line for the heal script renders" \
+    grep -q '^alice ALL=(root) NOPASSWD: /usr/local/lib/opencode-permissions-kit/git-heal/heal-index-head \*$' \
+    "$CONF/sudoers"
+_gh_grants=$(grep -c 'heal-index-head' "$CONF/sudoers" || true)
+if [ "$_gh_grants" = 1 ]; then
+    pass "git-heal grant: exactly one heal grant line (#671)"
+else
+    fail "git-heal grant: expected exactly 1 heal grant line, found $_gh_grants (#671)"
+fi
+
 # --- 2. legacy name cleanup ------------------------------------------------
 
 # A 440 file cannot be overwritten by its (non-root) owner — reset the

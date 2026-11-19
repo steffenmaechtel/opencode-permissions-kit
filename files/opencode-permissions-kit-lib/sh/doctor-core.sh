@@ -630,6 +630,76 @@ doctor_opk_dispatcher() {
 
 # --- the daemon user (the rootless backend runs as this user) --------------------
 # INSTALL_CONF resolves above (the 'all' block shares it)
+# Git heal hooks row (issue #671): the heal state and THIS project's
+# main-checkout lockout classification. The heal hooks (activated by
+# `opk git-heal on` through the developer's global core.hooksPath)
+# re-pin .git/index and .git/HEAD to the agent user after every
+# developer git operation that flipped their ownership (git writes
+# both via lock+rename; under the sticky .git of the #651 heal the
+# agent can never re-take ownership itself -- its main-checkout git
+# add / git switch locks out). Read-only like every doctor section.
+# GH_GITCONFIG and GH_LIBDIR are unit-test overrides (status-core's
+# twin row shares GH_GITCONFIG).
+doctor_git_heal() {
+    _dgh_lib="${GH_LIBDIR:-/usr/local/lib/opencode-permissions-kit}"
+    _dgh_dev=$(sed -n 's/^DEFAULT_USER=//p' "$INSTALL_CONF" 2>/dev/null | tail -n 1)
+    # Kit pieces: heal script + four hooks under the library.
+    _dgh_ok=1
+    [ -f "$_dgh_lib/git-heal/heal-index-head" ] || _dgh_ok=0
+    for _dgh_h in post-merge post-checkout post-rewrite post-index-change; do
+        [ -f "$_dgh_lib/git-heal/hooks/$_dgh_h" ] || _dgh_ok=0
+    done
+    # State: the developer's global gitconfig, read directly (rows stay
+    # descriptive; the lockout row below is where a warning lands).
+    _dgh_state=unknown
+    _dgh_cur=""
+    if [ -n "$_dgh_dev" ]; then
+        _dgh_home=$(getent passwd "$_dgh_dev" 2>/dev/null | cut -d: -f6)
+        _dgh_gc="${GH_GITCONFIG:-$_dgh_home/.gitconfig}"
+        if [ -n "$_dgh_home" ] && [ -r "$_dgh_gc" ]; then
+            _dgh_cur=$(git config -f "$_dgh_gc" core.hooksPath 2>/dev/null || true)
+            if [ -z "$_dgh_cur" ]; then
+                _dgh_state=off
+            elif [ "$_dgh_cur" = "$_dgh_lib/git-heal/hooks" ]; then
+                _dgh_state=on
+            else
+                _dgh_state=foreign
+            fi
+        fi
+    fi
+    if [ "$_dgh_ok" != 1 ]; then
+        ui_kv_warn "git-heal" "kit pieces incomplete under $_dgh_lib/git-heal (fix: sudo opk update)"
+    fi
+    case "$_dgh_state" in
+        on) ui_kv "git-heal" "ON -- developer git ops re-pin index/HEAD to $DOCTOR_USER" ;;
+        off)
+            ui_kv "git-heal" "OFF -- 'sudo opk git-heal on' keeps the agent's main-checkout"
+            ui_detail "git workflow (git add / git switch) green across developer checkouts/pulls"
+            ;;
+        foreign)
+            ui_kv "git-heal" "OFF -- core.hooksPath holds a foreign value ($_dgh_cur)"
+            ui_detail "the heal hooks are not in effect; 'sudo opk git-heal on' would retake the path"
+            ;;
+        unknown) ui_kv "git-heal" "unknown -- cannot read the developer's global gitconfig" ;;
+    esac
+    # Lockout classification for THIS project's main checkout.
+    _dgh_gd="$DOCTOR_ROOT/.git"
+    if [ -d "$_dgh_gd" ]; then
+        for _dgh_f in index HEAD; do
+            _dgh_own=$(stat -c %U "$_dgh_gd/$_dgh_f" 2>/dev/null) || continue
+            if [ "$_dgh_own" != "$DOCTOR_USER" ]; then
+                if [ "$_dgh_state" = on ]; then
+                    ui_kv "index/HEAD" "$_dgh_gd/$_dgh_f is $_dgh_own-owned (transient --"
+                    ui_detail "the next developer git operation heals it)"
+                else
+                    ui_kv_warn "index/HEAD" "$_dgh_gd/$_dgh_f is $_dgh_own-owned -- agent git"
+                    ui_detail "locked in this main checkout; 'sudo opk git-heal on' heals and keeps it healed"
+                fi
+            fi
+        done
+    fi
+}
+
 doctor_daemon_user() {
     if [ ! -f "$INSTALL_CONF" ]; then
         ui_error "doctor: $INSTALL_CONF not found -- is the kit installed?"

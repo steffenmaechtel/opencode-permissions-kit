@@ -135,7 +135,9 @@ The deployed library mirrors the repository layout
 (`files/opencode-permissions-kit-lib/`) one-to-one. Folder semantics:
 `bin/` = commands (no extension), `sh/` = sourced shell libraries,
 `py/` = python, `management/` = management entry scripts,
-`templates/` = render sources, `tui/` = TUI assets.
+`templates/` = render sources, `tui/` = TUI assets, `git-heal/` =
+the git heal hooks subsystem (#671; root-owned, executed by git and
+sudo — see [the how-to](../how-to/git-heal-hooks.md)).
 
 | Path | Purpose |
 |---|---|
@@ -152,6 +154,9 @@ The deployed library mirrors the repository layout
 | `/usr/local/lib/opencode-permissions-kit/bin/cwd-check` | Headless serve cwd probe (readable-for-opencode check) |
 | `/usr/local/lib/opencode-permissions-kit/bin/browser-bridge` | WSL browser bridge stand-in source (`wsl/` tree) |
 | `/usr/local/lib/opencode-permissions-kit/bin/xdg-open` | xdg-open fallback shim → `bin/browser-bridge` |
+| `/usr/local/lib/opencode-permissions-kit/git-heal/heal-index-head` | Root heal: index+HEAD -> agent user (#671) |
+| `/usr/local/lib/opencode-permissions-kit/git-heal/hooks/` | The four heal hook bodies (`opk git-heal on`) |
+| `/usr/local/lib/opencode-permissions-kit/git-heal/heal.log` | Heal audit log (one line per healed file) |
 | `/usr/local/lib/opencode-permissions-kit/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe` | WSL bridge |
 | `/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh` | Sourced `ddev()` terminal function |
 | `/usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh` | Shared helper: `.ddev` + settings-dir chown |
@@ -167,6 +172,7 @@ The deployed library mirrors the repository layout
 | `/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh` | Shared helper: bypass warnings |
 | `/usr/local/lib/opencode-permissions-kit/sh/staged-write.sh` | Shared helper: symlink-safe privileged writes |
 | `/usr/local/lib/opencode-permissions-kit/sh/status-core.sh` | Shared helper: the status report's section functions |
+| `/usr/local/lib/opencode-permissions-kit/sh/git-heal-core.sh` | Shared helper: the `opk git-heal` subcommand (#671) |
 | `/usr/local/lib/opencode-permissions-kit/sh/sudoers-deploy.sh` | Shared helper: the sudoers pipeline |
 | `/usr/local/lib/opencode-permissions-kit/sh/secure-binary.sh` | Shared helper: binary hardening |
 | `/usr/local/lib/opencode-permissions-kit/sh/deploy-lib.sh` | Shared helper: library deployment manifest |

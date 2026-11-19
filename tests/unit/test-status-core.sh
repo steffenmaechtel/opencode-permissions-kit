@@ -54,9 +54,10 @@ else
 fi
 
 # --- 2. every section entry point + helper is defined by sourcing -----------------
-_defs="status_section_core status_section_advisories status_section_projects
-status_section_backend status_section_ddev status_section_wsl2
-status_section_root_equiv status_section_leak_scan status_section_management
+_defs="status_section_core status_section_git_heal status_section_advisories
+status_section_projects status_section_backend status_section_ddev
+status_section_wsl2 status_section_root_equiv status_section_leak_scan
+status_section_management
 _st_progress_tee _st_ddev_scan _st_ancestor_grants_x _st_root_blocker
 _st_dbdump_gap _st_ddev_basic _st_ddev_share_scan _st_ddev_router_ports
 _st_ddev_mkcert_ca _st_ddev_db_dumps _st_ddev_version _st_ddev_win_hosts
@@ -64,7 +65,7 @@ status_groups_hits status_sock_agent_reachable
 status_sudo_verdict status_win_interop_verdict"
 # (#590 b F1 residue) _opk_timeout_ok stays unlisted BY DESIGN: the #248
 # sibling block below pins it BEHAVIORALLY (sourcing + broken-vs-healthy
-# call) — a removal/rename reddens that pin, so the list stays 25.
+# call) — a removal/rename reddens that pin, so the list stays 26.
 _ndefs="$(printf '%s\n' $_defs | wc -w | tr -d ' ')"
 _missing=""
 for _fn in $_defs; do
@@ -138,6 +139,68 @@ if printf '%s' "$_out" | grep -q 'kit update.*not checked — kit file sh/update
     pass "core: missing kit libs render their broken-kit warn rows"
 else
     fail "core: missing-lib fallback rows broken (out=$(printf '%s' "$_out" | head -4))"
+fi
+
+# --- 4b. Git heal hooks section: state rows + lockout classification (#671) -------
+# The section's whole state machine at FUNCTION level, sandboxed via
+# GH_GITCONFIG (the documented unit override) + a scratch LIBDIR and
+# PROJECTS_CONF: OFF renders the opt-in hint, ON renders the active
+# row and mutes the lockout warn, a foreign value names itself, and a
+# dev-owned index/HEAD under a heal-off state renders the counted
+# lockout warn with its fix hint.
+_ghs_stage() {
+    mkdir -p "$WORK/ghs/lib/git-heal/hooks" "$WORK/ghs/devhome" "$WORK/ghs/root"
+    cp "$REPO_FILES/git-heal/heal-index-head" "$WORK/ghs/lib/git-heal/"
+    cp "$REPO_FILES/git-heal/hooks/post-checkout" "$WORK/ghs/lib/git-heal/hooks/"
+    cp "$REPO_FILES/git-heal/hooks/post-index-change" "$WORK/ghs/lib/git-heal/hooks/"
+    cp "$REPO_FILES/git-heal/hooks/post-merge" "$WORK/ghs/lib/git-heal/hooks/"
+    cp "$REPO_FILES/git-heal/hooks/post-rewrite" "$WORK/ghs/lib/git-heal/hooks/"
+    git -C "$WORK/ghs/root" init -q
+    : >"$WORK/ghs/root/.git/index"
+    : >"$WORK/ghs/root/.git/HEAD"
+    : >"$WORK/ghs/devhome/.gitconfig"
+    printf '%s\n' "$WORK/ghs/root" >"$WORK/ghs/projects.conf"
+}
+_ghs_run() {
+    (
+        PATH="$STUB:$PATH"
+        export PATH NO_COLOR=1 GH_GITCONFIG="$WORK/ghs/devhome/.gitconfig"
+        . "$UI_LIB"
+        . "$LIB"
+        DEFAULT_USER="$(id -un)"
+        OPENCODE_USER=opencode-ghs-agent
+        LIBDIR="$WORK/ghs/lib"
+        PROJECTS_CONF="$WORK/ghs/projects.conf"
+        status_section_git_heal
+    ) 2>&1
+}
+_ghs_stage
+_out=$(_ghs_run || true)
+if printf '%s' "$_out" | grep -q "git-heal.*OFF — 'sudo opk git-heal on'" &&
+    printf '%s' "$_out" | grep -q "lockout.*$WORK/ghs/root/.git/index is $(id -un)-owned — agent git"; then
+    pass "git-heal section: OFF state renders the hint + counted lockout warn"
+else
+    fail "git-heal section: OFF/lockout rows broken (out=$(printf '%s' "$_out" | head -4))"
+fi
+git config -f "$WORK/ghs/devhome/.gitconfig" core.hooksPath "$WORK/ghs/lib/git-heal/hooks"
+_out=$(_ghs_run || true)
+if printf '%s' "$_out" | grep -q 'git-heal.*ON — developer git ops re-pin' &&
+    ! printf '%s' "$_out" | grep -q 'is .*-owned — agent git'; then
+    pass "git-heal section: ON state renders the active row, lockout turns transient"
+else
+    fail "git-heal section: ON rows broken (out=$(printf '%s' "$_out" | head -4))"
+fi
+if printf '%s' "$_out" | grep -q 'transient'; then
+    pass "git-heal section: ON + dev-owned index classifies transient, not warn"
+else
+    fail "git-heal section: transient row missing on ON+dev-owned (out=$(printf '%s' "$_out" | head -4))"
+fi
+git config -f "$WORK/ghs/devhome/.gitconfig" core.hooksPath /dev/null
+_out=$(_ghs_run || true)
+if printf '%s' "$_out" | grep -q 'git-heal.*OFF — core.hooksPath holds a foreign value (/dev/null)'; then
+    pass "git-heal section: foreign hooksPath is named, never silently overridden"
+else
+    fail "git-heal section: foreign row broken (out=$(printf '%s' "$_out" | head -4))"
 fi
 
 # --- 5. Leak scan section: the no-config leg at function level -------------------

@@ -279,6 +279,12 @@ opencode-permissions-kit-lib/sh/deploy-lib.sh \
 opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh \
 opencode-permissions-kit-lib/bin/browser-bridge \
 opencode-permissions-kit-lib/bin/xdg-open \
+opencode-permissions-kit-lib/git-heal/heal-index-head \
+opencode-permissions-kit-lib/git-heal/hooks/post-checkout \
+opencode-permissions-kit-lib/git-heal/hooks/post-index-change \
+opencode-permissions-kit-lib/git-heal/hooks/post-merge \
+opencode-permissions-kit-lib/git-heal/hooks/post-rewrite \
+opencode-permissions-kit-lib/sh/git-heal-core.sh \
 opencode-permissions-kit-lib/tui/kit-mode.tsx \
 opencode-permissions-kit-lib/tui/kit-mode-2x.tsx \
 opencode-permissions-kit-lib/tui/opencode-danger.theme.json \
@@ -310,6 +316,7 @@ fetch_kit() {
     mkdir -p "$dir/opencode-permissions-kit-lib/bin" "$dir/opencode-permissions-kit-lib/sh" \
         "$dir/opencode-permissions-kit-lib/py" "$dir/opencode-permissions-kit-lib/tui" \
         "$dir/opencode-permissions-kit-lib/management" "$dir/opencode-permissions-kit-lib/templates" \
+        "$dir/opencode-permissions-kit-lib/git-heal/hooks" \
         "$dir/etc"
     # Integrity manifest first (issue #478): every file below is verified
     # against it before it enters this tree. Gate order is deliberate:

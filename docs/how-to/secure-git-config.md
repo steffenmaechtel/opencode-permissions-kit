@@ -74,18 +74,38 @@ shows:
 
 Independent of the kit, you can stop YOUR git from executing any hook
 from any repository — git-config(1) documents the redirect (framing it
-as expert/per-command use; the standing global form below is our
+as expert/per-command use; the standing global forms below are our
 deliberate recommendation — on a kit machine the trade is usually
-right):
+right). Two forms:
+
+**Kit-managed (recommended on a kit machine):** the git heal hooks
+(issue
+[#671](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/671))
+point your global `core.hooksPath` at the kit's root-owned hook
+directory — same protective effect (repository hooks stop executing
+for you, including in fresh clones) **plus** the ownership heal that
+keeps the agent's `git add`/`git switch` working in the shared main
+checkout after your checkouts and pulls:
+
+```bash
+sudo opk git-heal on
+```
+
+Details, limits and the measured hook-carrier set live in
+[the git heal hooks how-to](git-heal-hooks.md). `sudo opk git-heal off`
+removes the value again.
+
+**Kit-independent fallback** (no kit hooks, same hook-disabling
+effect):
 
 ```bash
 git config --global core.hooksPath /dev/null
 ```
 
-This disables every hook type, in every repo of your user, including
-fresh clones. Limits: a repository-level `core.hooksPath` overrides the
-global one (`core.hooksPath` is not part of git's protected
-configuration), and project hook tooling (husky, pre-commit) stops
-working — on a kit machine that trade is usually right. The kit's
-`.git` heal closes the repo-config arms OS-side; this global switch is
-the belt to its suspenders for everything the heal cannot reach.
+Both forms share the limits: a repository-level `core.hooksPath`
+overrides the global one (`core.hooksPath` is not part of git's
+protected configuration), and project hook tooling (husky, pre-commit)
+stops working — on a kit machine that trade is usually right. The
+kit's `.git` heal closes the repo-config arms OS-side; the global
+switch is the belt to its suspenders for everything the heal cannot
+reach.

@@ -153,6 +153,8 @@ jobs:
         run: ./tests/unit/test-fetch-integrity.sh
       - name: Run fs-baseline progress tests
         run: ./tests/unit/test-fs-baseline.sh
+      - name: Run git heal hooks tests
+        run: ./tests/unit/test-git-heal-core.sh
       - name: Run staged-write / handover gate tests
         run: ./tests/unit/test-staged-write.sh
       - name: Run sudoers pipeline tests

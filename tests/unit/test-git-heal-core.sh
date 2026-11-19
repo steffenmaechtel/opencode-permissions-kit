@@ -1,0 +1,599 @@
+#!/bin/sh
+# Unit tests for the git heal hooks subsystem (issue #671):
+#
+#   files/opencode-permissions-kit-lib/git-heal/heal-index-head -- the
+#     narrow root heal (executed by the hooks via the sudoers grant):
+#     argument/allowlist/shape refusals, symlink + hardlink operand
+#     skips, the chown-failure and log-failure arms, the successful
+#     heal's audit lines.
+#   files/opencode-permissions-kit-lib/git-heal/hooks/post-* -- the
+#     four identical developer-side hook bodies: byte-identity, the
+#     MEASURED carrier matrix (post-checkout on checkout/switch,
+#     post-index-change on add/reset/commit + stale-cache status, no
+#     fire on fresh-cache status, post-merge on ff-pull, post-rewrite
+#     on rebase, common-dir resolution for worktrees), the hard no-op
+#     outside kit-managed roots, projects.conf comment tolerance, and
+#     the fail-loud sudo-failed arm.
+#   files/opencode-permissions-kit-lib/sh/git-heal-core.sh -- the
+#     `opk git-heal` logic: state machine (off/on/foreign/unknown),
+#     `on` (pieces gate, sudoers re-render, dev gitconfig write,
+#     one-time heal sweep), `off` (kit-owned value only), usage rc 64,
+#     the dispatcher loop-guard marker.
+#
+# Root code runs UNPRIVILEGED here: the heal script's root gate is
+# relaxed via its documented GH_ALLOW_NONROOT override and chowns to
+# the running user (a permitted no-op chown whose rc + audit line are
+# the observables); the real two-uid ownership flip is pinned by the
+# e2e suites. Hooks execute the heal through a stub sudo (exec "$@"),
+# so the whole carrier matrix runs as this user on scratch repos.
+# Run: sh tests/unit/test-git-heal-core.sh
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_FILES="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib"
+HEAL="$REPO_FILES/git-heal/heal-index-head"
+HOOKS="$REPO_FILES/git-heal/hooks"
+CORE="$REPO_FILES/sh/git-heal-core.sh"
+
+# Shared harness (issue #394): pass/fail/assert_eq + the work registry
+# (issue #395) — no trap of our own, the harness owns cleanup.
+. "$SCRIPT_DIR/lib/harness.sh"
+WORK="$(work_new)"
+
+# The unit overrides every GH_* consumer documents (git-heal-core.sh
+# and heal-index-head headers): allowlist, log, agent user, nonroot
+# gate, library base, developer home, privileged-drop prefix. The
+# matrix sudo stub strips leading sudo flags (-n and kin) and execs
+# the command directly -- git prepends GIT_EXEC_PATH to the hook's
+# PATH but passes the rest through unchanged (measured).
+CONF="$WORK/projects.conf"
+LOG="$WORK/heal.log"
+mkdir -p "$WORK/sbin"
+printf '#!/bin/sh\nwhile [ $# -gt 0 ]; do\n    case "$1" in\n    -*) shift ;;\n    *) break ;;\n    esac\ndone\nexec "$@"\n' >"$WORK/sbin/sudo"
+chmod +x "$WORK/sbin/sudo"
+GH_ENV="GH_PROJECTS_CONF=$CONF GH_LOG=$LOG GH_ALLOW_NONROOT=1 GH_AGENT_USER=$(id -un)"
+
+# --- 1. heal-index-head: argument + allowlist refusals ----------------------------
+
+_heal_rc() { # <env...> -- <args...>: rc in _hr_rc, output in _hr_out
+    _hr_rc=0
+    _hr_out=$(env "$@" "$HEAL" ${2+"$@"} 2>&1) || _hr_rc=$?
+}
+
+mkdir -p "$WORK/r1"
+printf '%s\n' "$WORK" >"$CONF"
+: >"$LOG"
+
+_hr_rc=0
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_PROJECTS_CONF="$CONF" "$HEAL" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 1 ] && printf '%s' "$_hr_out" | grep -qF 'usage:'; then
+    pass "heal: no argument is a loud usage error"
+else
+    fail "heal: usage arm (rc=$_hr_rc out=$_hr_out)"
+fi
+
+_hr_rc=0
+_hr_out=$("$HEAL" "$WORK/r1" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 1 ] && printf '%s' "$_hr_out" | grep -qF 'must run as root'; then
+    pass "heal: non-root without the test override is refused"
+else
+    fail "heal: root gate (rc=$_hr_rc out=$_hr_out)"
+fi
+
+_hr_rc=0
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_PROJECTS_CONF="$CONF" "$HEAL" r1 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 1 ] && printf '%s' "$_hr_out" | grep -qF 'not an absolute path'; then
+    pass "heal: relative gitdir refused"
+else
+    fail "heal: relative arm (rc=$_hr_rc out=$_hr_out)"
+fi
+
+_hr_rc=0
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_PROJECTS_CONF="$CONF" "$HEAL" /tmp 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 1 ] && printf '%s' "$_hr_out" | grep -qF 'outside kit-managed roots'; then
+    pass "heal: gitdir outside the projects.conf roots refused"
+else
+    fail "heal: allowlist arm (rc=$_hr_rc out=$_hr_out)"
+fi
+
+# --- 2. heal-index-head: realpath + gitdir-shape refusals --------------------------
+
+# The literal check passes (the link sits under an allowlisted root),
+# the realpath-resolved form lands OUTSIDE it -> the second check must
+# refuse (a symlinked gitdir must not smuggle an outside path).
+mkdir -p "$WORK/inroot-zone" "$WORK/smuggle-target/real"
+ln -s "$WORK/smuggle-target/real" "$WORK/inroot-zone/link"
+printf '%s\n' "$WORK/inroot-zone" >"$CONF"
+_hr_rc=0
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_PROJECTS_CONF="$CONF" \
+    "$HEAL" "$WORK/inroot-zone/link" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 1 ] && printf '%s' "$_hr_out" | grep -qF 'refused after realpath'; then
+    pass "heal: symlinked gitdir cannot smuggle an outside path past the literal check"
+else
+    fail "heal: realpath arm (rc=$_hr_rc out=$_hr_out)"
+fi
+printf '%s\n' "$WORK" >"$CONF"
+
+mkdir -p "$WORK/plain"
+: >"$WORK/plain/HEAD"
+_hr_rc=0
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_PROJECTS_CONF="$CONF" "$HEAL" "$WORK/plain" 2>&1) ||
+    _hr_rc=$?
+if [ "$_hr_rc" -eq 1 ] && printf '%s' "$_hr_out" | grep -qF 'not a (common) gitdir shape'; then
+    pass "heal: non-gitdir shape refused"
+else
+    fail "heal: shape arm (rc=$_hr_rc out=$_hr_out)"
+fi
+
+# A worktree registration carries HEAD but no objects/ — rejected by
+# the same shape gate, which is why only the COMMON gitdir is healed.
+git -C "$WORK" init -q -b main wt-main 2>/dev/null
+git -C "$WORK/wt-main" -c user.email=t@e -c user.name=t commit -q --allow-empty -m x
+git -C "$WORK/wt-main" worktree add -q "$WORK/wt-second" -b wt-branch 2>/dev/null
+_reg=$(find "$WORK/wt-main/.git/worktrees" -mindepth 1 -maxdepth 1 -type d | head -1)
+_hr_rc=0
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_PROJECTS_CONF="$CONF" "$HEAL" "$_reg" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 1 ] && printf '%s' "$_hr_out" | grep -qF 'not a (common) gitdir shape'; then
+    pass "heal: worktree registration dir rejected by shape"
+else
+    fail "heal: worktree-shape arm (rc=$_hr_rc out=$_hr_out)"
+fi
+
+# --- 3. heal-index-head: operand skips + success + failure arms --------------------
+
+git -C "$WORK" init -q -b main repo3 2>/dev/null
+git -C "$WORK/repo3" -c user.email=t@e -c user.name=t commit -q --allow-empty -m x
+rm -f "$LOG" && : >"$LOG"
+rm -f "${WORK:?}/repo3/.git/index"
+ln -s /dev/null "$WORK/repo3/.git/index"
+_hr_rc=0
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_AGENT_USER="$(id -un)" GH_PROJECTS_CONF="$CONF" \
+    GH_LOG="$LOG" "$HEAL" "$WORK/repo3/.git" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] && printf '%s' "$_hr_out" | grep -qF 'skip (symlink)'; then
+    pass "heal: symlinked operand skipped, never followed"
+else
+    fail "heal: symlink-skip arm (rc=$_hr_rc out=$_hr_out)"
+fi
+
+rm -f "${WORK:?}/repo3/.git/index"
+git -C "$WORK/repo3" read-tree HEAD 2>/dev/null
+ln "$WORK/repo3/.git/index" "$WORK/hardlink-mate"
+_hr_rc=0
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_AGENT_USER="$(id -un)" GH_PROJECTS_CONF="$CONF" \
+    GH_LOG="$LOG" "$HEAL" "$WORK/repo3/.git" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] && printf '%s' "$_hr_out" | grep -qF 'skip (hardlink, nlink>1)'; then
+    pass "heal: hardlinked operand skipped (a chown would re-own the shared inode)"
+else
+    fail "heal: hardlink-skip arm (rc=$_hr_rc out=$_hr_out)"
+fi
+rm -f "${WORK:?}/hardlink-mate"
+
+rm -f "$LOG" && : >"$LOG"
+_hr_rc=0
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_AGENT_USER="$(id -un)" GH_PROJECTS_CONF="$CONF" \
+    GH_LOG="$LOG" "$HEAL" "$WORK/repo3/.git" 2>&1) || _hr_rc=$?
+_lines=$(grep -c 'healed' "$LOG" || true)
+if [ "$_hr_rc" -eq 0 ] && [ "$_lines" -ge 2 ] &&
+    grep -qF 'healed index' "$LOG" && grep -qF 'healed HEAD' "$LOG" &&
+    grep -qF "gitdir=$WORK/repo3/.git" "$LOG" && grep -qF 'caller_uid=' "$LOG"; then
+    pass "heal: successful run audits one line per file (index + HEAD)"
+else
+    fail "heal: success arm (rc=$_hr_rc lines=$_lines log=$(cat "$LOG"))"
+fi
+
+# A missing operand (index removed; HEAD stays -- the shape gate
+# requires it) is a quiet no-op for that file, the other still heals.
+rm -f "${WORK:?}/repo3/.git/index"
+: >"$LOG"
+_hr_rc=0
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_AGENT_USER="$(id -un)" GH_PROJECTS_CONF="$CONF" \
+    GH_LOG="$LOG" "$HEAL" "$WORK/repo3/.git" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] && [ "$(grep -c healed "$LOG" || true)" = 1 ]; then
+    pass "heal: a missing operand is a quiet no-op for that file"
+else
+    fail "heal: missing-operand arm (rc=$_hr_rc log=$(cat "$LOG"))"
+fi
+git -C "$WORK/repo3" read-tree HEAD 2>/dev/null
+
+_hr_rc=0
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_AGENT_USER=nosuchuser-gh GH_PROJECTS_CONF="$CONF" \
+    GH_LOG="$LOG" "$HEAL" "$WORK/repo3/.git" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] && [ "$(printf '%s' "$_hr_out" | grep -cF 'chown failed')" -ge 2 ]; then
+    pass "heal: chown failure warns per operand and never breaks the run"
+else
+    fail "heal: chown-fail arm (rc=$_hr_rc out=$_hr_out)"
+fi
+
+_hr_rc=0
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_AGENT_USER="$(id -un)" GH_PROJECTS_CONF="$CONF" \
+    GH_LOG="$WORK/no-such-dir/x/heal.log" "$HEAL" "$WORK/repo3/.git" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] && printf '%s' "$_hr_out" | grep -qF 'could not append'; then
+    pass "heal: an unwritable log degrades loud, the heal still completes"
+else
+    fail "heal: log-fail arm (rc=$_hr_rc out=$_hr_out)"
+fi
+
+# --- 4. hook bodies: byte-identity -------------------------------------------------
+
+_ident=1
+for _h in post-merge post-rewrite post-index-change; do
+    cmp -s "$HOOKS/post-checkout" "$HOOKS/$_h" || _ident=0
+done
+if [ "$_ident" = 1 ]; then
+    pass "hooks: the four shipped bodies are byte-identical (filename selects the event)"
+else
+    fail "hooks: body drift across post-merge/post-checkout/post-rewrite/post-index-change"
+fi
+
+# --- 5. the carrier matrix (measured, not assumed — #671 pilot) --------------------
+# Scratch lib + stub sudo: the hooks resolve the shipped logic against
+# GH_LIBDIR, sudo de-escalates to this user, the heal runs with its
+# nonroot override. Every assertion compares audit-line counts.
+# _mlog: the healed-line count, 0-safe (grep -c already prints 0 on a
+# no-match rc 1; only a MISSING file must map to 0 explicitly).
+
+mkdir -p "$WORK/lib/git-heal/hooks" "$WORK/zone"
+cp "$HEAL" "$WORK/lib/git-heal/"
+for _h in post-merge post-checkout post-rewrite post-index-change; do
+    cp "$HOOKS/$_h" "$WORK/lib/git-heal/hooks/"
+done
+printf '%s\n' "$WORK/zone" "# a comment line rides along (#660 M6)" "" >"$CONF"
+: >"$LOG"
+
+_gitenv() { # env prefix for every matrix git call
+    printf 'GH_LIBDIR=%s GH_PROJECTS_CONF=%s GH_LOG=%s GH_ALLOW_NONROOT=1 GH_AGENT_USER=%s' \
+        "$WORK/lib" "$CONF" "$LOG" "$(id -un)"
+}
+_mgit() { # git in the matrix zone (hooks + env applied)
+    env PATH="$WORK/sbin:$PATH" $(_gitenv) git -C "$WORK/zone/repo" "$@"
+}
+_mlog() {
+    _ml_n=$(grep -c 'healed' "$LOG" 2>/dev/null) || true
+    printf '%s\n' "${_ml_n:-0}"
+}
+
+git -C "$WORK/zone" init -q -b main repo
+git -C "$WORK/zone/repo" config user.email t@e
+git -C "$WORK/zone/repo" config user.name t
+git -C "$WORK/zone/repo" config core.hooksPath "$WORK/lib/git-heal/hooks"
+echo one >"$WORK/zone/repo/f"
+_mgit add f
+_mgit commit -q -m c1
+
+_before=$(_mlog)
+_mgit checkout -q -b side
+if [ "$(_mlog)" -gt "$_before" ]; then
+    pass "matrix: checkout -b heals via post-checkout"
+else
+    fail "matrix: checkout -b did not fire a heal"
+fi
+
+_before=$(_mlog)
+_mgit checkout -q main
+if [ "$(_mlog)" -gt "$_before" ]; then
+    pass "matrix: cross-branch checkout heals via post-checkout"
+else
+    fail "matrix: cross-branch checkout did not fire a heal"
+fi
+
+_before=$(_mlog)
+_mgit reset -q --hard HEAD
+if [ "$(_mlog)" -gt "$_before" ]; then
+    pass "matrix: reset --hard heals via post-index-change (no post-reset exists)"
+else
+    fail "matrix: reset --hard did not fire a heal"
+fi
+
+_before=$(_mlog)
+echo two >"$WORK/zone/repo/f"
+_mgit add f
+if [ "$(_mlog)" -gt "$_before" ]; then
+    pass "matrix: git add heals via post-index-change"
+else
+    fail "matrix: git add did not fire a heal"
+fi
+
+_before=$(_mlog)
+_mgit commit -q -m c2
+if [ "$(_mlog)" -gt "$_before" ]; then
+    pass "matrix: commit's index write heals via post-index-change"
+else
+    fail "matrix: commit did not fire a heal"
+fi
+
+# Fresh-cache status: once the index is CURRENT, status writes nothing
+# and post-index-change must NOT fire. Two subtleties measured here:
+# a same-second status after a commit still rewrites the index (git's
+# racy-clean handling -- each rewrite re-smudges for the next
+# same-second reader), and it settles only once a second has passed.
+# The settle status runs first, then -- genuinely fresh -- the counted
+# one must fire nothing.
+_mgit status --porcelain >/dev/null
+sleep 1
+_mgit status --porcelain >/dev/null
+sleep 1
+_before=$(_mlog)
+_mgit status --porcelain >/dev/null
+if [ "$(_mlog)" = "$_before" ]; then
+    pass "matrix: fresh-cache status writes nothing and fires nothing"
+else
+    fail "matrix: fresh-cache status fired a heal (over-firing)"
+fi
+
+# Stale-cache status: an mtime-touch without content change makes the
+# refreshing status rewrite the index stat cache — the T5 pilot case
+# (VS Code/gitk refreshing while the agent edits).
+sleep 1
+touch "$WORK/zone/repo/f"
+_before=$(_mlog)
+_mgit status --porcelain >/dev/null
+if [ "$(_mlog)" -gt "$_before" ]; then
+    pass "matrix: stale-cache refreshing status heals via post-index-change (T5)"
+else
+    fail "matrix: stale-cache status did not fire a heal"
+fi
+
+# Fast-forward pull: post-merge fires on --ff-only pulls (the pilot's
+# scratch-proven carrier). Advance origin/main from a throwaway branch,
+# keep local main behind, then pull --ff-only (no clone needed).
+git -C "$WORK/zone" init -q --bare origin.git
+_mgit remote add origin "$WORK/zone/origin.git"
+_mgit push -q origin main 2>/dev/null
+_mgit checkout -q -b throwaway
+echo three >"$WORK/zone/repo/g"
+_mgit add g
+_mgit commit -q -m c3
+_mgit push -q origin throwaway:main 2>/dev/null
+_mgit checkout -q main
+git -C "$WORK/zone/repo" branch -q -D throwaway
+_before=$(_mlog)
+env PATH="$WORK/sbin:$PATH" $(_gitenv) \
+    git -C "$WORK/zone/repo" pull -q --ff-only origin main 2>/dev/null
+if [ "$(_mlog)" -gt "$_before" ]; then
+    pass "matrix: fast-forward pull heals via post-merge"
+else
+    fail "matrix: ff-pull did not fire a heal"
+fi
+
+# Rebase: post-rewrite.
+_mgit checkout -q -b feature
+echo four >"$WORK/zone/repo/h"
+_mgit add h
+_mgit commit -q -m c4
+_mgit checkout -q main
+echo five >"$WORK/zone/repo/i"
+_mgit add i
+_mgit commit -q -m c5
+_before=$(_mlog)
+_mgit rebase -q HEAD feature >/dev/null 2>&1 || _mgit rebase feature >/dev/null 2>&1
+if [ "$(_mlog)" -gt "$_before" ]; then
+    pass "matrix: rebase heals via post-rewrite"
+else
+    fail "matrix: rebase did not fire a heal"
+fi
+
+# Worktree: the hook must resolve the COMMON gitdir (the main .git is
+# the allowlisted, heal-worthy dir) even when firing inside a worktree.
+_before=$(_mlog)
+env PATH="$WORK/sbin:$PATH" $(_gitenv) \
+    git -C "$WORK/zone/repo" worktree add -q "$WORK/zone/wt2" -b wtb 2>/dev/null
+if [ "$(_mlog)" -gt "$_before" ]; then
+    pass "matrix: worktree add heals the common gitdir (post-checkout, --git-common-dir)"
+else
+    fail "matrix: worktree add did not fire a heal"
+fi
+
+# --- 6. no-op outside the roots + carrier discrimination + sudo-failed arm ---------
+
+git -C "$WORK" init -q -b main outside 2>/dev/null
+git -C "$WORK/outside" config user.email t@e
+git -C "$WORK/outside" config user.name t
+git -C "$WORK/outside" config core.hooksPath "$WORK/lib/git-heal/hooks"
+_before=$(_mlog)
+_out=$(env PATH="$WORK/sbin:$PATH" $(_gitenv) \
+    git -C "$WORK/outside" checkout -q -b wherever 2>&1) || true
+if [ "$(_mlog)" = "$_before" ] && [ -z "$_out" ]; then
+    pass "no-op: a repo outside the kit roots heals nothing, prints nothing"
+else
+    fail "no-op: outside arm fired (log grew or stderr: $_out)"
+fi
+
+# Carrier discrimination: WITHOUT post-index-change the index-write
+# family stops healing while checkout still does — the pin that keeps
+# each op tied to its measured carrier.
+mv "$WORK/lib/git-heal/hooks/post-index-change" "$WORK/pic-aside"
+git -C "$WORK/outside" config --unset core.hooksPath
+git -C "$WORK/zone/repo" config core.hooksPath "$WORK/lib/git-heal/hooks"
+echo six >"$WORK/zone/repo/j"
+_before=$(_mlog)
+env PATH="$WORK/sbin:$PATH" $(_gitenv) git -C "$WORK/zone/repo" add j
+if [ "$(_mlog)" = "$_before" ]; then
+    pass "discrimination: add stops healing without post-index-change"
+else
+    fail "discrimination: add healed without post-index-change (wrong carrier)"
+fi
+_before=$(_mlog)
+env PATH="$WORK/sbin:$PATH" $(_gitenv) \
+    git -C "$WORK/zone/repo" checkout -q -b still-covered
+if [ "$(_mlog)" -gt "$_before" ]; then
+    pass "discrimination: checkout still heals via post-checkout"
+else
+    fail "discrimination: checkout stopped healing too (carrier set broken)"
+fi
+mv "$WORK/pic-aside" "$WORK/lib/git-heal/hooks/post-index-change"
+
+# Sudo exists but fails: the git op itself must survive, one stderr
+# line explains the skip (fail-loud pin for the hook's || arm).
+printf '#!/bin/sh\nexit 1\n' >"$WORK/sbin/sudo"
+_before=$(_mlog)
+_hr_rc=0
+_out=$(env PATH="$WORK/sbin:$PATH" $(_gitenv) \
+    git -C "$WORK/zone/repo" checkout -q -b sudo-broken 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] && printf '%s' "$_out" | grep -qF 'heal skipped (sudo unavailable or failed)' &&
+    [ "$(_mlog)" = "$_before" ]; then
+    pass "sudo-failed: the git op survives, the skip is one loud line, nothing heals"
+else
+    fail "sudo-failed arm (rc=$_hr_rc out=$_out)"
+fi
+printf '#!/bin/sh\nexec "$@"\n' >"$WORK/sbin/sudo"
+
+# --- 7. git-heal-core.sh: state machine + on/off/usage ------------------------------
+
+_purity_out=$(sh -c '. "$1"' _ "$CORE" 2>&1) || _purity_rc=$?
+if [ "${_purity_rc:-0}" = 0 ] && [ -z "$_purity_out" ]; then
+    pass "core: sourcing git-heal-core.sh runs nothing, prints nothing"
+else
+    fail "core: sourcing must be side-effect free (rc=${_purity_rc:-0} out=$_purity_out)"
+fi
+
+_ui_stubs() {
+    ui_info() { echo "info: $*"; }
+    ui_success() { echo "success: $*"; }
+    ui_detail() { echo "detail: $*"; }
+    ui_error() { echo "error: $*" >&2; }
+}
+_core_run() { # <expr>: sources ui stubs + core with the scratch env
+    (
+        _ui_stubs
+        . "$CORE"
+        # exported: the heal sweep and git children must see them
+        GH_LIBDIR="$WORK/lib"
+        GH_DEV_HOME="$WORK/devhome"
+        GH_SUDO=""
+        GH_PROJECTS_CONF="$CONF"
+        GH_LOG="$LOG"
+        GH_ALLOW_NONROOT=1
+        GH_AGENT_USER="$(id -un)"
+        INSTALL_CONF="$WORK/install.conf"
+        export GH_LIBDIR GH_DEV_HOME GH_SUDO GH_PROJECTS_CONF GH_LOG \
+            GH_ALLOW_NONROOT GH_AGENT_USER INSTALL_CONF
+        eval "$1"
+    ) 2>&1
+}
+
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\n' "$(id -un)" "$(id -un)" >"$WORK/install.conf"
+mkdir -p "$WORK/devhome"
+: >"$WORK/devhome/.gitconfig"
+
+_out=$(_core_run '_ghc_state')
+if [ "$_out" = off ]; then
+    pass "core: state off with no core.hooksPath"
+else
+    fail "core: state off (got $_out)"
+fi
+
+git config --file "$WORK/devhome/.gitconfig" core.hooksPath "$WORK/lib/git-heal/hooks"
+_out=$(_core_run '_ghc_state')
+if [ "$_out" = on ]; then
+    pass "core: state on when hooksPath holds the kit dir"
+else
+    fail "core: state on (got $_out)"
+fi
+
+git config --file "$WORK/devhome/.gitconfig" core.hooksPath /dev/null
+_out=$(_core_run '_ghc_state')
+if [ "$_out" = foreign ]; then
+    pass "core: state foreign for a non-kit value"
+else
+    fail "core: state foreign (got $_out)"
+fi
+
+rm -f "${WORK:?}/devhome/.gitconfig"
+_out=$(GH_DEV_HOME="$WORK/devhome-no-such" INSTALL_CONF="$WORK/install.conf" sh -c \
+    '. "$1"; ui_error() { echo "ERR: $*" >&2; }; _ghc_state' _ "$CORE" 2>&1)
+if [ "$_out" = unknown ]; then
+    pass "core: state unknown when the dev gitconfig is unreadable"
+else
+    fail "core: state unknown (got $_out)"
+fi
+
+# `on`: pieces + sudoers re-render + dev gitconfig + one-time heal sweep.
+mkdir -p "$WORK/lib/sh" "$WORK/lib/templates" "$WORK/etc" "$WORK/sdd" "$WORK/zone/onroot"
+cp "$REPO_FILES/sh/sudoers-deploy.sh" "$WORK/lib/sh/"
+cp "$REPO_FILES/templates/sudoers.template" "$WORK/lib/templates/"
+printf '#!/bin/sh\nexit 0\n' >"$WORK/visudo"
+chmod +x "$WORK/visudo"
+git -C "$WORK/zone/onroot" init -q -b main
+git -C "$WORK/zone/onroot" -c user.email=t@e -c user.name=t commit -q --allow-empty -m x
+# the sweep is depth-1 (<root>/.git): the conf entry IS the project root
+printf '%s\n' "$WORK/zone/onroot" "# comment tolerated" >"$WORK/on-projects.conf"
+rm -f "${WORK:?}/devhome/.gitconfig"
+: >"$LOG"
+_hr_rc=0
+_out=$(
+    _core_run 'SD_SUDO="" SD_VISUDO="$WORK/visudo" SD_CONF_DIR="$WORK/etc" \
+        SD_SUDOERS_D="$WORK/sdd" GH_PROJECTS_CONF="$WORK/on-projects.conf" \
+        HOME="$WORK/devhome" _git_heal_on'
+) || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] &&
+    [ "$(git config --file "$WORK/devhome/.gitconfig" core.hooksPath)" = "$WORK/lib/git-heal/hooks" ] &&
+    grep -q "^$(id -un) ALL=(root) NOPASSWD: /usr/local/lib/opencode-permissions-kit/git-heal/heal-index-head \*\$" \
+        "$WORK/etc/sudoers" &&
+    grep -qF "gitdir=$WORK/zone/onroot/.git" "$LOG" &&
+    printf '%s' "$_out" | grep -qF 'success: git heal hooks active'; then
+    pass "core: on renders sudoers, writes the dev gitconfig, heals the root once"
+else
+    fail "core: on leg failed (rc=$_hr_rc gc=$(git config --file "$WORK/devhome/.gitconfig" core.hooksPath 2>&1) sudoers=$(grep -c heal-index-head "$WORK/etc/sudoers" 2>/dev/null) log=$(wc -l <"$LOG"))"
+fi
+
+# `on` pieces gate: an incomplete lib refuses before touching anything.
+mv "$WORK/lib/git-heal/hooks/post-merge" "$WORK/pm-aside"
+_hr_rc=0
+_out=$(_core_run '_git_heal_on') || _hr_rc=$?
+if [ "$_hr_rc" -eq 1 ] && printf '%s' "$_out" | grep -qF 'heal hooks incomplete'; then
+    pass "core: on refuses on incomplete kit pieces"
+else
+    fail "core: pieces gate (rc=$_hr_rc out=$_out)"
+fi
+mv "$WORK/pm-aside" "$WORK/lib/git-heal/hooks/post-merge"
+
+# `off`: kit-owned value unset; foreign untouched; absent no-op.
+git config --file "$WORK/devhome/.gitconfig" core.hooksPath "$WORK/lib/git-heal/hooks"
+_hr_rc=0
+_out=$(_core_run 'HOME="$WORK/devhome" _git_heal_off') || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] &&
+    ! git config --file "$WORK/devhome/.gitconfig" core.hooksPath >/dev/null 2>&1; then
+    pass "core: off unsets the kit-owned hooksPath"
+else
+    fail "core: off arm (rc=$_hr_rc out=$_out)"
+fi
+git config --file "$WORK/devhome/.gitconfig" core.hooksPath /dev/null
+_hr_rc=0
+_out=$(_core_run 'HOME="$WORK/devhome" _git_heal_off') || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] &&
+    [ "$(git config --file "$WORK/devhome/.gitconfig" core.hooksPath)" = /dev/null ] &&
+    printf '%s' "$_out" | grep -qF 'foreign value'; then
+    pass "core: off leaves a foreign value untouched"
+else
+    fail "core: off foreign leg failed (rc=$_hr_rc out=$_out gc=$(cat "$WORK/devhome/.gitconfig"))"
+fi
+rm -f "${WORK:?}/devhome/.gitconfig"
+_hr_rc=0
+_out=$(_core_run 'HOME="$WORK/devhome" _git_heal_off') || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] && printf '%s' "$_out" | grep -qF 'already off'; then
+    pass "core: off on an absent value is a clean no-op"
+else
+    fail "core: off absent arm (rc=$_hr_rc out=$_out)"
+fi
+
+# cli usage + loop-guard marker (parse precedes the sudo hop).
+_hr_rc=0
+_out=$(sh -c '. "$1"; ui_error() { echo "usage-err" >&2; }; git_heal_cli bogus' \
+    _ "$CORE" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 64 ]; then
+    pass "core: cli usage error exits 64"
+else
+    fail "core: cli usage (rc=$_hr_rc out=$_out)"
+fi
+_hr_rc=0
+_out=$(OPK_GITHEAL_ROOT=1 sh -c '. "$1"
+    ui_error() { echo "ERR: $*" >&2; }
+    _ghc_libdir() { printf %s "$WORK/lib"; }
+    git_heal_cli on' _ "$CORE" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 1 ] && printf '%s' "$_out" | grep -qF 'sudo did not elevate'; then
+    pass "core: the loop-guard marker refuses before any sudo exec (#479 a F24 shape)"
+else
+    fail "core: loop guard (rc=$_hr_rc out=$_out)"
+fi
+
+suite_done "git heal hooks (heal script + hook matrix + core)"
