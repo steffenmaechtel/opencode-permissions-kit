@@ -284,8 +284,13 @@ else
     fail "matrix: reset --hard did not fire a heal"
 fi
 
-_before=$(_mlog)
 echo two >"$WORK/zone/repo/f"
+# Deterministic freshness (the sleep-only settle flaked while two e2e
+# suites loaded the host): staging caches this OLD mtime, so the entry
+# can never be racily-clean (file mtime < index write second) and the
+# fresh-cache status below is provably quiet under any load.
+touch -d "@$(($(date +%s) - 120))" "$WORK/zone/repo/f"
+_before=$(_mlog)
 _mgit add f
 if [ "$(_mlog)" -gt "$_before" ]; then
     pass "matrix: git add heals via post-index-change"
@@ -301,17 +306,13 @@ else
     fail "matrix: commit did not fire a heal"
 fi
 
-# Fresh-cache status: once the index is CURRENT, status writes nothing
-# and post-index-change must NOT fire. Two subtleties measured here:
-# a same-second status after a commit still rewrites the index (git's
-# racy-clean handling -- each rewrite re-smudges for the next
-# same-second reader), and it settles only once a second has passed.
-# The settle status runs first, then -- genuinely fresh -- the counted
-# one must fire nothing.
-_mgit status --porcelain >/dev/null
-sleep 1
-_mgit status --porcelain >/dev/null
-sleep 1
+# Fresh-cache status: the index is CURRENT (f's cached stat is two
+# minutes old -- the add/commit writes just refreshed everything), so
+# status writes nothing and post-index-change must NOT fire. The racy
+# nuance stays documented: a same-second mtime WOULD re-smudge
+# (measured -- every same-second status rewrites the index until a
+# second passes); the old-mtime staging keeps this arm out of that
+# timing class.
 _before=$(_mlog)
 _mgit status --porcelain >/dev/null
 if [ "$(_mlog)" = "$_before" ]; then
@@ -386,6 +387,10 @@ fi
 # --- 6. no-op outside the roots + carrier discrimination + sudo-failed arm ---------
 
 git -C "$WORK" init -q -b main outside 2>/dev/null
+# A commit first, or checkout -b runs on an unborn HEAD and never
+# fires post-checkout -- the no-op pin would pass vacuously (found by
+# sabotage cycle 3: deleting the allowlist left it green).
+git -C "$WORK/outside" -c user.email=t@e -c user.name=t commit -q --allow-empty -m x
 git -C "$WORK/outside" config user.email t@e
 git -C "$WORK/outside" config user.name t
 git -C "$WORK/outside" config core.hooksPath "$WORK/lib/git-heal/hooks"
