@@ -389,9 +389,10 @@ F12_TRACK="$HG11_TRACK" FS_SUDO="" \
 # empty) and realgit's child scan (fires on the symlinked child). Empty
 # sidecars still register — the contract is abort-leak coverage. The
 # grep matches the EXACT sidecar shape (stem + 8 mktemp chars + l): a
-# bare mktemp name is 8 chars without the trailing l and can never
-# match — the earlier `.*l$` form flaked ~6%/run on bare names ending
-# in l (#655 e S1).
+# bare mktemp name is exactly 8 chars after the stem — one SHORT of
+# the 9 the {8}l$ pattern requires — so bare names can never match
+# even when their last random char is itself an l (which was the old
+# .*l$ form's ~6%/run flake, #655 e S1).
 if grep -cE 'opk-fsb-heal\.[A-Za-z0-9]{8}l$' "$HG11_TRACK" 2>/dev/null | grep -q '^4$'; then
     pass "heal: all sidecar temps registered with _tmp_track (d S2)"
 else
