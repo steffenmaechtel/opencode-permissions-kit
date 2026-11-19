@@ -284,6 +284,11 @@ check "RL2b: the post-checkout hook re-heals the NEXT developer git op" \
     E 'cd /var/www/vhosts/rl-gh && git checkout -q master && test "$(stat -c %U .git/index)" = "opencode" && test "$(stat -c %U .git/HEAD)" = "opencode"'
 check "RL2b: the on-sweep healed ORIG_HEAD too (widened set, #678)" \
     E 'test "$(stat -c %U /var/www/vhosts/rl-gh/.git/ORIG_HEAD)" = "opencode"'
+# The #671 arm left agent-file.txt STAGED (this suite has no unstaging
+# roundtrip arm like run.sh's) — git merge refuses over staged changes,
+# so the fixture file is returned to untracked-absent before the merge
+# closure arm (it has served its purpose in the arms above).
+E 'sudo -u opencode -H sh -c "git -C /var/www/vhosts/rl-gh reset -q HEAD -- agent-file.txt && rm -f /var/www/vhosts/rl-gh/agent-file.txt"'
 check "RL2b: agent merge is green over the healed ORIG_HEAD (#678 closure)" \
     E 'sudo -u opencode -H git -c user.email=agent@example.com -c user.name=agent -C /var/www/vhosts/rl-gh merge --no-ff -m rl678agent rl678-a && test "$(stat -c %U /var/www/vhosts/rl-gh/.git/ORIG_HEAD)" = "opencode"'
 check "RL2b: opk git-heal status reports ON" \
