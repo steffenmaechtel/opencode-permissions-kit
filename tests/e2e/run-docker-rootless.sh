@@ -263,10 +263,17 @@ check_fail "RL2b: agent git add DIES on the dev-owned index (sticky .git, #671)"
     E 'sudo -u opencode -H sh -c "echo x > /var/www/vhosts/rl-gh/agent-file.txt && git -C /var/www/vhosts/rl-gh add agent-file.txt"'
 # #678 rides the same pre-on window: dev merge flips ORIG_HEAD, the
 # agent merge dies on it (the live-incident shape, two-uid in-container).
+# mkdir follows EVERY checkout — switching to a master-based branch
+# prunes sub/rl678 (the other branch's tracked files vanish with the
+# empty dir).
 check "RL2b: developer merge flips ORIG_HEAD dev-owned (pre-heal, #678)" \
-    E 'cd /var/www/vhosts/rl-gh && mkdir -p sub/rl678 && git checkout -q -B rl678-a master && echo a >sub/rl678/a.txt && git add sub/rl678/a.txt && git -c user.email=dev@example.com -c user.name=dev commit -qm rl678a && git checkout -q -B rl678-b master && echo b >sub/rl678/b.txt && git add sub/rl678/b.txt && git -c user.email=dev@example.com -c user.name=dev commit -qm rl678b && git -c user.email=dev@example.com -c user.name=dev merge -q --no-ff -m rl678merge rl678-b && test "$(stat -c %U .git/ORIG_HEAD)" = "dev" && git checkout -q master'
-check_fail "RL2b: agent merge DIES on the dev-owned ORIG_HEAD (sticky .git, #678)" \
+    E 'cd /var/www/vhosts/rl-gh && git checkout -q -B rl678-a master && mkdir -p sub/rl678 && echo a >sub/rl678/a.txt && git add sub/rl678/a.txt && git -c user.email=dev@example.com -c user.name=dev commit -qm rl678a && git checkout -q -B rl678-b master && mkdir -p sub/rl678 && echo b >sub/rl678/b.txt && git add sub/rl678/b.txt && git -c user.email=dev@example.com -c user.name=dev commit -qm rl678b && git checkout -q rl678-a && git -c user.email=dev@example.com -c user.name=dev merge -q --no-ff -m rl678merge rl678-b && test "$(stat -c %U .git/ORIG_HEAD)" = "dev" && git checkout -q master'
+check_fail "RL2b: agent merge DIES on the dev-flipped .git metadata (sticky .git, #678)" \
     E 'sudo -u opencode -H git -c user.email=agent@example.com -c user.name=agent -C /var/www/vhosts/rl-gh merge --no-ff -m rl678agent rl678-a'
+# The dying merge leaves its worktree additions behind — clear them as
+# the directory owner so the post-on arms start clean (sub/ is purely
+# this arm's topology in this repo).
+E 'rm -rf /var/www/vhosts/rl-gh/sub'
 check "RL2b: opk git-heal on (sudo, dev gitconfig + heal sweep)" \
     E 'sudo opk git-heal on | grep -q "git heal hooks active"'
 check "RL2b: the on-sweep healed the lockout (index+HEAD agent-owned)" \
