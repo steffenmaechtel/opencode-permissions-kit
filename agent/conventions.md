@@ -463,8 +463,27 @@ waves (#496 a B1, #498, #519: `_rule2_batch`, `_rule1_batch`,
 - Detector rc semantics are per-tool, and rc diagnostics capture with
   `cmd || rc=$?` BEFORE branching — never read `$?` inside an `if !`
   branch: dash's negation clobbers it (#520 a A1, a death diagnostic
-  that always said rc=0). `grep` rc 1 = no match (normal) vs rc ≥ 2 =
-  death; awk rc ≠ 0 = death. (RM-0150)
+  that always said rc=0). The same rule's assignment shape: a fixture
+  run inside a command substitution assigned to a variable returns
+  the subshell's rc from the ASSIGNMENT — under a suite's `set -e` a
+  failing fixture aborts the suite right there, before the pass/fail
+  branch renders any row (every green-side gate blind to it; the
+  sabotage cycle's log simply ended, #676; PR #675 round a) — so the
+  capture is `_rc=0; _out="$( … )" || _rc=$?`. `grep` rc 1 = no
+  match (normal) vs rc ≥ 2 = death; awk rc ≠ 0 = death. (RM-0150)
+- An absence assertion over captured output pipes the capture to
+  grep's stdin (`printf '%s' "$cap" | grep -q …`), never as a file
+  operand: a captured multiline string is an unopenable "filename" —
+  grep exits rc 2 and the `!` inverts it into a pass, so the absence
+  leg goes green regardless of what the producer printed (PR #670 a
+  M3; probed under dash — rc 2 inverted into the vacuous pass, the
+  stdin shape discriminates both directions, #672). Channel
+  discipline on the same captures: an absence leg observes the
+  channel the producer renders on — a combined stdout+stderr capture
+  can carry raw operand bytes from TOOL diagnostics (grep's
+  "No such file" error echoes the operand), not from the rows under
+  test; capture stderr separately when a leg asserts byte
+  cleanliness. (RM-0187)
 - The channel is a property of the OBSERVED emitter, not of the
   capture convention: shipped runners' diagnostics go to stderr (the
   capture shape above), but `tests/e2e/lib.sh`'s FAIL and WARNING
@@ -767,6 +786,33 @@ until round a B2, fixed in 6e13493b).
   roster's job belongs to a query mechanism (a label, a search); the
   prose POINTS at the mechanism instead of duplicating its current
   result. (RM-0157)
+- A capability claim over a set — "every reader/consumer/script does
+  X" — is a roster claim even with no list in parens: it duplicates
+  the current result of a query over a growing set, and the next
+  member silently falsifies it (a docs sentence claiming `#` lines
+  are "ignored by every reader" while a reader the wave never
+  touched still printed them — the wrapper's refusal list, PR #670 a
+  L1). Grep the whole set before writing the sentence — and again at
+  review — or scope the claim to what the wave verified ("the
+  readers the wave touched skip …"); the mechanism-pointer form above
+  (name the query, not the result) applies verbatim. (RM-0188)
+
+## Wave-record claims: classes, not counts
+
+- An exhaustive claim in a wave record — a PR body's "the two sites",
+  "the only point where", "every probe of X around the copy", or a
+  shipped comment's count over sites — either enumerates by OPEN
+  CLASS over the code's real taxonomy ("every probe of the opencode
+  binary in the update path — fresh candidate, freshly deployed, old
+  deployed (same trust class)") or cites the grep that derives it; a
+  bare count or an "only/every + narrow scope" phrasing is review
+  debt that the next round's finer scope refutes — every count-based
+  and scope-narrowed rewording of one loop's claims fell this way,
+  while the class-scoped enumeration survived every round (PR #680
+  rounds a–c, #683). Standing prose carries the
+  same discipline under "Standing prose: history, not rosters" above;
+  tracker-state claims in PR bodies are the round-comment contract's
+  own rule (review-concept.md). (RM-0189)
 
 ## Docs code blocks (paste-safe commands)
 

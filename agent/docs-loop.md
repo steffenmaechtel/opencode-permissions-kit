@@ -155,7 +155,16 @@ sessions, one per PR).
   rename left the standing-review rule's unit and meta in
   review-concept.md split, and the SHA256SUMS sweep's internal/
   noise filter hid release-handling.md; both caught by review round
-  a, fixed in its fix wave, #641). (RM-0183)
+  a, fixed in its fix wave, #641). And a multi-word grep that
+  returns EMPTY over house-wrapped text is evidence only after the
+  single-word re-check (or a wrap-tolerant pattern): house wrapping
+  splits phrases across lines, so the empty multi-word result is the
+  no-collision FALSE negative — the ledger records BOTH patterns, or
+  records the phrase as wrap-split and skips the multi-word form
+  deliberately (pr-00668 round a Q2: the coined phrase
+  "registration probe" existed line-wrapped in review-concept.md
+  while the multi-word grep sat empty and the sweep record claimed
+  the re-check, #669). (RM-0183)
 
 ## Closure — and the next cycle
 
