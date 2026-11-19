@@ -510,6 +510,32 @@ else
 fi
 rm -rf "${ESCPROJ:?}"
 
+# #660 M7 examples row: the at-risk EXAMPLES under a declared tree are
+# find output (agent-choosable names) — the row must show the scrubbed
+# spelling. At-risk on purpose: the daemon-only range map leaves the
+# suite user's files unmapped, so the examples pass actually runs. The
+# mapped fixture around this point is saved and restored.
+ESCEX="$WORK/esc-examples"
+mkdir -p "$ESCEX/tree"
+echo x >"$ESCEX/tree/one"
+echo y >"$ESCEX/tree/evil$(printf '\033')name"
+printf '%s\n' '{"containerTrees":["tree"]}' >"$ESCEX/opk.json"
+rm -rf "$PROCFIX"
+mkmap 42 "0 0 1"
+_rd_rc=0
+_rd_out="$(OPK_INSTALL_CONF="$CONF" OPK_DOCTOR_PROC_ROOT="$PROCFIX" OPK_DOCTOR_OPK="${RD_OPK:-}" \
+    NO_COLOR=1 setsid sh "$DOCTOR" "$ESCEX" </dev/null 2>&1)" || _rd_rc=$?
+if [ "$_rd_rc" = 1 ] &&
+    printf '%s' "$_rd_out" | grep -qF 'examples:' &&
+    printf '%s' "$_rd_out" | grep -qF 'evilname' &&
+    ! printf '%s' "$_rd_out" | LC_ALL=C grep -q "$(printf '\033')"; then
+    pass "examples row shows the scrubbed entry name (#660 M7)"
+else
+    fail "the examples row must scrub entry names (#660 M7, rc $_rd_rc)"
+fi
+rm -rf "${ESCEX:?}" "$PROCFIX"
+mkmap 42 "0 0 1" "1 $CURUID 65536"
+
 # --- 4b. walk-up opk.json discovery (#353 / #313 phase 4) ---------------------------
 # Without a positional (a plain '.' counts as none) the root is
 # discovered upward from the invocation dir, nearest opk.json wins,
