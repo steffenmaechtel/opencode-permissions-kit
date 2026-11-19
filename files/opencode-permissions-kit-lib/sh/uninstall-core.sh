@@ -251,36 +251,80 @@ un_sudoers_remove() {
     fi
 }
 
-# Wrapper removal section.
+# Kit-ownership gate for the fixed /usr/local/bin link names (#662 S3):
+# install/update claim the names unconditionally (ln -sf), but a file
+# that REPLACED the link is not ours — the un_xdg_open_remove ownership
+# check, generalized. The match is a PREFIX, not one exact target: the
+# names pointed at DIFFERENT kit-internal targets across eras
+# ($LIBDIR/kit pre-#346, $LIBDIR/bin/* after), and everything inside
+# the kit library tree is kit-owned; a foreign file or a link to
+# anywhere else is left untouched (warned when present).
+un_link_owned() {
+    # un_link_owned <path>: true iff <path> is a symlink whose readlink
+    # target lies inside /usr/local/lib/opencode-permissions-kit/ —
+    # dangling included (readlink reads the link, not the target: a
+    # leftover kit link after a library wipe is still ours). Pre-0.0.10
+    # links ($LIBDIR was /usr/local/lib/opencode before c1b5c919) miss
+    # the prefix and land in the warn arm — visible, manual removal
+    # named; every update since 0.0.10 re-links to current targets.
+    [ -L "$1" ] || return 1
+    case "$(readlink "$1" 2>/dev/null || true)" in
+        /usr/local/lib/opencode-permissions-kit/*) return 0 ;;
+    esac
+    return 1
+}
+
+# Wrapper removal section (#662 S3: kit-owned link only — a foreign
+# file at the name is warned about and left untouched; an absent path
+# is quiet, deliberately quieter than the xdg sibling's line).
 un_wrapper_remove() {
     echo ""
     echo "--- Removing wrapper ---"
-    _un_partial=""
-    _un_revert_failed=0
-    un_rc_q "rm wrapper" sudo rm -f /usr/local/bin/opencode
-    if [ -z "$_un_partial" ]; then
-        echo "Wrapper removed."
-        log "wrapper removed: /usr/local/bin/opencode"
-    else
-        echo "WARN: wrapper removal failed ($_un_partial) — remove manually: /usr/local/bin/opencode" >&2
-        log "wrapper removal FAILED ($_un_partial)"
+    if [ -L /usr/local/bin/opencode ] || [ -e /usr/local/bin/opencode ]; then
+        if un_link_owned /usr/local/bin/opencode; then
+            _un_partial=""
+            _un_revert_failed=0
+            un_rc_q "rm wrapper" sudo rm -f /usr/local/bin/opencode
+            if [ -z "$_un_partial" ]; then
+                echo "Wrapper removed."
+                log "wrapper removed: /usr/local/bin/opencode"
+            else
+                echo "WARN: wrapper removal failed ($_un_partial) — remove manually: /usr/local/bin/opencode" >&2
+                log "wrapper removal FAILED ($_un_partial)"
+            fi
+        else
+            echo "/usr/local/bin/opencode is not kit-owned — left untouched."
+            log "wrapper not kit-owned, left untouched: /usr/local/bin/opencode"
+        fi
     fi
 }
 
-# CLI dispatcher removal section.
+# CLI dispatcher removal section (#662 S3: kit-owned links only; the
+# legacy opencode-permissions-kit alias is normally absent on current
+# installs — absent paths are quiet, present foreign files are warned).
 un_cli_remove() {
     echo ""
     echo "--- Removing cli dispatcher ---"
-    _un_partial=""
-    _un_revert_failed=0
-    un_rc_q "rm cli dispatcher" sudo rm -f /usr/local/bin/opk /usr/local/bin/opencode-permissions-kit
-    if [ -z "$_un_partial" ]; then
-        echo "CLI dispatcher removed."
-        log "cli removed: /usr/local/bin/opk"
-    else
-        echo "WARN: cli dispatcher removal failed ($_un_partial) — remove manually: /usr/local/bin/opk" >&2
-        log "cli dispatcher removal FAILED ($_un_partial)"
-    fi
+    _un_cli_path=""
+    for _un_cli_path in /usr/local/bin/opk /usr/local/bin/opencode-permissions-kit; do
+        if [ -L "$_un_cli_path" ] || [ -e "$_un_cli_path" ]; then
+            if un_link_owned "$_un_cli_path"; then
+                _un_partial=""
+                _un_revert_failed=0
+                un_rc_q "rm cli dispatcher" sudo rm -f "$_un_cli_path"
+                if [ -z "$_un_partial" ]; then
+                    echo "CLI dispatcher removed."
+                    log "cli removed: $_un_cli_path"
+                else
+                    echo "WARN: cli dispatcher removal failed ($_un_partial) — remove manually: $_un_cli_path" >&2
+                    log "cli dispatcher removal FAILED ($_un_partial): $_un_cli_path"
+                fi
+            else
+                echo "$_un_cli_path is not kit-owned — left untouched."
+                log "cli not kit-owned, left untouched: $_un_cli_path"
+            fi
+        fi
+    done
 }
 
 # xdg-open fallback shim removal section (kit-owned symlink only).

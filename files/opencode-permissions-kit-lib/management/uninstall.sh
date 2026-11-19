@@ -102,8 +102,17 @@ done
 
 # Agent-home link gates (review 0.0.39h F2, same class as the install/update
 # gates): the plugin removal below acts THROUGH a linked parent (~/.config,
-# ~/.config/opencode — agent-replaceable). Stub keeps older installs
-# (pre-0.0.39h deployed library, no walker yet) uninstallable.
+# ~/.config/opencode — agent-replaceable). The stub stands before the
+# candidate loop, so a current staged-write.sh REDEFINES it (the later
+# definition wins) — it stays standing only on a pre-0.0.39h or truncated
+# deployed library. That fail-open is deliberate and disclosed (#662 S1):
+# it needs that legacy lib (the weeks-old alpha cohort, shrinking with
+# every update) AND an agent-planted parent link to matter, and the ops
+# behind the gate are fixed-suffix rm/mv/chown — no root exec of agent
+# content. Fail-closed was considered and declined: it would hold REMOVAL
+# hostage to a gate on exactly the installs most likely to need a clean
+# way out (uninstall must stay maximally robust), unlike the install
+# twin, which fails CLOSED because install.sh always runs fresh code.
 agent_home_sane() { return 0; }
 for cand in "$UN_CALL_DIR/../sh/staged-write.sh" "/usr/local/lib/opencode-permissions-kit/sh/staged-write.sh"; do
     if [ -f "$cand" ]; then
@@ -207,7 +216,7 @@ un_pairing_guard() {
         un_umask_remove un_user_remove un_projects_revert \
         un_config_dirs_remove un_audit_log_remove \
         _un_revert_chown run_q un_group_membership_remove \
-        un_opencode_user_gate un_rc_q; do
+        un_opencode_user_gate un_rc_q un_link_owned; do
         command -v "$_npg" >/dev/null 2>&1 || {
             echo "error: function '$_npg' missing from uninstall-core.sh — version-skewed entry/lib pairing, refusing to run" >&2
             return 1

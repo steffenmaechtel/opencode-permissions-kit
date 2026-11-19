@@ -754,7 +754,17 @@ done
 }
 # Old-library fallback (pre-0.0.39h deployed copy): no walker yet — fail
 # open like the pre-gate behavior, the writes above still refuse via
-# staged_write itself.
+# staged_write itself. Deliberate and disclosed (#662 S1): the fail-open
+# stub needs a legacy (<0.0.39h — only 0.0.39g ever shipped staged_write
+# without the walker — the weeks-old alpha cohort, shrinking with every
+# update) or truncated deployed lib AND an agent-planted parent link to
+# matter, and the ops behind the gate are fixed-suffix rm/mv/chown — no
+# root exec of agent content. The normal path sources staged-write.sh
+# from the CHECKOUT first (walker present), and pre-0.0.39g libs refuse
+# via the staged_write stub above. Fail-closed was considered (the
+# install twin, install.sh, fails CLOSED — but install.sh always runs
+# fresh code) and declined: a semantic change to root-run code (both
+# e2e suites) for a near-dead path.
 command -v agent_home_sane >/dev/null 2>&1 || agent_home_sane() { return 0; }
 
 # Shared sudoers pipeline (render + visudo validation + install): one

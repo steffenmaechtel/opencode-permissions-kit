@@ -1105,6 +1105,17 @@ Remove a link in the chain or place your CA at $caroot and re-run — if the hom
             #    cmd.exe are frequently not on a WSL PATH, so %USERNAME% probing is
             #    unreliable — a failed probe silently skipped the Windows CA and
             #    fell through to an untrusted one (browsers showed "not secure").
+            # Windows CA scan (#662 S4, deliberate first-pick): the FIRST
+            # profile dir in glob order carrying a CA+key pair wins —
+            # nothing ties it to the CURRENT Windows user (username
+            # probing from WSL is unreliable, the exact reason this
+            # direct scan exists). A leftover profile of a FORMER Windows
+            # user can therefore win without malice; the failure mode is
+            # benign — ddev HTTPS certs get issued under a CA the current
+            # browsers do not trust ("not secure" warnings, still TLS).
+            # Residual: the winning CA's private key sits in another
+            # user's profile dir, readable per Windows ACLs on shared
+            # boxes — accepted for the kit's single-dev-box target.
             if [ -d /mnt/c/Users ]; then
                 for wca in /mnt/c/Users/*/AppData/Local/mkcert; do
                     if [ -f "$wca/rootCA.pem" ] && [ -f "$wca/rootCA-key.pem" ]; then
@@ -1614,6 +1625,11 @@ do_deploy_phase() {
 
     if [ "$opencode_found" = false ]; then
         if confirm "opencode not found. Run official installer (curl -fsSL https://opencode.ai/v2/install | bash)?"; then
+            # Trust model (#662 S2, same disposition as update-core's
+            # install_binary): this operator-consented pipe executes the
+            # official upstream installer as root, digest-free — TLS +
+            # the opencode.ai origin are the trust anchors, identical to
+            # the model of every manual run of the same one-liner.
             # pr-00263 a F19: pipefail (set at the top) carries a curl
             # failure through the pipe — the wrapper fires on either a
             # failed fetch or a failed installer run.
