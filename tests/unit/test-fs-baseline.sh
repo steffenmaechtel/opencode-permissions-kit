@@ -382,13 +382,17 @@ ln -s "$HG11/tgt" "$HG11/proj/contgit/.git/modules"
 ln -s "$HG11/tgt" "$HG11/proj/realgit/.git/modules/lnk-child"
 F12_TRACK="$HG11_TRACK" FS_SUDO="" \
     sh -c '. "$1" && _tmp_track() { printf "%s\n" "$1" >> "$F12_TRACK"; } \
-    && fs_baseline_root "$2" "$3"' _ "$LIB" "$HG11/proj" "$HGGRP" >/dev/null 2>&1 || true
+    && fs_baseline_root "$2" "$3"' _ "$LIB" "$HG11/proj" "$HGGRP" >/dev/null 2>&1
 # This fixture deterministically registers FOUR sidecars: the driver's
 # .git-symlink scan (empty here — its .git dirs are real), two module
 # container scans (contgit's fires on a real symlink, realgit's is
 # empty) and realgit's child scan (fires on the symlinked child). Empty
-# sidecars still register — the contract is abort-leak coverage.
-if grep -c 'opk-fsb-heal.*l$' "$HG11_TRACK" 2>/dev/null | grep -q '^4$'; then
+# sidecars still register — the contract is abort-leak coverage. The
+# grep matches the EXACT sidecar shape (stem + 8 mktemp chars + l): a
+# bare mktemp name is 8 chars without the trailing l and can never
+# match — the earlier `.*l$` form flaked ~6%/run on bare names ending
+# in l (#655 e S1).
+if grep -cE 'opk-fsb-heal\.[A-Za-z0-9]{8}l$' "$HG11_TRACK" 2>/dev/null | grep -q '^4$'; then
     pass "heal: all sidecar temps registered with _tmp_track (d S2)"
 else
     fail "heal: all sidecar temps registered with _tmp_track (d S2) — got: $(cat "$HG11_TRACK" 2>/dev/null | tr '\n' ' ')"
