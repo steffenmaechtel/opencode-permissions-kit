@@ -630,6 +630,8 @@ git_config_status() {
         ui_kv "git-config" "OFF — access allowed (agent tools may edit git config)"
         ui_detail "$f"
     fi
+    ui_detail "plain commits/pushes only read .git/config — the exceptions (push -u tracking write,"
+    ui_detail "repo-scope git config, submodule add) are the .git heal's documented costs"
 }
 
 git_config_apply() {

@@ -10,7 +10,7 @@ faf1193e92d7e4fc6755f00bb458ea0e4cd0c026e0b17218df03209796f4c112  files/opencode
 0ccdc3dcd152ecc845f8045c71a515d48e5929bfb0318a3c133db28060ca7977  files/opencode-permissions-kit-lib/bin/setup-container-backend
 72e2b48893c03886b5ba0680cf6b419d7185e84cf2cbe6b12df536652d25db1f  files/opencode-permissions-kit-lib/bin/socket-check
 9f21f5a57ff8c03d0aa913753530a53eb8bdbfd956371d941e6431a2a7dc2913  files/opencode-permissions-kit-lib/bin/xdg-open
-46b2c64ed38bd866fca0bbcf51b6a09ec0474c29da62a490a22a0769f4bb9770  files/opencode-permissions-kit-lib/management/config.sh
+ff808948236828576bf8bf36a186deb8164304b165fcddb0d8f285cf9bfe0383  files/opencode-permissions-kit-lib/management/config.sh
 139c413a316f9ec52e1551cb736e7e39bb43c95a0918ba8e9dc31cfadd3bd235  files/opencode-permissions-kit-lib/management/doctor.sh
 3fc0548913d43bcbe7f772b12a9048022eafa0ffe93b65231d4fe7d5d912a18e  files/opencode-permissions-kit-lib/management/status.sh
 546d3819cb32b608b6d712466c67e9da2aec5d934b2dc3e5b09712fedb62be44  files/opencode-permissions-kit-lib/management/uninstall.sh
@@ -25,7 +25,7 @@ f4fced7393cba03477d2b710cd53049364c425b90db43c2a363d99ab21256ea3  files/opencode
 34a6a6b1bf19af571ba33dc8878f4e6e78e2efe3dc0e14d23e95ebed9834608d  files/opencode-permissions-kit-lib/sh/ddev-terminal.sh
 b80b674296f3a66bbf208b249447bb0aeb7c8dc524708d33e387f2471669b969  files/opencode-permissions-kit-lib/sh/deploy-lib.sh
 341396e2953fe118112d1ec5afd3c580d5d9ee25e86c8bc644dca863638febbf  files/opencode-permissions-kit-lib/sh/doctor-core.sh
-6f1e9754eccbd14f6f56a34ad211d903ea20cf870f5ef4382842f5eee84b9a59  files/opencode-permissions-kit-lib/sh/fs-baseline.sh
+ecf7681c0cf08adf9451810f8be0f8b48c3d38b350afedcc6231cc1b792d2fc3  files/opencode-permissions-kit-lib/sh/fs-baseline.sh
 80579d6005c882c689086a3af913ccdf686059905451f43b496aa74005fd0b41  files/opencode-permissions-kit-lib/sh/git-check.sh
 6b0f24f63611d62aa97e81d6c836b04217e7ac142ca034cff86959097c4a7caf  files/opencode-permissions-kit-lib/sh/handover-core.sh
 da1635f7539e7a81bfbb4e1df9d7423dadc3f53cd683ae16983e1242d9d6c960  files/opencode-permissions-kit-lib/sh/install-core.sh

@@ -91,7 +91,10 @@ expect the reported paths to exist locally.
   creation (review-concept.md, "Round typing and tiering") — the
   review re-derives it; a missing line is a disclosed deviation.
   Merging the PR and closing the review loop stay with the
-  maintainer. (RM-0097)
+  maintainer. Push **without `-u`** (`git push origin <branch>`): the
+  `.git` heal pins `.git/config` developer-owned (issue #651), so the
+  tracking write a first `git push -u` performs fails with
+  `Operation not permitted` — the push itself transfers fine. (RM-0097)
 - **All shipped content is English** — scripts, docs, prompts, messages. (RM-0098)
 - **Follow `agent/conventions.md`** for interactive prompts, output
   style, shell security (untrusted input), and other shipped-code
@@ -111,7 +114,14 @@ expect the reported paths to exist locally.
   mirrors). (RM-0102)
 - The security model is deliberately **soft-only** — never re-introduce
   OS-level deny ACLs. Background: `internal/records/ddev-working.md`,
-  current model: `docs/concepts/security-model.md`. (RM-0103)
+  current model: `docs/concepts/security-model.md`. Sanctioned exception
+  (#651, PR #655): the `.git` heal — sticky bits (on `.git`, its
+  metadata containers, the project root and every `.git` ancestor
+  directory) plus developer-ownership narrowing on `.git` metadata that
+  the group baseline would otherwise leave agent-writable
+  (`fs-baseline.sh`); no deny ACLs involved, and the stickied
+  directories keep their sharing modes (sticky gates only rename/unlink
+  of foreign entries). (RM-0103)
 - **The kit never edits user-owned system config on its own — above all
   `/etc/wsl.conf`.** Install/update only *show* snippets or name opt-in
   commands the user runs themselves; `opk wsl-add-opencode-1-fix` is the

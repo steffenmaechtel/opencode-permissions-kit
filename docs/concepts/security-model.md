@@ -48,6 +48,66 @@ One exception: **browser-opening commands** (`launch`, `mailpit`,
 the developer — it needs the Windows interop the agent must not have. See
 [ddev integration](ddev-integration.md#browser-opening-commands).
 
+A second, deliberate exception — **the `.git` heal** (issue
+[#644](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/644),
+wave #651): the sharing baseline above still shares `.git` wholesale (the
+agent must be able to commit), but every baseline run *re-narrows the
+execution-bearing metadata* OS-side, because the developer's git executes
+from agent-writable surfaces there:
+
+- The **project root**, every **ancestor directory of each `.git`**
+  (root-exclusive down to its parent — scan roots like
+  `/var/www/vhosts` are not every repo's parent, so the bit rides the
+  whole chain), and `.git` itself get the sticky bit; `.git/config` and
+  `.git/hooks` (and the `modules` containers with their gitdirs, and
+  the worktree `commondir`/`gitdir` pointer files — top gitdir and
+  submodule gitdirs alike) are pinned **developer-owned, no group
+  write, no extended ACLs**.
+- Why that works: the sticky bit sits on the PARENT of whatever must
+  not be replaced — renaming or unlinking an entry needs write on its
+  parent directory, and a developer-owned entry in a sticky parent is
+  untouchable for the agent. Git *reads* the config for plain
+  commits/pushes but writes it through lock+rename — that rename dies
+  on the sticky bit. Planted hooks, `core.fsmonitor`, `core.hooksPath`
+  overrides and diff-driver registrations can no longer be placed or
+  rewritten by the agent, while the agent's add/commit/branch/push
+  workflow stays green (live evidence in issue #644, including the
+  field report on `push -u`).
+- This is OS-level narrowing — the one place the kit deliberately steps
+  out of the pure soft model, scoped to `.git` internals (and the
+  project root's sticky bit) that ddev never touches. Workflow costs
+  accepted with it: repo-scope `git config` and `git submodule add`
+  fail for the agent (`submodule add` dies at the clone stage — the
+  `modules` container accepts no agent writes; for `git config` the
+  write IS the operation); a first `git push -u` and
+  `git branch --set-upstream-to` fail at their tracking write while the
+  push transfer itself completes (field-reported 2026-11-18, recorded
+  in issue #644) — so agents push without `-u`
+  (`git push origin <branch>`); the agent cannot rename or delete
+  developer-owned entries in the project root and every `.git`
+  ancestor directory (sticky — content edits and renames in ordinary,
+  non-sticky subdirectories are unaffected); agent-side `git gc` can
+  hit the sticky bit on `packed-refs`; and a repo the agent cloned
+  INTO a developer-owned project tree is healed to the root's owner —
+  the agent loses repo-config writes in its own nested clone (work in
+  the main checkout or an agent-owned root instead).
+- What it does **not** close: the `.git` pointer *file* inside
+  agent-created worktree trees (delete+recreate sidesteps a pin — work in
+  the protected main checkout, not in agent worktrees), agent-owned
+  trees as a whole, and CONTENT planted before the heal — metadata
+  pinning preserves a planted hook file's exec bits and contents (the
+  heal warns about non-sample files it finds in `hooks/`; inspection
+  and removal stay human decisions). The full post-heal residual
+  inventory lands with issue #652 once the heal is piloted.
+- The heal survives `opk uninstall` where it matters: the revert walks
+  never touch the sticky bit or the **uid** of developer-owned pinned
+  entries (their *group* is reverted to the developer's login group by
+  the gid-matched chown pass — protection unaffected either way: no
+  group write in either group). On an agent-owned healed root the uid
+  arm of the same walk flips the pinned entries to the developer — the
+  desirable direction there. A healed `.git` keeps protecting the solo
+  developer.
+
 ## Download integrity (SHA256SUMS)
 
 The streamed installer and updater fetch every kit file from
@@ -151,15 +211,16 @@ Operational notes:
   are allowlisted, and the agent can write `.gitattributes` itself
   (`*.env diff=secret`). A planted `[diff "secret"] command = cat` driver
   then makes `git log -p` render denied file content, and the command
-  text names no protected file, so no bash tripwire fires. The planting
-  sites differ: `.git/config` is prompt-free only while its read/edit
-  denies are off — a default install renders them active (the
-  installer's recommended choice; `opk config git-config off` disables
-  them) — while the agent's global gitconfig (kit-created for
-  `safe.directory`, matched by no template rule) takes the same driver
-  for one ask (`git config --global diff.secret.command cat` hits no
-  allow and no tripwire) and then persists across sessions for every
-  repo; the git-config toggle does not close that arm.
+  text names no protected file, so no bash tripwire fires. The
+  `.git/config`-planted arm is closed OS-side by the `.git` heal (above)
+  — the agent can no longer write a local driver registration, whatever
+  the git-config toggle says (a default install renders them active; `opk
+  config git-config off` disables them — soft-only either way). The
+  remaining arm is the agent's global gitconfig (kit-created
+  for `safe.directory`, matched by no template rule): `git config
+  --global diff.secret.command cat` hits no allow and no tripwire and
+  persists across sessions for every repo — but it only affects the
+  AGENT's own git runs, never the developer's.
 - **Bind-mounted containers** read the mounted tree freely (they run as the
   opencode host UID).
 - **Renamed copies** of secrets are invisible to the name-based

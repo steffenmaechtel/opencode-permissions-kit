@@ -63,12 +63,13 @@ chmod 600 "$WORK/proj/file.txt" "$WORK/proj/.git/config"
 OUT="$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$WORK/proj" "$GRP" 2>&1)"
 
 # --- 1. final state -------------------------------------------------------------
-assert_eq "root dir: group + setgid + group rwx (700 -> 2770)" "2770" \
+assert_eq "root dir: group + setgid + group rwx + sticky (700 -> 3770, #655 a C1)" "3770" \
     "$(stat -c %a "$WORK/proj")"
 assert_eq "subdir carries setgid" "2770" "$(stat -c %a "$WORK/proj/sub")"
-assert_eq ".git included in the baseline (issue #17)" "2770" "$(stat -c %a "$WORK/proj/.git")"
+assert_eq ".git shared and sticky-healed (issue #17 + #651)" "3770" "$(stat -c %a "$WORK/proj/.git")"
 assert_eq "file gets group rw (600 -> 660)" "660" "$(stat -c %a "$WORK/proj/file.txt")"
-assert_eq ".git/config gets group rw" "660" "$(stat -c %a "$WORK/proj/.git/config")"
+assert_eq ".git/config healed developer-owned, no group write (#651)" "644" \
+    "$(stat -c %a "$WORK/proj/.git/config")"
 assert_eq "group applied everywhere" "$GRP" "$(stat -c %G "$WORK/proj/sub")"
 if getfacl -p "$WORK/proj/sub" 2>/dev/null | grep -q '^default:group:.*:rwx'; then
     pass "default ACL g:<group>:rwx set on directories"
@@ -76,7 +77,378 @@ else
     fail "default ACL g:<group>:rwx set on directories"
 fi
 
-# --- 2. symlink safety ----------------------------------------------------------
+# --- 1b. .git metadata heal (#644, wave #651) ------------------------------------------
+# The heal pins the execution-bearing .git entries developer-owned after
+# the sharing passes. Unit pins assert the STATE (modes, owners,
+# ACL-free, sticky); the uid-separation BLOCKING (an opencode-uid write
+# bouncing off a developer-owned sticky entry) is e2e/pilot territory —
+# a same-uid unit run cannot see ownership walls (the live battery is
+# the evidence in issue #644).
+HG="$WORK/healproj"
+HGGRP="$(id -gn)"
+HGME="$(id -u)"
+mkdir -p "$HG/proj/.git/hooks" "$HG/proj/.git/refs/heads" "$HG/proj/.git/objects" \
+    "$HG/proj/.git/logs/refs" "$HG/proj/.git/worktrees/wt1" \
+    "$HG/proj/.git/modules/sub/hooks" "$HG/proj/.git/modules/nohooks" \
+    "$HG/proj/nested/.git/hooks"
+printf 'cfg\n' >"$HG/proj/.git/config"
+printf 'nc\n' >"$HG/proj/nested/.git/config"
+printf 'sm\n' >"$HG/proj/.git/modules/sub/config"
+printf 'nh\n' >"$HG/proj/.git/modules/nohooks/config"
+printf 's\n' >"$HG/proj/.git/hooks/pre-commit.sample"
+printf '#!/bin/sh\n' >"$HG/proj/.git/hooks/planted-pre-commit"
+chmod 755 "$HG/proj/.git/hooks/planted-pre-commit"
+printf 'i\n' >"$HG/proj/.git/index"
+printf 'h\n' >"$HG/proj/.git/HEAD"
+printf 'r\n' >"$HG/proj/.git/refs/heads/main"
+printf '..\n' >"$HG/proj/.git/worktrees/wt1/commondir"
+printf '..\n' >"$HG/proj/.git/worktrees/wt1/gitdir"
+printf 'wh\n' >"$HG/proj/.git/worktrees/wt1/HEAD"
+printf 'log\n' >"$HG/proj/.git/logs/HEAD"
+chmod 700 "$HG/proj/.git" "$HG/proj/.git/hooks"
+HGOUT="$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$HG/proj" "$HGGRP" 2>&1)"
+assert_eq "heal: project root sticky (sharing mode stays, #655 a C1)" "3775" \
+    "$(stat -c %a "$HG/proj")"
+assert_eq "heal: NESTED .git parent sticky (scan roots are parents — the bit belongs on the direct parent, #655 a C1)" \
+    "3775" "$(stat -c %a "$HG/proj/nested")"
+assert_eq "heal: nested .git healed like any other" "644" \
+    "$(stat -c %a "$HG/proj/nested/.git/config")"
+assert_eq "heal: .git keeps sharing mode + sticky (dirs pass then +t)" "3770" \
+    "$(stat -c %a "$HG/proj/.git")"
+assert_eq "heal: .git/config 644" "644" "$(stat -c %a "$HG/proj/.git/config")"
+assert_eq "heal: .git/config owner is the developer (root-derived)" "$HGME" \
+    "$(stat -c %u "$HG/proj/.git/config")"
+assert_eq "heal: .git/hooks 755 shape, no group write (dir setgid rides along, harmless)" "2755" \
+    "$(stat -c %a "$HG/proj/.git/hooks")"
+assert_eq "heal: .git/hooks owner is the developer" "$HGME" "$(stat -c %u "$HG/proj/.git/hooks")"
+# The umask-644 fixture files (not pre-tightened to 600 — the healed
+# invariant is group rw, not a specific absolute mode): files pass g+rw
+# lands on 664, and the heal must NOT touch these agent-workflow files.
+assert_eq "heal: hook sample files stay shared (no execution surface)" "664" \
+    "$(stat -c %a "$HG/proj/.git/hooks/pre-commit.sample")"
+assert_eq "heal: index keeps group rw (agent workflow file)" "664" \
+    "$(stat -c %a "$HG/proj/.git/index")"
+assert_eq "heal: HEAD keeps group rw" "664" "$(stat -c %a "$HG/proj/.git/HEAD")"
+assert_eq "heal: refs keep group rw" "664" "$(stat -c %a "$HG/proj/.git/refs/heads/main")"
+assert_eq "heal: logs keep group rw" "664" "$(stat -c %a "$HG/proj/.git/logs/HEAD")"
+assert_eq "heal: worktrees collection sticky, still group-writable (agent adds its own)" "3775" \
+    "$(stat -c %a "$HG/proj/.git/worktrees")"
+assert_eq "heal: registration dir keeps group rw (merge-state files must appear)" "2775" \
+    "$(stat -c %a "$HG/proj/.git/worktrees/wt1")"
+assert_eq "heal: commondir pointer pinned 644" "644" \
+    "$(stat -c %a "$HG/proj/.git/worktrees/wt1/commondir")"
+assert_eq "heal: gitdir pointer pinned 644" "644" \
+    "$(stat -c %a "$HG/proj/.git/worktrees/wt1/gitdir")"
+assert_eq "heal: worktree HEAD keeps group rw" "664" \
+    "$(stat -c %a "$HG/proj/.git/worktrees/wt1/HEAD")"
+assert_eq "heal: module gitdir sticky, no group write (setgid rides along)" "3755" \
+    "$(stat -c %a "$HG/proj/.git/modules/sub")"
+assert_eq "heal: module config pinned 644" "644" \
+    "$(stat -c %a "$HG/proj/.git/modules/sub/config")"
+assert_eq "heal: module hooks pinned, no group write" "2755" \
+    "$(stat -c %a "$HG/proj/.git/modules/sub/hooks")"
+assert_eq "heal: modules CONTAINER pinned (sticky on the parent — gates wholesale child swaps, #655 a C2)" \
+    "3755" "$(stat -c %a "$HG/proj/.git/modules")"
+assert_eq "heal: container owner is the developer (#655 a C2)" "$HGME" \
+    "$(stat -c %u "$HG/proj/.git/modules")"
+assert_eq "heal: hooks-LESS module gitdir pinned too (marker-free enumeration, #655 a C3)" \
+    "3755" "$(stat -c %a "$HG/proj/.git/modules/nohooks")"
+assert_eq "heal: hooks-less module config pinned (#655 a C3)" "644" \
+    "$(stat -c %a "$HG/proj/.git/modules/nohooks/config")"
+if printf '%s\n' "$HGOUT" | grep -qF 'non-sample entries'; then
+    pass "heal: non-sample hook content surfaces as a warn (metadata pinning preserves it, #655 a C1)"
+else
+    fail "heal: non-sample hook content surfaces as a warn (metadata pinning preserves it, #655 a C1)"
+fi
+if printf '%s\n' "$HGOUT" | grep -qF "non-sample entries in $HG/proj/.git/hooks"; then
+    pass "heal: the warn names the hooks directory (inspect-and-remove pointer)"
+else
+    fail "heal: the warn names the hooks directory (inspect-and-remove pointer)"
+fi
+if getfacl -p "$HG/proj/.git/hooks" 2>/dev/null | grep -q '^default:'; then
+    fail "heal: default ACLs stripped from .git/hooks (they would re-grant group write)"
+else
+    pass "heal: default ACLs stripped from .git/hooks (they would re-grant group write)"
+fi
+if getfacl -p "$HG/proj/.git/config" 2>/dev/null | grep -qE '^(group:[^:]|default:)'; then
+    fail "heal: no extended ACL entries survive on .git/config"
+else
+    pass "heal: no extended ACL entries survive on .git/config"
+fi
+if printf '%s\n' "$HGOUT" | grep -q 'git heal:'; then
+    pass "heal: one progress line per healed .git"
+else
+    fail "heal: one progress line per healed .git"
+fi
+# Idempotence of the heal cycle: the sharing passes re-grant, the heal
+# re-narrows — the end state must be byte-stable across runs.
+HGRC2=0
+FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$HG/proj" "$HGGRP" \
+    >/dev/null 2>&1 || HGRC2=$?
+assert_eq "heal: idempotent re-run rc 0" "0" "$HGRC2"
+assert_eq "heal: idempotent re-run state stable (root/config/hooks/.git/worktrees)" \
+    "3775/644/2755/3770/3775" \
+    "$(stat -c %a "$HG/proj")/$(stat -c %a "$HG/proj/.git/config")/$(stat -c %a "$HG/proj/.git/hooks")/$(stat -c %a "$HG/proj/.git")/$(stat -c %a "$HG/proj/.git/worktrees")"
+
+# Trailing-slash root (#655 a C4): the belt accepts the spelling; the
+# heal must normalize before the component walk — pre-fix, the walk
+# voided and the config stayed unpinned (group-writable). Drive the
+# driver directly so the belt is out of the picture.
+HG4="$WORK/healslash"
+mkdir -p "$HG4/proj2/.git/hooks"
+printf 'c\n' >"$HG4/proj2/.git/config"
+printf 'h\n' >"$HG4/proj2/.git/hooks/pre-commit.sample"
+FS_SUDO="" sh -c '. "$1" && _fsb_heal_git "$2/" "$3"' _ "$LIB" "$HG4/proj2" "$HGGRP" >/dev/null 2>&1
+assert_eq "heal: trailing-slash root still pins (walk normalized, #655 a C4)" "644" \
+    "$(stat -c %a "$HG4/proj2/.git/config")"
+# Sticky assertion, not absolute mode: this host's /tmp grants group
+# write through default ACLs at mkdir time (1775, not 1755) — the
+# direct-driver pin cares about the sticky bit alone (leading 1).
+case "$(stat -c %a "$HG4/proj2")" in
+    1*)
+        pass "heal: trailing-slash root sticky applies"
+        ;;
+    *)
+        fail "heal: trailing-slash root sticky applies (got $(stat -c %a "$HG4/proj2"))"
+        ;;
+esac
+
+# Root swapped to a symlink before the heal (#655 a C5): refused loud —
+# the empty-scan silent no-op must not happen. _FSB_ERRORS is the
+# observable (the belt refuses this shape earlier at the fs_baseline_root
+# level, so the driver is driven directly).
+HG5="$WORK/healswap"
+mkdir -p "$HG5/real/.git"
+ln -s "$HG5/real" "$HG5/link"
+HG5OUT="$(FS_SUDO="" sh -c '. "$1" && _FSB_ERRORS=0 && _fsb_heal_git "$2" "$3" && echo "ERRS=$_FSB_ERRORS"' \
+    _ "$LIB" "$HG5/link" "$HGGRP" 2>&1)"
+if printf '%s\n' "$HG5OUT" | grep -q 'ERRS=1$'; then
+    pass "heal: symlinked root counts as an error (no silent no-op, #655 a C5)"
+else
+    fail "heal: symlinked root counts as an error (no silent no-op, #655 a C5) — got: $HG5OUT"
+fi
+if printf '%s\n' "$HG5OUT" | grep -qF 'root became a symlink'; then
+    pass "heal: the C5 refusal names the cause"
+else
+    fail "heal: the C5 refusal names the cause"
+fi
+
+# --- 1c. fix-wave-b arms (#655 b) ------------------------------------------------
+# C1 ancestor chain: a .git at depth 2 stickies BOTH intermediate dirs.
+HG6="$WORK/healdepth2"
+mkdir -p "$HG6/proj/grp/site/.git/hooks"
+printf 'c\n' >"$HG6/proj/grp/site/.git/config"
+FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$HG6/proj" "$HGGRP" >/dev/null 2>&1
+assert_eq "heal: depth-2 ancestor dir sticky (b C1)" "3775" \
+    "$(stat -c %a "$HG6/proj/grp")"
+assert_eq "heal: depth-2 .git parent sticky (b C1)" "3775" \
+    "$(stat -c %a "$HG6/proj/grp/site")"
+assert_eq "heal: depth-2 .git healed like any other" "644" \
+    "$(stat -c %a "$HG6/proj/grp/site/.git/config")"
+
+# C2: a symlinked .git is never followed, always surfaced.
+HG7="$WORK/heallnk"
+mkdir -p "$HG7/proj/repoA" "$HG7/outside"
+ln -s "$HG7/outside" "$HG7/proj/repoA/.git"
+HG7OUT="$(FS_SUDO="" sh -c '. "$1" && _FSB_ERRORS=0 && fs_baseline_root "$2" "$3"' \
+    _ "$LIB" "$HG7/proj" "$HGGRP" 2>&1)"
+HG7RC=$?
+assert_eq "heal: symlinked .git warns without failing the baseline (b C2)" "0" "$HG7RC"
+if printf '%s\n' "$HG7OUT" | grep -qF 'symlinked .git not followed'; then
+    pass "heal: the symlinked-.git warn names the entry (b C2)"
+else
+    fail "heal: the symlinked-.git warn names the entry (b C2)"
+fi
+
+# C3: symlinked containers and symlinked children are surfaced, never
+# followed — two separate gitdirs (a symlinked modules container hides
+# its children from every scan, so each arm needs its own fixture).
+mkdir -p "$HG7/proj/realgit/.git" "$HG7/proj/realgit/.git/hooks" "$HG7/modtarget"
+mkdir -p "$HG7/proj/contgit/.git/hooks"
+printf 'c\n' >"$HG7/proj/realgit/.git/config"
+printf 'c\n' >"$HG7/proj/contgit/.git/config"
+ln -s "$HG7/modtarget" "$HG7/proj/contgit/.git/modules"
+mkdir -p "$HG7/proj/realgit/.git/modules/real" "$HG7/childtarget"
+ln -s "$HG7/childtarget" "$HG7/proj/realgit/.git/modules/lnk-child"
+HG7BOUT="$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' \
+    _ "$LIB" "$HG7/proj" "$HGGRP" 2>&1)"
+if printf '%s\n' "$HG7BOUT" | grep -qF 'symlinked modules dir not followed'; then
+    pass "heal: the symlinked-modules warn fires (b C3)"
+else
+    fail "heal: the symlinked-modules warn fires (b C3)"
+fi
+if printf '%s\n' "$HG7BOUT" | grep -qF 'symlinked module entry not followed'; then
+    pass "heal: the child-level symlink warn fires (c S3)"
+else
+    fail "heal: the child-level symlink warn fires (c S3)"
+fi
+
+# C4: submodule worktree registration pointers are pinned like the top
+# gitdir's (helper extraction).
+mkdir -p "$HG/proj/.git/modules/sub/worktrees/wt2"
+printf '..\n' >"$HG/proj/.git/modules/sub/worktrees/wt2/commondir"
+printf '..\n' >"$HG/proj/.git/modules/sub/worktrees/wt2/gitdir"
+FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$HG/proj" "$HGGRP" >/dev/null 2>&1
+assert_eq "heal: submodule worktree commondir pinned (b C4)" "644" \
+    "$(stat -c %a "$HG/proj/.git/modules/sub/worktrees/wt2/commondir")"
+assert_eq "heal: submodule worktree gitdir pinned (b C4)" "644" \
+    "$(stat -c %a "$HG/proj/.git/modules/sub/worktrees/wt2/gitdir")"
+
+# S2/C7: a `/` root is refused — driver and belt both.
+HG8OUT="$(FS_SUDO="" sh -c '. "$1" && _FSB_ERRORS=0 && _fsb_heal_git / "$2" && echo "ERRS=$_FSB_ERRORS"' \
+    _ "$LIB" "$HGGRP" 2>&1)"
+if printf '%s\n' "$HG8OUT" | grep -qF 'never a heal root'; then
+    pass "heal: the / root is refused loud by the driver (b S2)"
+else
+    fail "heal: the / root is refused loud by the driver (b S2) — got: $HG8OUT"
+fi
+if printf '%s\n' "$HG8OUT" | grep -q 'ERRS=1$'; then
+    pass "heal: the / refusal COUNTS as an error (c S4)"
+else
+    fail "heal: the / refusal COUNTS as an error (c S4) — got: $HG8OUT"
+fi
+HG8BRC=0
+FS_SUDO="" sh -c '. "$1" && fs_baseline_root / "$2"' _ "$LIB" "$HGGRP" >/dev/null 2>&1 ||
+    HG8BRC=$?
+assert_eq "belt: the / root is refused before any pass runs (b S2/C7)" "1" "$HG8BRC"
+
+# S1: the wc-guard degradation — a restricted PATH without wc over a
+# tree WITH a non-sample hook must stay rc 0, warn nothing, not abort.
+HG9="$WORK/healnowc"
+HG9BIN="$WORK/healnowc-bin"
+mkdir -p "$HG9/proj/.git/hooks" "$HG9BIN"
+printf 'c\n' >"$HG9/proj/.git/config"
+printf '#!/bin/sh\n' >"$HG9/proj/.git/hooks/planted-x"
+chmod 755 "$HG9/proj/.git/hooks/planted-x"
+for _t in sh find cat chgrp chmod setfacl chown mktemp dirname stat rm xargs; do
+    ln -s "$(command -v "$_t")" "$HG9BIN/$_t"
+done
+HG9RC=0
+HG9OUT="$(FS_SUDO="" PATH="$HG9BIN" \
+    sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$HG9/proj" "$HGGRP" 2>&1)" ||
+    HG9RC=$?
+assert_eq "heal: missing wc degrades to no-warn, no abort (rc 0, b S1)" "0" "$HG9RC"
+if printf '%s\n' "$HG9OUT" | grep -qF 'non-sample entries'; then
+    fail "heal: missing wc must not emit the warn (b S1)"
+else
+    pass "heal: missing wc must not emit the warn (b S1)"
+fi
+
+# S6: the ==0 control arm — a samples-only hooks dir stays silent
+# (HG4 carries only pre-commit.sample; capture the driver output).
+HG4OUT="$(FS_SUDO="" sh -c '. "$1" && _fsb_heal_git "$2/" "$3"' _ "$LIB" "$HG4/proj2" "$HGGRP" 2>&1)"
+if printf '%s\n' "$HG4OUT" | grep -qF 'non-sample entries'; then
+    fail "heal: samples-only hooks dir stays warn-silent (b S6)"
+else
+    pass "heal: samples-only hooks dir stays warn-silent (b S6)"
+fi
+
+# d S1: the depth-1 guard's NEGATIVE arm — an in-tree dir named after
+# a root-path segment (here: "tmp", a segment of every /tmp/... root)
+# must stay UN-sticky when the .git sits directly under the root;
+# without the guard the walk would chew the parent's absolute segments
+# and sticky exactly this dir.
+HG10="$WORK/healneg"
+mkdir -p "$HG10/proj/tmp" "$HG10/proj/.git/hooks"
+printf 'c\n' >"$HG10/proj/.git/config"
+FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$HG10/proj" "$HGGRP" >/dev/null 2>&1
+case "$(stat -c %a "$HG10/proj/tmp")" in
+    [1357]???)
+        fail "heal: segment-named dir stays un-sticky at depth 1 (d S1)"
+        ;;
+    *)
+        pass "heal: segment-named dir stays un-sticky at depth 1 (d S1)"
+        ;;
+esac
+case "$(stat -c %a "$HG10/proj")" in
+    [1357]???)
+        pass "heal: the .git parent itself IS sticky at depth 1 (control)"
+        ;;
+    *)
+        fail "heal: the .git parent itself IS sticky at depth 1 (control)"
+        ;;
+esac
+
+# d S2: the sidecar registrations — a RECORDING _tmp_track over a heal
+# run with symlinks (all three sidecar shapes fire: driver .git scan,
+# container scan, child scan) must log the opk-fsb-heal stems.
+HG11="$WORK/healtrack"
+HG11_TRACK="$HG11/tracked"
+mkdir -p "$HG11/proj/contgit/.git/hooks" "$HG11/proj/realgit/.git/hooks" \
+    "$HG11/proj/realgit/.git/modules/real" "$HG11/tgt"
+printf 'c\n' >"$HG11/proj/contgit/.git/config"
+printf 'c\n' >"$HG11/proj/realgit/.git/config"
+ln -s "$HG11/tgt" "$HG11/proj/contgit/.git/modules"
+ln -s "$HG11/tgt" "$HG11/proj/realgit/.git/modules/lnk-child"
+F12_TRACK="$HG11_TRACK" FS_SUDO="" \
+    sh -c '. "$1" && _tmp_track() { printf "%s\n" "$1" >> "$F12_TRACK"; } \
+    && fs_baseline_root "$2" "$3"' _ "$LIB" "$HG11/proj" "$HGGRP" >/dev/null 2>&1
+# This fixture deterministically registers FOUR sidecars: the driver's
+# .git-symlink scan (empty here — its .git dirs are real), two module
+# container scans (contgit's fires on a real symlink, realgit's is
+# empty) and realgit's child scan (fires on the symlinked child). Empty
+# sidecars still register — the contract is abort-leak coverage. The
+# grep matches the EXACT sidecar shape (stem + 8 mktemp chars + l): a
+# bare mktemp name is exactly 8 chars after the stem — one SHORT of
+# the 9 the {8}l$ pattern requires — so bare names can never match
+# even when their last random char is itself an l (which was the old
+# .*l$ form's ~6%/run flake, #655 e S1).
+if grep -cE 'opk-fsb-heal\.[A-Za-z0-9]{8}l$' "$HG11_TRACK" 2>/dev/null | grep -q '^4$'; then
+    pass "heal: all sidecar temps registered with _tmp_track (d S2)"
+else
+    fail "heal: all sidecar temps registered with _tmp_track (d S2) — got: $(cat "$HG11_TRACK" 2>/dev/null | tr '\n' ' ')"
+fi
+
+rm -rf "$HG" "$HGS" "$HGF" "$HGFSTUB" "$HG4" "$HG5" "$HG6" "$HG7" "$HG9" "$HG9BIN" "$HG10" "$HG11"
+
+# A symlinked operand never gets pinned (the follow would write through
+# the link — the L5 class): a config swapped for a link is skipped with
+# the named warn, the run stays green, and the link TARGET outside the
+# tree keeps its mode.
+HGS="$WORK/healsym"
+mkdir -p "$HGS/proj/.git" "$HGS/outside"
+printf 't\n' >"$HGS/outside/target"
+chmod 600 "$HGS/outside/target"
+ln -s "$HGS/outside/target" "$HGS/proj/.git/config"
+HGSOUT="$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$HGS/proj" "$HGGRP" 2>&1)"
+HGSRC=$?
+assert_eq "heal: symlinked config skips without failing the baseline" "0" "$HGSRC"
+if printf '%s\n' "$HGSOUT" | grep -qF 'git heal skipped'; then
+    pass "heal: the skip names the operand (warn, not silence)"
+else
+    fail "heal: the skip names the operand (warn, not silence)"
+fi
+assert_eq "heal: symlink target outside the tree untouched" "600" \
+    "$(stat -c %a "$HGS/outside/target")"
+
+# A failing heal op fails the WHOLE baseline loud (the F10 contract):
+# a PATH-stubbed chown passes the tool probe but dies per operand —
+# the summary must refuse "applied".
+HGF="$WORK/healfail"
+HGFSTUB="$WORK/healfail-bin"
+mkdir -p "$HGF/proj/.git/hooks" "$HGFSTUB"
+printf 'c\n' >"$HGF/proj/.git/config"
+cat >"$HGFSTUB/chown" <<'EOF'
+#!/bin/sh
+echo "chown stub: deliberate failure" >&2
+exit 1
+EOF
+chmod +x "$HGFSTUB/chown"
+HGFOUT="$(PATH="$HGFSTUB:$PATH" FS_SUDO="" \
+    sh -c '. "$1" && fs_baseline_root "$2" "$3" && echo BASELINE-RC0' \
+    _ "$LIB" "$HGF/proj" "$HGGRP" 2>&1 || true)"
+if printf '%s\n' "$HGFOUT" | grep -q BASELINE-RC0; then
+    fail "heal: a failing heal op must fail the baseline (loud, not green)"
+else
+    pass "heal: a failing heal op must fail the baseline (loud, not green)"
+fi
+if printf '%s\n' "$HGFOUT" | grep -qF 'git heal: chown'; then
+    pass "heal: the failing op is named (chown)"
+else
+    fail "heal: the failing op is named (chown)"
+fi
+rm -rf "$HG" "$HGS" "$HGF" "$HGFSTUB"
+
 # A bare `chgrp <link>` follows the TARGET; chgrp -R (the old code) did
 # not. The pass must skip symlinks entirely — the link's TARGET (here a
 # root-owned system file) keeps its group. NB: plain stat(1) lstats a
@@ -109,8 +481,8 @@ _idem_rc=0
 FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$WORK/proj" "$GRP" >/dev/null 2>&1 ||
     _idem_rc=$?
 assert_eq "idempotent re-run exits 0" "0" "$_idem_rc"
-assert_eq "re-run is idempotent (modes stable)" \
-    "2770 2770 660" \
+assert_eq "re-run is idempotent (modes stable; root keeps sticky, #655 a C1)" \
+    "3770 2770 660" \
     "$(stat -c %a "$WORK/proj") $(stat -c %a "$WORK/proj/sub") $(stat -c %a "$WORK/proj/file.txt")"
 
 # --- 5. empty/missing root is a silent no-op ----------------------------------------
@@ -665,7 +1037,7 @@ mkdir -p "$W23NPBIN" "$W23NP/proj"
 chmod 700 "$W23NP/proj"
 printf 'nopy\n' >"$W23NP/proj/f"
 chmod 600 "$W23NP/proj/f"
-for _t in sh find cat chgrp chmod setfacl mktemp dirname stat getfacl grep rm xargs; do
+for _t in sh find cat chgrp chmod setfacl chown mktemp dirname stat getfacl grep rm xargs wc; do
     ln -s "$(command -v "$_t")" "$W23NPBIN/$_t"
 done
 W23NPRC=0
@@ -686,7 +1058,7 @@ mkdir -p "$W23NPBIN2"
 # reset the fixture the 11b run already baselined: the loud abort must
 # leave the file at 600, proving no pass ran at all
 chmod 600 "$W23NP/proj/f"
-for _t in sh find chgrp chmod setfacl mktemp dirname stat getfacl grep rm xargs; do
+for _t in sh find chgrp chmod setfacl chown mktemp dirname stat getfacl grep rm xargs wc; do
     ln -s "$(command -v "$_t")" "$W23NPBIN2/$_t"
 done
 W23CATRC=0

@@ -428,6 +428,444 @@ _fsb_pass() {
     return 0
 }
 
+# --- .git metadata heal (issue #644, wave #651) ---------------------------------
+#
+# The shared-tree execution gap (#644, confirmed on a kit-managed machine
+# 2026-11-18): the DEVELOPER's git executes from agent-writable surfaces.
+# A hook planted into .git/hooks, or a repo-config arm (core.fsmonitor,
+# core.hooksPath override, diff-driver registration, core.pager/editor),
+# runs with the developer's uid, groups and HOME on the next commit or
+# `git status`. The four passes above share .git wholesale (issue #17 —
+# the agent must be able to commit); the heal narrows exactly the
+# execution-bearing metadata, OS-side, while the agent's git workflow
+# stays intact (verified live: add, commit, branch ops and a push
+# --dry-run all green under the healed state; planted-hook,
+# git-config-write and rename-away probes all blocked — evidence in
+# issue #644):
+#
+#   <project root>   sticky +t — the wholesale arm of the attack
+#                     (mv .git .git.old && mkdir .git/hooks/…) dies
+#                     here: renaming or unlinking a developer-owned
+#                     TOP-LEVEL entry requires the directory owner.
+#                     The SAME sticky bit goes on every ANCESTOR
+#                     directory of each .git, root-exclusive down to
+#                     its parent (#655 b C1: a scan root is not the
+#                     parent of every .git — depth >= 2 grouping dirs
+#                     need it too). Cost: the agent cannot
+#                     rename/delete developer-owned entries of those
+#                     ancestor dirs (content edits unaffected — sticky
+#                     never blocks writes; renames in ordinary,
+#                     non-sticky subdirectories unaffected).
+#   .git              sticky +t only — mode and group stay (the agent
+#                     keeps creating lockfiles, objects, refs and worktree
+#                     registrations; it can no longer unlink or rename
+#                     over the developer-owned entries below)
+#   .git/config       developer-owned 644, ACLs stripped — plain
+#                     commits/pushes only READ it (the first-push `-u`
+#                     tracking write is a documented cost below); any
+#                     write goes through lock+rename, and the sticky
+#                     bit kills the rename
+#   .git/hooks        developer-owned 755, ACLs stripped — no planting;
+#                     the .sample files stay readable for everyone. The
+#                     directory setgid bit SURVIVES a numeric chmod on
+#                     Linux (measured — root included): harmless here,
+#                     it only steers group inheritance of NEW entries,
+#                     and without group write there are none.
+#   .git/modules      the container and every gitdir beneath it pinned
+#                     developer-owned with NO GROUP WRITE — that lost
+#                     write is what blocks wholesale-replacing a child
+#                     gitdir (#655 b Q4: the sticky bit only
+#                     restricts users who still have directory write;
+#                     post-pin the agent has none — sticky is
+#                     load-bearing where group write REMAINS, i.e. on
+#                     .git itself). Every DIRECT child dir of any dir
+#                     named modules pinned marker-free (a hooks-less
+#                     planted gitdir is pinned too, #655 a C3): dir
+#                     3755-in-practice (setgid rides along, see hooks
+#                     above), config 644, hooks 755, hookwarn and the
+#                     worktree arm included; nested modules
+#                     (modules/<a>/modules/<b>) ride the same find.
+#                     A SYMLINKED container or child is never followed
+#                     — surfaced as a warn (#655 b C3).
+#   .git/worktrees    sticky +t only (registrations stay
+#                     agent-manageable — `git worktree add` by the agent
+#                     keeps working); each registration's commondir and
+#                     gitdir POINTER FILES are pinned developer-owned 644
+#                     — the repointing arm dies, the workflow lives.
+#                     The registration dirs themselves keep group write:
+#                     merge-state files (MERGE_HEAD and friends) must
+#                     keep appearing for agent worktree merges.
+#
+# Owner derivation: the project root's owner is the developer in the kit
+# model. A root owned by the agent user is an agent-created tree — the
+# heal still runs (pinning to that owner), it just buys nothing there;
+# that class is a documented residual (#652). And chmod alone is not the
+# mechanism (git writes through lock+rename, which needs directory
+# write, not file write — measured in the #644 probe): OWNERSHIP is what
+# the heal pins.
+#
+# Accepted workflow costs (shipped with #651): repo-scope `git config`
+# and `git submodule add` fail for the agent (both write .git/config) —
+# including the tracking write of a first `git push -u`, so agents push
+# without -u (git push origin <branch>; the transfer itself completes —
+# field-reported 2026-11-18 and recorded in issue #644); the agent
+# cannot rename or delete developer-owned TOP-LEVEL entries (project
+# root sticky, #655 a C1); agent-side `git gc` can hit the sticky bit
+# renaming packed-refs; merges inside agent-created worktrees keep
+# working (their gitdir retains create rights — only the two pointer
+# files are pinned); a repo the agent cloned INTO a developer-owned
+# project tree is healed to the root's owner as well — the agent loses
+# repo-config writes in its own nested clone (#655 a S3; work in the
+# main checkout or an agent-owned root instead).
+# Residual: the .git POINTER FILE inside agent worktree trees stays
+# agent-writable (a delete+recreate sidesteps any pin) — #652 documents,
+# #653 detects. Same for content planted BEFORE the heal: metadata
+# pinning preserves a planted hook file's exec bit and content (the
+# heal warns about non-sample entries it finds; removal is a human
+# decision), and a .git.old-style pre-existing swap is not detected
+# here — #653's detection arm covers both. This is a deliberate scoped
+# exception to the repo's
+# soft-only security rule (AGENTS.md, Rules): OS-level narrowing on .git
+# internals ddev
+# never touches, decided with the maintainer in #651.
+
+# _fsb_comp_clear <root> <path>: the L5 component-walk gate for the
+# heal's root ops — true when no component between <root> (exclusive)
+# and <path> (inclusive) is a symlink. Same walk shape as the _fsb_pass
+# worker above; a standalone function because the heal acts from the
+# main shell, not from an xargs worker string.
+_fsb_comp_clear() {
+    case "$2" in
+        "$1"/*) ;;
+        *) return 1 ;;
+    esac
+    _fscc_pre=$1
+    _fscc_rest=${2#"$1"/}
+    while [ -n "$_fscc_rest" ]; do
+        case "$_fscc_rest" in
+            */*)
+                _fscc_pre=$_fscc_pre/${_fscc_rest%%/*}
+                _fscc_rest=${_fscc_rest#*/}
+                ;;
+            *) _fscc_pre=$2 _fscc_rest="" ;;
+        esac
+        [ -L "$_fscc_pre" ] && return 1
+    done
+    return 0
+}
+
+# _fsb_heal_skip <path>: a symlinked operand (or a path whose components
+# turned into links under us — the agent-writable tree moved between
+# scan and act) is skipped with a warn, NOT a baseline failure: parity
+# with the _fsb_pass worker, which skips symlinked operands the same
+# way. The #653 detection surface reports planted hooks and heal drift.
+_fsb_heal_skip() {
+    printf '  warn: git heal skipped %s (symlinked path — not followed)\n' "$1" >&2
+}
+
+# _fsb_heal_err <path> <what>: a failed op counts into _FSB_ERRORS and
+# fails the baseline loud through the summary gate in fs_baseline_root —
+# "agent cannot commit" weeks later is the worse failure mode.
+_fsb_heal_err() {
+    printf '  warn: git heal: %s failed on %s — see the message above\n' "$2" "$1" >&2
+    _FSB_ERRORS=$((_FSB_ERRORS + 1))
+}
+
+# _fsb_heal_sticky <root> <path>: add the sticky bit to ONE directory
+# that must keep its sharing mode (component walk + leaf recheck first —
+# L5; missing dirs are a no-op: a pristine repo has no worktrees dir).
+_fsb_heal_sticky() {
+    _fshs_p=$2
+    [ -L "$_fshs_p" ] && {
+        _fsb_heal_skip "$_fshs_p"
+        return 0
+    }
+    [ -d "$_fshs_p" ] || return 0
+    _fsb_comp_clear "$1" "$_fshs_p" || {
+        _fsb_heal_skip "$_fshs_p"
+        return 0
+    }
+    _fsb_sudo chmod +t "$_fshs_p" || _fsb_heal_err "$_fshs_p" "chmod +t"
+    return 0
+}
+
+# _fsb_heal_pin <root> <owner> <group> <path> <mode>: pin ONE entry
+# developer-owned with a fixed mode and no extended ACLs (chown ->
+# chmod -> setfacl -b, the pilot-verified sequence). Missing entries are
+# a clean no-op — a bare `git init` carries config and hooks, but a
+# damaged or foreign gitdir may not.
+_fsb_heal_pin() {
+    _fshp_p=$4
+    [ -L "$_fshp_p" ] && {
+        _fsb_heal_skip "$_fshp_p"
+        return 0
+    }
+    [ -e "$_fshp_p" ] || return 0
+    _fsb_comp_clear "$1" "$_fshp_p" || {
+        _fsb_heal_skip "$_fshp_p"
+        return 0
+    }
+    _fsb_sudo chown "$2:$3" "$_fshp_p" || _fsb_heal_err "$_fshp_p" "chown $2"
+    _fsb_sudo chmod "$5" "$_fshp_p" || _fsb_heal_err "$_fshp_p" "chmod $5"
+    _fsb_sudo setfacl -b "$_fshp_p" || _fsb_heal_err "$_fshp_p" "setfacl -b"
+    return 0
+}
+
+# Loop discipline for the two scans below (and the driver): find output
+# goes through a temp file and a redirect-while, never a pipeline while
+# — _FSB_ERRORS increments inside a pipe member die with its subshell
+# (the pipeline-tally class, agent/conventions.md "Script output style").
+
+# _fsb_heal_hookwarn <gitdir>: content-persistence visibility (#644,
+# #655 a C1/b S3) for ONE gitdir's hooks dir — the heal pins METADATA, a
+# hook planted before it keeps its exec bit and content. Informational
+# and uncounted (removal stays a human decision; the #653 detection
+# surface automates the report). Called for the main gitdir AND every
+# module gitdir. The wc guard degrades on a missing wc OR a failed find
+# (both stderr-suppressed) to "no warn" instead of aborting the
+# caller's set -e — the warn is informational, never load-bearing
+# (#655 b S1 pins the degraded branch).
+_fsb_heal_hookwarn() {
+    _fshw_gd=$1
+    [ -d "$_fshw_gd/hooks" ] && [ ! -L "$_fshw_gd/hooks" ] || return 0
+    _fshw_ns=$(_fsb_sudo find "$_fshw_gd/hooks" -mindepth 1 -maxdepth 1 \
+        ! -name '*.sample' -print 2>/dev/null | wc -l 2>/dev/null || printf '0')
+    if [ "${_fshw_ns:-0}" -gt 0 ] 2>/dev/null; then
+        printf '  warn: git heal: %s non-sample entries in %s/hooks — remove manually (issue #644)\n' \
+            "$_fshw_ns" "$_fshw_gd" >&2
+    fi
+    return 0
+}
+
+# _fsb_heal_worktrees <root> <owner> <group> <gitdir>: the worktree arm
+# (#655 b C4 — used for the MAIN gitdir and every module gitdir):
+# sticky over the collection (an agent may add its own registrations
+# and remove its own — sticky keeps every developer-owned registration
+# un-replaceable), and the two repointing pointer files pinned per
+# registration. The registration dirs themselves stay group-writable:
+# `git worktree add` by the agent must keep creating them, and
+# merge-state files inside them (MERGE_HEAD and friends) must keep
+# appearing.
+_fsb_heal_worktrees() {
+    _fshw_wt=$4/worktrees
+    [ -d "$_fshw_wt" ] || return 0
+    _fsb_heal_sticky "$1" "$_fshw_wt"
+    _fshw_hl=$(mktemp "${TMPDIR:-/tmp}/opk-fsb-heal.XXXXXXXX") || {
+        printf '  error: mktemp failed (is $TMPDIR writable?) — the git heal cannot scan %s\n' \
+            "$_fshw_wt" >&2
+        _FSB_ERRORS=$((_FSB_ERRORS + 1))
+        return 0
+    }
+    if command -v _tmp_track >/dev/null 2>&1; then
+        _tmp_track "$_fshw_hl"
+    fi
+    _fsb_sudo find "$_fshw_wt" -mindepth 1 -maxdepth 1 -type d -print >"$_fshw_hl" ||
+        _fsb_heal_err "$_fshw_wt" "the worktree scan (find)"
+    while IFS= read -r _fshw_w; do
+        [ -n "$_fshw_w" ] || continue
+        _fsb_heal_pin "$1" "$2" "$3" "$_fshw_w/commondir" 644
+        _fsb_heal_pin "$1" "$2" "$3" "$_fshw_w/gitdir" 644
+    done <"$_fshw_hl"
+    rm -f "$_fshw_hl"
+    return 0
+}
+
+# _fsb_heal_gitdir <root> <owner> <group> <gitdir>: heal one .git
+# directory (only dirs NAMED .git are enumerated — a bare repo with
+# config/hooks at its root is a different shape and stays shared).
+_fsb_heal_gitdir() {
+    _fshg_gd=$4
+    _fsb_heal_sticky "$1" "$_fshg_gd"
+    _fsb_heal_pin "$1" "$2" "$3" "$_fshg_gd/config" 644
+    _fsb_heal_pin "$1" "$2" "$3" "$_fshg_gd/hooks" 755
+    _fsb_heal_hookwarn "$_fshg_gd"
+    # Submodule gitdirs, marker-free (#655 a C3): every dir named
+    # `modules` under the gitdir is a container (nested modules
+    # modules/<a>/modules/<b> ride the same find); each container is
+    # PINNED 1755 — post-pin it has no group write, and THAT is what
+    # blocks wholesale-replacing a child (#655 b Q4: the sticky bit
+    # only restricts writers, and the agent has none left; sticky is
+    # load-bearing where group write REMAINS, like .git itself) — and
+    # every DIRECT child dir of a container is pinned gitdir-style
+    # (dir 1755, config 644, hooks 755 when present, hookwarn, the
+    # worktree arm). Marker-free on purpose: keying on a hooks dir let
+    # a hooks-less planted gitdir escape pinning silently. A SYMLINKED
+    # container or child dodges every -type d scan — surfaced as a
+    # warn, never followed (#655 b C3).
+    _fshg_ml=$(mktemp "${TMPDIR:-/tmp}/opk-fsb-heal.XXXXXXXX") || {
+        printf '  error: mktemp failed (is $TMPDIR writable?) — the git heal cannot scan %s\n' \
+            "$_fshg_gd" >&2
+        _FSB_ERRORS=$((_FSB_ERRORS + 1))
+        return 0
+    }
+    if command -v _tmp_track >/dev/null 2>&1; then
+        _tmp_track "$_fshg_ml"
+        # the sidecar (base + l) too (#655 c S2): created by the
+        # companion scan's redirect below — same abort-leak class the
+        # base registration closes.
+        _tmp_track "${_fshg_ml}l"
+    fi
+    _fsb_sudo find "$_fshg_gd" -type d -name modules -print >"$_fshg_ml" ||
+        _fsb_heal_err "$_fshg_gd" "the modules scan (find)"
+    _fsb_sudo find "$_fshg_gd" -type l -name modules -print 2>/dev/null >"${_fshg_ml}l" &&
+        while IFS= read -r _fshg_sl; do
+            [ -n "$_fshg_sl" ] || continue
+            printf '  warn: git heal: symlinked modules dir not followed — %s (its gitdirs are outside this heal)\n' \
+                "$_fshg_sl" >&2
+        done <"${_fshg_ml}l"
+    rm -f "${_fshg_ml}l"
+    while IFS= read -r _fshg_m; do
+        [ -n "$_fshg_m" ] || continue
+        _fsb_heal_pin "$1" "$2" "$3" "$_fshg_m" 1755
+        _fshg_cl=$(mktemp "${TMPDIR:-/tmp}/opk-fsb-heal.XXXXXXXX") || {
+            printf '  error: mktemp failed (is $TMPDIR writable?) — the git heal cannot scan %s\n' \
+                "$_fshg_m" >&2
+            _FSB_ERRORS=$((_FSB_ERRORS + 1))
+            continue
+        }
+        if command -v _tmp_track >/dev/null 2>&1; then
+            _tmp_track "$_fshg_cl"
+            _tmp_track "${_fshg_cl}l"
+        fi
+        _fsb_sudo find "$_fshg_m" -mindepth 1 -maxdepth 1 -type d -print >"$_fshg_cl" ||
+            _fsb_heal_err "$_fshg_m" "the module-gitdir scan (find)"
+        _fsb_sudo find "$_fshg_m" -mindepth 1 -maxdepth 1 -type l -print 2>/dev/null >"${_fshg_cl}l" &&
+            while IFS= read -r _fshg_sl; do
+                [ -n "$_fshg_sl" ] || continue
+                printf '  warn: git heal: symlinked module entry not followed — %s\n' "$_fshg_sl" >&2
+            done <"${_fshg_cl}l"
+        rm -f "${_fshg_cl}l"
+        while IFS= read -r _fshg_c; do
+            [ -n "$_fshg_c" ] || continue
+            _fsb_heal_pin "$1" "$2" "$3" "$_fshg_c" 1755
+            _fsb_heal_pin "$1" "$2" "$3" "$_fshg_c/config" 644
+            _fsb_heal_pin "$1" "$2" "$3" "$_fshg_c/hooks" 755
+            _fsb_heal_hookwarn "$_fshg_c"
+            _fsb_heal_worktrees "$1" "$2" "$3" "$_fshg_c"
+        done <"$_fshg_cl"
+        rm -f "$_fshg_cl"
+    done <"$_fshg_ml"
+    rm -f "$_fshg_ml"
+    _fsb_heal_worktrees "$1" "$2" "$3" "$_fshg_gd"
+    return 0
+}
+
+# _fsb_heal_git <root> <group>: sticky the project root (#655 a C1 —
+# the wholesale .git swap dies on it), enumerate every .git directory
+# under the root and heal it. Newline-separated iteration (find -print):
+# the kit's root gates reject whitespace roots; a newline inside a path
+# below the root splits into two halves, and BOTH die as counted errors
+# in the un-gated scans (the modules find ENOENTs on each garbage half
+# — simulated, #655 b Q3): the baseline reddens, fail-loud, never a
+# silent skip (or, against an attacker-created sibling dir, heals
+# IN-TREE: the attacker loses its own plant). Attacker noise either
+# way, never a legit checkout.
+_fsb_heal_git() {
+    # Root normalization (#655 a C4, the _fsb_pass shape): the belt
+    # accepts a single-trailing-slash spelling, and the component walk
+    # strips the root prefix by string match — with the slash kept, the
+    # walk silently voided for every operand. A root that normalizes to
+    # the empty string (`/` — the belt admits it, #655 b S2/C7) is the
+    # whole filesystem: refuse loud, never heal it.
+    _fsh_root=$1
+    while [ "${_fsh_root%/}" != "$_fsh_root" ]; do
+        _fsh_root=${_fsh_root%/}
+    done
+    if [ -z "$_fsh_root" ]; then
+        _fsb_heal_err "/" "the heal root recheck (the whole filesystem is never a heal root)"
+        return 0
+    fi
+    # Heal-entry root recheck (#655 a C5): a root swapped for a symlink
+    # between the passes and the heal turns the scan into an empty
+    # silent no-op — refuse that loud instead (parity with the passes'
+    # #421 batch-head recheck).
+    if [ -L "$_fsh_root" ]; then
+        _fsb_heal_err "$_fsh_root" "the heal entry recheck (root became a symlink)"
+        return 0
+    fi
+    if ! _fsh_owner=$(_fsb_sudo stat -c %u "$_fsh_root" 2>/dev/null); then
+        # Diagnostic rerun (#244 c S3 shape): stderr flows to the user,
+        # the rc is discarded — the counted error below is the loud
+        # part (#655 a S1).
+        _fsb_sudo stat -c %u "$_fsh_root" >/dev/null || true
+        _fsb_heal_err "$_fsh_root" "the owner probe (stat)"
+        return 0
+    fi
+    # Project-root sticky (#655 a C1): the wholesale arm — mv .git
+    # .git.old && mkdir .git — renames a TOP-LEVEL entry, and the bit
+    # that gates that sits on the ROOT. Applied even when no .git is
+    # found: uniform, and a later clone lands protected. Sharing mode
+    # and group stay — the dirs pass re-adds its group bits every run
+    # and +t survives it (g+rwxs never touches the sticky column).
+    _fsb_sudo chmod +t "$_fsh_root" || _fsb_heal_err "$_fsh_root" "chmod +t (project root)"
+    _fsh_list=$(mktemp "${TMPDIR:-/tmp}/opk-fsb-heal.XXXXXXXX") || {
+        printf '  error: mktemp failed (is $TMPDIR writable?) — the git heal cannot run under %s\n' "$_fsh_root" >&2
+        _FSB_ERRORS=$((_FSB_ERRORS + 1))
+        return 0
+    }
+    if command -v _tmp_track >/dev/null 2>&1; then
+        _tmp_track "$_fsh_list"
+        _tmp_track "${_fsh_list}l"
+    fi
+    _fsb_sudo find "$_fsh_root" -type d -name .git -print >"$_fsh_list" ||
+        _fsb_heal_err "$_fsh_root" "the .git scan (find)"
+    while IFS= read -r _fsh_gd; do
+        [ -n "$_fsh_gd" ] || continue
+        printf '  git heal: %s (hooks/config pinned developer-owned, issue #644)\n' "$_fsh_gd" >&2
+        # Ancestor-chain sticky (#655 a C1, b C1): the wholesale swap of
+        # a project dir dies on ITS parent's bit — a scan root (the
+        # install default is a parent like /var/www/vhosts) is not the
+        # parent of every .git beneath it, and at depth >= 2 the
+        # intermediate grouping dirs need the bit just as much. Sticky
+        # every directory from the root (exclusive — the driver pinned
+        # it) down to the .git's parent (inclusive). Cost: no agent
+        # rename/delete of developer-owned entries in those ancestor
+        # dirs — grouping dirs, rarely file-bearing.
+        _fshg_parent=$(dirname "$_fsh_gd")
+        # Ancestor walk only for parents INSIDE the root (#655 c S1,
+        # d S4): parent == root needs no walk (the driver stickied the
+        # root), and a parent outside the root entirely (a heal root
+        # that is itself a dir named .git — plausible misconfiguration)
+        # must not make the walk chew the parent's absolute-path
+        # segments: an in-tree dir named after a root segment could
+        # take an unintended sticky.
+        case "$_fshg_parent" in
+            "$_fsh_root"/*)
+                _fshg_anc=$_fsh_root
+                _fshg_rest=${_fshg_parent#"$_fsh_root"/}
+                while [ -n "$_fshg_rest" ]; do
+                    case "$_fshg_rest" in
+                        */*)
+                            _fshg_anc=$_fshg_anc/${_fshg_rest%%/*}
+                            _fshg_rest=${_fshg_rest#*/}
+                            ;;
+                        *) _fshg_anc=$_fshg_parent _fshg_rest="" ;;
+                    esac
+                    _fsb_heal_sticky "$_fsh_root" "$_fshg_anc"
+                done
+                ;;
+        esac
+        _fsb_heal_gitdir "$_fsh_root" "$_fsh_owner" "$2" "$_fsh_gd"
+    done <"$_fsh_list"
+    rm -f "$_fsh_list"
+    # Symlinked .git entries (#655 b C2): invisible to the -type d scan
+    # above, so a plant predating the first heal (or any repo-less
+    # dev-owned dir) would point the developer's git at an agent-owned
+    # gitdir OUTSIDE this tree — never healed, never mentioned. A
+    # worktree pointer .git is a regular FILE (legitimate); a symlinked
+    # .git is always foreign. Warn loudly, never follow; #653 automates
+    # the report.
+    if _fsb_sudo find "$_fsh_root" -type l -name .git -print 2>/dev/null >"${_fsh_list}l"; then
+        while IFS= read -r _fsh_sl; do
+            [ -n "$_fsh_sl" ] || continue
+            printf '  warn: git heal: symlinked .git not followed — %s (its hooks/config are outside this heal)\n' \
+                "$_fsh_sl" >&2
+        done <"${_fsh_list}l"
+    fi
+    rm -f "${_fsh_list}l"
+    return 0
+}
+
 # fs_baseline_root <root> <group>: the full recursive baseline —
 #   1. chgrp every entry to the sharing group
 #   2. setgid + group rwx on every directory (new files anywhere in the
@@ -435,6 +873,12 @@ _fsb_pass() {
 #   3. group rw on every file (developer and agent edit each other's
 #      pre-install files; .git included, issue #17)
 #   4. default ACLs g:<group>:rwx on every directory (governs new files)
+#   5. the .git metadata heal (#644/#651) — the execution-bearing
+#      entries above are re-narrowed after the sharing passes: .git
+#      sticky, config/hooks (and the submodule/worktree arms) pinned
+#      developer-owned without group write. The passes and the heal run
+#      in this order every time, so a re-run re-shares and re-heals in
+#      one idempotent cycle.
 # Idempotent; re-runs on install, `config.sh projects add` / `refresh`
 # and `update.sh --refresh`. Ancestors come first (fs_ensure_traversable
 # above): the passes below fix <root> down, but without traversable
@@ -464,6 +908,15 @@ fs_baseline_root() {
             return 1
             ;;
     esac
+    # Whole-filesystem refusal (#655 b S2/C7): the form arms below
+    # admit a bare `/` — the sharing passes would run filesystem-wide
+    # before any downstream gate noticed. Unreachable via shipped
+    # writers (path-sane blocklists `/`), exactly the direct/future
+    # caller class this belt exists for.
+    if [ "$fsb_root" = "/" ]; then
+        printf '  error: / is never a baseline root (the whole filesystem is out of scope)\n' >&2
+        return 1
+    fi
     case "$fsb_root" in
         *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]*)
             printf '  error: %s is a malformed root (dot/empty segment or whitespace) — refusing the group baseline\n' \
@@ -505,7 +958,11 @@ fs_baseline_root() {
     # probed with the rest since #223: the python3-less fallback of
     # _fsb_count_tee pipes the pass through it — a missing cat would
     # rebuild the exact empty-stream false-green the gate closes.
-    for _fsb_tool in find cat chgrp chmod setfacl; do
+    # Wholesale-failure detection part 2: probe chown and dirname too —
+    # chown is heal-only (the sharing passes chgrp), dirname feeds the
+    # ancestor-chain rider unguarded (#655 b C6); both must fail BEFORE
+    # the walk, not abort mid-baseline under the callers' set -e.
+    for _fsb_tool in find cat chgrp chmod setfacl chown dirname; do
         if ! command -v "$_fsb_tool" >/dev/null 2>&1; then
             printf '  error: required tool missing for the group baseline: %s\n' "$_fsb_tool" >&2
             return 1
@@ -519,6 +976,13 @@ fs_baseline_root() {
     _fsb_pass "dirs g+rwxs" "$fsb_root" -type d -- chmod g+rwxs
     _fsb_pass "files g+rw" "$fsb_root" -type f -- chmod g+rw
     _fsb_pass "default ACLs" "$fsb_root" -type d -- setfacl -d -m "g:$fsb_group:rwx"
+    # The heal AFTER the sharing passes, every run (#644/#651): the
+    # passes above re-grant group write on .git/config and .git/hooks
+    # (files g+rw / dirs g+rwxs / default ACLs) — this is by design,
+    # the pinning below re-narrows them in the same breath. Ordering is
+    # load-bearing: a heal run before the passes would be undone by
+    # them.
+    _fsb_heal_git "$fsb_root" "$fsb_group"
     # Wholesale-failure detection part 2: propagate the per-pass error
     # count (0.0.43a F10). Fail-loud on purpose — the callers' success
     # lines ("group + setgid + default ACLs applied") must not print
