@@ -3,8 +3,9 @@
 Add, list, and remove the directories the agent may work in.
 
 Project roots are stored in `/etc/opencode-permissions-kit/projects.conf`
-(one absolute path per line). The wrapper only allows opencode to start
-inside one of these directories or their subdirectories.
+(one absolute path per line; lines starting with `#` are comments). The
+wrapper only allows opencode to start inside one of these directories or
+their subdirectories.
 
 ## Add a project directory
 

@@ -337,17 +337,26 @@ ddev_migrate_has_db() {
 
 # _ddev_migrate_show <value>
 # Sanitized-for-DISPLAY form of a registry/manifest-derived string:
-# every byte outside printable ASCII becomes '?'. Escape bytes in a
-# tampered name, approot or dump operand must not forge transcript
-# lines at the very messages that report the tampering (#642 a S1,
-# the uninstall-core pr-00263 a F9 class). Display only — the raw
-# value stays the data currency (manifest lines, grep -F operands,
-# argv, paths).
+# every byte outside printable ASCII becomes '?', and backslash RUNS
+# collapse to a single '?'. Escape bytes in a tampered name, approot or
+# dump operand must not forge transcript lines at the very messages
+# that report the tampering (#642 a S1, the uninstall-core pr-00263
+# a F9 class); the backslash leg is the same duty one step later
+# (#670 a M1): a LITERAL backslash survives the printable-range scrub,
+# and the kit's rows render through `echo`, whose dash variant
+# interprets `\033`-style escapes — a scrubbed `p\033[31m` would
+# re-materialize the raw ESC byte at display time (bash-as-sh prints
+# it literally; /bin/sh is dash on the kit's primary targets). Display
+# only — the raw value stays the data currency (manifest lines, grep
+# -F operands, argv, paths).
 _ddev_migrate_show() {
     # Run-collapsing (#642 b S2): non-printable bytes degrade to one
     # '?' per RUN — a multi-byte UTF-8 character (and any adjacent
     # ones) share a single '?', not one per byte or per character.
-    printf '%s' "$1" | LC_ALL=C sed 's/[^ -~][^ -~]*/?/g'
+    # Backslash runs share the collapse for the same reason (the
+    # doctor display copies strip them outright, doctor-core's
+    # `tr -d '\\'` sites).
+    printf '%s' "$1" | LC_ALL=C sed -e 's/[^ -~][^ -~]*/?/g' -e 's/[\\][\\]*/?/g'
 }
 
 # ddev_migrate_export <dev-user> <opencode-user> <opencode-group> <root> [root ...]

@@ -485,6 +485,10 @@ update_redeploy_project_roots() {
         _ho_announced=false
         while IFS= read -r root; do
             [ -z "$root" ] && continue
+            # Comment line (#660 M6, the status reader's idiom): a comment
+            # is not a path attempt — skip it before the form gates instead
+            # of warning "not an absolute project path" over an annotation.
+            case "$root" in '#'*) continue ;; esac
             # Form gate, writer parity (review a S1/S2, completed b X1,
             # issue #245): `link/.` dodges the [ -L ] gate below and
             # the helper belt's strip (recursive baseline on the link's

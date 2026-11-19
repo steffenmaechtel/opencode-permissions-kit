@@ -802,6 +802,39 @@ else
     fail "ancestry stat failure section (out=$(printf '%s' "$_s4out3" | head -5))"
 fi
 
+# --- #660 M6: comment lines in projects.conf render no false-red rows ------------
+# The reader used to feed "# note" to [ -d ] and count a ui_miss "directory
+# missing" row per comment -- a hand-annotated conf read as exit-1 red. The
+# count row must also name the real entries only.
+_m6conf="$WORK/s4-m6-projects.conf"
+mkdir -p "$WORK/s4m6/proj"
+{
+    printf '%s\n' '# ops annotation'
+    printf '%s\n' "$WORK/s4m6/proj"
+} >"$_m6conf"
+_m6out=$(
+    (
+        set +e
+        . "$UI_LIB"
+        . "$STATUS_CORE"
+        OPENCODE_USER=root
+        PROJECTS_CONF="$_m6conf"
+        status_section_projects
+    ) 2>&1
+) || true
+if ! printf '%s' "$_m6out" | grep -qF 'directory missing' &&
+    ! printf '%s' "$_m6out" | grep -qF '# ops annotation'; then
+    pass "comment lines render no miss rows (#660 M6)"
+else
+    fail "a comment line must not render a miss row (#660 M6, out=$(printf '%s' "$_m6out" | head -5))"
+fi
+if printf '%s' "$_m6out" | grep -qF 'Projects (1)' &&
+    printf '%s' "$_m6out" | grep -qF "$WORK/s4m6/proj"; then
+    pass "comment lines do not count as projects; the real root renders (#660 M6)"
+else
+    fail "the projects count/rows must skip comments (#660 M6, out=$(printf '%s' "$_m6out" | head -5))"
+fi
+
 # (#621 a S1) — a host without getfacl: the audit degrades disclosed, not
 # blind — stat-only verdicts stay counted, the unknown row stays away, and
 # the section names the missing probe once.

@@ -75,7 +75,7 @@ _trap_cleanup() {
         "${RACESTUB:-}" "${RACESP:-}" "${RACESPS:-}" "${RACEC:-}" \
         "${RACECT:-}" "${RACEF:-}" "${RACEFT:-}" "${_112_dir:-}" \
         "${CB285:-}" "${SWAPF:-}" "${SWAPB:-}" "${SWAPR:-}" \
-        "${SWAPRB:-}" "${D2_dir:-}"
+        "${SWAPRB:-}" "${D2_dir:-}" "${D7STUB:-}"
 }
 trap _trap_cleanup EXIT INT TERM
 
@@ -132,6 +132,55 @@ else
     # test-update-flags.sh), an info row (test-status.sh) -- no
     # counter either way (#495 a A1).
     echo "  SKIP  helper refuses a non-opencode caller (current user IS opencode/undeterminable)"
+fi
+
+# --- 1b. #660 (#568 a D7 class): no numeric fallback on the uid probe ------------
+# With the opencode user missing (half-uninstalled kit) the old probe's
+# `|| echo 0` manufactured uid 0, and a ROOT caller passed the guard (the
+# helper then ran ddev as root, which ddev itself refuses with a confusing
+# error). The stubbed id makes every NAMED-user probe fail while the bare
+# `id -u` reports 0 — a simulated root caller: the guard must still
+# refuse. The ddev stub keeps a sabotaged (guard-passing) run from ever
+# reaching a host ddev binary.
+D7STUB=$(mktemp -d)
+mkdir -p "$D7STUB/bin"
+# id stub: the BARE caller probe (`id -u`, one flag operand) reports 0 —
+# a simulated root caller; any NAMED-user probe (`id -u <name>`, two
+# operands) fails — the user is "missing".
+printf '#!/bin/sh\n[ "$1" = -u ] && [ "$#" -eq 1 ] && echo 0 && exit 0\nexit 1\n' >"$D7STUB/bin/id"
+chmod +x "$D7STUB/bin/id"
+printf '#!/bin/sh\necho "ddev stub reached" >&2\nexit 42\n' >"$D7STUB/bin/ddev"
+chmod +x "$D7STUB/bin/ddev"
+printf 'OPENCODE_USER=whatever\n' >"$D7STUB/conf"
+set +e
+OUT=$(OPK_INSTALL_CONF="$D7STUB/conf" PATH="$D7STUB/bin:$PATH" sh "$HELPER" --version 2>&1)
+RC=$?
+set -e
+assert_eq "helper refuses a simulated root caller when the user probe fails (#660)" "1" "$RC"
+check "guard hint names the user on the probe-failure refusal (#660)" \
+    sh -c "printf '%s' \"\$1\" | grep -qF \"must run as user 'whatever'\"" _ "$OUT"
+check_fail "helper has no numeric uid fallback left (#660)" \
+    grep -qF 'id -u "$OPENCODE_USER" 2>/dev/null || echo 0' "$HELPER"
+
+# (#670 a M2) option-shaped conf user: GNU `id -u "-u"` parses the value
+# as a flag and prints the CALLER's uid — the guard self-passed for every
+# caller (host-verified in round a). The shape gate falls back to
+# 'opencode'; the stubbed id (named probes fail) then refuses. Pre-fix
+# the guard passed and the ddev stub was reached (rc 42).
+printf 'OPENCODE_USER=-u\n' >"$D7STUB/conf-opt"
+set +e
+OUT=$(OPK_INSTALL_CONF="$D7STUB/conf-opt" PATH="$D7STUB/bin:$PATH" sh "$HELPER" --version 2>&1)
+RC=$?
+set -e
+assert_eq "helper refuses an option-shaped conf user (#670 a M2)" "1" "$RC"
+check "option-shaped user: WARN names the charset-clean value (#670 a M2)" \
+    sh -c "printf '%s' \"\$1\" | grep -qF \"WARN: invalid OPENCODE_USER value in install.conf ('-u')\"" _ "$OUT"
+check "option-shaped user: guard hint names the fallback user (#670 a M2)" \
+    sh -c "printf '%s' \"\$1\" | grep -qF \"must run as user 'opencode'\"" _ "$OUT"
+if printf '%s' "$OUT" | grep -qF 'ddev stub reached'; then
+    fail "an option-shaped user must not reach the guard-passed path (#670 a M2)"
+else
+    pass "option-shaped user never reaches the guard-passed path (#670 a M2)"
 fi
 
 # --- 2. helper ddev-resolution / env / exec logic (static) ---------------------

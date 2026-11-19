@@ -156,6 +156,12 @@ wrapper_refusal() {
             count=0
             while IFS= read -r root; do
                 [ -z "$root" ] && continue
+                # Comment line (#670 a L1, the status reader's idiom): a
+                # '#'-annotation is not a suggested project directory —
+                # the old loop printed it under "Valid project
+                # directories:" and it counted toward the 10-row cap,
+                # contradicting files.md's every-reader claim.
+                case "$root" in '#'*) continue ;; esac
                 count=$((count + 1))
                 if [ "$count" -gt 10 ]; then
                     echo "  ... and more"
@@ -634,8 +640,27 @@ wrapper_container_resolve() {
                     # root-equivalent docker group — warn loudly and run without.
                     sock_host="${OPENCODE_DOCKER_HOST:-}"
                     if sock_reachable "$sock_host"; then
-                        CONTAINER_DOCKER_HOST="$sock_host"
-                        CONTAINER_XDG="/run/user/$(id -u opencode 2>/dev/null || echo 0)"
+                        # No numeric fallback on the uid probe (#606 a M4 /
+                        # #660, the ddev-terminal.sh #568 a D7 mirror): with
+                        # the opencode user missing (half-uninstalled kit)
+                        # `id -u opencode || echo 0` pointed XDG_RUNTIME_DIR
+                        # at ROOT's runtime dir (/run/user/0) — with a
+                        # configured backend and a reachable socket, container
+                        # tools then failed with a confusing socket error
+                        # instead of the loud warning every other degraded
+                        # state prints here. A missing user degrades the same
+                        # way: no container tools, say why.
+                        if _wc_uid=$(id -u opencode 2>/dev/null); then
+                            CONTAINER_DOCKER_HOST="$sock_host"
+                            CONTAINER_XDG="/run/user/$_wc_uid"
+                        else
+                            note "${RED}WARNING: the opencode user is missing — the kit is half-uninstalled.${NC}"
+                            note "${YELLOW}Running WITHOUT container tools""\
+ — repair with a re-run of install.sh (or remove with opk uninstall).${NC}"
+                            note ""
+                            CONTAINER_REQUESTED=false
+                            CONTAINER_AUTO=false
+                        fi
                     else
                         note "${RED}WARNING: docker-rootless socket not reachable (${sock_host:-unset}).${NC}"
                         note "${YELLOW}Running WITHOUT container tools""\
@@ -654,8 +679,19 @@ wrapper_container_resolve() {
                     sock_host="${OPENCODE_PODMAN_SOCKET:-}"
                     if [ -n "$sock_host" ]; then
                         if sock_reachable "$sock_host"; then
-                            CONTAINER_DOCKER_HOST="$sock_host"
-                            CONTAINER_XDG="/run/user/$(id -u opencode 2>/dev/null || echo 0)"
+                            # Same no-numeric-fallback rule as the
+                            # docker-rootless arm above (#606 a M4 / #660).
+                            if _wc_uid=$(id -u opencode 2>/dev/null); then
+                                CONTAINER_DOCKER_HOST="$sock_host"
+                                CONTAINER_XDG="/run/user/$_wc_uid"
+                            else
+                                note "${RED}WARNING: the opencode user is missing — the kit is half-uninstalled.${NC}"
+                                note "${YELLOW}Running WITHOUT container tools""\
+ — repair with a re-run of install.sh (or remove with opk uninstall).${NC}"
+                                note ""
+                                CONTAINER_REQUESTED=false
+                                CONTAINER_AUTO=false
+                            fi
                         else
                             note "${RED}WARNING: podman-rootless socket not reachable ($sock_host).${NC}"
                             note "${YELLOW}Running WITHOUT container tools""\
@@ -665,7 +701,23 @@ wrapper_container_resolve() {
                             CONTAINER_AUTO=false
                         fi
                     elif command -v podman >/dev/null 2>&1; then
-                        CONTAINER_PODMAN=true
+                        # Same missing-user rule as the socket arms above
+                        # (#660, completed #670 a L3): the podman-CLI path
+                        # is daemonless (no socket to probe), but a missing
+                        # opencode user is still a half-uninstalled kit --
+                        # degrade loudly instead of resolving to container
+                        # tools whose entry exec dies at sudo -u opencode
+                        # (a GREEN advisory over a broken environment).
+                        if _wc_uid=$(id -u opencode 2>/dev/null); then
+                            CONTAINER_PODMAN=true
+                        else
+                            note "${RED}WARNING: the opencode user is missing — the kit is half-uninstalled.${NC}"
+                            note "${YELLOW}Running WITHOUT container tools""\
+ — repair with a re-run of install.sh (or remove with opk uninstall).${NC}"
+                            note ""
+                            CONTAINER_REQUESTED=false
+                            CONTAINER_AUTO=false
+                        fi
                     else
                         note "${RED}WARNING: podman-rootless backend selected but 'podman' is not installed.${NC}"
                         note "${YELLOW}Running WITHOUT container tools""\

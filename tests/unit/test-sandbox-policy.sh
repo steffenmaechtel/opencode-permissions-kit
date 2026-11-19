@@ -70,6 +70,11 @@ tests/unit/test-project-paths.sh|/var/www/vhosts//
 tests/unit/test-project-paths.sh|/var/www/vhosts/////
 tests/unit/test-project-paths.sh|/var/www/vhosts/client
 tests/unit/test-project-paths.sh|/var/www/vhosts/client1
+# #670 a L2 writer-refusal arms: cntrl/backslash screening inputs —
+# the gate refuses them before any filesystem act ([ -L ] sits below),
+# policy-INPUT like the rows above
+tests/unit/test-project-paths.sh|/var/www/vhosts/evil
+tests/unit/test-project-paths.sh|/var/www/vhosts/back
 # screening-pattern loop values fed to greps against the uninstall
 # section lib (#346 wave 4 moved the cluster from test-uninstall.sh to
 # test-uninstall-core.sh with un_projects_revert)

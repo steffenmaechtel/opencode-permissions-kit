@@ -492,6 +492,50 @@ rc_doctor "no opk.json -> rc 2" 2 "$PROJ"
 grep_last_out "no-policy warn" grep -qF "no opk.json found"
 grep_last_out "no-policy row suggests detect" grep -qF "or run 'opk doctor detect'"
 
+# --- #660 M7: scan-mode rows that name the root render the SANITIZED path ------
+# Scan mode deliberately has no cntrl gate on the root (the fix/detect
+# gates guard operand round-trips); the display rows must not pass a
+# control byte from the directory name on to the terminal. Clean paths
+# round-trip byte-identical (doctor_show_sanitize contract).
+ESCPROJ="$WORK/esc$(printf '\033')proj"
+mkdir -p "$ESCPROJ"
+rc_doctor "esc-named root, no policy -> rc 2" 2 "$ESCPROJ"
+grep_last_out "M7: header row shows the stripped root" grep -qF "project root   $WORK/escproj"
+grep_last_out "M7: no-policy warn shows the stripped root" \
+    grep -qF "no opk.json found in $WORK/escproj -- nothing to check"
+if printf '%s' "$_rd_out" | LC_ALL=C grep -q "$(printf '\033')"; then
+    fail "an esc-named root must not leak its escape byte into any row (#660 M7)"
+else
+    pass "esc-named root: no raw escape byte in the output (#660 M7)"
+fi
+rm -rf "${ESCPROJ:?}"
+
+# #660 M7 examples row: the at-risk EXAMPLES under a declared tree are
+# find output (agent-choosable names) — the row must show the scrubbed
+# spelling. At-risk on purpose: the daemon-only range map leaves the
+# suite user's files unmapped, so the examples pass actually runs. The
+# mapped fixture around this point is saved and restored.
+ESCEX="$WORK/esc-examples"
+mkdir -p "$ESCEX/tree"
+echo x >"$ESCEX/tree/one"
+echo y >"$ESCEX/tree/evil$(printf '\033')name"
+printf '%s\n' '{"containerTrees":["tree"]}' >"$ESCEX/opk.json"
+rm -rf "$PROCFIX"
+mkmap 42 "0 0 1"
+_rd_rc=0
+_rd_out="$(OPK_INSTALL_CONF="$CONF" OPK_DOCTOR_PROC_ROOT="$PROCFIX" OPK_DOCTOR_OPK="${RD_OPK:-}" \
+    NO_COLOR=1 setsid sh "$DOCTOR" "$ESCEX" </dev/null 2>&1)" || _rd_rc=$?
+if [ "$_rd_rc" = 1 ] &&
+    printf '%s' "$_rd_out" | grep -qF 'examples:' &&
+    printf '%s' "$_rd_out" | grep -qF 'evilname' &&
+    ! printf '%s' "$_rd_out" | LC_ALL=C grep -q "$(printf '\033')"; then
+    pass "examples row shows the scrubbed entry name (#660 M7)"
+else
+    fail "the examples row must scrub entry names (#660 M7, rc $_rd_rc)"
+fi
+rm -rf "${ESCEX:?}" "$PROCFIX"
+mkmap 42 "0 0 1" "1 $CURUID 65536"
+
 # --- 4b. walk-up opk.json discovery (#353 / #313 phase 4) ---------------------------
 # Without a positional (a plain '.' counts as none) the root is
 # discovered upward from the invocation dir, nearest opk.json wins,
@@ -510,6 +554,24 @@ grep_last_out "root via row names the start dir" \
     grep -qF "root via       walk-up from $PROJ/sub/deep (nearest opk.json)"
 grep_last_out "trees resolve against the discovered root" \
     grep -qF "tree -- 3 entries mapped-safe"
+
+# #660 M7 walk-up variant: the "root via" row names the START dir (the
+# invocation cwd) -- same display duty while the discovery itself works on
+# raw bytes. Runs on the same verified-range fixture as the arms above.
+ESCWALK="$(work_new)"
+mkdir -p "$ESCWALK/w$(printf '\033')alk/sub"
+printf '%s\n' '{"containerTrees":[]}' >"$ESCWALK/w$(printf '\033')alk/opk.json"
+rc_doctor_in "M7: walk-up from an esc-named dir -> rc 0" 0 "$ESCWALK/w$(printf '\033')alk/sub"
+grep_last_out "M7: root-via row shows the stripped start dir" \
+    grep -qF "root via       walk-up from $ESCWALK/walk/sub (nearest opk.json)"
+grep_last_out "M7: header row shows the stripped discovered root" \
+    grep -qF "project root   $ESCWALK/walk"
+if printf '%s' "$_rd_out" | LC_ALL=C grep -q "$(printf '\033')"; then
+    fail "the root-via/header rows must not leak the escape byte (#660 M7)"
+else
+    pass "root-via and header rows sanitized over an esc-named dir (#660 M7)"
+fi
+rm -rf "${ESCWALK:?}"
 
 # invocation AT the root: found at depth 0 -- no discovery row (v1
 # output unchanged for the workspace-root workflow, #313's primary UX)
@@ -661,6 +723,17 @@ grep_last_out "policy rejected error row" grep -qF "policy file was rejected"
 rc_doctor "two args -> rc 64" 64 "$PROJ" "$PROJ"
 rc_doctor "flag arg -> rc 64" 64 --short
 rc_doctor "nonexistent dir -> rc 64" 64 "$WORK/no-such-project"
+
+# #660 M7: the no-such-directory row renders the sanitized spelling -- the
+# operand is operator/argv-sourced and can carry control bytes
+rc_doctor "esc-named nonexistent dir -> rc 64" 64 "$WORK/no$(printf '\033')such"
+grep_last_out "M7: no-such-directory row sanitized" \
+    grep -qF "no such directory: $WORK/nosuch"
+if printf '%s' "$_rd_out" | LC_ALL=C grep -q "$(printf '\033')"; then
+    fail "the no-such-directory row must not leak the escape byte (#660 M7)"
+else
+    pass "no-such-directory row sanitized (#660 M7)"
+fi
 
 # --- 4c. multi-project marker scan (#354 / #313 phase 5) -----------------------------
 # 'doctor all': opk.json markers DISCOVER the projects (find -maxdepth 3
@@ -827,6 +900,80 @@ if live_src "$DOCTOR_CORE" | grep -qF 'doctor_roots_append "$OPK_DOCTOR_SCAN_ROO
     pass "doctor_all: both roots-read arms route through the helper (#569 M5)"
 else
     fail "doctor_all: roots-read arms (#569 M5)"
+fi
+
+# --- #660: roots-list hygiene (M6 comments, M7 sanitize, M8 dedupe) ---------------
+# M7: the unreadable-seam warn row renders the SANITIZED operand -- the
+# env/conf-sourced path can carry control bytes, and the row that reports
+# the failed read must not pass them on (helper-level, the M5 seam shape:
+# a vanished path is the deterministic read failure). stderr is captured
+# SEPARATELY: grep's own "No such file..." diagnostic echoes the raw
+# operand bytes (tool diagnostics, not a kit-rendered row -- the same
+# class as any find/stat error on hostile paths, out of this wave's
+# scope); the row itself renders on stdout, the channel production
+# observes it on.
+(
+    . "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/ui.sh"
+    . "$DOCTOR_CORE"
+    : >"$WORK/m7-dst"
+    doctor_roots_append "$WORK/m7-esc$(printf '\033')gone" "$WORK/m7-dst"
+) >"$WORK/m7-esc.out" 2>"$WORK/m7-esc.err"
+if grep -qF "m7-escgone unreadable -- its roots are not scanned" "$WORK/m7-esc.out" &&
+    ! LC_ALL=C grep -q "$(printf '\033')" "$WORK/m7-esc.out"; then
+    pass "doctor_roots_append: unreadable warn row is sanitized (#660 M7)"
+else
+    fail "doctor_roots_append: unreadable warn row must be sanitized (#660 M7)"
+fi
+
+# M7: the seam-value error row (env operand) renders the sanitized value.
+rc_doctor_roots "all: esc-named seam value -> loud rc 1" 1 "$WORK/esc$(printf '\033')seam" all
+grep_last_out "M7: seam error row sanitized" \
+    grep -qF "is set but not a readable file: $WORK/escseam"
+if printf '%s' "$_rd_out" | LC_ALL=C grep -q "$(printf '\033')"; then
+    fail "the seam error row must not leak the escape byte (#660 M7)"
+else
+    pass "seam error row sanitized (#660 M7)"
+fi
+
+# M6: '#'-lines in a roots list are annotations, not roots -- the old
+# reader fed "# note" to the absolute gate and warned over a comment.
+ALLCMT="$WORK/all-comments.txt"
+{
+    printf '%s\n' '# annotated by ops'
+    printf '%s\n' "$ALLGREEN"
+} >"$ALLCMT"
+rc_doctor_roots "all: comment line skipped, real root scanned -> rc 0" 0 "$ALLCMT" all
+grep_last_out "M6: the real root under a comment still scans" \
+    grep -qF "projects       1 scanned under 1 scan root(s)"
+if printf '%s' "$_rd_out" | grep -qF "'#"; then
+    fail "a comment line must not render a warn row (#660 M6)"
+else
+    pass "comment lines render no warn rows (#660 M6)"
+fi
+
+# M8: two spellings of one root ('x', 'x/') normalize together -- the tree
+# walks ONCE. Pre-fix, the raw-line sort -u kept both: same discovered
+# projects (the list dedupes), double scan time, USED count 2.
+ALLDUP="$WORK/all-dup.txt"
+{
+    printf '%s\n' "$ALLGREEN"
+    printf '%s/\n' "$ALLGREEN"
+} >"$ALLDUP"
+rc_doctor_roots "all: duplicate spellings -> green fleet rc 0" 0 "$ALLDUP" all
+grep_last_out "M8: normalized duplicates walk as one root" \
+    grep -qF "projects       1 scanned under 1 scan root(s)"
+
+# M7: the absolute-gate row renders the sanitized line (the gate itself
+# still sees the RAW pre-normalization spelling, #370 a C3).
+ALLRESC="$WORK/all-rel-esc.txt"
+printf 'rel\033root\n' >"$ALLRESC"
+rc_doctor_roots "all: esc-carrying relative line skipped -> rc 2" 2 "$ALLRESC" all
+grep_last_out "M7: absolute-gate row sanitized" \
+    grep -qF "'relroot' is not an absolute path -- skipped"
+if printf '%s' "$_rd_out" | LC_ALL=C grep -q "$(printf '\033')"; then
+    fail "the absolute-gate row must not leak the escape byte (#660 M7)"
+else
+    pass "absolute-gate row sanitized (#660 M7)"
 fi
 
 # missing scan root in the seam: warn + skip; nothing was scanned, so
@@ -1035,6 +1182,18 @@ ln -s "$ALLGREEN" "$ALLSYM/rootlink"
 rc_doctor "a F11: symlinked scan root followed (-H) -> rc 0" 0 all "$ALLSYM/rootlink"
 grep_last_out "a F11: marker found through the root link" grep -qF "tree -- 2 entries mapped-safe"
 
+# #660 M7: the symlinked-project row renders the SANITIZED link name -- find
+# output carries agent-choosable bytes under the scanned tree.
+ln -s "$ALLSYM/realproj" "$ALLSYM/esc$(printf '\033')link"
+rc_doctor "all: esc-named project symlink warned -> rc 0" 0 all "$ALLSYM"
+grep_last_out "M7: symlink warn row sanitized" \
+    grep -qF "symlinked project '$ALLSYM/esclink' is not descended -- pass the real directory"
+if printf '%s' "$_rd_out" | LC_ALL=C grep -q "$(printf '\033')"; then
+    fail "the symlink warn row must not leak the escape byte (#660 M7)"
+else
+    pass "symlink warn row sanitized (#660 M7)"
+fi
+
 # F8: a control-character root line (CRLF-edited seam) is skipped with a
 # sanitized warn row
 ALLCRLF="$WORK/all-crlf.txt"
@@ -1240,6 +1399,21 @@ _rd_out="$(OPK_INSTALL_CONF="$WORK/bad-user.conf" NO_COLOR=1 sh "$DOCTOR" "$PROJ
 [ "$_rd_rc" = 1 ] && printf '%s' "$_rd_out" | grep -qF "does not exist" &&
     pass "unknown daemon user -> rc 1" ||
     fail "unknown daemon user -> rc 1 (rc $_rd_rc)"
+
+# #660 M7: a SHAPE-INVALID conf user falls back to 'opencode' loudly, the
+# sibling idiom of status.sh/update.sh/config.sh. No rc assert: the
+# fallback user exists on kit hosts and not on CI -- the WARN row, its
+# sanitized form and the escape-free output are the deterministic parts.
+printf 'OPENCODE_USER=bad\033user\nVERSION=9.9.9\n' >"$WORK/esc-user.conf"
+_rd_rc=0
+_rd_out="$(OPK_INSTALL_CONF="$WORK/esc-user.conf" NO_COLOR=1 sh "$DOCTOR" "$PROJ" 2>&1)" || _rd_rc=$?
+if printf '%s' "$_rd_out" | grep -qF "WARN: invalid OPENCODE_USER value in install.conf ('bad?user')" &&
+    printf '%s' "$_rd_out" | grep -qF "falling back to 'opencode'" &&
+    ! printf '%s' "$_rd_out" | LC_ALL=C grep -q "$(printf '\033')"; then
+    pass "shape-invalid OPENCODE_USER: sanitized WARN + fallback to 'opencode' (#660 M7)"
+else
+    fail "shape-invalid OPENCODE_USER must warn sanitized and fall back (#660 M7, rc $_rd_rc)"
+fi
 
 # unreadable subtree: the scan must warn, never shrink silently (L1)
 rm -rf "$PROCFIX"

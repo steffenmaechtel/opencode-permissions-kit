@@ -20,7 +20,7 @@ asks before removing the kit block; your own entries always stay.
 | Path | Purpose |
 |---|---|
 | `install.conf` | Install settings (keys below) |
-| `projects.conf` | Project roots, one per line |
+| `projects.conf` | Project roots, one per line (`#` comments) |
 | `handover/` | Scan-skip stamps for the ddev handover |
 | `sudoers` | Deployed sudoers rules (root-owned; symlinked as `/etc/sudoers.d/opencode-permissions-kit`) |
 | `ddev-browser-cmds.conf` | Extra ddev command names for the browser bridge (one per line, `#` comments) |
@@ -28,7 +28,12 @@ asks before removing the kit block; your own entries always stay.
 - `ddev-browser-cmds.conf` is optional and user-created — the kit reads it
   but never writes or ships it
 - `projects.conf` paths must not contain spaces — the writer splits on
-  them and every consumer reads the file line-by-line. Entries are
+  them and every consumer reads the file line-by-line. Control
+  characters and backslashes are refused by the writer (they clobber
+  the report rows that render conf lines). Lines starting
+  with `#` are comments and are ignored by every reader (status counts,
+  the doctor `all` scan roots, the config/update refresh passes — an
+  annotated conf renders no verdict rows). Entries are
   written by install and `opk config` only: every consumer that runs
   root operations over the roots (`opk update`, `opk config refresh`,
   `opk uninstall`) re-validates each line reader-side and skips
