@@ -271,13 +271,16 @@ def extract_tools(config_path):
         # Disclosed premise arm (#661 P11): entries whose info.permissions
         # is absent or not a list yield no rules, the tool loop prints
         # nothing at rc 0 — and the exit-3 guard below is UNREACHABLE for
-        # list shapes: it fires for non-list, non-dict top levels AND for
-        # a piped dict carrying neither 'permission' nor 'permissions'
-        # (the arm below), never for the list branch here. A real Entry[]
-        # without any permissions would therefore read as "no container
-        # tools" and silently turn the wrapper's auto-detect off for the
-        # session; the triggering premise (2.x emitting permission-less
-        # documents) is unverifiable in-repo.
+        # list shapes: it fires only for PIPED shapes ('-') — a piped
+        # non-dict top level or a piped dict carrying neither
+        # 'permission' nor 'permissions' (the arm below; file inputs
+        # enter that arm too but fall through to the permissive empty
+        # result — the exit itself is gated on '-') — never for the list
+        # branch here. A real Entry[] without any permissions would
+        # therefore read as "no container tools" and silently turn the
+        # wrapper's auto-detect off for the session; the triggering
+        # premise (2.x emitting permission-less documents) is
+        # unverifiable in-repo.
         rules = _debug_entry_rules(config)
         whole = None
     elif not isinstance(config, dict) or (config_path == '-' and 'permission' not in config and 'permissions' not in config):

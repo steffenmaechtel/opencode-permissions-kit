@@ -15,7 +15,7 @@ fb9142f9a61917d33799885993b16db664ce6eefdd7bfc9b45bbd797e9b312c0  files/opencode
 3fc0548913d43bcbe7f772b12a9048022eafa0ffe93b65231d4fe7d5d912a18e  files/opencode-permissions-kit-lib/management/status.sh
 546d3819cb32b608b6d712466c67e9da2aec5d934b2dc3e5b09712fedb62be44  files/opencode-permissions-kit-lib/management/uninstall.sh
 2a302ef22b6f95573260cb78c05704c01bd70dd5bb4d4b8cb16f9123a21b0415  files/opencode-permissions-kit-lib/management/update.sh
-26c19e6fcf7e1a941f5d9c64f48b7f692b8149a5fa1a1dbbe9d97737d8e7781f  files/opencode-permissions-kit-lib/py/jsonc-parser.py
+f547a32d7ad24391f5c9ebd143506d46140d8981af2ce5b6574c7c9cce6f8d4b  files/opencode-permissions-kit-lib/py/jsonc-parser.py
 d9f9fb0aae130f10c300153b745f4768b9a763e07f82298f6f156a671a07e37a  files/opencode-permissions-kit-lib/py/tui-register.py
 dcb8b17188cab386608f95f5e4b2fe3ae0a0cf87e624c4661be08074f32fa1e8  files/opencode-permissions-kit-lib/sh/advisories.sh
 6881c60c6033a5c95c4d4ca8e983b28f18bc5c9c92648e390835430e7c4ad6c9  files/opencode-permissions-kit-lib/sh/as-opencode-core.sh
