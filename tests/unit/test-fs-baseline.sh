@@ -222,7 +222,7 @@ mkdir -p "$HG5/real/.git"
 ln -s "$HG5/real" "$HG5/link"
 HG5OUT="$(FS_SUDO="" sh -c '. "$1" && _FSB_ERRORS=0 && _fsb_heal_git "$2" "$3" && echo "ERRS=$_FSB_ERRORS"' \
     _ "$LIB" "$HG5/link" "$HGGRP" 2>&1)"
-if printf '%s\n' "$HG5OUT" | grep -qF 'ERRS=1'; then
+if printf '%s\n' "$HG5OUT" | grep -q 'ERRS=1$'; then
     pass "heal: symlinked root counts as an error (no silent no-op, #655 a C5)"
 else
     fail "heal: symlinked root counts as an error (no silent no-op, #655 a C5) — got: $HG5OUT"
@@ -343,7 +343,58 @@ else
     pass "heal: samples-only hooks dir stays warn-silent (b S6)"
 fi
 
-rm -rf "$HG" "$HGS" "$HGF" "$HGFSTUB" "$HG4" "$HG5" "$HG6" "$HG7" "$HG9" "$HG9BIN"
+# d S1: the depth-1 guard's NEGATIVE arm — an in-tree dir named after
+# a root-path segment (here: "tmp", a segment of every /tmp/... root)
+# must stay UN-sticky when the .git sits directly under the root;
+# without the guard the walk would chew the parent's absolute segments
+# and sticky exactly this dir.
+HG10="$WORK/healneg"
+mkdir -p "$HG10/proj/tmp" "$HG10/proj/.git/hooks"
+printf 'c\n' >"$HG10/proj/.git/config"
+FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$HG10/proj" "$HGGRP" >/dev/null 2>&1
+case "$(stat -c %a "$HG10/proj/tmp")" in
+    [1357]???)
+        fail "heal: segment-named dir stays un-sticky at depth 1 (d S1)"
+        ;;
+    *)
+        pass "heal: segment-named dir stays un-sticky at depth 1 (d S1)"
+        ;;
+esac
+case "$(stat -c %a "$HG10/proj")" in
+    [1357]???)
+        pass "heal: the .git parent itself IS sticky at depth 1 (control)"
+        ;;
+    *)
+        fail "heal: the .git parent itself IS sticky at depth 1 (control)"
+        ;;
+esac
+
+# d S2: the sidecar registrations — a RECORDING _tmp_track over a heal
+# run with symlinks (all three sidecar shapes fire: driver .git scan,
+# container scan, child scan) must log the opk-fsb-heal stems.
+HG11="$WORK/healtrack"
+HG11_TRACK="$HG11/tracked"
+mkdir -p "$HG11/proj/contgit/.git/hooks" "$HG11/proj/realgit/.git/hooks" \
+    "$HG11/proj/realgit/.git/modules/real" "$HG11/tgt"
+printf 'c\n' >"$HG11/proj/contgit/.git/config"
+printf 'c\n' >"$HG11/proj/realgit/.git/config"
+ln -s "$HG11/tgt" "$HG11/proj/contgit/.git/modules"
+ln -s "$HG11/tgt" "$HG11/proj/realgit/.git/modules/lnk-child"
+F12_TRACK="$HG11_TRACK" FS_SUDO="" \
+    sh -c '. "$1" && _tmp_track() { printf "%s\n" "$1" >> "$F12_TRACK"; } \
+    && fs_baseline_root "$2" "$3"' _ "$LIB" "$HG11/proj" "$HGGRP" >/dev/null 2>&1 || true
+# This fixture deterministically registers FOUR sidecars: the driver's
+# .git-symlink scan (empty here — its .git dirs are real), two module
+# container scans (contgit's fires on a real symlink, realgit's is
+# empty) and realgit's child scan (fires on the symlinked child). Empty
+# sidecars still register — the contract is abort-leak coverage.
+if grep -c 'opk-fsb-heal.*l$' "$HG11_TRACK" 2>/dev/null | grep -q '^4$'; then
+    pass "heal: all sidecar temps registered with _tmp_track (d S2)"
+else
+    fail "heal: all sidecar temps registered with _tmp_track (d S2) — got: $(cat "$HG11_TRACK" 2>/dev/null | tr '\n' ' ')"
+fi
+
+rm -rf "$HG" "$HGS" "$HGF" "$HGFSTUB" "$HG4" "$HG5" "$HG6" "$HG7" "$HG9" "$HG9BIN" "$HG10" "$HG11"
 
 # A symlinked operand never gets pinned (the follow would write through
 # the link — the L5 class): a config swapped for a link is skipped with

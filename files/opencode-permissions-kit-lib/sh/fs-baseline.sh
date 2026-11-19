@@ -822,25 +822,29 @@ _fsb_heal_git() {
         # rename/delete of developer-owned entries in those ancestor
         # dirs — grouping dirs, rarely file-bearing.
         _fshg_parent=$(dirname "$_fsh_gd")
-        # Depth-1 no-op guard (#655 c S1): with the .git directly under
-        # the scan root the strip pattern below does not match and the
-        # walk would chew the PARENT'S absolute-path segments (the root
-        # gets a redundant +t, garbage segments no-op silently, but an
-        # in-tree dir named after a root segment could be stickied).
-        if [ "$_fshg_parent" != "$_fsh_root" ]; then
-            _fshg_anc=$_fsh_root
-            _fshg_rest=${_fshg_parent#"$_fsh_root"/}
-            while [ -n "$_fshg_rest" ]; do
-                case "$_fshg_rest" in
-                    */*)
-                        _fshg_anc=$_fshg_anc/${_fshg_rest%%/*}
-                        _fshg_rest=${_fshg_rest#*/}
-                        ;;
-                    *) _fshg_anc=$_fshg_parent _fshg_rest="" ;;
-                esac
-                _fsb_heal_sticky "$_fsh_root" "$_fshg_anc"
-            done
-        fi
+        # Ancestor walk only for parents INSIDE the root (#655 c S1,
+        # d S4): parent == root needs no walk (the driver stickied the
+        # root), and a parent outside the root entirely (a heal root
+        # that is itself a dir named .git — plausible misconfiguration)
+        # must not make the walk chew the parent's absolute-path
+        # segments: an in-tree dir named after a root segment could
+        # take an unintended sticky.
+        case "$_fshg_parent" in
+            "$_fsh_root"/*)
+                _fshg_anc=$_fsh_root
+                _fshg_rest=${_fshg_parent#"$_fsh_root"/}
+                while [ -n "$_fshg_rest" ]; do
+                    case "$_fshg_rest" in
+                        */*)
+                            _fshg_anc=$_fshg_anc/${_fshg_rest%%/*}
+                            _fshg_rest=${_fshg_rest#*/}
+                            ;;
+                        *) _fshg_anc=$_fshg_parent _fshg_rest="" ;;
+                    esac
+                    _fsb_heal_sticky "$_fsh_root" "$_fshg_anc"
+                done
+                ;;
+        esac
         _fsb_heal_gitdir "$_fsh_root" "$_fsh_owner" "$2" "$_fsh_gd"
     done <"$_fsh_list"
     rm -f "$_fsh_list"
