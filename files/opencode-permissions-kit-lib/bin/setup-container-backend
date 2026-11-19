@@ -308,16 +308,20 @@ setup_docker_rootless() {
             # (0700 agent-owned): escape bytes in a name must not
             # forge/clear transcript lines in root's stderr dump —
             # scrub for display, run-collapsing (#660, pr-00657 a S1;
-            # the #646 list-arm idiom). The adjacent systemctl dumps are
-            # command output, not name listings — systemd's own unit-name
-            # charset gates that surface.
+            # the #646 list-arm idiom). The systemctl --user status
+            # dump gets the same scrub: its output embeds unit
+            # Descriptions from the agent-writable
+            # ~/.config/systemd/user — not operator-typed bytes
+            # either. loginctl show-user and the fixed-unit is-active
+            # probe stay raw: fixed-shape property output with
+            # root-approved operands.
             ls -la "/run/user/$OC_UID" 2>&1 | LC_ALL=C sed -e 's/[^ -~][^ -~]*/?/g' -e 's/^/  /' >&2
             echo "systemctl --user is-active dbus:" >&2
             sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" \
                 systemctl --user is-active dbus 2>&1 | sed 's/^/  /' >&2
             echo "systemctl --user status:" >&2
             sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" \
-                systemctl --user status 2>&1 | head -10 | sed 's/^/  /' >&2
+                systemctl --user status 2>&1 | head -10 | LC_ALL=C sed -e 's/[^ -~][^ -~]*/?/g' -e 's/^/  /' >&2
             exit 1
         fi
     fi

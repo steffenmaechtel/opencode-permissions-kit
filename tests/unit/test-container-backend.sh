@@ -328,6 +328,11 @@ check_live "setup checks systemd for docker-rootless" "$SETUP" -Fq 'systemctl --
 # unit-drivable); the wiring pin guards the scrub's presence.
 check_live "setup scrubs the /run/user listing for display" "$SETUP" \
     -Fq 'ls -la "/run/user/$OC_UID" 2>&1 | LC_ALL=C sed -e '"'"'s/[^ -~][^ -~]*/?/g'"'"' -e '"'"'s/^/  /'"'"' >&2'
+# the status dump rides the same scrub (its output embeds unit
+# Descriptions from the agent-writable ~/.config/systemd/user) — the
+# quote-free prefix identifies the line
+check_live "setup scrubs the systemctl --user status dump for display" "$SETUP" \
+    -Fq 'systemctl --user status 2>&1 | head -10 | LC_ALL=C sed -e'
 
 echo ""
 echo "-- late pins (arg no-op, daemon-start rc) --"
