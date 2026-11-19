@@ -16,7 +16,8 @@
 # orchestration is e2e territory (category 3, no coverage promise).
 # Covers:
 #   - sourcing purity: definitions only, zero top-level side effects
-#   - all 19 section/helper functions defined by sourcing
+#   - all section/helper functions defined by sourcing (count derives
+#     from the _defs list — never hardcoded)
 #   - the pairing guard (#413, #452): real lib passes, truncated lib dies
 #     loud, and both completeness riders (every core call the entry
 #     makes AND every function the lib defines — comment-stripped,
@@ -2085,16 +2086,30 @@ mkdir -p "$WORK/s3link"
 ln -s /usr/local/lib/opencode-permissions-kit/bin/opk "$WORK/s3link/cur"
 ln -s /usr/local/lib/opencode-permissions-kit/kit "$WORK/s3link/legacy"
 ln -s /usr/local/lib/opencode-permissions-kit/bin/gone "$WORK/s3link/dangling"
+ln -s /usr/local/lib/opencode-permissions-kit-evil/x "$WORK/s3link/evilwin"
+ln -s /usr/local/lib/opencode-permissions-kit/../evil "$WORK/s3link/dotdot"
 ln -s /usr/local/bin/other "$WORK/s3link/foreign"
 : >"$WORK/s3link/regfile"
 _s3_owned=0
-for _s3_p in cur legacy dangling; do
+for _s3_p in cur legacy dangling dotdot; do
     un_link_owned "$WORK/s3link/$_s3_p" || _s3_owned=1
 done
 if [ "$_s3_owned" -eq 0 ]; then
     pass "un_link_owned: kit-internal targets of every era (dangling included) are kit-owned (#662 S3)"
 else
     fail "un_link_owned must accept kit-internal targets of every era (#662 S3)"
+fi
+# The prefix is prefix-PLUS-SLASH: a sibling tree name
+# (/usr/local/lib/opencode-permissions-kit-evil/…) shares the stem but
+# not the literal `/` boundary — it must be refused (a `*`-glob prefix
+# without the slash WOULD match it). `..` segments stay inside the
+# literal prefix → owned, harmless (rm removes the link NAME, never
+# follows the target). Pinned per review a A3: the discriminating
+# boundary the header comment asserts.
+if un_link_owned "$WORK/s3link/evilwin"; then
+    fail "un_link_owned must refuse sibling-name targets (prefix-plus-slash boundary, #662 S3 / review a A3)"
+else
+    pass "un_link_owned refuses sibling-name targets (prefix-plus-slash boundary) (#662 S3 / review a A3)"
 fi
 if un_link_owned "$WORK/s3link/foreign" ||
     un_link_owned "$WORK/s3link/regfile" ||

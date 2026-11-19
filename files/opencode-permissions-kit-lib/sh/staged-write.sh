@@ -77,12 +77,12 @@ staged_write() {
     fi
     # Residual window (#662 S7; the #420-accepted class, sibling comments
     # in _un_revert_chown, _fsb_pass and install-core's copy handover):
-    # the [ -d ] recheck and the mv are two syscalls — a destination
-    # swapped for a dir-symlink in the gap moves the staged file INSIDE
-    # the swapped target. Microsecond-scale and undetectable ahead of
-    # time; the accepted gate->op shape of every such pair in the kit.
-    # A link-to-FILE has no window: mv -f replaces it (the S1 contract
-    # above) instead of descending into it.
+    # the recheck→mv gap (the [ -d ] test runs, then the mv) — a
+    # destination swapped for a dir-symlink in the gap moves the staged
+    # file INSIDE the swapped target. Microsecond-scale and undetectable
+    # ahead of time; the accepted gate->op shape of every such pair in
+    # the kit. A link-to-FILE has no window: mv -f replaces it (the S1
+    # contract above) instead of descending into it.
     _sw_sudo mv -f "$_sw_tmp" "$_sw_dst" || {
         _sw_sudo rm -f "$_sw_tmp"
         return 1

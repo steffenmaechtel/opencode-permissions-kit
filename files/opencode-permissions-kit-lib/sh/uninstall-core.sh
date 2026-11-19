@@ -255,18 +255,20 @@ un_sudoers_remove() {
 # install/update claim the names unconditionally (ln -sf), but a file
 # that REPLACED the link is not ours — the un_xdg_open_remove ownership
 # check, generalized. The match is a PREFIX, not one exact target: the
-# names pointed at DIFFERENT kit-internal targets across eras
-# ($LIBDIR/kit pre-#346, $LIBDIR/bin/* after), and everything inside
-# the kit library tree is kit-owned; a foreign file or a link to
-# anywhere else is left untouched (warned when present).
+# names pointed at DIFFERENT kit-internal targets across eras (the
+# wrapper: $LIBDIR/wrapper, then $LIBDIR/bin/opencode-as-opencode since
+# 72d474af (#54); opk + its legacy alias: $LIBDIR/kit, then $LIBDIR/
+# bin/opk), and everything inside the kit library tree is kit-owned; a
+# foreign file or a link to anywhere else is left untouched (the path
+# is named in the output when present).
 un_link_owned() {
     # un_link_owned <path>: true iff <path> is a symlink whose readlink
     # target lies inside /usr/local/lib/opencode-permissions-kit/ —
     # dangling included (readlink reads the link, not the target: a
     # leftover kit link after a library wipe is still ours). Pre-0.0.10
     # links ($LIBDIR was /usr/local/lib/opencode before c1b5c919) miss
-    # the prefix and land in the warn arm — visible, manual removal
-    # named; every update since 0.0.10 re-links to current targets.
+    # the prefix and land in the not-owned arm — the path is named in
+    # the output; every update since 0.0.10 re-links to current targets.
     [ -L "$1" ] || return 1
     case "$(readlink "$1" 2>/dev/null || true)" in
         /usr/local/lib/opencode-permissions-kit/*) return 0 ;;

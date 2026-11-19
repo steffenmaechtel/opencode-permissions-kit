@@ -108,11 +108,14 @@ done
 # deployed library. That fail-open is deliberate and disclosed (#662 S1):
 # it needs that legacy lib (the weeks-old alpha cohort, shrinking with
 # every update) AND an agent-planted parent link to matter, and the ops
-# behind the gate are fixed-suffix rm/mv/chown — no root exec of agent
-# content. Fail-closed was considered and declined: it would hold REMOVAL
-# hostage to a gate on exactly the installs most likely to need a clean
-# way out (uninstall must stay maximally robust), unlike the install
-# twin, which fails CLOSED because install.sh always runs fresh code.
+# behind the uninstall-side gate are a fixed-suffix rm -rf plus the
+# KIT-OWNED tui-register.py run via python3 -I — cli.json is an
+# agent-replaceable DATA operand, never executed (#249 guards the
+# interpreter env) — no root exec of agent content. Fail-closed was
+# considered and declined: it would hold REMOVAL hostage to a gate on
+# exactly the installs most likely to need a clean way out (uninstall
+# must stay maximally robust), unlike the install twin, which fails
+# CLOSED because install.sh always runs fresh code.
 agent_home_sane() { return 0; }
 for cand in "$UN_CALL_DIR/../sh/staged-write.sh" "/usr/local/lib/opencode-permissions-kit/sh/staged-write.sh"; do
     if [ -f "$cand" ]; then

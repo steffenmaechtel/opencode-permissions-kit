@@ -758,13 +758,16 @@ done
 # stub needs a legacy (<0.0.39h — only 0.0.39g ever shipped staged_write
 # without the walker — the weeks-old alpha cohort, shrinking with every
 # update) or truncated deployed lib AND an agent-planted parent link to
-# matter, and the ops behind the gate are fixed-suffix rm/mv/chown — no
-# root exec of agent content. The normal path sources staged-write.sh
-# from the CHECKOUT first (walker present), and pre-0.0.39g libs refuse
-# via the staged_write stub above. Fail-closed was considered (the
-# install twin, install.sh, fails CLOSED — but install.sh always runs
-# fresh code) and declined: a semantic change to root-run code (both
-# e2e suites) for a near-dead path.
+# matter, and the ops behind the update-side gate are a fixed-suffix
+# mkdir plus the staged_write family (cp/chown/chmod/mv on a staged
+# temp) — no root exec of agent content. A fetched/streamed run re-execs
+# from the fresh tree (walker present); the deployed-only shapes (stdin
+# --only-binary, direct deployed invocation) hit the LIBDIR fallback —
+# current libs carry the walker there too, pre-0.0.39g libs refuse via
+# the staged_write stub above. Fail-closed was considered (the install
+# twin, install.sh, fails CLOSED — but install.sh always runs fresh
+# code) and declined: a semantic change to root-run code (both e2e
+# suites) for a near-dead path.
 command -v agent_home_sane >/dev/null 2>&1 || agent_home_sane() { return 0; }
 
 # Shared sudoers pipeline (render + visudo validation + install): one

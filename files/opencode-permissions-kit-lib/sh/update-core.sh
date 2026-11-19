@@ -782,11 +782,13 @@ install_binary() {
     # considered and declined: the kit resolves *latest* at runtime, and a
     # pinned digest means a pinned version — that kills the resolution
     # (the kit's own SHA256SUMS standard works because the kit controls
-    # its release artifacts; upstream's don't stand still). The --version
-    # probes below are the ONLY point where fetched bytes execute as ROOT
-    # — after copy_binary_atomic the binary runs as the opencode user via
-    # the wrapper. A follow-up could drop that delta by probing as the
-    # opencode user (runuser); not pursued here.
+    # its release artifacts; upstream's don't stand still). Fetched bytes
+    # execute as ROOT at three points in the update path: the pre-copy
+    # candidate probes below, the post-copy opencode_version_line probe
+    # of the freshly deployed binary, and the install-side stamp probes
+    # (install-core.sh) — wrapper-mediated runs are the opencode user.
+    # A follow-up could drop that delta by probing as the opencode user
+    # (runuser), covering ALL three points; not pursued here.
     if _opk_timeout_ok; then
         timeout 30 "$src" --version >/dev/null 2>&1 || return 1
     else
