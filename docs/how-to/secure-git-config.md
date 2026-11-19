@@ -11,10 +11,13 @@ see the [security model](../concepts/security-model.md)).
 pushes and branch operations only *read* `.git/config` — but the
 exceptions are real and documented: a first `git push -u` and
 `git branch --set-upstream-to` fail at their *tracking write* while the
-push transfer itself completes; repo-scope `git config` fails outright
-(the write IS the operation); `git submodule add` dies at the clone
-stage (the `modules` container accepts no agent writes). All of these
-fail with `Operation not permitted` under the `.git` heal (issue
+push transfer itself completes (`Operation not permitted` — the
+lock+rename dies on the sticky bit); repo-scope `git config` fails
+outright (the write IS the operation, same `Operation not permitted`);
+`git submodule add` dies at the clone stage (`Permission denied` —
+creating `.git/modules/<name>` under the pinned container, which
+accepts no agent writes). All of these are the `.git` heal's documented
+costs (issue
 [#644](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/644)).
 Agents push without `-u`; the full cost list lives in the
 [security model](../concepts/security-model.md).

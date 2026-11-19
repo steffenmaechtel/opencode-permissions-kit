@@ -700,6 +700,10 @@ _fsb_heal_gitdir() {
     }
     if command -v _tmp_track >/dev/null 2>&1; then
         _tmp_track "$_fshg_ml"
+        # the sidecar (base + l) too (#655 c S2): created by the
+        # companion scan's redirect below — same abort-leak class the
+        # base registration closes.
+        _tmp_track "${_fshg_ml}l"
     fi
     _fsb_sudo find "$_fshg_gd" -type d -name modules -print >"$_fshg_ml" ||
         _fsb_heal_err "$_fshg_gd" "the modules scan (find)"
@@ -721,6 +725,7 @@ _fsb_heal_gitdir() {
         }
         if command -v _tmp_track >/dev/null 2>&1; then
             _tmp_track "$_fshg_cl"
+            _tmp_track "${_fshg_cl}l"
         fi
         _fsb_sudo find "$_fshg_m" -mindepth 1 -maxdepth 1 -type d -print >"$_fshg_cl" ||
             _fsb_heal_err "$_fshg_m" "the module-gitdir scan (find)"
@@ -800,6 +805,7 @@ _fsb_heal_git() {
     }
     if command -v _tmp_track >/dev/null 2>&1; then
         _tmp_track "$_fsh_list"
+        _tmp_track "${_fsh_list}l"
     fi
     _fsb_sudo find "$_fsh_root" -type d -name .git -print >"$_fsh_list" ||
         _fsb_heal_err "$_fsh_root" "the .git scan (find)"
@@ -816,18 +822,25 @@ _fsb_heal_git() {
         # rename/delete of developer-owned entries in those ancestor
         # dirs — grouping dirs, rarely file-bearing.
         _fshg_parent=$(dirname "$_fsh_gd")
-        _fshg_anc=$_fsh_root
-        _fshg_rest=${_fshg_parent#"$_fsh_root"/}
-        while [ -n "$_fshg_rest" ]; do
-            case "$_fshg_rest" in
-                */*)
-                    _fshg_anc=$_fshg_anc/${_fshg_rest%%/*}
-                    _fshg_rest=${_fshg_rest#*/}
-                    ;;
-                *) _fshg_anc=$_fshg_parent _fshg_rest="" ;;
-            esac
-            _fsb_heal_sticky "$_fsh_root" "$_fshg_anc"
-        done
+        # Depth-1 no-op guard (#655 c S1): with the .git directly under
+        # the scan root the strip pattern below does not match and the
+        # walk would chew the PARENT'S absolute-path segments (the root
+        # gets a redundant +t, garbage segments no-op silently, but an
+        # in-tree dir named after a root segment could be stickied).
+        if [ "$_fshg_parent" != "$_fsh_root" ]; then
+            _fshg_anc=$_fsh_root
+            _fshg_rest=${_fshg_parent#"$_fsh_root"/}
+            while [ -n "$_fshg_rest" ]; do
+                case "$_fshg_rest" in
+                    */*)
+                        _fshg_anc=$_fshg_anc/${_fshg_rest%%/*}
+                        _fshg_rest=${_fshg_rest#*/}
+                        ;;
+                    *) _fshg_anc=$_fshg_parent _fshg_rest="" ;;
+                esac
+                _fsb_heal_sticky "$_fsh_root" "$_fshg_anc"
+            done
+        fi
         _fsb_heal_gitdir "$_fsh_root" "$_fsh_owner" "$2" "$_fsh_gd"
     done <"$_fsh_list"
     rm -f "$_fsh_list"

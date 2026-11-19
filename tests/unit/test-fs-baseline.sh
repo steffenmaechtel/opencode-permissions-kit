@@ -260,16 +260,27 @@ else
     fail "heal: the symlinked-.git warn names the entry (b C2)"
 fi
 
-# C3: a symlinked modules container is surfaced, never followed.
+# C3: symlinked containers and symlinked children are surfaced, never
+# followed — two separate gitdirs (a symlinked modules container hides
+# its children from every scan, so each arm needs its own fixture).
 mkdir -p "$HG7/proj/realgit/.git" "$HG7/proj/realgit/.git/hooks" "$HG7/modtarget"
+mkdir -p "$HG7/proj/contgit/.git/hooks"
 printf 'c\n' >"$HG7/proj/realgit/.git/config"
-ln -s "$HG7/modtarget" "$HG7/proj/realgit/.git/modules"
+printf 'c\n' >"$HG7/proj/contgit/.git/config"
+ln -s "$HG7/modtarget" "$HG7/proj/contgit/.git/modules"
+mkdir -p "$HG7/proj/realgit/.git/modules/real" "$HG7/childtarget"
+ln -s "$HG7/childtarget" "$HG7/proj/realgit/.git/modules/lnk-child"
 HG7BOUT="$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' \
-    _ "$LIB" "$HG7/proj/realgit" "$HGGRP" 2>&1)"
+    _ "$LIB" "$HG7/proj" "$HGGRP" 2>&1)"
 if printf '%s\n' "$HG7BOUT" | grep -qF 'symlinked modules dir not followed'; then
     pass "heal: the symlinked-modules warn fires (b C3)"
 else
     fail "heal: the symlinked-modules warn fires (b C3)"
+fi
+if printf '%s\n' "$HG7BOUT" | grep -qF 'symlinked module entry not followed'; then
+    pass "heal: the child-level symlink warn fires (c S3)"
+else
+    fail "heal: the child-level symlink warn fires (c S3)"
 fi
 
 # C4: submodule worktree registration pointers are pinned like the top
@@ -287,14 +298,19 @@ assert_eq "heal: submodule worktree gitdir pinned (b C4)" "644" \
 HG8OUT="$(FS_SUDO="" sh -c '. "$1" && _FSB_ERRORS=0 && _fsb_heal_git / "$2" && echo "ERRS=$_FSB_ERRORS"' \
     _ "$LIB" "$HGGRP" 2>&1)"
 if printf '%s\n' "$HG8OUT" | grep -qF 'never a heal root'; then
-    pass "heal: the $(/) root is refused loud by the driver (b S2)"
+    pass "heal: the / root is refused loud by the driver (b S2)"
 else
-    fail "heal: the $(/) root is refused loud by the driver (b S2) — got: $HG8OUT"
+    fail "heal: the / root is refused loud by the driver (b S2) — got: $HG8OUT"
+fi
+if printf '%s\n' "$HG8OUT" | grep -q 'ERRS=1$'; then
+    pass "heal: the / refusal COUNTS as an error (c S4)"
+else
+    fail "heal: the / refusal COUNTS as an error (c S4) — got: $HG8OUT"
 fi
 HG8BRC=0
 FS_SUDO="" sh -c '. "$1" && fs_baseline_root / "$2"' _ "$LIB" "$HGGRP" >/dev/null 2>&1 ||
     HG8BRC=$?
-assert_eq "belt: the $(/) root is refused before any pass runs (b S2/C7)" "1" "$HG8BRC"
+assert_eq "belt: the / root is refused before any pass runs (b S2/C7)" "1" "$HG8BRC"
 
 # S1: the wc-guard degradation — a restricted PATH without wc over a
 # tree WITH a non-sample hook must stay rc 0, warn nothing, not abort.
@@ -327,7 +343,7 @@ else
     pass "heal: samples-only hooks dir stays warn-silent (b S6)"
 fi
 
-rm -rf "$HG" "$HGS" "$HGF" "$HGFSTUB" "$HG4" "$HG5" "$HG6" "$HG7" "$HG8" "$HG9" "$HG9BIN"
+rm -rf "$HG" "$HGS" "$HGF" "$HGFSTUB" "$HG4" "$HG5" "$HG6" "$HG7" "$HG9" "$HG9BIN"
 
 # A symlinked operand never gets pinned (the follow would write through
 # the link — the L5 class): a config swapped for a link is skipped with
