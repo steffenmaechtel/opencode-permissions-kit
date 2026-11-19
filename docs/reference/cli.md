@@ -55,11 +55,14 @@ sudo opk git-heal status  # state, kit pieces, lockout risks
 ```
 
 `on` keeps the agent's git workflow in the shared main checkout green:
-developer git operations rewrite `.git/index` and `.git/HEAD` (git
-lock+rename — ownership follows the last writer), and under the sticky
-`.git` of the `.git` heal the agent cannot re-take ownership itself.
-The hooks re-pin both files to the agent user after every developer git
-operation, via a narrow root heal behind a sudoers grant. `on` sets your
+developer git operations rewrite the heal's operand metadata —
+`.git/index`, `.git/HEAD` and the measured lock+rename carriers
+(`ORIG_HEAD`, `REBASE_HEAD`, `packed-refs`, the conflict pseudo-refs;
+git lock+rename — ownership follows the last writer) — and under the
+sticky `.git` of the `.git` heal the agent cannot re-take ownership
+itself. The hooks re-pin the operand set to the agent user after every
+developer git operation, via a narrow root heal behind a sudoers grant
+(each operand only when it exists). `on` sets your
 global `core.hooksPath` to the kit's root-owned hook dir (repo hooks
 stop executing for you — the `core.hooksPath /dev/null` trade plus the
 heal), re-renders sudoers and heals kit-managed main checkouts once.

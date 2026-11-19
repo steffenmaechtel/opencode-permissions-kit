@@ -304,6 +304,8 @@ _dgh_stage() {
     git -C "$WORK/dgh/proj" init -q
     : >"$WORK/dgh/proj/.git/index"
     : >"$WORK/dgh/proj/.git/HEAD"
+    # Widened-operand fixture pins doctor's mirror row set (#684 a a10)
+    : >"$WORK/dgh/proj/.git/ORIG_HEAD"
     : >"$WORK/dgh/devhome/.gitconfig"
     printf 'DEFAULT_USER=%s\nOPENCODE_USER=opencode-dgh-agent\n' "$(id -un)" \
         >"$WORK/dgh/install.conf"
@@ -324,8 +326,9 @@ _dgh_run() {
 _dgh_stage
 _out=$(_dgh_run || true)
 if printf '%s' "$_out" | grep -q "git-heal.*OFF -- 'sudo opk git-heal on'" &&
-    printf '%s' "$_out" | grep -q "index/HEAD.*$WORK/dgh/proj/.git/index is $(id -un)-owned -- agent git"; then
-    pass "doctor git-heal: OFF state + counted lockout warn with fix hint"
+    printf '%s' "$_out" | grep -q "git-heal-file.*$WORK/dgh/proj/.git/index is $(id -un)-owned -- agent git" &&
+    printf '%s' "$_out" | grep -q "git-heal-file.*$WORK/dgh/proj/.git/ORIG_HEAD is $(id -un)-owned"; then
+    pass "doctor git-heal: OFF state + lockout rows incl. a widened operand"
 else
     fail "doctor git-heal: OFF/lockout rows broken (out=$(printf '%s' "$_out" | head -4))"
 fi

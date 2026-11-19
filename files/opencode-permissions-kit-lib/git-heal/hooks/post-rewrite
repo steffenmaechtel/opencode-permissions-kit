@@ -1,12 +1,14 @@
 #!/bin/sh
-# post-* hook -- opencode permissions kit, git heal hooks (#671).
+# post-* hook -- opencode permissions kit, git heal hooks (#671,
+# operand set widened in #678).
 #
-# After a developer git operation rewrote .git/index and/or .git/HEAD
-# (ownership flip via lock+rename), trigger the narrow root heal so
-# the agent user keeps its main-checkout workflow (git add / git
-# switch). This body is installed four times -- post-merge,
-# post-checkout, post-rewrite, post-index-change -- with identical
-# bytes; the filename selects the git event:
+# After a developer git operation rewrote the heal's operand metadata
+# (.git/index, .git/HEAD and the measured lock+rename carriers --
+# heal-index-head's header carries the full list), trigger the narrow
+# root heal so the agent user keeps its main-checkout workflow (git
+# add / git switch / git merge). This body is installed four times --
+# post-merge, post-checkout, post-rewrite, post-index-change -- with
+# identical bytes; the filename selects the git event:
 #
 #   post-merge         pull/merge, including fast-forward pulls
 #   post-checkout      every checkout/switch (both -b and cross-commit)
@@ -39,9 +41,9 @@ HEAL="$GH_LIBDIR/git-heal/heal-index-head"
 CONF="${GH_PROJECTS_CONF:-/etc/opencode-permissions-kit/projects.conf}"
 
 # Common gitdir of the repo the hook fires in (for a worktree that is
-# the MAIN .git -- exactly the gitdir whose index/HEAD matter). The
-# plain form without --path-format keeps git 2.30 (the kit's tested
-# floor) working; relative results resolve through cd + pwd -P.
+# the MAIN .git -- exactly the gitdir whose operand metadata matters).
+# The plain form without --path-format keeps git 2.30 (the kit's
+# tested floor) working; relative results resolve through cd + pwd -P.
 cdg=$(git rev-parse --git-common-dir 2>/dev/null) || exit 0
 [ -n "$cdg" ] || exit 0
 case "$cdg" in

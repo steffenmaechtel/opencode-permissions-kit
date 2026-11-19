@@ -261,6 +261,23 @@ check "RL2b: developer checkout flips index+HEAD dev-owned (lockout state, #671)
     E 'cd /var/www/vhosts/rl-gh && git checkout -q -b rl671-flip && test "$(stat -c %U .git/index)" = "dev" && test "$(stat -c %U .git/HEAD)" = "dev"'
 check_fail "RL2b: agent git add DIES on the dev-owned index (sticky .git, #671)" \
     E 'sudo -u opencode -H sh -c "echo x > /var/www/vhosts/rl-gh/agent-file.txt && git -C /var/www/vhosts/rl-gh add agent-file.txt"'
+# #678 rides the same pre-on window: dev merge flips ORIG_HEAD, the
+# agent merge dies on it (the live-incident shape, two-uid in-container).
+# mkdir follows EVERY checkout — switching to a master-based branch
+# prunes sub/rl678 (the other branch's tracked files vanish with the
+# empty dir).
+check "RL2b: developer merge flips ORIG_HEAD dev-owned (pre-heal, #678)" \
+    E 'cd /var/www/vhosts/rl-gh && git checkout -q -B rl678-a master && mkdir -p sub/rl678 && echo a >sub/rl678/a.txt && git add sub/rl678/a.txt && git -c user.email=dev@example.com -c user.name=dev commit -qm rl678a && git checkout -q -B rl678-b master && mkdir -p sub/rl678 && echo b >sub/rl678/b.txt && git add sub/rl678/b.txt && git -c user.email=dev@example.com -c user.name=dev commit -qm rl678b && git checkout -q rl678-a && git -c user.email=dev@example.com -c user.name=dev merge -q --no-ff -m rl678merge rl678-b && test "$(stat -c %U .git/ORIG_HEAD)" = "dev" && git checkout -q master'
+check_fail "RL2b: agent merge DIES on the dev-flipped .git metadata (sticky .git, #678)" \
+    E 'sudo -u opencode -H git -c user.email=agent@example.com -c user.name=agent -C /var/www/vhosts/rl-gh merge --no-ff -m rl678agent rl678-a'
+# The dying merge leaves its worktree additions behind — clear them as
+# the directory owner so the post-on arms start clean (sub/ is purely
+# this arm's topology in this repo). Death-point note: this PRE-on
+# state has index+ORIG_HEAD both dev-owned and the in-container death
+# fires at the index write first; with a healed index (the shipped
+# #674 world) the same merge dies at ORIG_HEAD (rc 128, zero partial
+# state — the #678 live incident).
+E 'rm -rf /var/www/vhosts/rl-gh/sub'
 check "RL2b: opk git-heal on (sudo, dev gitconfig + heal sweep)" \
     E 'sudo opk git-heal on | grep -q "git heal hooks active"'
 check "RL2b: the on-sweep healed the lockout (index+HEAD agent-owned)" \
@@ -269,6 +286,15 @@ check "RL2b: agent git add is green again after the heal" \
     E 'sudo -u opencode -H git -C /var/www/vhosts/rl-gh add agent-file.txt'
 check "RL2b: the post-checkout hook re-heals the NEXT developer git op" \
     E 'cd /var/www/vhosts/rl-gh && git checkout -q master && test "$(stat -c %U .git/index)" = "opencode" && test "$(stat -c %U .git/HEAD)" = "opencode"'
+check "RL2b: the on-sweep healed ORIG_HEAD too (widened set, #678)" \
+    E 'test "$(stat -c %U /var/www/vhosts/rl-gh/.git/ORIG_HEAD)" = "opencode"'
+# The #671 arm left agent-file.txt STAGED (this suite has no unstaging
+# roundtrip arm like run.sh's) — git merge refuses over staged changes,
+# so the fixture file is returned to untracked-absent before the merge
+# closure arm (it has served its purpose in the arms above).
+E 'sudo -u opencode -H sh -c "git -C /var/www/vhosts/rl-gh reset -q HEAD -- agent-file.txt && rm -f /var/www/vhosts/rl-gh/agent-file.txt"'
+check "RL2b: agent merge is green over the healed ORIG_HEAD (#678 closure)" \
+    E 'sudo -u opencode -H git -c user.email=agent@example.com -c user.name=agent -C /var/www/vhosts/rl-gh merge --no-ff -m rl678agent rl678-a && test "$(stat -c %U /var/www/vhosts/rl-gh/.git/ORIG_HEAD)" = "opencode"'
 check "RL2b: opk git-heal status reports ON" \
     E 'sudo opk git-heal status | grep -q "git-heal: ON"'
 

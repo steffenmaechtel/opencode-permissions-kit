@@ -58,14 +58,17 @@ DEFAULT_USER ALL=(opencode)  NOPASSWD: /usr/local/lib/opencode-permissions-kit/b
 # Git heal hooks (issue #671): the developer-side post-merge /
 # post-checkout / post-rewrite / post-index-change hooks (activated by
 # `opk git-heal on` through the developer's global core.hooksPath)
-# re-pin .git/index and .git/HEAD to the opencode user after a
-# developer git operation flipped their ownership (git writes both via
+# re-pin the measured operand metadata (.git/index, .git/HEAD and
+# the widened #678 carriers) to the opencode user after a developer
+# git operation flipped their ownership (git writes them via
 # lock+rename, so ownership floats with the last writer; under the
 # sticky .git of the #651 heal the agent can never re-take it itself).
 # RunAs root by design -- only chown can heal -- but narrow by
 # construction: the script allowlists kit-managed project roots
 # (projects.conf), realpath-rechecks the gitdir, verifies the gitdir
 # shape (HEAD + objects/), skips symlinked and hardlinked operands,
-# and changes nothing but those two files' ownership. Without
-# `opk git-heal on` nothing ever invokes it.
+# and changes nothing but the ownership of the measured operand set
+# (the heal script's header carries the list: index, HEAD, ORIG_HEAD,
+# REBASE_HEAD, packed-refs and the conflict pseudo-refs, each only
+# when present). Without `opk git-heal on` nothing ever invokes it.
 DEFAULT_USER ALL=(root) NOPASSWD: /usr/local/lib/opencode-permissions-kit/git-heal/heal-index-head *

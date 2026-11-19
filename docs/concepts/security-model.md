@@ -75,19 +75,25 @@ from agent-writable surfaces there:
   floating (the agent must stage and switch branches), which has its
   own cost — see the **git heal hooks** below.
 - **The git heal hooks** (issue
-  [#671](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/671)):
+  [#671](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/671),
+  operand set widened in
+  [#678](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/678)):
   git rewrites `.git/index` and `.git/HEAD` through lock+rename too, so
   their ownership floats with the last writer — and a sticky `.git`
   blocks the agent from renaming over a developer-owned entry ever
   again. The first developer checkout or pull after a merge therefore
   locks the agent's staging and branch operations (`git add`, `git
-  switch`) out of the main checkout; the baseline cannot close that
+  switch`) out of the main checkout; a developer merge/pull/reset/rebase
+  flips `ORIG_HEAD` the same way and kills the agent's merge and pull.
+  The baseline cannot close that
   (every developer git operation re-flips the ownership, and lifecycle
   re-heals would only ping-pong). The closure is opt-in and
   maintainer-side: `opk git-heal on` points the developer's global
   `core.hooksPath` at the kit-owned hook directory
   (`git-heal/hooks/`), whose `post-merge`, `post-checkout`,
-  `post-rewrite` and `post-index-change` bodies re-pin `index`/`HEAD`
+  `post-rewrite` and `post-index-change` bodies re-pin the measured
+  operand set — `index`/`HEAD`/`ORIG_HEAD`/`REBASE_HEAD`/`packed-refs`
+  plus the conflict pseudo-refs, each only when it exists —
   to the agent user after every developer git operation, via a narrow
   root heal (`git-heal/heal-index-head`) behind a sudoers grant. The
   carrier set is measured, not assumed: `post-index-change` fires on
@@ -97,7 +103,13 @@ from agent-writable surfaces there:
   writes nothing, which is exactly the no-flip case; pull/merge
   (including fast-forward) rides `post-merge`, checkouts/switches ride
   `post-checkout` (there is no `post-reset` hook in git;
-  `post-index-change` is that family's real carrier). The global
+  `post-index-change` is that family's real carrier); the resolution
+  `git add` fires `post-index-change` with the merge-state set
+  present, and mid-rebase steps fire `post-checkout`/
+  `post-index-change` with `REBASE_HEAD` present (`post-rewrite`
+  also carries it, but only in a conflicted rebase concluded via
+  `--continue` — the mid-rebase fires are the robust carrier). The
+  global
   `core.hooksPath` doubles as defense in depth: repo hooks stop
   executing for the developer (the effect the `/dev/null` form in
   [secure git config](../how-to/secure-git-config.md) documents), and

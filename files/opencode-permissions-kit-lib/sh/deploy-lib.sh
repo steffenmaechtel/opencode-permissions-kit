@@ -136,10 +136,12 @@ opencode-permissions-kit-lib/bin/socket-check 755
 opencode-permissions-kit-lib/bin/xdg-open 755
 # git-heal/ -- the git heal hooks subsystem (#671): heal-index-head is
 # executed by path (the developer-side post-* hooks sudo into it via
-# the sudoers grant; it runs as root and chowns .git/index + .git/HEAD
-# back to the agent user), the four hook bodies are executed by git
-# itself through the developer's global core.hooksPath (`opk git-heal
-# on`) -- identical bytes, the filename selects the event. 755 by the
+# the sudoers grant; it runs as root and chowns the measured operand
+# set -- .git/index, .git/HEAD and the widened #678 carriers, each
+# only when present -- back to the agent user), the four hook bodies
+# are executed by git itself through the developer's global
+# core.hooksPath (`opk git-heal on`) -- identical bytes, the filename
+# selects the event. 755 by the
 # exec-bit rule; the hooks dir must exist because core.hooksPath
 # points at it. The core lib is sh/git-heal-core.sh (sourced, below).
 opencode-permissions-kit-lib/git-heal/heal-index-head 755

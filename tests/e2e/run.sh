@@ -241,6 +241,22 @@ check "2c: #671 — developer checkout flips index+HEAD dev-owned (lockout state
     E 'cd /var/www/vhosts/perm-check && git checkout -q -b e2e-671-flip && test "$(stat -c %U .git/index)" = "dev" && test "$(stat -c %U .git/HEAD)" = "dev"'
 check_fail "2c: #671 — agent git add DIES on the dev-owned index (sticky .git)" \
     E 'sudo -u opencode -H sh -c "echo x > /var/www/vhosts/perm-check/agent-file.txt && git -C /var/www/vhosts/perm-check add agent-file.txt"'
+# #678 arms ride the same pre-on window: the ORIG_HEAD lockout shape
+# (dev merge flips it, agent merge dies) must exist BEFORE `on` heals.
+# mkdir follows EVERY checkout — switching to a master-based branch
+# prunes sub/e678 (tracked files of the other branch vanish with the
+# empty dir), and the echo would die on the missing directory.
+check "2c: #678 — developer merge flips ORIG_HEAD dev-owned (pre-heal lockout state)" \
+    E 'cd /var/www/vhosts/perm-check && git checkout -q -B e2e-678-a master && mkdir -p sub/e678 && echo a >sub/e678/a.txt && git add sub/e678/a.txt && git -c user.email=dev@example.com -c user.name=dev commit -qm e678a && git checkout -q -B e2e-678-b master && mkdir -p sub/e678 && echo b >sub/e678/b.txt && git add sub/e678/b.txt && git -c user.email=dev@example.com -c user.name=dev commit -qm e678b && git checkout -q e2e-678-a && git -c user.email=dev@example.com -c user.name=dev merge -q --no-ff -m e678merge e2e-678-b && test "$(stat -c %U .git/ORIG_HEAD)" = "dev" && git checkout -q e2e-678-b'
+check_fail "2c: #678 — agent merge DIES on the dev-flipped .git metadata (sticky .git, pre-heal)" \
+    E 'sudo -u opencode -H git -c user.email=agent@example.com -c user.name=agent -C /var/www/vhosts/perm-check merge --no-ff -m e678agent e2e-678-a'
+# The dying merge leaves its worktree additions behind — clear them as
+# the directory owner so the post-on arms start clean. Death-point
+# note: this PRE-on state has index+ORIG_HEAD both dev-owned, and the
+# in-container death fires at the index write first; with a healed
+# index (the shipped #674 world) the same merge dies at ORIG_HEAD
+# (rc 128, zero partial state — the #678 live incident).
+E 'rm -f /var/www/vhosts/perm-check/sub/e678/a.txt'
 check "2c: #671 — opk git-heal on (sudo, dev gitconfig + heal sweep)" \
     E 'sudo opk git-heal on | grep -q "git heal hooks active"'
 check "2c: #671 — dev global core.hooksPath points at the kit hook dir" \
@@ -257,6 +273,20 @@ check "2c: #671 — agent staging survives the dev flip + hook heal roundtrip" \
     E 'sudo -u opencode -H sh -c "echo y >> /var/www/vhosts/perm-check/agent-file.txt && git -C /var/www/vhosts/perm-check add agent-file.txt && git -C /var/www/vhosts/perm-check reset -q HEAD -- agent-file.txt"'
 check "2c: #671 — opk git-heal status reports ON" \
     E 'sudo opk git-heal status | grep -q "git-heal: ON"'
+# --- 2c/#678: the widened operand set — ORIG_HEAD closure + conflict state ---
+# The sub/e678 topology keeps worktree churn inside non-sticky subdirs
+# (the #682 top-level class must not colour these arms).
+check "2c: #678 — the on-sweep healed ORIG_HEAD too (widened operand set)" \
+    E 'test "$(stat -c %U /var/www/vhosts/perm-check/.git/ORIG_HEAD)" = "opencode"'
+check "2c: #678 — agent merge is green over the healed ORIG_HEAD (live-incident closure)" \
+    E 'sudo -u opencode -H git -c user.email=agent@example.com -c user.name=agent -C /var/www/vhosts/perm-check merge --no-ff -m e678agent e2e-678-a && test "$(stat -c %U /var/www/vhosts/perm-check/.git/ORIG_HEAD)" = "opencode"'
+check "2c: #678 — dev conflict state heals on the resolution add (post-index-change carrier)" \
+    E 'cd /var/www/vhosts/perm-check && git checkout -q -B e2e-678-ca master && mkdir -p sub/e678 && echo A >sub/e678/c.txt && git add sub/e678/c.txt && git -c user.email=dev@example.com -c user.name=dev commit -qm e678ca && git checkout -q -B e2e-678-cb master && mkdir -p sub/e678 && echo B >sub/e678/c.txt && git add sub/e678/c.txt && git -c user.email=dev@example.com -c user.name=dev commit -qm e678cb && (git -c user.email=dev@example.com -c user.name=dev merge e2e-678-ca >/dev/null 2>&1 || true) && test -f .git/MERGE_HEAD && echo fixed >sub/e678/c.txt && git add sub/e678/c.txt && test "$(stat -c %U .git/MERGE_HEAD)" = "opencode" && test "$(stat -c %U .git/AUTO_MERGE)" = "opencode"'
+check "2c: #678 — agent merge --abort concludes cleanly (state file really gone)" \
+    E 'sudo -u opencode -H git -C /var/www/vhosts/perm-check merge --abort && test ! -e /var/www/vhosts/perm-check/.git/MERGE_HEAD'
+check "2c: #678 — the audit log records the widened-set heals" \
+    E 'grep -q "healed ORIG_HEAD" /usr/local/lib/opencode-permissions-kit/git-heal/heal.log && grep -q "healed MERGE_HEAD" /usr/local/lib/opencode-permissions-kit/git-heal/heal.log'
+E 'cd /var/www/vhosts/perm-check && git checkout -q master'
 # Remove the fake binary: section 3 asserts no ddev shadow exists at
 # /usr/local/bin/ddev (the soft-only kit ships no shim).
 E 'sudo rm -f /usr/local/bin/ddev'

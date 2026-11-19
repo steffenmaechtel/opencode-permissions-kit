@@ -96,9 +96,12 @@ expect the reported paths to exist locally.
   tracking write a first `git push -u` performs fails with
   `Operation not permitted` — the push itself transfers fine. The
   agent's main-checkout staging/branching (`git add`, `git switch`)
-  depends on the maintainer-side git heal hooks being on (`opk
-  git-heal on`, issue #671): developer git operations flip `.git/index`
-  and `.git/HEAD` ownership, and without the hooks the sticky `.git`
+  and merging (`git merge`/`git pull`, #678) depend on the
+  maintainer-side git heal hooks being on (`opk
+  git-heal on`, issue #671): developer git operations flip the heal's
+  operand metadata (`.git/index`, `.git/HEAD` and the widened #678
+  carriers — ORIG_HEAD, REBASE_HEAD, packed-refs, the conflict
+  pseudo-refs), and without the hooks the sticky `.git`
   locks the agent out until healed — `opk status` shows the lockout
   risk; agent worktrees are the self-sufficient fallback. (RM-0097)
 - **All shipped content is English** — scripts, docs, prompts, messages. (RM-0098)
@@ -129,9 +132,10 @@ expect the reported paths to exist locally.
   directories keep their sharing modes (sticky gates only rename/unlink
   of foreign entries). Follow-up (#671): the git heal hooks —
   opt-in maintainer-side git hooks (`opk git-heal on`) that re-pin
-  `.git/index`/`.git/HEAD` to the agent user after developer git
-  operations via a narrow root heal behind a sudoers grant; still no
-  deny ACLs, ownership-only. (RM-0103)
+  the measured operand set (`.git/index`, `.git/HEAD` and the widened
+  #678 carriers, each only when present) to the agent user after
+  developer git operations via a narrow root heal behind a sudoers
+  grant; still no deny ACLs, ownership-only. (RM-0103)
 - **The kit never edits user-owned system config on its own — above all
   `/etc/wsl.conf`.** Install/update only *show* snippets or name opt-in
   commands the user runs themselves; `opk wsl-add-opencode-1-fix` is the
