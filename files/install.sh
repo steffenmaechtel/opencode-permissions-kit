@@ -934,9 +934,10 @@ _py3_health_probe() {
     # — ddev describe, update resolve and status feed json/sys — the
     # status progress tee sys/threading/time — the opk settings edit
     # json/sys/pathlib — tui-register importlib.util/json/os/stat/sys/
-    # tempfile (the parser's `re` import was dead and removed, #661 P8).
-    # Drift-pinned: every shipped python import must appear
-    # here (tests/unit/test-install-args.sh).
+    # tempfile — doctor-core's and handover-core's embedded python
+    # json/sys (#675 a Q7). The parser's `re` import was dead and
+    # removed (#661 P8). Drift-pinned: every shipped python import must
+    # appear here (tests/unit/test-install-args.sh).
     _py3_imports='import fnmatch, importlib.util, json, os, pathlib, stat, sys, tempfile, threading, time'
     if ! command -v python3 >/dev/null 2>&1; then
         ui_error "python3 is required but not installed (apt install python3)."

@@ -106,14 +106,17 @@ def main(argv):
     data = {}
     # No cross-process lock around this read-modify-write (issue #661 P4,
     # deliberate): cli.json's real concurrent writer is the live 2.x TUI
-    # persisting user preferences, and it takes no advisory lock — flock
-    # here could only order kit-vs-kit runs (install/update/uninstall run
-    # sequentially and interactively; today only unregister writes), never
-    # kit-vs-TUI, and locking the replaced inode would not even exclude a
-    # second kit process after os.replace. A lost update is accepted
-    # either way; what the write path below guarantees instead is
-    # ATOMICITY (mkstemp + fsync + os.replace — no torn cli.json, the
-    # corruption class that matters for user-owned state).
+    # persisting user preferences, and it takes no advisory lock (external
+    # premise, unverifiable in-repo — hedged like the #661 P11 note) —
+    # flock here could only order kit-vs-kit runs (install/update/
+    # uninstall run sequentially and interactively; no shipped caller
+    # invokes register today, so unregister is the only writer the kit
+    # itself runs), never kit-vs-TUI, and locking the replaced inode
+    # would not even exclude a second kit process after os.replace. A
+    # lost update is accepted either way; what the write path below
+    # guarantees instead is ATOMICITY (mkstemp + fsync + os.replace — no
+    # torn cli.json, the corruption class that matters for user-owned
+    # state).
     if os.path.exists(path):
         try:
             data = load(path)

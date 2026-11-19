@@ -2347,13 +2347,17 @@ do_deploy_phase() {
     #                     running the ORIGINAL opencode binary as yourself
     #                     defeats the kit's UID separation; deny-all still
     #                     guards, the red is the visible amplifier).
-    # Only the tui.json files carry the _opencode_permissions_kit marker
-    # and are marker-gated: the kit writes them just when absent or
-    # previously kit-written — user edits survive re-installs and updates
-    # (same policy as the deny-all config above). The danger THEME file
-    # carries NO marker (#661 P6, comment truth): the gate below checks
-    # the sibling tui.json's marker and then copies the theme
-    # UNCONDITIONALLY — a hand-customized deployed danger theme is
+    # The tui.json files deployed here carry the _opencode_permissions_kit
+    # marker and are marker-gated: the kit writes a tui.json only when it
+    # is absent or still carries the marker — a user-authored file
+    # WITHOUT the marker is kept untouched. Note the flip side: edits to
+    # the deployed kit-written file keep the marker and are REFRESHED by
+    # the next install/update (take ownership by removing the marker —
+    # same semantics as the agent config's marker gate above; the
+    # default-user deny-all below is backup-and-replace by design). The
+    # danger THEME file carries NO marker (#661 P6, comment truth): the
+    # gate below checks the sibling tui.json's marker and then copies the
+    # theme UNCONDITIONALLY — a hand-customized deployed danger theme is
     # overwritten on the next install/update. Deliberate: the bypass
     # warning look stays current, and the design record accepted user
     # theme changes losing the warning styling (deny-all still guards).

@@ -26,8 +26,10 @@
 // paths used to throw into render()'s catch and render the WARNING row
 // as NOTHING — exactly in the bypass case the row exists for. A missing
 // token now degrades to the default color (fg undefined), the row still
-// renders. Everything is defensive: a broken plugin must never take the
-// TUI down.
+// renders — the runtime premise (the renderer tolerates an undefined
+// fg prop) is the shape validated against opencode 2.0.6, not provable
+// in this repo (#675 a S2). Everything is defensive: a broken plugin
+// must never take the TUI down.
 //
 // Deployed to /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx.
 // REGISTRATION on 2.x is the plugins/<name>/ directory symlink

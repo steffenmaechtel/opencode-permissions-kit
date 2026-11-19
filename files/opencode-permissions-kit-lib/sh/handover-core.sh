@@ -243,7 +243,11 @@ import sys
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 try:
-    with open(sys.argv[1], "r", encoding="utf-8") as f:
+    # utf-8-sig, not plain utf-8 (#661 P2 class, #675 a M1): opk.json is
+    # hand-edited per the docs, and a leading Windows BOM used to land
+    # in this except as a bare rc 1 the caller misreads as "unreadable
+    # opk.json". Same pin as the jsonc parser's read paths.
+    with open(sys.argv[1], "r", encoding="utf-8-sig") as f:
         doc = json.load(f)
 except Exception:
     sys.exit(1)
