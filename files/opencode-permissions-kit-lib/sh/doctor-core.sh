@@ -914,7 +914,12 @@ import sys
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 try:
-    with open(sys.argv[1], "r", encoding="utf-8") as f:
+    # utf-8-sig, not plain utf-8 (#661 P2 class, #675 a M1): opk.json is
+    # hand-edited per the docs (cli.md, troubleshooting.md), and a
+    # leading Windows BOM used to die as "not valid JSON" on a valid
+    # file. utf-8-sig strips the BOM when present, decodes identically
+    # when absent.
+    with open(sys.argv[1], "r", encoding="utf-8-sig") as f:
         doc = json.load(f)
 except OSError as e:
     sys.stderr.write("opk.json: unreadable: %s\n" % e)
@@ -1501,7 +1506,9 @@ def _cntrl(c):
 path = root + "/opk.json"
 doc = {}
 try:
-    with open(path, "r", encoding="utf-8") as f:
+    # Same BOM pin as the validator's read side above (#675 a M1): the
+    # fix-side re-validation must accept what the reader accepts.
+    with open(path, "r", encoding="utf-8-sig") as f:
         doc = json.load(f)
 except FileNotFoundError:
     pass

@@ -1805,7 +1805,7 @@ EOF
         fi
         scan_count=$(printf '%s\n' "$scan_hits" | grep -c . || true)
         if [ "$scan_unscannable" = true ]; then
-            ui_kv_warn "result" "skipped — agent config unscannable (top level is not an object?)"
+            ui_kv_warn "result" "skipped — agent config unscannable (top level is not an object? truncated config?)"
             log "leak scan: skipped, parser rejected $SCAN_CFG"
         elif [ "${scan_count:-0}" -gt 0 ]; then
             ui_warn "$scan_count match(es) — deny-pattern files outside the protected roots:"

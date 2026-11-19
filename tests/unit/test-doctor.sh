@@ -346,15 +346,42 @@ _out="$(pol '{"version":1,"futureKey":true,"containerTrees":[{"path":"a","role":
     pass "unknown keys ignored (forward compatibility)" ||
     fail "unknown keys ignored (forward compatibility) (got: $_out)"
 
+# BOM pin (#675 a M1, the #661 P2 class swept beyond the py files): a
+# Windows-BOM'd opk.json is a valid file on the docs-invited hand-edit
+# path; the loader reads utf-8-sig now, so the policy PARSES instead of
+# dying as "not valid JSON" (json's "Unexpected UTF-8 BOM" used to land
+# in the ValueError arm). Octal escapes: dash printf has no \xHH;
+# \357\273\277 = EF BB BF. The rc is captured BEFORE branching
+# (conventions.md "Fail-loud detector sweeps"): a bare assignment over
+# the failing cmdsub would abort the whole suite under set -e and skip
+# every later pin — the fail must be a ROW, not an abort (caught by the
+# wave's own sabotage cycle).
+printf '\357\273\277{"version":1,"containerTrees":[{"path":"web/assets","note":"bom"}]}\n' >"$WORK/opk.json"
+_bom_rc=0
+_out="$(
+    (
+        PATH="$SCRATCHBIN"
+        export PATH
+        . "$POL_FN"
+        doctor_load_policy "$WORK" 2>"$WORK/pol.err"
+    )
+)" || _bom_rc=$?
+if [ "$_bom_rc" -eq 0 ] && [ "$_out" = "$(printf 'web/assets\tbom')" ]; then
+    pass "BOM'd opk.json parses (utf-8-sig, #675 a M1)"
+else
+    fail "BOM'd opk.json parses (utf-8-sig, #675 a M1) (rc=$_bom_rc got: $_out err: $(cat "$WORK/pol.err" 2>/dev/null))"
+fi
+
 # hostile-locale pin (#510, the #485 F23 class beyond the two py files):
 # paths and notes tolerate non-ASCII (only control characters are
 # gated), and under a 7-bit locale the unpinned TSV write used to raise
 # UnicodeEncodeError -- a VALID policy surfaced as "rejected" (the
 # caller renders "the policy file was rejected -- fix opk.json"). The
 # heredoc reconfigures stdout to utf-8: the TSV must round-trip
-# byte-exact. The loader reads via open(encoding="utf-8") (decode
-# already locale-independent); the fixture carries literal UTF-8 bytes
-# so the write side is what runs. Control arm first (harness #510).
+# byte-exact. The loader reads via open(encoding="utf-8-sig") (decode
+# already locale-independent; BOM-tolerant since #675 a M1); the fixture
+# carries literal UTF-8 bytes so the write side is what runs. Control
+# arm first (harness #510).
 P510="$(hostile_stdio_python)"
 if hostile_stdio_control "$P510"; then
     pass "control arm: strict 7-bit stdout kills the -I non-ASCII write (#510)"

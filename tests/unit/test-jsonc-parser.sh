@@ -378,5 +378,45 @@ _f22_err=$(env PATH="$P514:$PATH" $F22_ENV python3 "$PARSER" "$TMP/badutf8.json"
 assert_contains "locale: invalid UTF-8 carries the decode diagnostic (F22)" "Error decoding" "$_f22_err"
 assert_not_contains "locale: invalid UTF-8 carries no traceback (F22)" "Traceback" "$_f22_err"
 
+# --- 29. UTF-8 BOM (#661 P2): a leading U+FEFF (Windows editors on WSL
+# write one) used to survive the decode AND the comment strip, so
+# json.loads died and the status leak scan degraded to "unscannable"
+# forever. utf-8-sig strips it on BOTH read paths — file and stdin.
+# Octal escapes (dash printf has no \xHH): \357\273\277 = EF BB BF. ---
+printf '\357\273\277{"permission": {"read": {"*.env*": "deny"}}}\n' >"$TMP/bom.jsonc"
+OUT=$(python3 "$PARSER" "$TMP/bom.jsonc" 2>/dev/null || true)
+assert_contains "bom: file mode strips the BOM, pattern emitted (P2)" ".env*" "$OUT"
+assert_exitcode "bom: file mode exits 0 (P2)" 0 python3 "$PARSER" "$TMP/bom.jsonc"
+OUT=$(python3 "$PARSER" - <"$TMP/bom.jsonc" 2>/dev/null || true)
+assert_contains "bom: stdin path strips the BOM, pattern emitted (P2)" ".env*" "$OUT"
+
+# --- 30. RecursionError (#661 P3): a deeply nested document used to
+# escape load_config's except arms as a raw traceback — RecursionError
+# is a RuntimeError, not a ValueError, so no arm caught it. The tuple
+# arm prints the polished diagnostic instead. ---
+python3 -c 'print("[" * 200000 + "]" * 200000)' >"$TMP/deep.json"
+assert_exitcode "deep: nested doc exits 1, no crash (P3)" 1 python3 "$PARSER" "$TMP/deep.json"
+_deep_err=$(python3 "$PARSER" "$TMP/deep.json" 2>&1 >/dev/null || true)
+assert_contains "deep: stderr carries the parse diagnostic (P3)" "Error parsing" "$_deep_err"
+assert_not_contains "deep: no traceback on stderr (P3)" "Traceback" "$_deep_err"
+
+# --- 31. Unterminated trailing block comment fails loud (#661 P7): the
+# comment text used to be silently dropped — a truncated config parsed
+# clean rc 0 and its deny patterns read as if complete. The raise rides
+# the polished JSONDecodeError arm of load_config. ---
+printf '%s' '{"permission": {"read": {"*.env*": "deny"}}} /* truncated' >"$TMP/unterm.jsonc"
+assert_exitcode "unterminated block comment: exits 1 (P7)" 1 python3 "$PARSER" "$TMP/unterm.jsonc"
+_unterm_err=$(python3 "$PARSER" "$TMP/unterm.jsonc" 2>&1 >/dev/null || true)
+assert_contains "unterminated: diagnostic names the cause (P7)" "unterminated block comment" "$_unterm_err"
+assert_not_contains "unterminated: no traceback (P7)" "Traceback" "$_unterm_err"
+# The trailing-comma PEEK loop walks past EOF without its own raise — the
+# MAIN loop's raise must catch this shape too (class-sweep leg).
+printf '%s' '{"permission": {"read": {"*.env*": "deny"},} /* truncated' >"$TMP/unterm2.jsonc"
+assert_exitcode "unterminated after trailing comma: exits 1 (P7)" 1 python3 "$PARSER" "$TMP/unterm2.jsonc"
+# Control: a TERMINATED trailing block comment still parses clean.
+printf '%s' '{"permission": {"read": {"*.env*": "deny"}}} /* fine */' >"$TMP/term.jsonc"
+OUT=$(python3 "$PARSER" "$TMP/term.jsonc" 2>/dev/null || true)
+assert_contains "terminated trailing comment: still parses (P7 control)" ".env*" "$OUT"
+
 # --- Summary ---
 suite_done "jsonc parser edge-case tests"
