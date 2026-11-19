@@ -31,7 +31,7 @@ ecf7681c0cf08adf9451810f8be0f8b48c3d38b350afedcc6231cc1b792d2fc3  files/opencode
 da1635f7539e7a81bfbb4e1df9d7423dadc3f53cd683ae16983e1242d9d6c960  files/opencode-permissions-kit-lib/sh/install-core.sh
 575266d6e05f87e5b5444464538ab3c222931bf5d5753d44695308aac067c3bf  files/opencode-permissions-kit-lib/sh/log.sh
 590d0a5899e7a902c3c4a1e4cf3254dfef7d4fc63cfc6f530cb6002630a8eee2  files/opencode-permissions-kit-lib/sh/openchamber-core.sh
-f7ebc8696c500cdccd08cd17bef525453d77760ef1f2c363d5dba055480478ac  files/opencode-permissions-kit-lib/sh/path-sane.sh
+2ff33567f1185886a2692b6a5bda7d205b4cee2cdf5f2e605659a131745cf0a1  files/opencode-permissions-kit-lib/sh/path-sane.sh
 b2b21462d2352dfb1def2676c4d4946b17bf76b6957980876b9286d95a18a967  files/opencode-permissions-kit-lib/sh/render-agent-config.sh
 c555d74f4799dd63dbe6e4ea92086df68a5df83691d337a89ab59cfffe9ca123  files/opencode-permissions-kit-lib/sh/secure-binary.sh
 ab6f9f1e32ed3dfffa7280764a3fd006823295b0e49cc09a13f0ca9347778a8a  files/opencode-permissions-kit-lib/sh/shell-warn.sh

@@ -475,6 +475,15 @@ if printf '%s' "$_ps_l2_out" | grep -qF "evil?proj"; then
 else
     fail "refusal must name the sanitized path form (#670 a L2, out=$_ps_l2_out)"
 fi
+# (#670 b D1) the sanitize receiver must not collide with install-core's
+# _pps (ip_unprivileged_port_start) — install.sh sources both libs into
+# one shell. Absence leg RAW by design (conventions "Source-counting
+# pins": a commented-out survivor must keep failing here).
+if grep -qE '_pps=' "$PATH_SANE"; then
+    fail "path-sane must not define install-core's _pps name (#670 b D1)"
+else
+    pass "path-sane defines no _pps receiver (#670 b D1)"
+fi
 if project_path_sane '/var/www/vhosts/back\slash'; then
     fail "rejects backslash paths (#670 a L2)"
 else

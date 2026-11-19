@@ -125,8 +125,13 @@ project_path_sane() {
     # refusal message shows a sanitized copy (pr-00263 a F9 class).
     if printf '%s' "$_pp" | LC_ALL=C grep -q "$(printf '[[:cntrl:]]')" ||
         printf '%s' "$_pp" | LC_ALL=C grep -qF '\'; then
-        _pps="$(printf '%s' "$_pp" | tr -c 'A-Za-z0-9_./-' '?')"
-        echo "  refused: '$_pps' carries control characters or a backslash — not registrable as a project root" >&2
+        # _pp_san, NOT _pps: install.sh sources this lib AND
+        # install-core.sh into one shell, where _pps is the
+        # ip_unprivileged_port_start reader (#670 b D1) — one global
+        # namespace, adjacent assign-then-read today, silently swapped
+        # values the day an interleave appears.
+        _pp_san="$(printf '%s' "$_pp" | tr -c 'A-Za-z0-9_./-' '?')"
+        echo "  refused: '$_pp_san' carries control characters or a backslash — not registrable as a project root" >&2
         return 1
     fi
     # A root ENTRY that is itself a symlink (issue #245): the form is
