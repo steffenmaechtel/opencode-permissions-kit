@@ -157,7 +157,21 @@ the construct, never because of environment luck: the first n10j arm
 stayed green with the dot-dot guard deleted (`../../etc/passwd`
 failed `-f` anyway — /tmp/etc/passwd happens not to exist) until the
 arm planted the reachable marker the guard exists to reject (PR #564
-round b D1, fixed in 86850e0b).
+round b D1, fixed in 86850e0b). Fixture shape is pin shape, twice
+over (November 2026): an assertion must match the producer's EXACT
+output shape — `stat -c %a` prints minimal digits, so once the
+baseline's dirs have passed, sticky modes are [1357]??? (sticky and
+setgid ride along), never `1*`; a count-pin over mktemp-recorded
+logs matches stem + the exact N mktemp chars + suffix, because a
+`.*suffix$` grep flakes at 1−(61/62)^N per run (both PR #655 round
+e, #666). And a probe fixture must contain the construct it claims
+before a verdict derives from its output: `$(printf '\n')` is EMPTY
+(POSIX strips trailing newlines from command substitution), so the
+intuitive embedded-newline operand silently builds the wrong fixture
+— its plausible-looking output can flip a verdict to REFUTED. Build
+embedded newlines via a variable (`NL=$(printf '\nX'); NL=${NL%X}`)
+and verify the fixture itself with `od -c`/`cat -A` before reading
+its output (PR #657 round a S3, #659).
 
 ### L5 — Root-operand inventory check
 *Classes: `perm-model` + `race-toctou` — run 1: 53 findings, 23 MED/HIGH,
@@ -205,7 +219,14 @@ agrees since 2026-10-11 ([review-concept.md](review-concept.md),
 revised from the 0.0.46a→0.0.46b chain): a round whose fixes touch code —
 LOW fixes included, the 0.0.46b W1 MED arrived through exactly those —
 owes its low-tier re-review; only comment/docs/disposition-only rounds
-close the loop without one.
+close the loop without one. And the pin discriminates the FIX's own
+mechanism, not only the finding's behavior — the negative arm of a
+new guard, the registration calls of new tracking, the failure path
+of a new degradation: PR #655 shipped the construct and pinned it one
+round later three times in one loop (rounds b–e, every gap found by a
+reviewer, none by the wave — #666, 2026-11-19). Cheapest form while
+writing the fix: list the constructs and ask per construct "which pin
+reddens if exactly THIS is deleted?"
 
 ### L7 — New scripts start from the skeleton
 *Class: `shell-semantics` — run 1: 46 findings, 14 MED/HIGH; run 2: 7

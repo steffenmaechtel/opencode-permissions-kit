@@ -288,6 +288,14 @@ nothing to review.
   (#573 alone re-attached 34 findings). The folding pointer-comment
   rule (the finding AND its evidence) governs filing too: the issue
   IS the durable record. (RM-0161)
+- A deferred-findings COLLECTION issue states its own scope in the
+  title or preamble — file class (shipped `files/**` vs tests/docs),
+  severity range, source pass — so the gate's fold decisions key on
+  it at a glance, never by body archaeology: a policy parenthetical
+  that mislabels the composition ("non-shipped-track policy" over
+  overwhelmingly shipped-code items) can send a fold to the wrong
+  home or suppress one (PR #657's fold re-derived #573's composition
+  from the full body; #658). (RM-0185)
 - After the work-order gate settles (every YES filed or folded, every
   NO recorded, the closing summary's list posted), the loop's chat
   duties extend exactly once more: the disposition report ends by
@@ -616,7 +624,12 @@ Review-relevant code touched this round: yes/no → …
   the check NAME list is identical across pushes and carries no
   commit identity, the run URLs do (PR #642 pushes 2–4: the watch
   reported 7/7 from push 1's run IDs over push 2's commit, caught by
-  keying on run identity, #650). (RM-0154)
+  keying on run identity, #650). And the identity probe names the
+  FULL 40-char sha: `gh run list --commit <short-sha>` served an
+  empty list three times over runs that were already registered
+  (`gh pr checks` showed them in the same second) while the full sha
+  resolved them instantly — a short-sha match is not a registration
+  probe (PR #654's fix push, #656). (RM-0154)
 - Size guard: GitHub caps one comment at ~64k characters; a comment
   that would exceed ~60k is SPLIT into part 1/2 (each part with its
   own marker and a `"part":1|2` field) — content is NEVER trimmed to
@@ -883,6 +896,15 @@ here.
   comment's run provenance. A subagent's final message lands in the
   parent session's context — that IS the bloat path; the file is the
   transport, the response only the pointer. (RM-0090)
+- A session close (window, terminal, host) kills running reviewer
+  subagents mid-fan-out: the completion notification never arrives,
+  and the checkpoint file keeps its launch line only. Recovery is a
+  follow-up subagent call WITH the dead child's sessionID — it JOINS
+  the existing session and continues it (fresh re-read of what it
+  needs, same checkpoint file, same finding-ID namespace), so partial
+  work and provenance survive where a fresh re-spawn loses them; the
+  restart is disclosed in the round comment's run provenance (PR #655
+  round b, #667). (RM-0186)
 
 ## Release gate
 
