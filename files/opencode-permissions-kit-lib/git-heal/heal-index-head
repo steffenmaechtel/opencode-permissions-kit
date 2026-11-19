@@ -106,7 +106,14 @@ _gh_root_ok() {
             *) break ;;
         esac
     done
-    [ -n "$_gh_ro" ] || return 1
+    # "/" strips to empty: a system path by any spelling (#674 b D1 —
+    # this arm refused silently before, contradicting the loud-refusal
+    # contract two lines up). Loud in every mode: it sits before the
+    # GH_CONF_RELAX guard on purpose.
+    [ -n "$_gh_ro" ] || {
+        say "skip (conf): system path is never a project root: /"
+        return 1
+    }
     if [ "${GH_CONF_RELAX:-}" != "1" ]; then
         _gh_ah=$(getent passwd "$_gh_agent" 2>/dev/null | cut -d: -f6) || true
         if [ "$_gh_ro" = "/home/$_gh_agent" ] ||

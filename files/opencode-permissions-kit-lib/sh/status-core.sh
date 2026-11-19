@@ -448,12 +448,21 @@ status_section_git_heal() {
     # lock the agent out of the main checkout until the heal hooks
     # fire (state off/foreign: they never will) or the next developer
     # git operation re-pins them (state on: transient by design). The
-    # enumeration mirrors the on-sweep (#674 a C3): every .git under
-    # each conf root, recursively — conf roots are scan roots
-    # (config.sh parent registration), so the literal <root>/.git
-    # would miss every nested repo.
+    # enumeration mirrors the on-sweep's RECURSION (#674 a C3: every
+    # .git under each conf root — conf roots are scan roots, config.sh
+    # parent registration; the literal <root>/.git would miss every
+    # nested repo), deliberately NOT its conf-line reader gate
+    # (#674 b D2): status is display-only, no root operation — it
+    # renders the conf as written (bounded display residual; the
+    # sanctioned writer refuses such lines).
     [ -f "$PROJECTS_CONF" ] || return 0
-    _st_gh_list=$(mktemp) || return 0
+    # Loud but never fatal (#674 b D3): a swallowed mktemp failure
+    # would silently drop the lockout rows this section exists to
+    # show (the on-sweep twin fails loud).
+    _st_gh_list=$(mktemp) || {
+        ui_kv_warn "git-heal" "lockout rows unavailable (mktemp failed)"
+        return 0
+    }
     while IFS= read -r _st_gh_root; do
         case "$_st_gh_root" in '' | '#'*) continue ;; esac
         [ -d "$_st_gh_root" ] || continue

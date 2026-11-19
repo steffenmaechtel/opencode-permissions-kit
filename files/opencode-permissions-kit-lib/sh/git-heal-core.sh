@@ -183,7 +183,9 @@ _ghc_root_ok() {
             *) break ;;
         esac
     done
-    [ -n "$_ghc_ro" ] || return 1
+    # "/" strips to empty: rc 3 (system path), never the generic rc 1
+    # form message — "/" is absolute and not malformed (#674 b D1).
+    [ -n "$_ghc_ro" ] || return 3
     if [ "${GH_CONF_RELAX:-}" != "1" ]; then
         _ghc_ah=$(getent passwd "$(_ghc_agentuser)" 2>/dev/null | cut -d: -f6) ||
             true
@@ -356,13 +358,24 @@ _git_heal_status() {
     # lock the agent out until the heal hooks fire (off/foreign) or
     # the next developer git operation re-pins them (on: transient —
     # the same classification the opk status / doctor rows render,
-    # #674 a C7). The enumeration mirrors the on-sweep (#674 a C3):
-    # every .git under each conf root, recursively — conf roots are
-    # scan roots (config.sh parent registration), so the literal
-    # <root>/.git would miss every nested repo.
+    # #674 a C7). The enumeration mirrors the on-sweep's RECURSION
+    # (#674 a C3: every .git under each conf root — conf roots are
+    # scan roots, config.sh parent registration; the literal
+    # <root>/.git would miss every nested repo), deliberately NOT its
+    # conf-line reader gate (#674 b D2): status is display-only, no
+    # root operation — it renders the conf as written, so a
+    # hand-edited line the sweep refuses loudly can still show rows
+    # here (a bounded display residual; the sanctioned writer refuses
+    # such lines, and the rows say something is off).
     _ghc_stt_conf="${GH_PROJECTS_CONF:-/etc/opencode-permissions-kit/projects.conf}"
     [ -f "$_ghc_stt_conf" ] || return 0
-    _ghc_stt_list=$(mktemp) || return 0
+    # Loud but never fatal (#674 b D3): status must not die, but a
+    # swallowed mktemp failure would silently drop the lockout rows
+    # this section exists to show (the on-sweep twin fails loud).
+    _ghc_stt_list=$(mktemp) || {
+        ui_detail "git-heal: lockout rows unavailable (mktemp failed)"
+        return 0
+    }
     while IFS= read -r _ghc_stt_root; do
         case "$_ghc_stt_root" in '' | '#'*) continue ;; esac
         [ -d "$_ghc_stt_root" ] || continue

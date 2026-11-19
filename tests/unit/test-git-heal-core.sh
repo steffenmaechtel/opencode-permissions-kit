@@ -166,6 +166,34 @@ else
     fail "heal: conf mixed-lines arm (rc=$_hr_rc out=$_hr_out)"
 fi
 
+# The `/` line (strip-to-empty) refuses LOUD in every mode — it sits
+# before the relax guard (#674 b D1; silent before).
+printf '%s\n' "/" >"$CONF"
+_hr_rc=0
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 GH_PROJECTS_CONF="$CONF" \
+    "$HEAL" "$WORK/r1" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 1 ] &&
+    printf '%s' "$_hr_out" | grep -qF 'skip (conf): system path is never a project root: /'; then
+    pass "heal: bare / conf line refuses loud (strip-to-empty arm)"
+else
+    fail "heal: conf slash arm (rc=$_hr_rc out=$_hr_out)"
+fi
+
+# Dot and whitespace form arms execute UNDER relax — the "form arms
+# never relax" claim, pinned (#674 b D4); both lines are skipped, so
+# the gitdir matches nothing.
+printf '%s\n' "$WORK/r1/../r1" "$WORK /gap" >"$CONF"
+_hr_rc=0
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 GH_PROJECTS_CONF="$CONF" \
+    "$HEAL" "$WORK/r1" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 1 ] &&
+    printf '%s' "$_hr_out" | grep -qF 'skip (conf): malformed root' &&
+    ! printf '%s' "$_hr_out" | grep -qF 'not a (common) gitdir shape'; then
+    pass "heal: dot and whitespace conf lines refused even under relax"
+else
+    fail "heal: conf form-arms-under-relax (rc=$_hr_rc out=$_hr_out)"
+fi
+
 printf '%s\n' "$WORK" >"$CONF"
 
 # --- 2. heal-index-head: realpath + gitdir-shape refusals --------------------------
@@ -662,6 +690,29 @@ if [ "$_hr_rc" -eq 0 ] &&
 else
     fail "core: on conf gate (rc=$_hr_rc out=$(printf '%s' "$_out" | grep 'skip (conf)' | head -2))"
 fi
+
+# The sweep's agent-home arm (rc 2, #674 b D4): the running user's own
+# home as a conf line is skipped with its own reason — the core reads
+# the agent from install.conf (OPENCODE_USER=$(id -un)), so getent's
+# home for that user is the refused spelling.
+_ahome=$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f6)
+if [ -n "$_ahome" ]; then
+    printf '%s\n' "$_ahome" >"$WORK/on-projects.conf"
+    : >"$LOG"
+    _hr_rc=0
+    _out=$(
+        _core_run 'SD_SUDO="" SD_VISUDO="$WORK/visudo" SD_CONF_DIR="$WORK/etc" \
+            SD_SUDOERS_D="$WORK/sdd" GH_PROJECTS_CONF="$WORK/on-projects.conf" \
+            GH_CONF_RELAX= HOME="$WORK/devhome" _git_heal_on'
+    ) || _hr_rc=$?
+    if [ "$_hr_rc" -eq 0 ] &&
+        printf '%s' "$_out" | grep -qF "skip (conf): agent home is never a project root: $_ahome" &&
+        [ "$(grep -c 'gitdir=' "$LOG" 2>/dev/null || true)" = 0 ]; then
+        pass "core: on skips the agent-home conf line with its own reason"
+    else
+        fail "core: on agent-home gate (rc=$_hr_rc out=$(printf '%s' "$_out" | grep 'skip (conf)' | head -2))"
+    fi
+fi
 printf '%s\n' "$WORK/zone/onroot" "# comment tolerated" >"$WORK/on-projects.conf"
 
 # `on` pieces gate: an incomplete lib refuses before touching anything.
@@ -762,6 +813,18 @@ if printf '%s' "$_out" | grep -qF 'lockout (transient — the next developer git
     pass "status renderer: ON classifies the same lockout as transient"
 else
     fail "status renderer: transient classification (out=$(printf '%s' "$_out" | grep -i lockout | head -2))"
+fi
+
+# The mktemp failure path EXECUTES (#674 b D3): a dead TMPDIR drops
+# the lockout rows with a loud line, never silently — and the state
+# row above still renders (status never dies).
+_out=$(_core_run 'INSTALL_CONF="$WORK/install-render.conf" \
+    TMPDIR="$WORK/no-such-tmp" _git_heal_status')
+if printf '%s' "$_out" | grep -qF 'git-heal: lockout rows unavailable (mktemp failed)' &&
+    printf '%s' "$_out" | grep -qF 'git-heal: ON — heal hooks active'; then
+    pass "status renderer: mktemp failure is loud and non-fatal"
+else
+    fail "status renderer: mktemp arm (out=$(printf '%s' "$_out" | head -3))"
 fi
 rm -f "${WORK:?}/devhome/.gitconfig"
 

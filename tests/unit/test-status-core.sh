@@ -199,6 +199,17 @@ else
     fail "git-heal section: recursive lockout row missing (out=$(printf '%s' "$_out" | grep lockout | head -2))"
 fi
 printf '%s\n' "$WORK/ghs/root" >"$WORK/ghs/projects.conf"
+
+# The mktemp failure path EXECUTES for the status-core twin too
+# (#674 b D3): a dead TMPDIR drops the lockout rows with a loud warn,
+# never silently — and the state row above still renders.
+_out=$(TMPDIR="$WORK/ghs/no-such-tmp" _ghs_run || true)
+if printf '%s' "$_out" | grep -qF 'lockout rows unavailable (mktemp failed)' &&
+    printf '%s' "$_out" | grep -q "git-heal.*OFF — 'sudo opk git-heal on'"; then
+    pass "git-heal section: mktemp failure is loud and non-fatal"
+else
+    fail "git-heal section: mktemp arm (out=$(printf '%s' "$_out" | head -3))"
+fi
 git config -f "$WORK/ghs/devhome/.gitconfig" core.hooksPath "$WORK/ghs/lib/git-heal/hooks"
 _out=$(_ghs_run || true)
 if printf '%s' "$_out" | grep -q 'git-heal.*ON — developer git ops re-pin' &&
