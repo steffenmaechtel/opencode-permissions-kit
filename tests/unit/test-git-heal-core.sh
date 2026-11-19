@@ -313,9 +313,12 @@ if [ "$_hr_rc" -eq 0 ] && [ "$_lines" -eq 11 ] &&
     grep -qF 'healed REBASE_HEAD' "$LOG" &&
     grep -qF 'healed packed-refs' "$LOG" &&
     grep -qF 'healed MERGE_HEAD' "$LOG" &&
+    grep -qF 'healed MERGE_MSG' "$LOG" &&
+    grep -qF 'healed MERGE_MODE' "$LOG" &&
+    grep -qF 'healed AUTO_MERGE' "$LOG" &&
     grep -qF 'healed CHERRY_PICK_HEAD' "$LOG" &&
     grep -qF 'healed REVERT_HEAD' "$LOG"; then
-    pass "heal: the #678 operand set heals per existing file (11 audit lines)"
+    pass "heal: the #678 operand set heals per existing file (11 audit lines, every operand named — a swap for any present file reds)"
 else
     fail "heal: widened-set arm (rc=$_hr_rc lines=$_lines log=$(cat "$LOG"))"
 fi

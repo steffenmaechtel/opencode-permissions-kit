@@ -300,8 +300,9 @@ _git_heal_on() {
         rm -f "$_ghc_on_list"
     fi
     ui_success "git heal hooks active — developer git operations now re-pin"
-    ui_success ".git/index and .git/HEAD to the agent user (repo hooks stay"
-    ui_success "off for the developer; hooksPath=$(_ghc_hooksdir))"
+    ui_success "the measured operand set (.git/index, .git/HEAD and the widened"
+    ui_success "#678 carriers, each only when present) to the agent user (repo"
+    ui_success "hooks stay off for the developer; hooksPath=$(_ghc_hooksdir))"
 }
 
 _git_heal_off() {

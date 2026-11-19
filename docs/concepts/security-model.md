@@ -104,8 +104,11 @@ from agent-writable surfaces there:
   (including fast-forward) rides `post-merge`, checkouts/switches ride
   `post-checkout` (there is no `post-reset` hook in git;
   `post-index-change` is that family's real carrier); the resolution
-  `git add` fires `post-index-change` with the full conflict set
-  present, and `post-rewrite` fires with `REBASE_HEAD` present. The
+  `git add` fires `post-index-change` with the merge-state set
+  present, and mid-rebase steps fire `post-checkout`/
+  `post-index-change` with `REBASE_HEAD` present (`post-rewrite`
+  also carries it, but only in a conflicted rebase concluded via
+  `--continue` — the mid-rebase fires are the robust carrier). The
   global
   `core.hooksPath` doubles as defense in depth: repo hooks stop
   executing for the developer (the effect the `/dev/null` form in

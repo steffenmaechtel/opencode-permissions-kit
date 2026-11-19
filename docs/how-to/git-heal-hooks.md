@@ -60,9 +60,14 @@ nothing, which is exactly the case where nothing flipped. Pull/merge
 ride `post-checkout`. There is no `post-reset` hook in git;
 `post-index-change` covers that whole family. The #678 measurement
 added the conflict-state carriers: the resolution `git add` fires
-`post-index-change` with the full `MERGE_*`/`CHERRY_PICK_HEAD` set
-present, and `post-rewrite` fires at rebase conclusion with
-`REBASE_HEAD` still present.
+`post-index-change` with the merge-state set present
+(`MERGE_HEAD`/`MERGE_MSG`/`MERGE_MODE`/`AUTO_MERGE`; the per-operation
+`CHERRY_PICK_HEAD`/`REVERT_HEAD` ride their own operations' adds),
+and mid-rebase steps fire `post-checkout`/`post-index-change` with
+`REBASE_HEAD` present. (`post-rewrite` also carries `REBASE_HEAD`,
+but only in a conflicted rebase concluded via `--continue` — an
+interactive clean rewrite deletes it first, so the mid-rebase fires
+are the robust carrier.)
 
 ## Turn it off, inspect it
 
@@ -92,8 +97,9 @@ changes nothing but the ownership of the measured operand set —
 conflict pseudo-refs (`MERGE_HEAD`, `MERGE_MSG`, `MERGE_MODE`,
 `AUTO_MERGE`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`), each only when it
 exists. Every healed file appends one audit line to
-`/usr/local/lib/opencode-permissions-kit/git-heal/heal.log` — a full
-heal of `index` + `HEAD` writes two lines.
+`/usr/local/lib/opencode-permissions-kit/git-heal/heal.log` — one
+line per operand that existed and healed, so a full heal of a
+conflict-state repository writes up to eleven.
 
 Deliberately NOT healed (measured in #678, not assumed):
 `FETCH_HEAD` and `COMMIT_EDITMSG` are written in place and never flip
@@ -110,8 +116,9 @@ developer git operation": a conflict state your developer abandons
 without staging a resolution is only healed when the next
 index-writing developer operation fires a hook (a mere refreshing
 `git status` qualifies), and a `packed-refs` flip heals on the same
-cadence — agent `gc` in between degrades to a stderr warning with no
-packing (no lockout).
+cadence — agent `gc` in between exits rc 0 with a pack-refs failure
+on stderr and no packing done (the exit status stays silent about
+the no-pack; no lockout).
 
 ## Limits
 

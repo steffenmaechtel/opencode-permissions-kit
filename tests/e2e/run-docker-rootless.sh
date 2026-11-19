@@ -272,7 +272,11 @@ check_fail "RL2b: agent merge DIES on the dev-flipped .git metadata (sticky .git
     E 'sudo -u opencode -H git -c user.email=agent@example.com -c user.name=agent -C /var/www/vhosts/rl-gh merge --no-ff -m rl678agent rl678-a'
 # The dying merge leaves its worktree additions behind — clear them as
 # the directory owner so the post-on arms start clean (sub/ is purely
-# this arm's topology in this repo).
+# this arm's topology in this repo). Death-point note: this PRE-on
+# state has index+ORIG_HEAD both dev-owned and the in-container death
+# fires at the index write first; with a healed index (the shipped
+# #674 world) the same merge dies at ORIG_HEAD (rc 128, zero partial
+# state — the #678 live incident).
 E 'rm -rf /var/www/vhosts/rl-gh/sub'
 check "RL2b: opk git-heal on (sudo, dev gitconfig + heal sweep)" \
     E 'sudo opk git-heal on | grep -q "git heal hooks active"'

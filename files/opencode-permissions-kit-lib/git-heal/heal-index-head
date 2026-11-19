@@ -20,15 +20,23 @@
 #   REBASE_HEAD          rebase's pseudo-ref -- same lock+rename
 #                        class, missing from #678's draft list
 #   packed-refs          pack-refs/gc/prune-of-packed rewrite it; a
-#                        dev flip soft-breaks agent gc (silent
-#                        no-pack behind rc 0)
+#                        dev flip soft-breaks agent gc (rc 0 with a
+#                        pack-refs failure on stderr -- the exit
+#                        status stays silent about the no-pack)
 #   MERGE_HEAD, MERGE_MSG, MERGE_MODE, AUTO_MERGE, CHERRY_PICK_HEAD,
 #   REVERT_HEAD          dev-left conflict state; unhealed it is
 #                        un-escapable for the agent (abort/quit/
 #                        conclude all rc-0-lie with the state stuck).
 #                        Carriers measured: post-index-change fires
-#                        on the resolution add with the set present,
-#                        post-rewrite fires with REBASE_HEAD present.
+#                        on the resolution add with the merge-state
+#                        set present; mid-rebase steps fire post-
+#                        checkout/post-index-change with REBASE_HEAD
+#                        present (post-rewrite also carries it, but
+#                        ONLY in a conflicted rebase concluded via
+#                        --continue -- an interactive clean rewrite
+#                        deletes REBASE_HEAD first, so it is not the
+#                        robust carrier; flavor-conditional, both
+#                        probes 2026-11-20).
 #   NOT healed, on measurement: FETCH_HEAD and COMMIT_EDITMSG
 #   (in-place writes never flip), logs/** (append into a non-sticky
 #   dir), loose refs (non-sticky refs/), config (the deliberate #651
@@ -209,7 +217,7 @@ _gh_allowlisted "$gd" ||
 # Gitdir shape: a COMMON gitdir carries HEAD and objects/. A worktree
 # registration dir has neither -> rejected here by construction (and
 # it needs no healing: registration dirs are non-sticky by heal
-# design, #655 -- only the common gitdir's index/HEAD matter).
+# design, #655 -- only the common gitdir's operand metadata matters).
 if [ ! -e "$gd/HEAD" ] || [ ! -d "$gd/objects" ]; then
     say "not a (common) gitdir shape: $gd"
     exit 1

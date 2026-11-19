@@ -395,9 +395,10 @@ status_section_core() {
 # === Git heal hooks (issue #671) ==================================================
 # The hook-heal state row + per-root lockout rows. The heal hooks
 # (activated by `opk git-heal on` through the developer's global
-# core.hooksPath) re-pin .git/index and .git/HEAD to the agent user
+# core.hooksPath) re-pin the measured operand set (.git/index,
+# .git/HEAD and the widened #678 carriers) to the agent user
 # after every developer git operation that flipped their ownership
-# (git writes both via lock+rename, so ownership floats with the last
+# (git writes them via lock+rename, so ownership floats with the last
 # writer; under the sticky .git of the #651 heal the agent can never
 # re-take ownership itself -- its main-checkout git add / git switch
 # locks out). GH_GITCONFIG is a unit-test override for the developer's
@@ -486,7 +487,7 @@ status_section_git_heal() {
                     ui_detail "the next developer git operation heals it)"
                 else
                     ui_kv_warn "lockout" "$_st_gh_gd/$_st_gh_f is $_st_gh_own-owned — agent git"
-                    ui_detail "locked there; 'sudo opk git-heal on' heals and keeps it healed"
+                    ui_detail "blocked there; 'sudo opk git-heal on' heals and keeps it healed"
                 fi
             fi
         done

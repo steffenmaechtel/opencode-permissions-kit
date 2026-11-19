@@ -158,6 +158,10 @@ _ghs_stage() {
     git -C "$WORK/ghs/root" init -q
     : >"$WORK/ghs/root/.git/index"
     : >"$WORK/ghs/root/.git/HEAD"
+    # A widened-operand file in the fixture pins the mirror loop's row
+    # set (#684 a a10): a dropped/typo'd operand name in status-core's
+    # list silently under-reports lockout rows with nothing red.
+    : >"$WORK/ghs/root/.git/ORIG_HEAD"
     : >"$WORK/ghs/devhome/.gitconfig"
     printf '%s\n' "$WORK/ghs/root" >"$WORK/ghs/projects.conf"
 }
@@ -177,8 +181,9 @@ _ghs_run() {
 _ghs_stage
 _out=$(_ghs_run || true)
 if printf '%s' "$_out" | grep -q "git-heal.*OFF — 'sudo opk git-heal on'" &&
-    printf '%s' "$_out" | grep -q "lockout.*$WORK/ghs/root/.git/index is $(id -un)-owned — agent git"; then
-    pass "git-heal section: OFF state renders the hint + counted lockout warn"
+    printf '%s' "$_out" | grep -q "lockout.*$WORK/ghs/root/.git/index is $(id -un)-owned — agent git" &&
+    printf '%s' "$_out" | grep -q "lockout.*$WORK/ghs/root/.git/ORIG_HEAD is $(id -un)-owned"; then
+    pass "git-heal section: OFF state renders the hint + lockout rows incl. a widened operand"
 else
     fail "git-heal section: OFF/lockout rows broken (out=$(printf '%s' "$_out" | head -4))"
 fi

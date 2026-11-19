@@ -250,9 +250,12 @@ check "2c: #678 — developer merge flips ORIG_HEAD dev-owned (pre-heal lockout 
     E 'cd /var/www/vhosts/perm-check && git checkout -q -B e2e-678-a master && mkdir -p sub/e678 && echo a >sub/e678/a.txt && git add sub/e678/a.txt && git -c user.email=dev@example.com -c user.name=dev commit -qm e678a && git checkout -q -B e2e-678-b master && mkdir -p sub/e678 && echo b >sub/e678/b.txt && git add sub/e678/b.txt && git -c user.email=dev@example.com -c user.name=dev commit -qm e678b && git checkout -q e2e-678-a && git -c user.email=dev@example.com -c user.name=dev merge -q --no-ff -m e678merge e2e-678-b && test "$(stat -c %U .git/ORIG_HEAD)" = "dev" && git checkout -q e2e-678-b'
 check_fail "2c: #678 — agent merge DIES on the dev-flipped .git metadata (sticky .git, pre-heal)" \
     E 'sudo -u opencode -H git -c user.email=agent@example.com -c user.name=agent -C /var/www/vhosts/perm-check merge --no-ff -m e678agent e2e-678-a'
-# The dying merge leaves its worktree additions behind (it fails at the
-# still-dev-owned index AFTER applying the tree) — clear them as the
-# directory owner so the post-on arms start clean.
+# The dying merge leaves its worktree additions behind — clear them as
+# the directory owner so the post-on arms start clean. Death-point
+# note: this PRE-on state has index+ORIG_HEAD both dev-owned, and the
+# in-container death fires at the index write first; with a healed
+# index (the shipped #674 world) the same merge dies at ORIG_HEAD
+# (rc 128, zero partial state — the #678 live incident).
 E 'rm -f /var/www/vhosts/perm-check/sub/e678/a.txt'
 check "2c: #671 — opk git-heal on (sudo, dev gitconfig + heal sweep)" \
     E 'sudo opk git-heal on | grep -q "git heal hooks active"'

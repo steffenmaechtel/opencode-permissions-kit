@@ -230,8 +230,8 @@ Deployment notes:
 
 The git-heal audit log lives outside this tree by design (next to the
 heal script it serves): `/usr/local/lib/opencode-permissions-kit/git-heal/heal.log`,
-runtime-created, one line per healed file (`index` + `HEAD` = two lines
-on a full heal).
+runtime-created, one line per healed operand — a full heal of a
+conflict-state repository writes up to eleven lines.
 
 ## Project-side: opk.json
 
