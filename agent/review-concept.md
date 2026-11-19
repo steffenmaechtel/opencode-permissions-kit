@@ -289,8 +289,8 @@ nothing to review.
   rule (the finding AND its evidence) governs filing too: the issue
   IS the durable record. (RM-0161)
 - A deferred-findings COLLECTION issue states its own scope in the
-  title or preamble — file class (shipped `files/**` vs tests/docs),
-  severity range, source pass — so the gate's fold decisions key on
+  title or preamble — file class (shipped `files/**` vs non-shipped
+  paths), severity range, source pass — so the gate's fold decisions key on
   it at a glance, never by body archaeology: a policy parenthetical
   that mislabels the composition ("non-shipped-track policy" over
   overwhelmingly shipped-code items) can send a fold to the wrong
@@ -628,8 +628,8 @@ Review-relevant code touched this round: yes/no → …
   FULL 40-char sha: `gh run list --commit <short-sha>` served an
   empty list three times over runs that were already registered
   (`gh pr checks` showed them in the same second) while the full sha
-  resolved them instantly — a short-sha match is not a registration
-  probe (PR #654's fix push, #656). (RM-0154)
+  resolved them instantly — a short-sha match is not a reliable
+  identity probe (PR #654's fix push, #656). (RM-0154)
 - Size guard: GitHub caps one comment at ~64k characters; a comment
   that would exceed ~60k is SPLIT into part 1/2 (each part with its
   own marker and a `"part":1|2` field) — content is NEVER trimmed to

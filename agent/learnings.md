@@ -160,11 +160,15 @@ arm planted the reachable marker the guard exists to reject (PR #564
 round b D1, fixed in 86850e0b). Fixture shape is pin shape, twice
 over (November 2026): an assertion must match the producer's EXACT
 output shape — `stat -c %a` prints minimal digits, so once the
-baseline's dirs have passed, sticky modes are [1357]??? (sticky and
-setgid ride along), never `1*`; a count-pin over mktemp-recorded
-logs matches stem + the exact N mktemp chars + suffix, because a
-`.*suffix$` grep flakes at 1−(61/62)^N per run (both PR #655 round
-e, #666). And a probe fixture must contain the construct it claims
+baseline's dirs have passed, sticky modes are [1357]??? (setgid and
+setuid ride along on the sticky bit), never `1*`; a count-pin over
+mktemp-recorded logs matches stem + the exact mktemp chars + suffix,
+never a trailing-char shape: a pattern matching bare names ending in
+one specific char flakes at 1−(61/62)^N per run — N recorded names,
+62-char mktemp alphabet (PR #655 round e, ~6%/run at N=4, #666; NOT
+the `.*suffix$` attribution first drafted here — a dot-led pattern
+matches any middle and never flakes on random chars, pr-00668 a Q3).
+And a probe fixture must contain the construct it claims
 before a verdict derives from its output: `$(printf '\n')` is EMPTY
 (POSIX strips trailing newlines from command substitution), so the
 intuitive embedded-newline operand silently builds the wrong fixture
