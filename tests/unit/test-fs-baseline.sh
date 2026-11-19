@@ -1412,6 +1412,9 @@ fi
 # refused entry proves no mid-loop abort (the a S2 over-abort shape).
 # The b X1 arms ride along: `.` and `foo` (relative spellings the a-wave
 # form arms missed) and a spaced absolute path (writer whitespace arm).
+# #660 M6: a '#'-line leads the conf — an annotation must render NO warn
+# row in either refresh loop (the pre-fix shape warned "not an absolute
+# project path" over it).
 # #247 arms at the tail: the classic system paths (/etc, /usr, /var and
 # the bare /home — the stripped-compare arm the writer's blocklist owes)
 # plus the agent home /home/toc (OPENCODE_USER=toc above; lexical, so
@@ -1425,7 +1428,7 @@ fi
 # this suite's scratch (TMPDIR territory) and their FSB/HO counts prove
 # those prefixes stay processable — the blocklist deliberately leaves
 # them open (the comments in update-core.sh / config.sh name why).
-printf '%s\n/\n%s\n%s/\n%s/.\n%s//\n%s\n%s\n.\nfoo\n/var/www/foo bar\n/etc\n/usr\n/var\n/home\n/var/backups\n/home/toc\n/relocated/opencode\n' \
+printf '#660 ops note\n%s\n/\n%s\n%s/\n%s/.\n%s//\n%s\n%s\n.\nfoo\n/var/www/foo bar\n/etc\n/usr\n/var\n/home\n/var/backups\n/home/toc\n/relocated/opencode\n' \
     "$S245/real" "$S245/link" "$S245/link" "$S245/link" "$S245/link" \
     "$S245/dangling" "$S245/real2" >"$S245/conf"
 # getent stub (L1 rider for the agent-home arm): toc's RELOCATED home —
@@ -1461,6 +1464,7 @@ if [ "$(printf '%s\n' "$S245R_OUT" | grep -c '^FSB: ')" -eq 2 ] &&
     [ "$(printf '%s\n' "$S245R_OUT" | grep -cF '(agent home — never a project root)')" -eq 2 ] &&
     [ "$(printf '%s\n' "$S245R_OUT" | grep -cF 'ui_warn: skip /home/toc (agent home')" -eq 1 ] &&
     [ "$(printf '%s\n' "$S245R_OUT" | grep -cF 'ui_warn: skip /relocated/opencode (agent home')" -eq 1 ] &&
+    ! printf '%s\n' "$S245R_OUT" | grep -qF 'skip #660 ops note' &&
     ! printf '%s\n' "$S245R_OUT" | grep -q '^FSB: /etc' &&
     ! printf '%s\n' "$S245R_OUT" | grep -q '^FSB: /home$'; then
     pass "config.sh refresh: real roots only, link/dangling/malformed/relative/spaced skipped loudly, system paths + agent home refused, no abort (#245, a S1/S2/S3, b X1; #247)"
@@ -1508,6 +1512,7 @@ if [ "$(printf '%s\n' "$S245U_OUT" | grep -c '^FSB: ')" -eq 2 ] &&
     [ "$(printf '%s\n' "$S245U_OUT" | grep -cF '(agent home — never a project root)')" -eq 2 ] &&
     [ "$(printf '%s\n' "$S245U_OUT" | grep -cF 'ui_warn: skip /home/toc (agent home')" -eq 1 ] &&
     [ "$(printf '%s\n' "$S245U_OUT" | grep -cF 'ui_warn: skip /relocated/opencode (agent home')" -eq 1 ] &&
+    ! printf '%s\n' "$S245U_OUT" | grep -qF 'skip #660 ops note' &&
     ! printf '%s\n' "$S245U_OUT" | grep -q '^FSB: /etc' &&
     ! printf '%s\n' "$S245U_OUT" | grep -q '^HO: /home$'; then
     pass "update.sh root loop: real roots only, link/dangling/malformed/relative/spaced skipped loudly, system paths + agent home refused, no abort (#245, a S1/S2/S3, b X1; #247)"
@@ -1537,6 +1542,27 @@ if [ "$S245C" -ge 3 ]; then
     pass "config.sh symlink skip arms wired at all three sites (add, handover, refresh) (#245)"
 else
     fail "config.sh must carry the symlink skip arm at add/handover/refresh (found $S245C of 3) (#245)"
+fi
+
+# 12e. #660 M6: projects_list renders no "missing" atten row for a
+# '#'-line — an annotated conf is not a fleet of phantom roots. Extracted
+# like the refresh harness above (12), ui_* stubbed to observable echoes.
+{
+    printf '%s\n' \
+        'ui_info() { :; }' \
+        'ui_detail() { :; }' \
+        'ui_have() { echo "have: $1"; }' \
+        'ui_atten() { echo "atten: $1 $2"; }'
+    extract_func "$CONFIG" projects_list
+    printf '%s\n' 'projects_list'
+} >"$S245/run-list.sh"
+printf '#660 ops note\n%s\n' "$S245/real" >"$S245/list-conf"
+S245L_OUT=$(PROJECTS_CONF="$S245/list-conf" sh "$S245/run-list.sh" 2>&1)
+if printf '%s\n' "$S245L_OUT" | grep -qF "have: [1] $S245/real" &&
+    ! printf '%s\n' "$S245L_OUT" | grep -qF 'atten:'; then
+    pass "config.sh projects_list: comment lines render no atten rows (#660 M6)"
+else
+    fail "projects_list must not count comment lines as missing roots (#660 M6, out=$S245L_OUT)"
 fi
 if live_src "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/ddev-handover.sh" |
     grep -qF 'if [ -L "${dhr_root%/}" ]; then'; then

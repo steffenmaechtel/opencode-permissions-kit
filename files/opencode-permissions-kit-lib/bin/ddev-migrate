@@ -85,19 +85,33 @@ case "${1:-}" in
             ddev_migrate_registry "$dm_home/.ddev" | while IFS='|' read -r dm_n dm_ar; do
                 [ -n "$dm_ar" ] || continue
                 dm_ar="${dm_ar%/}"
+                # Display forms scrubbed (#660, pr-00657 a S2): name and
+                # approot are registry-derived (project_list.yaml /
+                # global_config.yaml under the queried user's home — the
+                # opencode variant reads an agent-writable registry), and
+                # a raw echo of either would let escape bytes forge/clear
+                # transcript lines. Same scrub the sourced lib applies at
+                # every display site (_ddev_migrate_show); the raw fields
+                # stay the data currency for the gates below.
+                dm_show=$(_ddev_migrate_show "$dm_n")
+                dm_ashow=$(_ddev_migrate_show "$dm_ar")
                 if ddev_migrate_under_roots "$dm_ar" "$@"; then
                     if [ -d "$dm_ar" ]; then
-                        echo "  export:  $dm_n  ($dm_ar)"
+                        echo "  export:  $dm_show  ($dm_ashow)"
                     else
-                        echo "  export:  $dm_n  ($dm_ar — DIRECTORY MISSING)"
+                        echo "  export:  $dm_show  ($dm_ashow — DIRECTORY MISSING)"
                     fi
                 else
-                    echo "  outside: $dm_n  ($dm_ar)"
+                    echo "  outside: $dm_show  ($dm_ashow)"
                 fi
             done
         else
             echo "ddev registry of $dm_user:"
-            ddev_migrate_registry "$dm_home/.ddev" | sed 's/^/  /'
+            # Bare list, same scrub over the whole line (the #646 list-arm
+            # idiom, run-collapsing): the parser's output is registry-
+            # derived, not operator-typed.
+            ddev_migrate_registry "$dm_home/.ddev" |
+                LC_ALL=C sed -e 's/[^ -~][^ -~]*/?/g' -e 's/^/  /'
         fi
         ;;
     *)

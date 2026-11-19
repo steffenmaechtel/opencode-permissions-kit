@@ -724,7 +724,9 @@ status_section_projects() {
     # exits 1 — a bare `|| echo 0` appends a second 0 and the captured
     # "0<newline>0" breaks the header across lines. || true keeps the printed
     # 0; the default covers a missing file (grep prints nothing, exits 2).
-    _st_pc=$(grep -c . "$PROJECTS_CONF" 2>/dev/null || true)
+    # '#'-lines are comments (#660 M6): they count neither as projects nor
+    # as verdict rows below — the count matches what the reader processes.
+    _st_pc=$(grep -cv -e '^$' -e '^#' "$PROJECTS_CONF" 2>/dev/null || true)
     : "${_st_pc:=0}"
     ui_section "Projects ($_st_pc)"
 
@@ -735,6 +737,12 @@ status_section_projects() {
             ui_kv "ACL probe" "unavailable (getfacl missing) — traversal verdicts are stat-only"
         while IFS= read -r root; do
             [ -z "$root" ] && continue
+            # Comment line (#660 M6, the deploy-lib reader idiom): a
+            # hand-annotated conf is not an error — the old reader fed
+            # "# note" to [ -d ] below and counted a false-red "directory
+            # missing" row (exit 1 over an annotation). Writers emit bare
+            # paths only; comments are a reader-side affordance.
+            case "$root" in '#'*) continue ;; esac
             # Symlinked root (review a X4, issue #245): a link's mode is
             # always 777, so the setgid check below would fire for EVERY
             # link entry and recommend a refresh that now skips links with
@@ -956,6 +964,7 @@ _st_ddev_share_scan() {
         elif [ -f "$PROJECTS_CONF" ] && [ -s "$PROJECTS_CONF" ]; then
             while IFS= read -r _st_root; do
                 [ -z "$_st_root" ] && continue
+                case "$_st_root" in '#'*) continue ;; esac
                 [ -d "$_st_root" ] || continue
                 # Findings print in the MAIN shell (issue #158): ui_kv_warn
                 # inside a `find | while` pipeline would bump the summary's
@@ -1167,7 +1176,9 @@ _st_ddev_db_dumps() {
                 if [ -z "$_st_gap_roots" ]; then
                     ui_kv_warn "db dumps" "gap scan skipped — mktemp failed (check TMPDIR / /tmp)"
                 else
-                    grep -v '^[[:space:]]*$' "$PROJECTS_CONF" 2>/dev/null >"$_st_gap_roots" || true
+                    # '#'-lines stay out of the root argv too (#660 M6):
+                    # a comment is not an operand
+                    grep -v -e '^[[:space:]]*$' -e '^#' "$PROJECTS_CONF" 2>/dev/null >"$_st_gap_roots" || true
                     _st_dbdump_gap "$DEFAULT_USER" <"$_st_gap_roots" || true
                     rm -f "$_st_gap_roots"
                 fi
@@ -1263,6 +1274,7 @@ _st_ddev_win_hosts() {
         elif [ -f "$PROJECTS_CONF" ] && [ -s "$PROJECTS_CONF" ]; then
             while IFS= read -r _st_root; do
                 [ -z "$_st_root" ] && continue
+                case "$_st_root" in '#'*) continue ;; esac
                 [ -d "$_st_root" ] || continue
                 # vendor/, node_modules/, testdata/ and .git/ pruned (issues
                 # #21, #29, #112): composer/npm packages and test fixtures

@@ -977,6 +977,76 @@ assert_eq "wrapped container warning renders with one join space (#453 a A1)" \
     "$(printf 'WARNING: podman-rootless socket not reachable (unix:///run/podman/podman.sock).\nRunning WITHOUT container tools — not downgrading to a root-equivalent path.')" \
     "$_wrap_out"
 
+# --- #660 (#606 a M4): no numeric fallback on the XDG uid probe ------------------
+# With the opencode user missing (half-uninstalled kit) the old probe
+# yielded 0 and pointed XDG_RUNTIME_DIR at ROOT's runtime dir — with a
+# configured backend and a reachable socket, container tools failed with
+# a confusing socket error instead of the loud degradation every other
+# unreachable state prints here. Four arms: both backends, user present
+# (uid flows into the runtime dir) vs missing (loud warning, container
+# tools off, no vars set). id is stubbed as a function — the probe is
+# the only caller on this path.
+_m4_run() { # <backend> <id-exit-rc: 0=user exists (uid 4242), 1=missing>
+    (
+        . "$CORE_LIB"
+        HEADLESS=false
+        RED='' GREEN='' CYAN='' YELLOW='' NC=''
+        CONTAINER_REQUESTED=true
+        CONTAINER_BACKEND="$1"
+        OPENCODE_DOCKER_HOST=unix:///run/user/1000/docker.sock
+        OPENCODE_PODMAN_SOCKET=unix:///run/user/1000/podman/podman.sock
+        _w=""
+        note() {
+            if [ -n "$1" ]; then
+                if [ -n "$_w" ]; then _w="$_w
+$1"; else _w="$1"; fi
+            fi
+        }
+        sock_reachable() { return 0; }
+        if [ "$2" = 0 ]; then id() { echo 4242; }; else id() { return 1; }; fi
+        wrapper_container_resolve
+        printf 'XDG=[%s] DOCKER=[%s] REQ=[%s] WARN=[%s]' \
+            "$CONTAINER_XDG" "$CONTAINER_DOCKER_HOST" "$CONTAINER_REQUESTED" "$_w"
+    )
+}
+_m4a=$(_m4_run docker-rootless 0)
+if [ "$_m4a" = "XDG=[/run/user/4242] DOCKER=[unix:///run/user/1000/docker.sock] REQ=[true] WARN=[]" ]; then
+    pass "docker-rootless: uid probe result flows into XDG_RUNTIME_DIR (#660)"
+else
+    fail "docker-rootless must derive the runtime dir from the live uid (#660, got $_m4a)"
+fi
+_m4b=$(_m4_run docker-rootless 1)
+case "$_m4b" in
+    'XDG=[] DOCKER=[] REQ=[false] WARN=[WARNING: the opencode user is missing'*)
+        pass "docker-rootless: missing user degrades loudly, never /run/user/0 (#660)"
+        ;;
+    *)
+        fail "docker-rootless must warn and disable on a missing user (#660, got $_m4b)"
+        ;;
+esac
+_m4c=$(_m4_run podman-rootless 0)
+if [ "$_m4c" = "XDG=[/run/user/4242] DOCKER=[unix:///run/user/1000/podman/podman.sock] REQ=[true] WARN=[]" ]; then
+    pass "podman-rootless socket path: uid probe result flows into XDG_RUNTIME_DIR (#660)"
+else
+    fail "podman-rootless must derive the runtime dir from the live uid (#660, got $_m4c)"
+fi
+_m4d=$(_m4_run podman-rootless 1)
+case "$_m4d" in
+    'XDG=[] DOCKER=[] REQ=[false] WARN=[WARNING: the opencode user is missing'*)
+        pass "podman-rootless: missing user degrades loudly, never /run/user/0 (#660)"
+        ;;
+    *)
+        fail "podman-rootless must warn and disable on a missing user (#660, got $_m4d)"
+        ;;
+esac
+# absence leg RAW by design (conventions, "Source-counting pins"): a
+# commented-out survivor of the numeric fallback must keep failing here
+if grep -qF 'id -u opencode 2>/dev/null || echo 0' "$CORE_LIB"; then
+    fail "the numeric uid fallback must be gone from the wrapper lib (#660)"
+else
+    pass "no numeric uid fallback remains in the wrapper lib (#660)"
+fi
+
 # functional: source the lib's detection section, stub the probe + note,
 # run the REAL parser (sourcing pin since #449, #396 accounting — same
 # technique as HL/sc_serve: later definitions override the lib's)

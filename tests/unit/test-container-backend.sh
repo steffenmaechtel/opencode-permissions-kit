@@ -321,6 +321,13 @@ check_live "setup adds Docker apt repo when docker-ce-rootless-extras missing" "
 check_live "setup prints OPENCODE_DOCKER_HOST on stdout" "$SETUP" -Fq 'echo "OPENCODE_DOCKER_HOST=$SOCK"'
 check_live "setup reads opencode user from install.conf" "$SETUP" -Fq 'OPENCODE_USER="opencode"'
 check_live "setup checks systemd for docker-rootless" "$SETUP" -Fq 'systemctl --user is-active dbus'
+# #660 (pr-00657 a S1): the /run/user/<uid> diagnostic dump is a NAME
+# LISTING of an agent-owned 0700 dir (entry names agent-chosen) — the
+# display scrub of the #646 list-arm idiom must sit on the ls line. The
+# block itself needs root + a broken systemd user session (not
+# unit-drivable); the wiring pin guards the scrub's presence.
+check_live "setup scrubs the /run/user listing for display" "$SETUP" \
+    -Fq 'ls -la "/run/user/$OC_UID" 2>&1 | LC_ALL=C sed -e '"'"'s/[^ -~][^ -~]*/?/g'"'"' -e '"'"'s/^/  /'"'"' >&2'
 
 echo ""
 echo "-- late pins (arg no-op, daemon-start rc) --"

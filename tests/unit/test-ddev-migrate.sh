@@ -1855,6 +1855,48 @@ else
 fi
 rm -rf "$F3ROOT"
 
+# --- #660 (pr-00657 a S2): the registry arm scrubs registry-derived names ------
+# Names and approots come from <home>/.ddev yamls (the opencode variant reads
+# an agent-writable registry) — the dispatcher's rows must carry the scrubbed
+# form like every display site in the sourced lib, never the raw bytes. Both
+# arms: the roots-filtered loop (export/outside rows) and the bare list.
+S2ROOT=$(work_new)
+S2HOME=$(work_new)
+S2EVIL_NAME="evil$(printf '\033')[2Kname"
+S2EVIL_DIR="evil$(printf '\033')[2Kdir"
+mkdir -p "$S2HOME/.ddev" "$S2ROOT/under/$S2EVIL_DIR"
+printf '%s:\n    approot: "%s/under/%s"\n' \
+    "$S2EVIL_NAME" "$S2ROOT" "$S2EVIL_DIR" >"$S2HOME/.ddev/project_list.yaml"
+S2WANT="export:  evil?[2Kname  ($S2ROOT/under/evil?[2Kdir)"
+S2RC=0
+S2OUT="$(DDEV_MIG_DEV_HOME="$S2HOME" "$BIN_MIG" registry someuser "$S2ROOT" 2>&1)" || S2RC=$?
+case "$S2OUT" in
+    *"$(printf '\033')"*)
+        fail "registry arm leaks a raw escape byte into its rows (#660)"
+        ;;
+    *) pass "registry arm output carries no raw escape byte (#660)" ;;
+esac
+if printf '%s' "$S2OUT" | grep -qF "$S2WANT"; then
+    pass "registry export row shows the SCRUBBED name and approot (#660)"
+else
+    fail "registry export row must scrub name and approot (#660, out=$S2OUT)"
+fi
+S2RC=0
+S2OUT="$(DDEV_MIG_DEV_HOME="$S2HOME" "$BIN_MIG" registry someuser 2>&1)" || S2RC=$?
+case "$S2OUT" in
+    *"$(printf '\033')"*)
+        fail "registry bare list leaks a raw escape byte (#660)"
+        ;;
+    *) pass "registry bare list carries no raw escape byte (#660)" ;;
+esac
+S2WANT="  evil?[2Kname|$S2ROOT/under/evil?[2Kdir"
+if printf '%s' "$S2OUT" | grep -qF "$S2WANT"; then
+    pass "registry bare list shows the SCRUBBED pair (#660)"
+else
+    fail "registry bare list must scrub the pair (#660, out=$S2OUT)"
+fi
+rm -rf "$S2ROOT" "$S2HOME"
+
 # --- Summary ------------------------------------------------------------------------
 
 # Cleanup the fixture sandbox root. Unit-test policy (0.0.42e C1): suites

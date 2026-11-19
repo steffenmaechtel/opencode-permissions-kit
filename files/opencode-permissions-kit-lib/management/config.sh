@@ -475,6 +475,10 @@ projects_list() {
     num=0
     while IFS= read -r line; do
         [ -z "$line" ] && continue
+        # Comment line (#660 M6, the status reader's idiom): an annotated
+        # conf is not an error — the old reader counted a false "missing"
+        # atten row per comment.
+        case "$line" in '#'*) continue ;; esac
         num=$((num + 1))
         if [ -d "$line" ]; then
             ui_have "[$num] $line" ""
@@ -921,6 +925,10 @@ refresh() {
     if [ -f "$PROJECTS_CONF" ]; then
         while IFS= read -r p; do
             [ -z "$p" ] && continue
+            # Comment line (#660 M6, the status reader's idiom): a comment
+            # is not a path attempt — skip it before the form gates instead
+            # of warning "not an absolute project path" over an annotation.
+            case "$p" in '#'*) continue ;; esac
             # Form gate, writer parity (review a S1/S2, completed b X1,
             # issue #245): raw-conf entries no writer gate ever saw —
             # dot/empty-segment spellings (`link/.`) dodge the [ -L ]

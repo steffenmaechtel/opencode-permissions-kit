@@ -159,7 +159,10 @@ doctor_cli() {
             ;;
     esac
     if [ ! -d "$DOCTOR_ROOT" ]; then
-        ui_error "doctor: no such directory: $DOCTOR_ROOT"
+        # display-sanitized (#660 M7): the root reached every lexical gate
+        # above but can still carry control bytes -- the error row must
+        # not pass them on to the terminal
+        ui_error "doctor: no such directory: $(doctor_show_sanitize "$DOCTOR_ROOT")"
         exit 64
     fi
 }
@@ -207,20 +210,28 @@ doctor_cli() {
 # shellcheck disable=SC2317  # invoked via trap only
 _doctor_all_cleanup() { rm -rf "$WORK_ALL"; }
 
-# doctor_roots_append <list-file> <dest>: appends the file's non-blank lines
-# to <dest> (the doctor_all roots list). -a (round a A1): a line carrying a
-# raw C1 byte makes GNU grep deem the whole list BINARY — it then prints
-# "binary file matches" and delivers NO lines, so the per-root gate below
-# never sees the offending root; --text keeps the line stream intact and the
-# gate refuses it sanitized. rc discipline (#569 M5): rc 1 (no non-blank
-# lines) is benign; rc >1 is a real read failure — the precheck-to-read
-# race — which the old `|| true` swallowed while the list shrank SILENTLY.
-# Loud now like the sibling unreadable arm in doctor_all (warn row), never
-# a silent skip; rc 0 returned either way (a roots read never kills the run).
+# doctor_roots_append <list-file> <dest>: appends the file's non-blank,
+# non-comment lines to <dest> (the doctor_all roots list). -a (round a A1):
+# a line carrying a raw C1 byte makes GNU grep deem the whole list BINARY —
+# it then prints "binary file matches" and delivers NO lines, so the
+# per-root gate below never sees the offending root; --text keeps the line
+# stream intact and the gate refuses it sanitized. '#'-lines are comments
+# (#660 M6, the deploy-lib reader idiom): an annotated projects.conf is not
+# an error -- comment lines must not become phantom roots at the absolute
+# gate. rc discipline (#569 M5): rc 1 (no lines left) is benign; rc >1 is a
+# real read failure — the precheck-to-read race — which the old `|| true`
+# swallowed while the list shrank SILENTLY. Loud now like the sibling
+# unreadable arm in doctor_all (warn row), never a silent skip; rc 0
+# returned either way (a roots read never kills the run).
 doctor_roots_append() {
     dra_rc=0
-    grep -a -v '^[[:space:]]*$' "$1" >>"$2" || dra_rc=$?
-    [ "$dra_rc" -gt 1 ] && ui_kv_warn "scan root" "$1 unreadable -- its roots are not scanned"
+    grep -a -v -e '^[[:space:]]*$' -e '^#' "$1" >>"$2" || dra_rc=$?
+    # Warn row display-sanitized (#660 M7): $1 is env/conf-sourced (the
+    # OPK_DOCTOR_SCAN_ROOTS seam file or projects.conf) -- control bytes
+    # in it must not forge transcript lines in the row that reports the
+    # failed read.
+    dra_show="$(doctor_show_sanitize "$1")"
+    [ "$dra_rc" -gt 1 ] && ui_kv_warn "scan root" "$dra_show unreadable -- its roots are not scanned"
     return 0
 }
 doctor_all() {
@@ -259,8 +270,10 @@ doctor_all() {
             :
         elif [ ! -f "$OPK_DOCTOR_SCAN_ROOTS" ] || [ ! -r "$OPK_DOCTOR_SCAN_ROOTS" ]; then
             # -f, not just -r: a directory would pass -r and die later in
-            # the roots read (#360 a F7)
-            ui_error "doctor: OPK_DOCTOR_SCAN_ROOTS is set but not a readable file: $OPK_DOCTOR_SCAN_ROOTS"
+            # the roots read (#360 a F7). Env-sourced operand: the error
+            # row shows the sanitized form (#660 M7).
+            _da_show="$(doctor_show_sanitize "$OPK_DOCTOR_SCAN_ROOTS")"
+            ui_error "doctor: OPK_DOCTOR_SCAN_ROOTS is set but not a readable file: $_da_show"
             exit 1
         else
             # the precheck above covers the static case; the helper observes
@@ -324,7 +337,12 @@ doctor_all() {
         case "$_da_root" in
             /*) ;;
             *)
-                ui_kv_warn "scan root" "'$_da_root' is not an absolute path -- skipped (list roots must be absolute)"
+                # display-sanitized (#660 M7): this gate sees the RAW line
+                # (pre-normalization, #370 a C3) and it can still carry
+                # control bytes -- only the display copy is scrubbed, the
+                # check itself stays on the raw spelling
+                _da_show="$(doctor_show_sanitize "$_da_root")"
+                ui_kv_warn "scan root" "'$_da_show' is not an absolute path -- skipped (list roots must be absolute)"
                 continue
                 ;;
         esac
@@ -337,6 +355,17 @@ doctor_all() {
         # raw-line gate above screens the spelling, this one the
         # resolution).
         _da_root="$(realpath -m "$_da_root" 2>/dev/null || printf '%s' "$_da_root")"
+        # Dedupe on the NORMALIZED form (#660 M8): the raw-line sort -u
+        # above leaves 'x' and 'x/' (and any other spellings that
+        # normalize together) as two entries and the tree walks twice --
+        # wasted scan time, no second verdict. A seen-file keyed on the
+        # normalized root skips the duplicate before every gate and walk
+        # below; ALL_ROOTS_N still counted every raw line above, so the
+        # fleet summary stays honest about the list it was given.
+        if grep -a -qxF -e "$_da_root" "$WORK_ALL/roots.seen" 2>/dev/null; then
+            continue
+        fi
+        printf '%s\n' "$_da_root" >>"$WORK_ALL/roots.seen"
         # root gate (#360 a F8, class completed round a A1): control
         # bytes or a backslash make the root unusable as a find operand
         # AND clobber the rows -- warn sanitized, skip
@@ -435,7 +464,11 @@ doctor_all() {
         while IFS= read -r _da_link; do
             [ -n "$_da_link" ] || continue
             [ -f "$_da_link/opk.json" ] || continue
-            ui_kv_warn "scan root" "symlinked project '$_da_link' is not descended -- pass the real directory"
+            # display-sanitized (#660 M7): find output carries the raw
+            # link name, and the name under the scanned tree is not the
+            # operator's own spelling -- agent-choosable bytes
+            _da_show="$(doctor_show_sanitize "$_da_link")"
+            ui_kv_warn "scan root" "symlinked project '$_da_show' is not descended -- pass the real directory"
         done <"$WORK_ALL/links"
     done <"$WORK_ALL/roots"
     LC_ALL=C sort -u "$WORK_ALL/projects" >"$WORK_ALL/projects.s" &&
@@ -610,6 +643,19 @@ doctor_daemon_user() {
         ui_error "doctor: install.conf has no OPENCODE_USER -- is the kit installed?"
         exit 1
     fi
+    # Shape-gate the extracted value (#660 M7, the status.sh/update.sh/
+    # config.sh sibling idiom): a hand-edited conf value with foreign
+    # bytes feeds id -u and every report row below (header, backend-down
+    # warn) -- fall back to the canonical literal, loudly; the WARN
+    # echoes a sanitized form (pr-00263 a F9 class: a raw corrupted
+    # value can forge transcript lines).
+    case "$DOCTOR_USER" in
+        *[!A-Za-z0-9_.-]* | [.-]* | *[.])
+            _du_bad="$(printf '%s' "$DOCTOR_USER" | tr -c 'A-Za-z0-9_.-' '?')"
+            echo "WARN: invalid OPENCODE_USER value in install.conf ('$_du_bad') — falling back to 'opencode'" >&2
+            DOCTOR_USER=opencode
+            ;;
+    esac
     DOCTOR_DAEMON_UID="$(id -u "$DOCTOR_USER" 2>/dev/null || true)"
     if [ -z "$DOCTOR_DAEMON_UID" ]; then
         ui_error "doctor: user '$DOCTOR_USER' (OPENCODE_USER) does not exist"
@@ -709,9 +755,13 @@ doctor_ranges() {
 # --- report header ----------------------------------------------------------------
 doctor_header() {
     ui_section "Doctor -- container-tree ownership (#312 class)"
-    ui_kv "project root" "$DOCTOR_ROOT"
+    # Root rows display-sanitized (#660 M7): scan mode has no cntrl gate
+    # on the root (the fix/detect gates are operand-safety, deliberately
+    # mode-scoped) -- a control byte in the path must not reach the
+    # terminal through the header. Clean paths round-trip byte-identical.
+    ui_kv "project root" "$(doctor_show_sanitize "$DOCTOR_ROOT")"
     if [ "$DOCTOR_DISCOVERED" = 1 ]; then
-        ui_kv "root via" "walk-up from $DOCTOR_START_DIR (nearest opk.json)"
+        ui_kv "root via" "walk-up from $(doctor_show_sanitize "$DOCTOR_START_DIR") (nearest opk.json)"
     fi
     if [ "$DOCTOR_MODE" = "fix" ]; then
         if [ "$DOCTOR_FIX_DRY" = 1 ]; then
@@ -749,9 +799,9 @@ doctor_policy() {
             # searched -- "strict-cwd" would be a lie since phase 4. Explicit
             # roots keep the plain v1 text (nothing was searched above them).
             if [ "$DOCTOR_WALKED" = 1 ]; then
-                ui_warn "no opk.json found in $DOCTOR_ROOT (searched upward to /) -- nothing to check"
+                ui_warn "no opk.json found in $(doctor_show_sanitize "$DOCTOR_ROOT") (searched upward to /) -- nothing to check"
             else
-                ui_warn "no opk.json found in $DOCTOR_ROOT -- nothing to check"
+                ui_warn "no opk.json found in $(doctor_show_sanitize "$DOCTOR_ROOT") -- nothing to check"
             fi
             ui_detail "declare the trees your container builds write to (docs/reference/cli.md, 'doctor')"
             ui_detail "or run 'opk doctor detect' to propose entries from ownership evidence"
@@ -761,7 +811,7 @@ doctor_policy() {
         # set is simply empty and every finding is new
         ui_kv "policy" "none yet -- detect will propose one (entries are written only on consent)"
     else
-        ui_kv "policy" "$DOCTOR_ROOT/opk.json"
+        ui_kv "policy" "$(doctor_show_sanitize "$DOCTOR_ROOT")/opk.json"
     fi
 
     if [ "$DOCTOR_POLICY_PRESENT" = 1 ]; then
@@ -1028,7 +1078,7 @@ doctor_scan_trees() {
         if [ "$_cl_risk" -gt 0 ]; then
             ui_kv_bad "container tree" "$DOCTOR_PATH -- $_cl_risk of $_cl_total entries at-risk (unmapped owners)"
             [ -n "$_cl_uids" ] && ui_detail "at-risk owners: uid ${_cl_uids%, }"
-            [ -n "$_cl_ex" ] && ui_detail "examples: $_cl_ex"
+            [ -n "$_cl_ex" ] && ui_detail "examples: $(doctor_show_sanitize "$_cl_ex")"
             ui_detail "container metadata ops (futimes/chmod/chown) EPERM on these -- the #312 build-breaker class"
             ui_detail "fix: opk doctor fix"
             ui_detail "or rebuild the affected outputs clean (docs/troubleshooting.md, EPERM entry)"

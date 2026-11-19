@@ -610,4 +610,22 @@ else
     fail "the status-core timeout probe must discriminate broken vs healthy (#248)"
 fi
 
+# --- #660 M6 wiring: every projects.conf reader in this lib skips '#'-lines ------
+# The projects-section pin (test-status.sh) covers the false-red arm
+# behaviorally; the share/hosts loops and the db-dump root argv have no
+# observable row change (comments already skipped silently via [ -d ]) --
+# their comment tolerance is pinned at the wiring level so a future gate
+# reorder cannot flip an annotation into a verdict or an operand. The
+# one-line case tail is identical in all three loops; the two grep
+# fragments below are quote-free on purpose (the pinned lines carry
+# mixed quoting).
+_pc6=$(live_src "$LIB" | grep -cF "in '#'*) continue ;; esac" || true)
+if [ "${_pc6:-0}" = 3 ] &&
+    live_src "$LIB" | grep -qF 'grep -cv -e' &&
+    live_src "$LIB" | grep -qF 'grep -v -e'; then
+    pass "projects/share/hosts loops, count and db-dump argv exclude '#'-lines (#660 M6)"
+else
+    fail "every projects.conf reader must exclude '#'-lines (loops found: ${_pc6:-0} of 3) (#660 M6)"
+fi
+
 suite_done
