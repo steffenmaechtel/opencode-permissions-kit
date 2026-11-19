@@ -8,12 +8,12 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**184 metas · 181 active · 3 retired · 13 review-pending · next due 2026-11-17**
+**186 metas · 183 active · 3 retired · 15 review-pending · next due 2026-11-17**
 
 ## Actionable
 
-- **Review pending:** RM-0177, RM-0178, RM-0179, RM-0180, RM-0181, RM-0182, RM-0183, RM-0184
-- **Amended — pending:** RM-0044 (2026-11-18), RM-0113 (2026-11-18), RM-0141 (2026-11-18), RM-0154 (2026-11-18), RM-0175 (2026-11-18)
+- **Review pending:** RM-0177, RM-0178, RM-0179, RM-0180, RM-0181, RM-0182, RM-0183, RM-0184, RM-0185, RM-0186
+- **Amended — pending:** RM-0044 (2026-11-18), RM-0113 (2026-11-18), RM-0141 (2026-11-18), RM-0175 (2026-11-18), RM-0154 (2026-11-19)
 
 ## AGENTS.md
 
@@ -201,6 +201,7 @@
 | [RM-0136](0/1/3/RM-0136.md) | Deferred work orders collected during | active | approved | 1m | 2026-12-17 |
 | [RM-0140](0/1/4/RM-0140.md) | After the work-order gate settles | active | approved | 1m | 2026-12-15 |
 | [RM-0161](0/1/6/RM-0161.md) | A FILED work order is self-contained at creation | active | approved | 1m | 2026-12-17 |
+| [RM-0185](0/1/8/RM-0185.md) | A deferred-findings COLLECTION issue states | active | **pending** | 1m | 2026-12-19 |
 
 ### Round typing and tiering
 
@@ -317,6 +318,7 @@
 | [RM-0111](0/1/1/RM-0111.md) | Sabotage spot-checks mutate the | active | approved | 1m | 2026-11-22 |
 | [RM-0114](0/1/1/RM-0114.md) | Agents stamp with their own | active | approved | 1m | 2026-11-22 |
 | [RM-0172](0/1/7/RM-0172.md) | A shipped code block is | active | approved | 1m | 2026-12-17 |
+| [RM-0186](0/1/8/RM-0186.md) | A session close (window, terminal, host) | active | **pending** | 1m | 2026-12-19 |
 
 ### Release gate
 
