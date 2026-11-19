@@ -628,14 +628,17 @@ doctor_opk_dispatcher() {
     fi
 }
 
-# Git heal hooks row (issue #671): the heal state and THIS project's
-# main-checkout lockout classification. The heal hooks (activated by
-# `opk git-heal on` through the developer's global core.hooksPath)
-# re-pin .git/index and .git/HEAD to the agent user after every
-# developer git operation that flipped their ownership (git writes
-# both via lock+rename; under the sticky .git of the #651 heal the
-# agent can never re-take ownership itself -- its main-checkout git
-# add / git switch locks out). Read-only like every doctor section.
+# Git heal hooks row (issue #671, operand set widened in #678): the
+# heal state and THIS project's main-checkout lockout classification.
+# The heal hooks (activated by `opk git-heal on` through the
+# developer's global core.hooksPath) re-pin the measured operand set
+# (index, HEAD, ORIG_HEAD, REBASE_HEAD, packed-refs and the conflict
+# pseudo-refs — heal-index-head's header) to the agent user after
+# every developer git operation that flipped their ownership (git
+# writes them via lock+rename; under the sticky .git of the #651 heal
+# the agent can never re-take ownership itself -- its main-checkout
+# git add / git switch / git merge locks out). Read-only like every
+# doctor section.
 # GH_GITCONFIG and GH_LIBDIR are unit-test overrides (status-core's
 # twin row shares GH_GITCONFIG).
 doctor_git_heal() {
@@ -669,7 +672,7 @@ doctor_git_heal() {
         ui_kv_warn "git-heal" "kit pieces incomplete under $_dgh_lib/git-heal (fix: sudo opk update)"
     fi
     case "$_dgh_state" in
-        on) ui_kv "git-heal" "ON -- developer git ops re-pin index/HEAD to $DOCTOR_USER" ;;
+        on) ui_kv "git-heal" "ON -- developer git ops re-pin the heal operand set to $DOCTOR_USER" ;;
         off)
             ui_kv "git-heal" "OFF -- 'sudo opk git-heal on' keeps the agent's main-checkout"
             ui_detail "git workflow (git add / git switch) green across developer checkouts/pulls"
@@ -680,18 +683,23 @@ doctor_git_heal() {
             ;;
         unknown) ui_kv "git-heal" "unknown -- cannot read the developer's global gitconfig" ;;
     esac
-    # Lockout classification for THIS project's main checkout.
+    # Lockout classification for THIS project's main checkout. The row
+    # set mirrors heal-index-head's operand list (#678 widening;
+    # existence-gated — absent files render nothing, same as the
+    # status-core twin).
     _dgh_gd="$DOCTOR_ROOT/.git"
     if [ -d "$_dgh_gd" ]; then
-        for _dgh_f in index HEAD; do
+        for _dgh_f in index HEAD ORIG_HEAD REBASE_HEAD packed-refs \
+            MERGE_HEAD MERGE_MSG MERGE_MODE AUTO_MERGE \
+            CHERRY_PICK_HEAD REVERT_HEAD; do
             _dgh_own=$(stat -c %U "$_dgh_gd/$_dgh_f" 2>/dev/null) || continue
             if [ "$_dgh_own" != "$DOCTOR_USER" ]; then
                 if [ "$_dgh_state" = on ]; then
-                    ui_kv "index/HEAD" "$_dgh_gd/$_dgh_f is $_dgh_own-owned (transient --"
+                    ui_kv "git-heal-file" "$_dgh_gd/$_dgh_f is $_dgh_own-owned (transient --"
                     ui_detail "the next developer git operation heals it)"
                 else
-                    ui_kv_warn "index/HEAD" "$_dgh_gd/$_dgh_f is $_dgh_own-owned -- agent git"
-                    ui_detail "locked in this main checkout; 'sudo opk git-heal on' heals and keeps it healed"
+                    ui_kv_warn "git-heal-file" "$_dgh_gd/$_dgh_f is $_dgh_own-owned -- agent git"
+                    ui_detail "blocked in this main checkout; 'sudo opk git-heal on' heals and keeps it healed"
                 fi
             fi
         done

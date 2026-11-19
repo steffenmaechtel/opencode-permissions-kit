@@ -430,7 +430,7 @@ status_section_git_heal() {
     fi
     case "$_st_gh_state" in
         on)
-            ui_kv_ok "git-heal" "ON — developer git ops re-pin index/HEAD to $OPENCODE_USER"
+            ui_kv_ok "git-heal" "ON — developer git ops re-pin the heal operand set to $OPENCODE_USER"
             ;;
         off)
             ui_kv "git-heal" "OFF — 'sudo opk git-heal on' keeps the agent's main-checkout"
@@ -444,10 +444,12 @@ status_section_git_heal() {
             ui_kv "git-heal" "unknown — cannot read the developer's global gitconfig"
             ;;
     esac
-    # Per-gitdir lockout rows: dev-owned index/HEAD under a sticky .git
+    # Per-gitdir lockout rows: dev-owned operands under a sticky .git
     # lock the agent out of the main checkout until the heal hooks
     # fire (state off/foreign: they never will) or the next developer
     # git operation re-pins them (state on: transient by design). The
+    # row set mirrors heal-index-head's operand list (#678 widening;
+    # existence-gated — absent files render nothing). The
     # enumeration mirrors the on-sweep's RECURSION (#674 a C3: every
     # .git under each conf root — conf roots are scan roots, config.sh
     # parent registration; the literal <root>/.git would miss every
@@ -474,7 +476,9 @@ status_section_git_heal() {
     done <"$PROJECTS_CONF"
     while IFS= read -r _st_gh_gd; do
         [ -n "$_st_gh_gd" ] || continue
-        for _st_gh_f in index HEAD; do
+        for _st_gh_f in index HEAD ORIG_HEAD REBASE_HEAD packed-refs \
+            MERGE_HEAD MERGE_MSG MERGE_MODE AUTO_MERGE \
+            CHERRY_PICK_HEAD REVERT_HEAD; do
             _st_gh_own=$(stat -c %U "$_st_gh_gd/$_st_gh_f" 2>/dev/null) || continue
             if [ "$_st_gh_own" != "$OPENCODE_USER" ]; then
                 if [ "$_st_gh_state" = on ]; then

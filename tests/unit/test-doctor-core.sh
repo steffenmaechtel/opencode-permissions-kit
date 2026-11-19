@@ -324,7 +324,7 @@ _dgh_run() {
 _dgh_stage
 _out=$(_dgh_run || true)
 if printf '%s' "$_out" | grep -q "git-heal.*OFF -- 'sudo opk git-heal on'" &&
-    printf '%s' "$_out" | grep -q "index/HEAD.*$WORK/dgh/proj/.git/index is $(id -un)-owned -- agent git"; then
+    printf '%s' "$_out" | grep -q "git-heal-file.*$WORK/dgh/proj/.git/index is $(id -un)-owned -- agent git"; then
     pass "doctor git-heal: OFF state + counted lockout warn with fix hint"
 else
     fail "doctor git-heal: OFF/lockout rows broken (out=$(printf '%s' "$_out" | head -4))"
