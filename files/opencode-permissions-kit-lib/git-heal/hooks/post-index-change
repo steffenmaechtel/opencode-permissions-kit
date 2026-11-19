@@ -50,7 +50,10 @@ case "$cdg" in
 esac
 
 # Hard no-op outside kit-managed roots (fast path -- no sudo spawn
-# for any unrelated repository of the developer).
+# for any unrelated repository of the developer). Conf-line validity is
+# the heal's gate: it re-validates every projects.conf line reader-side
+# before authorizing anything (the files.md root-op contract, #674
+# a A1) -- this fast path only decides whether to spawn it.
 _gh_hit=0
 if [ -f "$CONF" ]; then
     while IFS= read -r _gh_root; do

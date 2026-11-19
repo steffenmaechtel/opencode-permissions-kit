@@ -444,15 +444,24 @@ status_section_git_heal() {
             ui_kv "git-heal" "unknown — cannot read the developer's global gitconfig"
             ;;
     esac
-    # Per-root lockout rows: dev-owned index/HEAD under a sticky .git
+    # Per-gitdir lockout rows: dev-owned index/HEAD under a sticky .git
     # lock the agent out of the main checkout until the heal hooks
     # fire (state off/foreign: they never will) or the next developer
-    # git operation re-pins them (state on: transient by design).
+    # git operation re-pins them (state on: transient by design). The
+    # enumeration mirrors the on-sweep (#674 a C3): every .git under
+    # each conf root, recursively — conf roots are scan roots
+    # (config.sh parent registration), so the literal <root>/.git
+    # would miss every nested repo.
     [ -f "$PROJECTS_CONF" ] || return 0
+    _st_gh_list=$(mktemp) || return 0
     while IFS= read -r _st_gh_root; do
         case "$_st_gh_root" in '' | '#'*) continue ;; esac
-        _st_gh_gd="$_st_gh_root/.git"
-        [ -d "$_st_gh_gd" ] || continue
+        [ -d "$_st_gh_root" ] || continue
+        find "$_st_gh_root" -type d -name .git >>"$_st_gh_list" 2>/dev/null ||
+            true
+    done <"$PROJECTS_CONF"
+    while IFS= read -r _st_gh_gd; do
+        [ -n "$_st_gh_gd" ] || continue
         for _st_gh_f in index HEAD; do
             _st_gh_own=$(stat -c %U "$_st_gh_gd/$_st_gh_f" 2>/dev/null) || continue
             if [ "$_st_gh_own" != "$OPENCODE_USER" ]; then
@@ -465,7 +474,8 @@ status_section_git_heal() {
                 fi
             fi
         done
-    done <"$PROJECTS_CONF"
+    done <"$_st_gh_list"
+    rm -f "$_st_gh_list"
 }
 
 # === Security advisories (issue #107) ============================================

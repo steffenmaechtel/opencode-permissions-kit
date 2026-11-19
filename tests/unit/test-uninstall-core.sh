@@ -79,8 +79,11 @@ for _fn in $_defs; do
     sh -c '. "$1" && command -v "$2" >/dev/null' _ "$LIB" "$_fn" 2>/dev/null ||
         _missing="$_missing $_fn"
 done
+# Count derived from the list, never hardcoded (#595): the next list
+# edit cannot desync the message.
+_ndefs="$(printf '%s\n' $_defs | wc -w | tr -d ' ')"
 if [ -z "$_missing" ]; then
-    pass "all 6 helpers + 14 section functions defined by sourcing"
+    pass "all $_ndefs helper/section functions defined by sourcing"
 else
     fail "functions missing after sourcing:$_missing"
 fi

@@ -73,12 +73,15 @@ before removing the library (a dangling path would break your git).
 
 The heal script runs as root (the sudoers grant names exactly this one
 path) but is narrow by construction: it only accepts a gitdir under a
-kit-managed project root (`projects.conf`), re-checks the real path
+kit-managed project root (`projects.conf`), re-validates every conf
+line reader-side (a hand-edited system path, scratch prefix or agent
+home never authorizes a heal), re-checks the real path
 after symlink resolution, verifies the gitdir shape (a worktree
 registration is rejected), skips symlinked and hardlinked operands, and
-changes nothing but the ownership of `index` and `HEAD`. Every run
-appends one audit line to
-`/usr/local/lib/opencode-permissions-kit/git-heal/heal.log`.
+changes nothing but the ownership of `index` and `HEAD`. Every healed
+file appends one audit line to
+`/usr/local/lib/opencode-permissions-kit/git-heal/heal.log` — a full
+heal of `index` + `HEAD` writes two lines.
 
 ## Limits
 

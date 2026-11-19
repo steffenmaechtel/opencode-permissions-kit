@@ -51,7 +51,6 @@ LOG="$WORK/heal.log"
 mkdir -p "$WORK/sbin"
 printf '#!/bin/sh\nwhile [ $# -gt 0 ]; do\n    case "$1" in\n    -*) shift ;;\n    *) break ;;\n    esac\ndone\nexec "$@"\n' >"$WORK/sbin/sudo"
 chmod +x "$WORK/sbin/sudo"
-GH_ENV="GH_PROJECTS_CONF=$CONF GH_LOG=$LOG GH_ALLOW_NONROOT=1 GH_AGENT_USER=$(id -un)"
 
 # --- 1. heal-index-head: argument + allowlist refusals ----------------------------
 
@@ -96,6 +95,79 @@ else
     fail "heal: allowlist arm (rc=$_hr_rc out=$_hr_out)"
 fi
 
+# --- 1b. heal: conf-line reader gate (#674 a A1) — a hand-edited line
+# never authorizes a heal. Arms run WITHOUT GH_CONF_RELAX (system-path
+# and agent-home arms live) except where a relax arm is named — the
+# form arms (absolute, dot/empty segment, whitespace) never relax.
+
+printf '%s\n' "/etc" >"$CONF"
+_hr_rc=0
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_PROJECTS_CONF="$CONF" "$HEAL" "$WORK/r1" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 1 ] &&
+    printf '%s' "$_hr_out" | grep -qF 'skip (conf): system path is never a project root: /etc' &&
+    printf '%s' "$_hr_out" | grep -qF 'outside kit-managed roots'; then
+    pass "heal: system-path conf line skipped loudly, authorizes nothing"
+else
+    fail "heal: conf system-path arm (rc=$_hr_rc out=$_hr_out)"
+fi
+
+printf '%s\n' "relative/root" >"$CONF"
+_hr_rc=0
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_PROJECTS_CONF="$CONF" "$HEAL" "$WORK/r1" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 1 ] &&
+    printf '%s' "$_hr_out" | grep -qF 'skip (conf): not an absolute root: relative/root'; then
+    pass "heal: non-absolute conf line skipped"
+else
+    fail "heal: conf absolute arm (rc=$_hr_rc out=$_hr_out)"
+fi
+
+_ahome=$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f6)
+if [ -n "$_ahome" ]; then
+    printf '%s\n' "$_ahome" >"$CONF"
+    _hr_rc=0
+    _hr_out=$(env GH_ALLOW_NONROOT=1 GH_AGENT_USER="$(id -un)" GH_PROJECTS_CONF="$CONF" \
+        "$HEAL" "$WORK/r1" 2>&1) || _hr_rc=$?
+    if [ "$_hr_rc" -eq 1 ] &&
+        printf '%s' "$_hr_out" | grep -qF "skip (conf): agent home is never a project root: $_ahome"; then
+        pass "heal: agent-home conf line skipped"
+    else
+        fail "heal: conf agent-home arm (rc=$_hr_rc out=$_hr_out)"
+    fi
+fi
+
+# Trailing-slash conf roots match after normalization (writer parity:
+# the strip-then-compare shape) — the refusal below is the SHAPE
+# gate's, proving the allowlist matched the normalized root.
+printf '%s\n' "$WORK/r1/" >"$CONF"
+_hr_rc=0
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 GH_PROJECTS_CONF="$CONF" \
+    "$HEAL" "$WORK/r1" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 1 ] &&
+    printf '%s' "$_hr_out" | grep -qF 'not a (common) gitdir shape' &&
+    ! printf '%s' "$_hr_out" | grep -qF 'outside kit-managed roots'; then
+    pass "heal: trailing-slash conf root matches after normalization"
+else
+    fail "heal: conf trailing-slash arm (rc=$_hr_rc out=$_hr_out)"
+fi
+
+# Form gates stay live under GH_CONF_RELAX, and a refused line never
+# poisons the good ones riding along in the same conf: the malformed
+# line is skipped loudly while the well-formed root still matches.
+printf '%s\n' "//malformed" "$WORK/r1" >"$CONF"
+_hr_rc=0
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 GH_PROJECTS_CONF="$CONF" \
+    "$HEAL" "$WORK/r1" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 1 ] &&
+    printf '%s' "$_hr_out" | grep -qF 'skip (conf): malformed root' &&
+    printf '%s' "$_hr_out" | grep -qF 'not a (common) gitdir shape' &&
+    ! printf '%s' "$_hr_out" | grep -qF 'outside kit-managed roots'; then
+    pass "heal: malformed line skipped, well-formed sibling still matches (relax keeps form gates)"
+else
+    fail "heal: conf mixed-lines arm (rc=$_hr_rc out=$_hr_out)"
+fi
+
+printf '%s\n' "$WORK" >"$CONF"
+
 # --- 2. heal-index-head: realpath + gitdir-shape refusals --------------------------
 
 # The literal check passes (the link sits under an allowlisted root),
@@ -105,7 +177,7 @@ mkdir -p "$WORK/inroot-zone" "$WORK/smuggle-target/real"
 ln -s "$WORK/smuggle-target/real" "$WORK/inroot-zone/link"
 printf '%s\n' "$WORK/inroot-zone" >"$CONF"
 _hr_rc=0
-_hr_out=$(env GH_ALLOW_NONROOT=1 GH_PROJECTS_CONF="$CONF" \
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 GH_PROJECTS_CONF="$CONF" \
     "$HEAL" "$WORK/inroot-zone/link" 2>&1) || _hr_rc=$?
 if [ "$_hr_rc" -eq 1 ] && printf '%s' "$_hr_out" | grep -qF 'refused after realpath'; then
     pass "heal: symlinked gitdir cannot smuggle an outside path past the literal check"
@@ -117,7 +189,7 @@ printf '%s\n' "$WORK" >"$CONF"
 mkdir -p "$WORK/plain"
 : >"$WORK/plain/HEAD"
 _hr_rc=0
-_hr_out=$(env GH_ALLOW_NONROOT=1 GH_PROJECTS_CONF="$CONF" "$HEAL" "$WORK/plain" 2>&1) ||
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 GH_PROJECTS_CONF="$CONF" "$HEAL" "$WORK/plain" 2>&1) ||
     _hr_rc=$?
 if [ "$_hr_rc" -eq 1 ] && printf '%s' "$_hr_out" | grep -qF 'not a (common) gitdir shape'; then
     pass "heal: non-gitdir shape refused"
@@ -132,7 +204,7 @@ git -C "$WORK/wt-main" -c user.email=t@e -c user.name=t commit -q --allow-empty 
 git -C "$WORK/wt-main" worktree add -q "$WORK/wt-second" -b wt-branch 2>/dev/null
 _reg=$(find "$WORK/wt-main/.git/worktrees" -mindepth 1 -maxdepth 1 -type d | head -1)
 _hr_rc=0
-_hr_out=$(env GH_ALLOW_NONROOT=1 GH_PROJECTS_CONF="$CONF" "$HEAL" "$_reg" 2>&1) || _hr_rc=$?
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 GH_PROJECTS_CONF="$CONF" "$HEAL" "$_reg" 2>&1) || _hr_rc=$?
 if [ "$_hr_rc" -eq 1 ] && printf '%s' "$_hr_out" | grep -qF 'not a (common) gitdir shape'; then
     pass "heal: worktree registration dir rejected by shape"
 else
@@ -147,7 +219,7 @@ rm -f "$LOG" && : >"$LOG"
 rm -f "${WORK:?}/repo3/.git/index"
 ln -s /dev/null "$WORK/repo3/.git/index"
 _hr_rc=0
-_hr_out=$(env GH_ALLOW_NONROOT=1 GH_AGENT_USER="$(id -un)" GH_PROJECTS_CONF="$CONF" \
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 GH_AGENT_USER="$(id -un)" GH_PROJECTS_CONF="$CONF" \
     GH_LOG="$LOG" "$HEAL" "$WORK/repo3/.git" 2>&1) || _hr_rc=$?
 if [ "$_hr_rc" -eq 0 ] && printf '%s' "$_hr_out" | grep -qF 'skip (symlink)'; then
     pass "heal: symlinked operand skipped, never followed"
@@ -159,7 +231,7 @@ rm -f "${WORK:?}/repo3/.git/index"
 git -C "$WORK/repo3" read-tree HEAD 2>/dev/null
 ln "$WORK/repo3/.git/index" "$WORK/hardlink-mate"
 _hr_rc=0
-_hr_out=$(env GH_ALLOW_NONROOT=1 GH_AGENT_USER="$(id -un)" GH_PROJECTS_CONF="$CONF" \
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 GH_AGENT_USER="$(id -un)" GH_PROJECTS_CONF="$CONF" \
     GH_LOG="$LOG" "$HEAL" "$WORK/repo3/.git" 2>&1) || _hr_rc=$?
 if [ "$_hr_rc" -eq 0 ] && printf '%s' "$_hr_out" | grep -qF 'skip (hardlink, nlink>1)'; then
     pass "heal: hardlinked operand skipped (a chown would re-own the shared inode)"
@@ -170,7 +242,7 @@ rm -f "${WORK:?}/hardlink-mate"
 
 rm -f "$LOG" && : >"$LOG"
 _hr_rc=0
-_hr_out=$(env GH_ALLOW_NONROOT=1 GH_AGENT_USER="$(id -un)" GH_PROJECTS_CONF="$CONF" \
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 GH_AGENT_USER="$(id -un)" GH_PROJECTS_CONF="$CONF" \
     GH_LOG="$LOG" "$HEAL" "$WORK/repo3/.git" 2>&1) || _hr_rc=$?
 _lines=$(grep -c 'healed' "$LOG" || true)
 if [ "$_hr_rc" -eq 0 ] && [ "$_lines" -ge 2 ] &&
@@ -186,7 +258,7 @@ fi
 rm -f "${WORK:?}/repo3/.git/index"
 : >"$LOG"
 _hr_rc=0
-_hr_out=$(env GH_ALLOW_NONROOT=1 GH_AGENT_USER="$(id -un)" GH_PROJECTS_CONF="$CONF" \
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 GH_AGENT_USER="$(id -un)" GH_PROJECTS_CONF="$CONF" \
     GH_LOG="$LOG" "$HEAL" "$WORK/repo3/.git" 2>&1) || _hr_rc=$?
 if [ "$_hr_rc" -eq 0 ] && [ "$(grep -c healed "$LOG" || true)" = 1 ]; then
     pass "heal: a missing operand is a quiet no-op for that file"
@@ -196,7 +268,7 @@ fi
 git -C "$WORK/repo3" read-tree HEAD 2>/dev/null
 
 _hr_rc=0
-_hr_out=$(env GH_ALLOW_NONROOT=1 GH_AGENT_USER=nosuchuser-gh GH_PROJECTS_CONF="$CONF" \
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 GH_AGENT_USER=nosuchuser-gh GH_PROJECTS_CONF="$CONF" \
     GH_LOG="$LOG" "$HEAL" "$WORK/repo3/.git" 2>&1) || _hr_rc=$?
 if [ "$_hr_rc" -eq 0 ] && [ "$(printf '%s' "$_hr_out" | grep -cF 'chown failed')" -ge 2 ]; then
     pass "heal: chown failure warns per operand and never breaks the run"
@@ -205,7 +277,7 @@ else
 fi
 
 _hr_rc=0
-_hr_out=$(env GH_ALLOW_NONROOT=1 GH_AGENT_USER="$(id -un)" GH_PROJECTS_CONF="$CONF" \
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 GH_AGENT_USER="$(id -un)" GH_PROJECTS_CONF="$CONF" \
     GH_LOG="$WORK/no-such-dir/x/heal.log" "$HEAL" "$WORK/repo3/.git" 2>&1) || _hr_rc=$?
 if [ "$_hr_rc" -eq 0 ] && printf '%s' "$_hr_out" | grep -qF 'could not append'; then
     pass "heal: an unwritable log degrades loud, the heal still completes"
@@ -241,7 +313,7 @@ printf '%s\n' "$WORK/zone" "# a comment line rides along (#660 M6)" "" >"$CONF"
 : >"$LOG"
 
 _gitenv() { # env prefix for every matrix git call
-    printf 'GH_LIBDIR=%s GH_PROJECTS_CONF=%s GH_LOG=%s GH_ALLOW_NONROOT=1 GH_AGENT_USER=%s' \
+    printf 'GH_LIBDIR=%s GH_PROJECTS_CONF=%s GH_LOG=%s GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 GH_AGENT_USER=%s' \
         "$WORK/lib" "$CONF" "$LOG" "$(id -un)"
 }
 _mgit() { # git in the matrix zone (hooks + env applied)
@@ -332,6 +404,33 @@ if [ "$(_mlog)" -gt "$_before" ]; then
     pass "matrix: stale-cache refreshing status heals via post-index-change (T5)"
 else
     fail "matrix: stale-cache status did not fire a heal"
+fi
+
+# Racy-clean status — the same-second nuance the hook header documents,
+# pinned as the racy half of the carrier claim (#674 a C1). A normally
+# staged entry's cached mtime ties the index-write second; until a
+# boundary-crossing rewrite stamps a newer index mtime, EVERY status
+# re-smudges (rewrites the index, post-index-change fires) — the tie is
+# between cache and index (both stamped by the add), so the firing is
+# deterministic regardless of when the status runs; the sleep only
+# guarantees the first status's rewrite lands in a later second, which
+# makes the status after it provably quiet (the settled half).
+echo racy >"$WORK/zone/repo/f"
+_mgit add f
+sleep 1
+_before=$(_mlog)
+_mgit status --porcelain >/dev/null
+if [ "$(_mlog)" -gt "$_before" ]; then
+    pass "matrix: racy-clean statuses keep re-smudging until a second passes (fires)"
+else
+    fail "matrix: racy-clean status did not fire"
+fi
+_before=$(_mlog)
+_mgit status --porcelain >/dev/null
+if [ "$(_mlog)" = "$_before" ]; then
+    pass "matrix: tie broken — the settled status after is quiet"
+else
+    fail "matrix: settled status fired again (tie not broken)"
 fi
 
 # Fast-forward pull: post-merge fires on --ff-only pulls (the pilot's
@@ -468,10 +567,11 @@ _core_run() { # <expr>: sources ui stubs + core with the scratch env
         GH_PROJECTS_CONF="$CONF"
         GH_LOG="$LOG"
         GH_ALLOW_NONROOT=1
+        GH_CONF_RELAX=1
         GH_AGENT_USER="$(id -un)"
         INSTALL_CONF="$WORK/install.conf"
         export GH_LIBDIR GH_DEV_HOME GH_SUDO GH_PROJECTS_CONF GH_LOG \
-            GH_ALLOW_NONROOT GH_AGENT_USER INSTALL_CONF
+            GH_ALLOW_NONROOT GH_CONF_RELAX GH_AGENT_USER INSTALL_CONF
         eval "$1"
     ) 2>&1
 }
@@ -520,7 +620,8 @@ printf '#!/bin/sh\nexit 0\n' >"$WORK/visudo"
 chmod +x "$WORK/visudo"
 git -C "$WORK/zone/onroot" init -q -b main
 git -C "$WORK/zone/onroot" -c user.email=t@e -c user.name=t commit -q --allow-empty -m x
-# the sweep is depth-1 (<root>/.git): the conf entry IS the project root
+# the sweep is recursive (find -name .git under each conf root — conf
+# entries are scan roots; the heal output below asserts the sweep hit)
 printf '%s\n' "$WORK/zone/onroot" "# comment tolerated" >"$WORK/on-projects.conf"
 rm -f "${WORK:?}/devhome/.gitconfig"
 : >"$LOG"
@@ -535,11 +636,33 @@ if [ "$_hr_rc" -eq 0 ] &&
     grep -q "^$(id -un) ALL=(root) NOPASSWD: /usr/local/lib/opencode-permissions-kit/git-heal/heal-index-head \*\$" \
         "$WORK/etc/sudoers" &&
     grep -qF "gitdir=$WORK/zone/onroot/.git" "$LOG" &&
+    printf '%s' "$_out" | grep -qF "heal ran for $WORK/zone/onroot/.git" &&
     printf '%s' "$_out" | grep -qF 'success: git heal hooks active'; then
     pass "core: on renders sudoers, writes the dev gitconfig, heals the root once"
 else
     fail "core: on leg failed (rc=$_hr_rc gc=$(git config --file "$WORK/devhome/.gitconfig" core.hooksPath 2>&1) sudoers=$(grep -c heal-index-head "$WORK/etc/sudoers" 2>/dev/null) log=$(wc -l <"$LOG"))"
 fi
+
+# `on` sweep conf gate (#674 a A1): a hand-edited system-path line is
+# skipped loudly and steers no root find — with GH_CONF_RELAX unset the
+# blocklist is live even in the unit harness (the sweep's mktemp list
+# stays empty, `on` still completes its other legs).
+printf '%s\n' "/etc" "$WORK/zone/onroot" >"$WORK/on-projects.conf"
+: >"$LOG"
+_hr_rc=0
+_out=$(
+    _core_run 'SD_SUDO="" SD_VISUDO="$WORK/visudo" SD_CONF_DIR="$WORK/etc" \
+        SD_SUDOERS_D="$WORK/sdd" GH_PROJECTS_CONF="$WORK/on-projects.conf" \
+        GH_CONF_RELAX= HOME="$WORK/devhome" _git_heal_on'
+) || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] &&
+    printf '%s' "$_out" | grep -qF 'skip (conf): system path is never a project root: /etc' &&
+    [ "$(grep -c 'gitdir=' "$LOG" 2>/dev/null || true)" = 0 ]; then
+    pass "core: on skips a system-path conf line loudly, heals nothing under it"
+else
+    fail "core: on conf gate (rc=$_hr_rc out=$(printf '%s' "$_out" | grep 'skip (conf)' | head -2))"
+fi
+printf '%s\n' "$WORK/zone/onroot" "# comment tolerated" >"$WORK/on-projects.conf"
 
 # `on` pieces gate: an incomplete lib refuses before touching anything.
 mv "$WORK/lib/git-heal/hooks/post-merge" "$WORK/pm-aside"
@@ -600,5 +723,46 @@ if [ "$_hr_rc" -eq 1 ] && printf '%s' "$_out" | grep -qF 'sudo did not elevate';
 else
     fail "core: loop guard (rc=$_hr_rc out=$_out)"
 fi
+
+# --- 7. status renderer: state vocabulary (#674 a C6), lockout
+# classification (a C7) and the recursive lockout enumeration (a C3).
+# The core reads the agent user from install.conf (OPENCODE_USER), so
+# this section carries its own conf naming a NON-existent agent —
+# every real file then counts as foreign-owned and the rows must fire.
+mkdir -p "$WORK/zone/scan/nested/repo"
+git -C "$WORK/zone/scan/nested/repo" init -q -b main
+git -C "$WORK/zone/scan/nested/repo" -c user.email=t@e -c user.name=t \
+    commit -q --allow-empty -m x
+printf '%s\n' "$WORK/zone/scan" >"$CONF"
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=ghs-render-agent\n' "$(id -un)" \
+    >"$WORK/install-render.conf"
+
+# foreign hooksPath: the same state word the opk status / doctor rows
+# render — INACTIVE is gone (one vocabulary across the surfaces).
+git config --file "$WORK/devhome/.gitconfig" core.hooksPath /dev/null
+_out=$(_core_run 'INSTALL_CONF="$WORK/install-render.conf" _git_heal_status')
+if printf '%s' "$_out" | grep -qF 'git-heal: OFF — core.hooksPath holds a foreign value' &&
+    ! printf '%s' "$_out" | grep -qF 'INACTIVE'; then
+    pass "status renderer: foreign state says OFF (opk status vocabulary)"
+else
+    fail "status renderer: foreign wording (out=$(printf '%s' "$_out" | head -3))"
+fi
+if printf '%s' "$_out" | grep -qF "lockout risk: $WORK/zone/scan/nested/repo/.git/index"; then
+    pass "status renderer: nested repo under a scan root shows its lockout risk"
+else
+    fail "status renderer: recursive lockout row missing (out=$(printf '%s' "$_out" | grep lockout | head -2))"
+fi
+
+# ON: the same dev-owned operands render transient (the next developer
+# git operation heals them), matching the opk status / doctor rows.
+git config --file "$WORK/devhome/.gitconfig" core.hooksPath "$WORK/lib/git-heal/hooks"
+_out=$(_core_run 'INSTALL_CONF="$WORK/install-render.conf" _git_heal_status')
+if printf '%s' "$_out" | grep -qF 'lockout (transient — the next developer git operation' &&
+    printf '%s' "$_out" | grep -qF "heals it): $WORK/zone/scan/nested/repo/.git/index"; then
+    pass "status renderer: ON classifies the same lockout as transient"
+else
+    fail "status renderer: transient classification (out=$(printf '%s' "$_out" | grep -i lockout | head -2))"
+fi
+rm -f "${WORK:?}/devhome/.gitconfig"
 
 suite_done "git heal hooks (heal script + hook matrix + core)"

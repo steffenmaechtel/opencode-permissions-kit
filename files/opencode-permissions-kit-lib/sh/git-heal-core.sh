@@ -30,8 +30,13 @@
 #      (repo hooks stay disabled for the developer -- the same
 #      protective effect secure-git-config.md documents for the
 #      /dev/null form, plus the heal),
-#   4. heals every kit-managed main checkout once (depth-1 <root>/.git
-#      -- nested repos ride the hooks on their next developer op).
+#   4. heals every kit-managed gitdir once: enumerates every .git
+#      under the conf roots RECURSIVELY (roots are scan roots like
+#      /var/www/vhosts, the config.sh parent-registration shape --
+#      depth-1 <root>/.git would find nothing), after re-validating
+#      every conf line reader-side (the files.md root-op contract,
+#      #674 a A1: the uninstall-core reader mirror -- a hand-edited
+#      system/scratch/agent-home line never steers the root sweep).
 # `off` removes ONLY the kit-owned hooksPath value (a foreign value is
 # never touched) and leaves the sudoers grant in place (narrow,
 # nothing invokes it without the hooksPath). `status` reports the
@@ -156,6 +161,55 @@ _ghc_heal_once() {
     "$(_ghc_libdir)/git-heal/heal-index-head" "$1"
 }
 
+# _ghc_root_ok <line>: reader-side conf-line gate for the on-sweep
+# (files.md contract — every consumer that runs root operations over
+# the roots re-validates each line; the uninstall-core reader mirror,
+# #674 a A1). rc 0: usable root, trailing-slash-stripped form in
+# _ghc_root_norm; rc 1: refused (the caller prints the skip line).
+# The system-path and agent-home arms sit behind GH_CONF_RELAX (unit
+# scratch zones live under /tmp); the form arms never relax.
+_ghc_root_ok() {
+    _ghc_ro="$1"
+    case "$_ghc_ro" in
+        /*) ;;
+        *) return 1 ;;
+    esac
+    case "$_ghc_ro" in
+        *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]*) return 1 ;;
+    esac
+    while :; do
+        case "$_ghc_ro" in
+            */) _ghc_ro="${_ghc_ro%/}" ;;
+            *) break ;;
+        esac
+    done
+    [ -n "$_ghc_ro" ] || return 1
+    if [ "${GH_CONF_RELAX:-}" != "1" ]; then
+        _ghc_ah=$(getent passwd "$(_ghc_agentuser)" 2>/dev/null | cut -d: -f6) ||
+            true
+        if [ "$_ghc_ro" = "/home/$(_ghc_agentuser)" ] ||
+            { [ -n "$_ghc_ah" ] && [ "$_ghc_ro" = "$_ghc_ah" ]; }; then
+            return 2
+        fi
+        case "$_ghc_ro" in
+            # The writer's FHS-complete blocklist (sh/path-sane.sh
+            # project_path_sane — same arms as every reader mirror).
+            / | /bin | /bin/* | /boot | /boot/* | /dev | /dev/* | /etc | /etc/* | /home | /lib* | \
+                /media | /media/* | /mnt | /mnt/* | /opt | /opt/* | /proc | /proc/* | /root | /root/* | \
+                /run | /run/* | /sbin | /sbin/* | /srv | /srv/* | /sys | /sys/* | /tmp | /tmp/* | /var/tmp/* | \
+                /usr | /usr/* | /var | /var/tmp | /var/account | /var/account/* | /var/backups | \
+                /var/backups/* | /var/cache | /var/cache/* | /var/crash | /var/crash/* | /var/games | \
+                /var/games/* | /var/lib | /var/lib/* | /var/local | /var/local/* | /var/lock | \
+                /var/lock/* | /var/log | /var/log/* | /var/mail | /var/mail/* | /var/opt | \
+                /var/opt/* | /var/run | /var/run/* | /var/spool | /var/spool/* | /var/yp | /var/yp/*)
+                return 3
+                ;;
+        esac
+    fi
+    _ghc_root_norm="$_ghc_ro"
+    return 0
+}
+
 _git_heal_on() {
     _ghc_on_dev=$(_ghc_devuser)
     _ghc_on_home=$(_ghc_devhome "$_ghc_on_dev")
@@ -193,14 +247,14 @@ _git_heal_on() {
         ui_error "git-heal: could not write core.hooksPath for $_ghc_on_dev"
         exit 1
     fi
-    # Heal every kit-managed main checkout once: enumerate the .git
-    # dirs under each projects.conf root (the same universe the hook
-    # allowlist covers -- roots are SCAN roots like /var/www/vhosts,
-    # not project dirs, so depth-1 would find nothing). No path-sane
-    # gate here by design: every conf entry was policy-validated when
-    # it was added (config.sh projects add gates there), and the heal
-    # script re-allowlists every found gitdir against the same conf --
-    # the same layering fs_baseline_root uses (gated by its callers).
+    # Heal every kit-managed gitdir once: enumerate the .git dirs
+    # under each projects.conf root (the same universe the hook
+    # allowlist covers — roots are SCAN roots like /var/www/vhosts,
+    # not project dirs, so depth-1 would find nothing), with every
+    # conf line re-validated reader-side first (files.md contract,
+    # #674 a A1). No path-sane sourcing here by design: the reader
+    # mirror is the house shape (uninstall-core, update-core, config
+    # refresh, bin/opk handover all ship inline mirrors).
     _ghc_on_conf="${GH_PROJECTS_CONF:-/etc/opencode-permissions-kit/projects.conf}"
     if [ -f "$_ghc_on_conf" ]; then
         _ghc_on_list=$(mktemp) || {
@@ -209,12 +263,29 @@ _git_heal_on() {
         }
         while IFS= read -r _ghc_on_root; do
             case "$_ghc_on_root" in '' | '#'*) continue ;; esac
+            _ghc_rk_rc=0
+            _ghc_root_ok "$_ghc_on_root" || _ghc_rk_rc=$?
+            if [ "$_ghc_rk_rc" -ne 0 ]; then
+                case "$_ghc_rk_rc" in
+                    2) _ghc_on_why="agent home is never a project root" ;;
+                    3) _ghc_on_why="system path is never a project root" ;;
+                    *) _ghc_on_why="not an absolute root, or malformed (dot, empty segment, or whitespace)" ;;
+                esac
+                ui_detail "skip (conf): $_ghc_on_why: $_ghc_on_root"
+                continue
+            fi
+            _ghc_on_root="$_ghc_root_norm"
             [ -d "$_ghc_on_root" ] || continue
             find "$_ghc_on_root" -type d -name .git >>"$_ghc_on_list" 2>/dev/null || true
         done <"$_ghc_on_conf"
         while IFS= read -r _ghc_on_gd; do
             if _ghc_heal_once "$_ghc_on_gd"; then
-                ui_detail "healed $_ghc_on_gd"
+                # rc-true is "the heal ran", not "every chown
+                # succeeded": the heal exits 0 even when an operand's
+                # chown failed (it must never break a git op), so the
+                # detail line names the run, not a per-file result
+                # (#674 a A2 — the audit log carries those).
+                ui_detail "heal ran for $_ghc_on_gd"
             else
                 ui_detail "heal skipped for $_ghc_on_gd (see messages above)"
             fi
@@ -255,7 +326,8 @@ _git_heal_off() {
 _git_heal_status() {
     _ghc_stt_dev=$(_ghc_devuser)
     _ghc_stt_agent=$(_ghc_agentuser)
-    case $(_ghc_state) in
+    _ghc_stt_state=$(_ghc_state)
+    case "$_ghc_stt_state" in
         on)
             ui_info "git-heal: ON — heal hooks active (core.hooksPath=$(_ghc_hooksdir))"
             ;;
@@ -264,8 +336,12 @@ _git_heal_status() {
             ui_info "        main-checkout git workflow (git add / git switch) green"
             ;;
         foreign)
-            ui_info "git-heal: INACTIVE — core.hooksPath holds a foreign value"
-            ui_info "        ($(_ghc_dev_hooks_path "$_ghc_stt_dev")) — heal hooks not in effect"
+            # Same state word the opk status / doctor rows render for a
+            # foreign hooksPath ("OFF — ...", #674 a C6): one vocabulary
+            # across the two surfaces the how-to documents as parallel.
+            ui_info "git-heal: OFF — core.hooksPath holds a foreign value"
+            ui_info "        ($(_ghc_dev_hooks_path "$_ghc_stt_dev")) — heal hooks not in effect;"
+            ui_info "        'sudo opk git-heal on' would retake the path"
             ;;
         unknown)
             ui_info "git-heal: UNKNOWN — cannot read the developer's gitconfig"
@@ -276,22 +352,39 @@ _git_heal_status() {
     else
         ui_detail "kit pieces INCOMPLETE under $(_ghc_libdir)/git-heal — run 'opk update'"
     fi
-    # Per-root lockout rows: dev-owned index/HEAD under a sticky .git
-    # lock the agent out until the heal hooks fire (off) or the next
-    # developer git operation (on) re-pins them.
+    # Per-gitdir lockout rows: dev-owned index/HEAD under a sticky .git
+    # lock the agent out until the heal hooks fire (off/foreign) or
+    # the next developer git operation re-pins them (on: transient —
+    # the same classification the opk status / doctor rows render,
+    # #674 a C7). The enumeration mirrors the on-sweep (#674 a C3):
+    # every .git under each conf root, recursively — conf roots are
+    # scan roots (config.sh parent registration), so the literal
+    # <root>/.git would miss every nested repo.
     _ghc_stt_conf="${GH_PROJECTS_CONF:-/etc/opencode-permissions-kit/projects.conf}"
     [ -f "$_ghc_stt_conf" ] || return 0
+    _ghc_stt_list=$(mktemp) || return 0
     while IFS= read -r _ghc_stt_root; do
         case "$_ghc_stt_root" in '' | '#'*) continue ;; esac
-        _ghc_stt_gd="$_ghc_stt_root/.git"
-        [ -d "$_ghc_stt_gd" ] || continue
+        [ -d "$_ghc_stt_root" ] || continue
+        find "$_ghc_stt_root" -type d -name .git >>"$_ghc_stt_list" 2>/dev/null ||
+            true
+    done <"$_ghc_stt_conf"
+    while IFS= read -r _ghc_stt_gd; do
+        [ -n "$_ghc_stt_gd" ] || continue
         for _ghc_stt_f in index HEAD; do
             _ghc_stt_own=$(stat -c %U "$_ghc_stt_gd/$_ghc_stt_f" 2>/dev/null) || continue
             if [ "$_ghc_stt_own" != "$_ghc_stt_agent" ]; then
-                ui_detail "lockout risk: $_ghc_stt_gd/$_ghc_stt_f is $_ghc_stt_own-owned"
+                if [ "$_ghc_stt_state" = on ]; then
+                    ui_detail "lockout (transient — the next developer git operation"
+                    ui_detail "heals it): $_ghc_stt_gd/$_ghc_stt_f is $_ghc_stt_own-owned"
+                else
+                    ui_detail "lockout risk: $_ghc_stt_gd/$_ghc_stt_f is $_ghc_stt_own-owned —"
+                    ui_detail "'sudo opk git-heal on' heals and keeps it healed"
+                fi
             fi
         done
-    done <"$_ghc_stt_conf"
+    done <"$_ghc_stt_list"
+    rm -f "$_ghc_stt_list"
 }
 
 git_heal_cli() {

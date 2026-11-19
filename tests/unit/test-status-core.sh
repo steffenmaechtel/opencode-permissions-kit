@@ -182,6 +182,23 @@ if printf '%s' "$_out" | grep -q "git-heal.*OFF — 'sudo opk git-heal on'" &&
 else
     fail "git-heal section: OFF/lockout rows broken (out=$(printf '%s' "$_out" | head -4))"
 fi
+
+# Parent-root registration (config.sh "parent of several projects"):
+# the lockout enumeration recurses — a nested repo under the conf root
+# renders its row (#674 a C3; the literal <root>/.git shape above
+# still works, this pins the scan-root shape the on-sweep heals).
+mkdir -p "$WORK/ghs/scan/deep/repo"
+git -C "$WORK/ghs/scan/deep/repo" init -q
+: >"$WORK/ghs/scan/deep/repo/.git/index"
+: >"$WORK/ghs/scan/deep/repo/.git/HEAD"
+printf '%s\n' "$WORK/ghs/scan" >"$WORK/ghs/projects.conf"
+_out=$(_ghs_run || true)
+if printf '%s' "$_out" | grep -q "lockout.*$WORK/ghs/scan/deep/repo/.git/index is $(id -un)-owned — agent git"; then
+    pass "git-heal section: nested repo under a parent-root conf shows its lockout"
+else
+    fail "git-heal section: recursive lockout row missing (out=$(printf '%s' "$_out" | grep lockout | head -2))"
+fi
+printf '%s\n' "$WORK/ghs/root" >"$WORK/ghs/projects.conf"
 git config -f "$WORK/ghs/devhome/.gitconfig" core.hooksPath "$WORK/ghs/lib/git-heal/hooks"
 _out=$(_ghs_run || true)
 if printf '%s' "$_out" | grep -q 'git-heal.*ON — developer git ops re-pin' &&

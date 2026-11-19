@@ -36,7 +36,8 @@ asks before removing the kit block; your own entries always stay.
   annotated conf renders no verdict rows). Entries are
   written by install and `opk config` only: every consumer that runs
   root operations over the roots (`opk update`, `opk config refresh`,
-  `opk uninstall`) re-validates each line reader-side and skips
+  `opk uninstall`, `opk git-heal on` and the heal itself) re-validates
+  each line reader-side and skips
   malformed entries, system paths, the scratch prefixes (`/tmp`,
   `/var/tmp`) and the agent home loudly — a hand-edited line cannot
   drive the recursive group baseline over system or scratch trees.
@@ -156,7 +157,6 @@ sudo — see [the how-to](../how-to/git-heal-hooks.md)).
 | `/usr/local/lib/opencode-permissions-kit/bin/xdg-open` | xdg-open fallback shim → `bin/browser-bridge` |
 | `/usr/local/lib/opencode-permissions-kit/git-heal/heal-index-head` | Root heal: index+HEAD -> agent user (#671) |
 | `/usr/local/lib/opencode-permissions-kit/git-heal/hooks/` | The four heal hook bodies (`opk git-heal on`) |
-| `/usr/local/lib/opencode-permissions-kit/git-heal/heal.log` | Heal audit log (one line per healed file) |
 | `/usr/local/lib/opencode-permissions-kit/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe` | WSL bridge |
 | `/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh` | Sourced `ddev()` terminal function |
 | `/usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh` | Shared helper: `.ddev` + settings-dir chown |
@@ -220,6 +220,11 @@ Deployment notes:
 | Path | Purpose |
 |---|---|
 | `opencode-permissions-kit.log` | Audit log (mode 750/640, self-rotating) — see [audit log](audit-log.md) |
+
+The git-heal audit log lives outside this tree by design (next to the
+heal script it serves): `/usr/local/lib/opencode-permissions-kit/git-heal/heal.log`,
+runtime-created, one line per healed file (`index` + `HEAD` = two lines
+on a full heal).
 
 ## Project-side: opk.json
 

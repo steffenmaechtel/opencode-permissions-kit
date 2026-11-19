@@ -37,6 +37,10 @@
 #                     install.conf, else the literal "opencode")
 #   GH_ALLOW_NONROOT  relax the root gate (tests chown to the running
 #                     user, which is a permitted no-op chown)
+#   GH_CONF_RELAX     relax the conf-line system-path/agent-home arms
+#                     (unit scratch zones live under /tmp, which the
+#                     arms refuse; like every GH_* override this never
+#                     survives sudo's env_reset in production)
 set -u
 
 _gh_lib="${GH_LIBDIR:-/usr/local/lib/opencode-permissions-kit}"
@@ -63,16 +67,86 @@ case "$gd" in
         ;;
 esac
 
+# Agent user: OPENCODE_USER from install.conf (doctor-style sed read,
+# never a source of a root-owned file), literal fallback like every
+# kit lib carries for the canonical user. Resolved BEFORE the
+# allowlist: the conf-line gate's agent-home arm needs it.
+_gh_agent="${GH_AGENT_USER:-$(sed -n 's/^OPENCODE_USER=//p' \
+    /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -n 1)}"
+_gh_agent="${_gh_agent:-opencode}"
+
+# _gh_root_ok <line>: reader-side conf-line gate (files.md contract:
+# every consumer that runs root operations over the roots re-validates
+# each line — the uninstall-core reader mirror, #243/#418/#247
+# precedent, extended to the heal in #674 a A1). rc 0: the line is a
+# usable root, normalized (trailing slashes stripped) in _gh_root_norm.
+# Refused lines say why (the hook-safe loud form — a skip line, never
+# an exit) and rc 1. The system-path and agent-home arms sit behind
+# GH_CONF_RELAX (unit scratch zones live under /tmp); the form arms
+# (absolute, dot/empty segment, whitespace) never relax — a malformed
+# line is refused in every mode.
+_gh_root_ok() {
+    _gh_ro="$1"
+    case "$_gh_ro" in
+        /*) ;;
+        *)
+            say "skip (conf): not an absolute root: $_gh_ro"
+            return 1
+            ;;
+    esac
+    case "$_gh_ro" in
+        *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]*)
+            say "skip (conf): malformed root (dot, empty segment, or whitespace): $_gh_ro"
+            return 1
+            ;;
+    esac
+    while :; do
+        case "$_gh_ro" in
+            */) _gh_ro="${_gh_ro%/}" ;;
+            *) break ;;
+        esac
+    done
+    [ -n "$_gh_ro" ] || return 1
+    if [ "${GH_CONF_RELAX:-}" != "1" ]; then
+        _gh_ah=$(getent passwd "$_gh_agent" 2>/dev/null | cut -d: -f6) || true
+        if [ "$_gh_ro" = "/home/$_gh_agent" ] ||
+            { [ -n "$_gh_ah" ] && [ "$_gh_ro" = "$_gh_ah" ]; }; then
+            say "skip (conf): agent home is never a project root: $_gh_ro"
+            return 1
+        fi
+        case "$_gh_ro" in
+            # The writer's FHS-complete blocklist (sh/path-sane.sh
+            # project_path_sane — same arms as every reader mirror).
+            / | /bin | /bin/* | /boot | /boot/* | /dev | /dev/* | /etc | /etc/* | /home | /lib* | \
+                /media | /media/* | /mnt | /mnt/* | /opt | /opt/* | /proc | /proc/* | /root | /root/* | \
+                /run | /run/* | /sbin | /sbin/* | /srv | /srv/* | /sys | /sys/* | /tmp | /tmp/* | /var/tmp/* | \
+                /usr | /usr/* | /var | /var/tmp | /var/account | /var/account/* | /var/backups | \
+                /var/backups/* | /var/cache | /var/cache/* | /var/crash | /var/crash/* | /var/games | \
+                /var/games/* | /var/lib | /var/lib/* | /var/local | /var/local/* | /var/lock | \
+                /var/lock/* | /var/log | /var/log/* | /var/mail | /var/mail/* | /var/opt | \
+                /var/opt/* | /var/run | /var/run/* | /var/spool | /var/spool/* | /var/yp | /var/yp/*)
+                say "skip (conf): system path is never a project root: $_gh_ro"
+                return 1
+                ;;
+        esac
+    fi
+    _gh_root_norm="$_gh_ro"
+    return 0
+}
+
 # allowlisted <path>: rc 0 when <path> equals or sits under a root
 # listed in the projects config (one absolute root per line; # and
-# empty lines ignored -- projects.conf format).
+# empty lines ignored — projects.conf format; every line runs the
+# _gh_root_ok reader gate first, so a hand-edited system/scratch/
+# agent-home line never authorizes a heal).
 _gh_allowlisted() {
     _gh_p="$1"
     [ -f "$_gh_conf" ] || return 1
     while IFS= read -r _gh_root; do
         case "$_gh_root" in '' | '#'*) continue ;; esac
+        _gh_root_ok "$_gh_root" || continue
         case "$_gh_p" in
-            "$_gh_root" | "$_gh_root"/*) return 0 ;;
+            "$_gh_root_norm" | "$_gh_root_norm"/*) return 0 ;;
         esac
     done <"$_gh_conf"
     return 1
@@ -107,12 +181,6 @@ if [ ! -e "$gd/HEAD" ] || [ ! -d "$gd/objects" ]; then
     say "not a (common) gitdir shape: $gd"
     exit 1
 fi
-
-# Agent user: OPENCODE_USER from install.conf (doctor-style sed read,
-# never a source of a root-owned file), literal fallback like every
-# kit lib carries for the canonical user.
-_gh_agent="${GH_AGENT_USER:-$(sed -n 's/^OPENCODE_USER=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -n 1)}"
-_gh_agent="${_gh_agent:-opencode}"
 
 for f in index HEAD; do
     p="$gd/$f"

@@ -105,6 +105,7 @@ docs_scope() {
 scope_files() {
     find files -name '*.sh' -type f
     find files/opencode-permissions-kit-lib/bin -type f
+    find files/opencode-permissions-kit-lib/git-heal -type f
     find .github/workflows -name '*.yml' -type f
     docs_scope
 }

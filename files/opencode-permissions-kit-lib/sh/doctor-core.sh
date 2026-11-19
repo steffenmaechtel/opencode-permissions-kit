@@ -628,8 +628,6 @@ doctor_opk_dispatcher() {
     fi
 }
 
-# --- the daemon user (the rootless backend runs as this user) --------------------
-# INSTALL_CONF resolves above (the 'all' block shares it)
 # Git heal hooks row (issue #671): the heal state and THIS project's
 # main-checkout lockout classification. The heal hooks (activated by
 # `opk git-heal on` through the developer's global core.hooksPath)
@@ -700,6 +698,8 @@ doctor_git_heal() {
     fi
 }
 
+# --- the daemon user (the rootless backend runs as this user) --------------------
+# INSTALL_CONF resolves above (the 'all' block shares it)
 doctor_daemon_user() {
     if [ ! -f "$INSTALL_CONF" ]; then
         ui_error "doctor: $INSTALL_CONF not found -- is the kit installed?"
