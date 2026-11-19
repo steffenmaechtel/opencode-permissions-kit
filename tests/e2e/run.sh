@@ -236,7 +236,7 @@ check "2c: agent git can read the dev-owned repository (no dubious ownership)" \
 check "2c: git-heal pieces deployed by the install (heal script + four hooks, #671)" \
     E 'test -x /usr/local/lib/opencode-permissions-kit/git-heal/heal-index-head && test -x /usr/local/lib/opencode-permissions-kit/git-heal/hooks/post-merge && test -x /usr/local/lib/opencode-permissions-kit/git-heal/hooks/post-checkout && test -x /usr/local/lib/opencode-permissions-kit/git-heal/hooks/post-rewrite && test -x /usr/local/lib/opencode-permissions-kit/git-heal/hooks/post-index-change'
 check "2c: sudoers carries the heal grant (dev -> root -> exact script, #671)" \
-    E 'grep -q "^dev ALL=(root) NOPASSWD: /usr/local/lib/opencode-permissions-kit/git-heal/heal-index-head \*$" /etc/opencode-permissions-kit/sudoers'
+    E 'sudo grep -q "^dev ALL=(root) NOPASSWD: /usr/local/lib/opencode-permissions-kit/git-heal/heal-index-head \*$" /etc/sudoers.d/opencode-permissions-kit'
 check "2c: #671 — developer checkout flips index+HEAD dev-owned (lockout state)" \
     E 'cd /var/www/vhosts/perm-check && git checkout -q -b e2e-671-flip && test "$(stat -c %U .git/index)" = "dev" && test "$(stat -c %U .git/HEAD)" = "dev"'
 check_fail "2c: #671 — agent git add DIES on the dev-owned index (sticky .git)" \
