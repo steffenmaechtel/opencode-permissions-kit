@@ -162,6 +162,27 @@ check "guard hint names the user on the probe-failure refusal (#660)" \
 check_fail "helper has no numeric uid fallback left (#660)" \
     grep -qF 'id -u "$OPENCODE_USER" 2>/dev/null || echo 0' "$HELPER"
 
+# (#670 a M2) option-shaped conf user: GNU `id -u "-u"` parses the value
+# as a flag and prints the CALLER's uid — the guard self-passed for every
+# caller (host-verified in round a). The shape gate falls back to
+# 'opencode'; the stubbed id (named probes fail) then refuses. Pre-fix
+# the guard passed and the ddev stub was reached (rc 42).
+printf 'OPENCODE_USER=-u\n' >"$D7STUB/conf-opt"
+set +e
+OUT=$(OPK_INSTALL_CONF="$D7STUB/conf-opt" PATH="$D7STUB/bin:$PATH" sh "$HELPER" --version 2>&1)
+RC=$?
+set -e
+assert_eq "helper refuses an option-shaped conf user (#670 a M2)" "1" "$RC"
+check "option-shaped user: WARN names the charset-clean value (#670 a M2)" \
+    sh -c "printf '%s' \"\$1\" | grep -qF \"WARN: invalid OPENCODE_USER value in install.conf ('-u')\"" _ "$OUT"
+check "option-shaped user: guard hint names the fallback user (#670 a M2)" \
+    sh -c "printf '%s' \"\$1\" | grep -qF \"must run as user 'opencode'\"" _ "$OUT"
+if printf '%s' "$OUT" | grep -qF 'ddev stub reached'; then
+    fail "an option-shaped user must not reach the guard-passed path (#670 a M2)"
+else
+    pass "option-shaped user never reaches the guard-passed path (#670 a M2)"
+fi
+
 # --- 2. helper ddev-resolution / env / exec logic (static) ---------------------
 check_live "helper resolves the real ddev via PATH" "$HELPER" -q 'command -v ddev'
 check_live "helper falls back to /usr/local/bin/ddev" "$HELPER" -qF '/usr/local/bin/ddev'

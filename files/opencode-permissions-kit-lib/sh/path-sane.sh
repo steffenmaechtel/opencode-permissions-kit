@@ -116,6 +116,19 @@ project_path_sane() {
         *[[:space:]]*) return 1 ;;                         # storage format is line-based and
             # space-free (0.0.39b C3)
     esac
+    # Control characters or a backslash (#670 a L2, the doctor operand
+    # class): such a root clobbers every reader's verdict rows (raw
+    # conf-line bytes reach the terminal — status/config/update print
+    # $root unsanitized) and doctor refuses it for its own walks; the
+    # writer refusing closes the sanctioned registration route (a
+    # hand-edited conf stays the pre-existing display residual). The
+    # refusal message shows a sanitized copy (pr-00263 a F9 class).
+    if printf '%s' "$_pp" | LC_ALL=C grep -q "$(printf '[[:cntrl:]]')" ||
+        printf '%s' "$_pp" | LC_ALL=C grep -qF '\'; then
+        _pps="$(printf '%s' "$_pp" | tr -c 'A-Za-z0-9_./-' '?')"
+        echo "  refused: '$_pps' carries control characters or a backslash — not registrable as a project root" >&2
+        return 1
+    fi
     # A root ENTRY that is itself a symlink (issue #245): the form is
     # clean and the blocklist below never fires, but every consumer of
     # the conf would operate on the wrong object — chmod g-s and

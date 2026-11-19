@@ -28,7 +28,9 @@ asks before removing the kit block; your own entries always stay.
 - `ddev-browser-cmds.conf` is optional and user-created — the kit reads it
   but never writes or ships it
 - `projects.conf` paths must not contain spaces — the writer splits on
-  them and every consumer reads the file line-by-line. Lines starting
+  them and every consumer reads the file line-by-line. Control
+  characters and backslashes are refused by the writer (they clobber
+  the report rows that render conf lines). Lines starting
   with `#` are comments and are ignored by every reader (status counts,
   the doctor `all` scan roots, the config/update refresh passes — an
   annotated conf renders no verdict rows). Entries are

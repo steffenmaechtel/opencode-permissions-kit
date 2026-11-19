@@ -55,6 +55,16 @@ echo ""
 
 # --- 1. registry parser --------------------------------------------------------
 
+# _ddev_migrate_show backslash leg (#670 a M1): a LITERAL backslash
+# survives the printable-range scrub, and the kit's rows render through
+# echo — dash's variant interprets `\033`-style escapes, re-materializing
+# the raw ESC byte at display time. The display form collapses backslash
+# runs to '?' so no echo variant can re-open the escape surface.
+SHOW1=$(sh -c '. "$1" && _ddev_migrate_show "$2"' _ "$MIG" 'p\033[31mX')
+assert_eq "scrub collapses literal backslashes (#670 a M1)" 'p?033[31mX' "$SHOW1"
+SHOW2=$(sh -c '. "$1" && _ddev_migrate_show "$2"' _ "$MIG" "$(printf 'a\tb\233c')")
+assert_eq "scrub keeps the non-printable collapse (TAB/CSI)" 'a?b?c' "$SHOW2"
+
 mkdir -p "$WORK/devhome/.ddev"
 cat >"$WORK/devhome/.ddev/global_config.yaml" <<'YML'
 last_used_version: v1.24.1
@@ -1880,6 +1890,26 @@ if printf '%s' "$S2OUT" | grep -qF "$S2WANT"; then
     pass "registry export row shows the SCRUBBED name and approot (#660)"
 else
     fail "registry export row must scrub name and approot (#660, out=$S2OUT)"
+fi
+
+# (#670 a M1) the backslash twin: a LITERAL `\033` in a registry name —
+# printable-range-clean, so only the backslash collapse stops dash's
+# echo from re-materializing the ESC byte at render time (the missing
+# approot takes the DIRECTORY MISSING variant; the row text is the
+# same scrub surface).
+printf 'evil\\033[2Kname2:\n    approot: "%s/under/not-there"\n' "$S2ROOT" >>"$S2HOME/.ddev/project_list.yaml"
+S2RC=0
+S2OUT="$(DDEV_MIG_DEV_HOME="$S2HOME" "$BIN_MIG" registry someuser "$S2ROOT" 2>&1)" || S2RC=$?
+case "$S2OUT" in
+    *"$(printf '\033')"*)
+        fail "registry arm re-materializes an escape from a literal backslash (#670 a M1)"
+        ;;
+    *) pass "registry rows carry no re-materialized escape byte (#670 a M1)" ;;
+esac
+if printf '%s' "$S2OUT" | grep -qF 'evil?033[2Kname2'; then
+    pass "registry row shows the backslash-collapsed name (#670 a M1)"
+else
+    fail "registry row must collapse literal backslashes in names (#670 a M1, out=$S2OUT)"
 fi
 S2RC=0
 S2OUT="$(DDEV_MIG_DEV_HOME="$S2HOME" "$BIN_MIG" registry someuser 2>&1)" || S2RC=$?

@@ -1409,7 +1409,7 @@ _rd_rc=0
 _rd_out="$(OPK_INSTALL_CONF="$WORK/esc-user.conf" NO_COLOR=1 sh "$DOCTOR" "$PROJ" 2>&1)" || _rd_rc=$?
 if printf '%s' "$_rd_out" | grep -qF "WARN: invalid OPENCODE_USER value in install.conf ('bad?user')" &&
     printf '%s' "$_rd_out" | grep -qF "falling back to 'opencode'" &&
-    ! LC_ALL=C grep -q "$(printf '\033')" "$_rd_out"; then
+    ! printf '%s' "$_rd_out" | LC_ALL=C grep -q "$(printf '\033')"; then
     pass "shape-invalid OPENCODE_USER: sanitized WARN + fallback to 'opencode' (#660 M7)"
 else
     fail "shape-invalid OPENCODE_USER must warn sanitized and fall back (#660 M7, rc $_rd_rc)"

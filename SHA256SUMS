@@ -3,7 +3,7 @@ e8286582b4a2f62c91e4fd880bff9e5e01302096f2126253daa0f1808e4769b6  files/etc/umas
 d291ca3c41011944889903f979e2f2400f03c5b031f5bf66086aa705b3de8fd1  files/install.sh
 3052fa97c78c4074d6cffc083ab23df97a3b4668f9a31604835fef06675b5c64  files/opencode-permissions-kit-lib/bin/browser-bridge
 cc0600ce9007dd07229d2c9d0a2538ae17d7777f4586025169679a2410190f33  files/opencode-permissions-kit-lib/bin/cwd-check
-f8e2847962bdd4b2e8e66bf61a0c0a632df0b71c376856ff475ac8c24a1f564a  files/opencode-permissions-kit-lib/bin/ddev-as-opencode
+d74d7105d4e95b938323b1f378b46b5d8eaa8db7d3cbbe38322f1e258929b96a  files/opencode-permissions-kit-lib/bin/ddev-as-opencode
 c49b1ae4bafda33b445cb6fc80704ca94c2b26c121b6b5f6a9b5a04a10cab284  files/opencode-permissions-kit-lib/bin/ddev-migrate
 269c7c1db8ff3a1461c4d237c22c09276b8c5ed83c15528996894f64bc64f596  files/opencode-permissions-kit-lib/bin/opencode-as-opencode
 faf1193e92d7e4fc6755f00bb458ea0e4cd0c026e0b17218df03209796f4c112  files/opencode-permissions-kit-lib/bin/opk
@@ -18,10 +18,10 @@ fb9142f9a61917d33799885993b16db664ce6eefdd7bfc9b45bbd797e9b312c0  files/opencode
 c353a6ddf9b1e34bfcb70b9b41bce0fde53654e0b7045dd90f090e5fe4f9a1fc  files/opencode-permissions-kit-lib/py/jsonc-parser.py
 fe73733c1e47f72d4477d3dbcacacfbbee195aaca281f892d171871e4ff82e05  files/opencode-permissions-kit-lib/py/tui-register.py
 dcb8b17188cab386608f95f5e4b2fe3ae0a0cf87e624c4661be08074f32fa1e8  files/opencode-permissions-kit-lib/sh/advisories.sh
-cc2136a5b29da69e0c6097483a97c335a13012aeee92efe00595a77dfb4270ee  files/opencode-permissions-kit-lib/sh/as-opencode-core.sh
+6881c60c6033a5c95c4d4ca8e983b28f18bc5c9c92648e390835430e7c4ad6c9  files/opencode-permissions-kit-lib/sh/as-opencode-core.sh
 e0dfb3838beed80f82674bcdb6e0e9fd54e7e68a7fed447a02f11c83b943b16d  files/opencode-permissions-kit-lib/sh/ddev-handover.sh
 2b6e687d11d2b3b623799eef7a67c4a6356e4ac692649b5782cb18da947ba3c9  files/opencode-permissions-kit-lib/sh/ddev-hosts.sh
-f4fced7393cba03477d2b710cd53049364c425b90db43c2a363d99ab21256ea3  files/opencode-permissions-kit-lib/sh/ddev-migrate.sh
+b46ff01a242272adc09abb83b12f7c7982d836212cbbac5d3cce05965302ba78  files/opencode-permissions-kit-lib/sh/ddev-migrate.sh
 34a6a6b1bf19af571ba33dc8878f4e6e78e2efe3dc0e14d23e95ebed9834608d  files/opencode-permissions-kit-lib/sh/ddev-terminal.sh
 b80b674296f3a66bbf208b249447bb0aeb7c8dc524708d33e387f2471669b969  files/opencode-permissions-kit-lib/sh/deploy-lib.sh
 63bf1eba342539befa39c6cfeba9daa223c457ec327ed86406b9aa2789d5ac02  files/opencode-permissions-kit-lib/sh/doctor-core.sh
@@ -31,7 +31,7 @@ ecf7681c0cf08adf9451810f8be0f8b48c3d38b350afedcc6231cc1b792d2fc3  files/opencode
 da1635f7539e7a81bfbb4e1df9d7423dadc3f53cd683ae16983e1242d9d6c960  files/opencode-permissions-kit-lib/sh/install-core.sh
 575266d6e05f87e5b5444464538ab3c222931bf5d5753d44695308aac067c3bf  files/opencode-permissions-kit-lib/sh/log.sh
 590d0a5899e7a902c3c4a1e4cf3254dfef7d4fc63cfc6f530cb6002630a8eee2  files/opencode-permissions-kit-lib/sh/openchamber-core.sh
-f584ab754df8a491dab02cd3ec60e1ffece05a07f8aaf9498213f308fab665e4  files/opencode-permissions-kit-lib/sh/path-sane.sh
+f7ebc8696c500cdccd08cd17bef525453d77760ef1f2c363d5dba055480478ac  files/opencode-permissions-kit-lib/sh/path-sane.sh
 b2b21462d2352dfb1def2676c4d4946b17bf76b6957980876b9286d95a18a967  files/opencode-permissions-kit-lib/sh/render-agent-config.sh
 c555d74f4799dd63dbe6e4ea92086df68a5df83691d337a89ab59cfffe9ca123  files/opencode-permissions-kit-lib/sh/secure-binary.sh
 ab6f9f1e32ed3dfffa7280764a3fd006823295b0e49cc09a13f0ca9347778a8a  files/opencode-permissions-kit-lib/sh/shell-warn.sh

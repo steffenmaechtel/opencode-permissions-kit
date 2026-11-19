@@ -1047,6 +1047,48 @@ else
     pass "no numeric uid fallback remains in the wrapper lib (#660)"
 fi
 
+# --- #670 a L3: the podman-CLI arm degrades on a missing user too ----------------
+# Daemonless path (no socket to probe) — the uid probe is the only
+# half-uninstall signal; podman is a FUNCTION so command -v finds it
+# without a host binary.
+_m4_run_cli() { # <id-exit-rc: 0=user exists, 1=missing>
+    (
+        . "$CORE_LIB"
+        HEADLESS=false
+        RED='' GREEN='' CYAN='' YELLOW='' NC=''
+        CONTAINER_REQUESTED=true
+        CONTAINER_BACKEND=podman-rootless
+        unset OPENCODE_PODMAN_SOCKET
+        _w=""
+        note() {
+            if [ -n "$1" ]; then
+                if [ -n "$_w" ]; then _w="$_w
+$1"; else _w="$1"; fi
+            fi
+        }
+        sock_reachable() { return 0; }
+        podman() { :; }
+        if [ "$1" = 0 ]; then id() { echo 4242; }; else id() { return 1; }; fi
+        wrapper_container_resolve
+        printf 'PODMAN=[%s] REQ=[%s] WARN=[%s]' "$CONTAINER_PODMAN" "$CONTAINER_REQUESTED" "$_w"
+    )
+}
+_m4e=$(_m4_run_cli 0)
+if [ "$_m4e" = "PODMAN=[true] REQ=[true] WARN=[]" ]; then
+    pass "podman-CLI path resolves with container tools when the user exists (#670 a L3)"
+else
+    fail "podman-CLI path must resolve with a present user (#670 a L3, got $_m4e)"
+fi
+_m4f=$(_m4_run_cli 1)
+case "$_m4f" in
+    'PODMAN=[] REQ=[false] WARN=[WARNING: the opencode user is missing'*)
+        pass "podman-CLI path degrades loudly on a missing user (#670 a L3)"
+        ;;
+    *)
+        fail "podman-CLI path must degrade on a missing user (#670 a L3, got $_m4f)"
+        ;;
+esac
+
 # functional: source the lib's detection section, stub the probe + note,
 # run the REAL parser (sourcing pin since #449, #396 accounting — same
 # technique as HL/sc_serve: later definitions override the lib's)
@@ -1335,6 +1377,34 @@ if [ "$_b220_init_n" -eq 3 ]; then
     pass "#220: ADV_LINE/ADV_VERSION/ADV_HITS inits precede the advisories gate"
 else
     fail "#220: init(s) missing or behind the gate (got $_b220_init_n/3, gate:$_b220_gate_ln)"
+fi
+
+# --- #670 a L1: the refusal list skips '#'-lines ---------------------------------
+# The wrapper's "Valid project directories:" screen printed comment lines
+# as suggestions and counted them toward the 10-row cap — contradicting
+# files.md's every-reader claim. Sourcing pin: refusal state forced, a
+# comment + one real root in the conf, exit captured in the subshell.
+mkdir -p "$TMPDIR/l1proj"
+{
+    printf '%s\n' '# ops annotation'
+    printf '%s\n' "$TMPDIR/l1proj"
+} >"$TMPDIR/l1-conf"
+_l1_out="$(
+    (
+        . "$CORE_LIB"
+        HEADLESS=false
+        RED='' YELLOW='' NC=''
+        CWD=/nowhere-valid
+        VALID=false
+        PROJECTS_CONF="$TMPDIR/l1-conf"
+        wrapper_refusal
+    ) 2>&1
+)" || true
+if printf '%s' "$_l1_out" | grep -qF -- "- $TMPDIR/l1proj" &&
+    ! printf '%s' "$_l1_out" | grep -qF '# ops annotation'; then
+    pass "refusal list: comment lines are not suggested project directories (#670 a L1)"
+else
+    fail "the refusal list must skip '#'-lines (#670 a L1, out=$_l1_out)"
 fi
 
 suite_done "wrapper tests"

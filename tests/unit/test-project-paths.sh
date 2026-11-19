@@ -453,6 +453,40 @@ else
     pass "rejects paths containing tabs/spaces anywhere"
 fi
 
+# --- #670 a L2: control bytes and backslashes are refused at the writer ----------
+# Such roots clobber every reader's verdict rows (status/config/update
+# print $root unsanitized) and doctor refuses them for its own walks —
+# the writer closes the sanctioned registration route. The refusal
+# message itself carries a sanitized copy.
+_ps_l2_out="$(project_path_sane "/var/www/vhosts/evil$(printf '\033')proj" 2>&1 || true)"
+if project_path_sane "/var/www/vhosts/evil$(printf '\033')proj" 2>/dev/null; then
+    fail "rejects control-byte paths (#670 a L2)"
+else
+    pass "rejects control-byte paths (#670 a L2)"
+fi
+case "$_ps_l2_out" in
+    *"$(printf '\033')"*)
+        fail "the refusal message leaks the raw control byte (#670 a L2)"
+        ;;
+    *) pass "refusal message shows the sanitized spelling (#670 a L2)" ;;
+esac
+if printf '%s' "$_ps_l2_out" | grep -qF "evil?proj"; then
+    pass "refusal names the sanitized path form (#670 a L2)"
+else
+    fail "refusal must name the sanitized path form (#670 a L2, out=$_ps_l2_out)"
+fi
+if project_path_sane '/var/www/vhosts/back\slash'; then
+    fail "rejects backslash paths (#670 a L2)"
+else
+    pass "rejects backslash paths (#670 a L2)"
+fi
+# clean UTF-8 stays registrable (the gate is cntrl/backslash, not non-ASCII)
+if project_path_sane "/var/www/vhosts/$(printf '\303\234')mlaut"; then
+    pass "clean UTF-8 paths stay registrable (#670 a L2)"
+else
+    fail "the cntrl gate must not reject clean UTF-8 (#670 a L2)"
+fi
+
 # Trailing-/. and empty-segment forms (0.0.45c S1): a trailing "/." matched
 # none of the old interior-dot arms and — with no /var/*, /home/* catch-all
 # in the blocklist — put the ROOT-SIDE recursive group baseline over /,
