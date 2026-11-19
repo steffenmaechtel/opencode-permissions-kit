@@ -114,6 +114,13 @@ wrapper_validate_cwd() {
             [ -z "$root" ] && continue
             [ ! -d "$root" ] && continue
             root_clean="${root%/}"
+            # A bare "/" strips to empty, and an empty prefix would
+            # match EVERY absolute cwd — the membership guard would
+            # fail open (#674 c E1, the D1 class's one open variant:
+            # the sanctioned writer refuses "/", a hand-edited line
+            # must not void the guard). Skip it: fail closed, like
+            # the loop's other invalid-entry skips.
+            [ -n "$root_clean" ] || continue
             if [ "$CWD" = "$root_clean" ] || [ "${CWD#"$root_clean"/}" != "$CWD" ]; then
                 VALID=true
                 break

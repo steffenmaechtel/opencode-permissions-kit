@@ -713,6 +713,25 @@ if [ -n "$_ahome" ]; then
         fail "core: on agent-home gate (rc=$_hr_rc out=$(printf '%s' "$_out" | grep 'skip (conf)' | head -2))"
     fi
 fi
+
+# The core's `/` -> rc-3 mapping (#674 c E2): the skip line names the
+# system-path reason, never the generic form message.
+printf '%s\n' "/" >"$WORK/on-projects.conf"
+: >"$LOG"
+_hr_rc=0
+_out=$(
+    _core_run 'SD_SUDO="" SD_VISUDO="$WORK/visudo" SD_CONF_DIR="$WORK/etc" \
+        SD_SUDOERS_D="$WORK/sdd" GH_PROJECTS_CONF="$WORK/on-projects.conf" \
+        GH_CONF_RELAX= HOME="$WORK/devhome" _git_heal_on'
+) || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] &&
+    printf '%s' "$_out" | grep -qF 'skip (conf): system path is never a project root: /' &&
+    ! printf '%s' "$_out" | grep -qF 'not an absolute root, or malformed' &&
+    [ "$(grep -c 'gitdir=' "$LOG" 2>/dev/null || true)" = 0 ]; then
+    pass "core: on maps the bare / line to the system-path reason (rc 3)"
+else
+    fail "core: on slash mapping (rc=$_hr_rc out=$(printf '%s' "$_out" | grep 'skip (conf)' | head -2))"
+fi
 printf '%s\n' "$WORK/zone/onroot" "# comment tolerated" >"$WORK/on-projects.conf"
 
 # `on` pieces gate: an incomplete lib refuses before touching anything.
@@ -784,6 +803,10 @@ mkdir -p "$WORK/zone/scan/nested/repo"
 git -C "$WORK/zone/scan/nested/repo" init -q -b main
 git -C "$WORK/zone/scan/nested/repo" -c user.email=t@e -c user.name=t \
     commit -q --allow-empty -m x
+# An unreadable empty subtree under the scan root (#674 c E4): find
+# hits EACCES there (rc 1) while the readable repo still enumerates.
+mkdir "$WORK/zone/scan/locked"
+chmod 000 "$WORK/zone/scan/locked"
 printf '%s\n' "$WORK/zone/scan" >"$CONF"
 printf 'DEFAULT_USER=%s\nOPENCODE_USER=ghs-render-agent\n' "$(id -un)" \
     >"$WORK/install-render.conf"
@@ -802,6 +825,13 @@ if printf '%s' "$_out" | grep -qF "lockout risk: $WORK/zone/scan/nested/repo/.gi
     pass "status renderer: nested repo under a scan root shows its lockout risk"
 else
     fail "status renderer: recursive lockout row missing (out=$(printf '%s' "$_out" | grep lockout | head -2))"
+fi
+# The find partial-failure notice rides the same output (#674 c E4):
+# one honesty line for the unreadable subtree, rows still rendered.
+if printf '%s' "$_out" | grep -qF 'lockout rows may be incomplete under'; then
+    pass "status renderer: unreadable subtree renders the incompleteness notice"
+else
+    fail "status renderer: find-notice arm (out=$(printf '%s' "$_out" | grep -i incomplete | head -2))"
 fi
 
 # ON: the same dev-owned operands render transient (the next developer
@@ -826,6 +856,8 @@ if printf '%s' "$_out" | grep -qF 'git-heal: lockout rows unavailable (mktemp fa
 else
     fail "status renderer: mktemp arm (out=$(printf '%s' "$_out" | head -3))"
 fi
+chmod 700 "$WORK/zone/scan/locked"
+rmdir "$WORK/zone/scan/locked"
 rm -f "${WORK:?}/devhome/.gitconfig"
 
 suite_done "git heal hooks (heal script + hook matrix + core)"

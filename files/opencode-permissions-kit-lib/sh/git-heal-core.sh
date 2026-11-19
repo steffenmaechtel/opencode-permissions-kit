@@ -165,7 +165,10 @@ _ghc_heal_once() {
 # (files.md contract — every consumer that runs root operations over
 # the roots re-validates each line; the uninstall-core reader mirror,
 # #674 a A1). rc 0: usable root, trailing-slash-stripped form in
-# _ghc_root_norm; rc 1: refused (the caller prints the skip line).
+# _ghc_root_norm. rc 1: refused, form (non-absolute, dot/empty
+# segment, whitespace); rc 2: refused, agent home; rc 3: refused,
+# system path (incl. the bare "/" that strips to empty, #674 b D1) —
+# the caller maps each rc to its skip line.
 # The system-path and agent-home arms sit behind GH_CONF_RELAX (unit
 # scratch zones live under /tmp); the form arms never relax.
 _ghc_root_ok() {
@@ -379,8 +382,12 @@ _git_heal_status() {
     while IFS= read -r _ghc_stt_root; do
         case "$_ghc_stt_root" in '' | '#'*) continue ;; esac
         [ -d "$_ghc_stt_root" ] || continue
+        # Loud on partial failure (#674 c E4): an unreadable subtree
+        # silently loses its lockout rows otherwise — one notice per
+        # affected root keeps the section honest (find rc 1 = errors
+        # encountered, output still collected).
         find "$_ghc_stt_root" -type d -name .git >>"$_ghc_stt_list" 2>/dev/null ||
-            true
+            ui_detail "git-heal: lockout rows may be incomplete under $_ghc_stt_root (unreadable)"
     done <"$_ghc_stt_conf"
     while IFS= read -r _ghc_stt_gd; do
         [ -n "$_ghc_stt_gd" ] || continue

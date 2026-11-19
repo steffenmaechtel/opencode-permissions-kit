@@ -466,8 +466,11 @@ status_section_git_heal() {
     while IFS= read -r _st_gh_root; do
         case "$_st_gh_root" in '' | '#'*) continue ;; esac
         [ -d "$_st_gh_root" ] || continue
+        # Loud on partial failure (#674 c E4): an unreadable subtree
+        # silently loses its lockout rows otherwise — one notice per
+        # affected root keeps the section honest.
         find "$_st_gh_root" -type d -name .git >>"$_st_gh_list" 2>/dev/null ||
-            true
+            ui_detail "git-heal: lockout rows may be incomplete under $_st_gh_root (unreadable)"
     done <"$PROJECTS_CONF"
     while IFS= read -r _st_gh_gd; do
         [ -n "$_st_gh_gd" ] || continue

@@ -210,6 +210,23 @@ if printf '%s' "$_out" | grep -qF 'lockout rows unavailable (mktemp failed)' &&
 else
     fail "git-heal section: mktemp arm (out=$(printf '%s' "$_out" | head -3))"
 fi
+
+# The find partial-failure notice for the status-core twin (#674 c
+# E4): an unreadable subtree under the conf root renders one honesty
+# line while the readable repo's row still renders.
+mkdir -p "$WORK/ghs/scan/locked"
+chmod 000 "$WORK/ghs/scan/locked"
+printf '%s\n' "$WORK/ghs/scan" >"$WORK/ghs/projects.conf"
+_out=$(_ghs_run || true)
+if printf '%s' "$_out" | grep -qF 'lockout rows may be incomplete under' &&
+    printf '%s' "$_out" | grep -q "lockout.*$WORK/ghs/scan/deep/repo/.git/index"; then
+    pass "git-heal section: unreadable subtree renders the notice, rows still render"
+else
+    fail "git-heal section: find-notice arm (out=$(printf '%s' "$_out" | grep -iE 'incomplete|lockout' | head -2))"
+fi
+chmod 700 "$WORK/ghs/scan/locked"
+rmdir "$WORK/ghs/scan/locked"
+printf '%s\n' "$WORK/ghs/root" >"$WORK/ghs/projects.conf"
 git config -f "$WORK/ghs/devhome/.gitconfig" core.hooksPath "$WORK/ghs/lib/git-heal/hooks"
 _out=$(_ghs_run || true)
 if printf '%s' "$_out" | grep -q 'git-heal.*ON — developer git ops re-pin' &&
