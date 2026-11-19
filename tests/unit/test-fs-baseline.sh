@@ -233,7 +233,101 @@ else
     fail "heal: the C5 refusal names the cause"
 fi
 
-rm -rf "$HG" "$HGS" "$HGF" "$HGFSTUB" "$HG4" "$HG5"
+# --- 1c. fix-wave-b arms (#655 b) ------------------------------------------------
+# C1 ancestor chain: a .git at depth 2 stickies BOTH intermediate dirs.
+HG6="$WORK/healdepth2"
+mkdir -p "$HG6/proj/grp/site/.git/hooks"
+printf 'c\n' >"$HG6/proj/grp/site/.git/config"
+FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$HG6/proj" "$HGGRP" >/dev/null 2>&1
+assert_eq "heal: depth-2 ancestor dir sticky (b C1)" "3775" \
+    "$(stat -c %a "$HG6/proj/grp")"
+assert_eq "heal: depth-2 .git parent sticky (b C1)" "3775" \
+    "$(stat -c %a "$HG6/proj/grp/site")"
+assert_eq "heal: depth-2 .git healed like any other" "644" \
+    "$(stat -c %a "$HG6/proj/grp/site/.git/config")"
+
+# C2: a symlinked .git is never followed, always surfaced.
+HG7="$WORK/heallnk"
+mkdir -p "$HG7/proj/repoA" "$HG7/outside"
+ln -s "$HG7/outside" "$HG7/proj/repoA/.git"
+HG7OUT="$(FS_SUDO="" sh -c '. "$1" && _FSB_ERRORS=0 && fs_baseline_root "$2" "$3"' \
+    _ "$LIB" "$HG7/proj" "$HGGRP" 2>&1)"
+HG7RC=$?
+assert_eq "heal: symlinked .git warns without failing the baseline (b C2)" "0" "$HG7RC"
+if printf '%s\n' "$HG7OUT" | grep -qF 'symlinked .git not followed'; then
+    pass "heal: the symlinked-.git warn names the entry (b C2)"
+else
+    fail "heal: the symlinked-.git warn names the entry (b C2)"
+fi
+
+# C3: a symlinked modules container is surfaced, never followed.
+mkdir -p "$HG7/proj/realgit/.git" "$HG7/proj/realgit/.git/hooks" "$HG7/modtarget"
+printf 'c\n' >"$HG7/proj/realgit/.git/config"
+ln -s "$HG7/modtarget" "$HG7/proj/realgit/.git/modules"
+HG7BOUT="$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' \
+    _ "$LIB" "$HG7/proj/realgit" "$HGGRP" 2>&1)"
+if printf '%s\n' "$HG7BOUT" | grep -qF 'symlinked modules dir not followed'; then
+    pass "heal: the symlinked-modules warn fires (b C3)"
+else
+    fail "heal: the symlinked-modules warn fires (b C3)"
+fi
+
+# C4: submodule worktree registration pointers are pinned like the top
+# gitdir's (helper extraction).
+mkdir -p "$HG/proj/.git/modules/sub/worktrees/wt2"
+printf '..\n' >"$HG/proj/.git/modules/sub/worktrees/wt2/commondir"
+printf '..\n' >"$HG/proj/.git/modules/sub/worktrees/wt2/gitdir"
+FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$HG/proj" "$HGGRP" >/dev/null 2>&1
+assert_eq "heal: submodule worktree commondir pinned (b C4)" "644" \
+    "$(stat -c %a "$HG/proj/.git/modules/sub/worktrees/wt2/commondir")"
+assert_eq "heal: submodule worktree gitdir pinned (b C4)" "644" \
+    "$(stat -c %a "$HG/proj/.git/modules/sub/worktrees/wt2/gitdir")"
+
+# S2/C7: a `/` root is refused — driver and belt both.
+HG8OUT="$(FS_SUDO="" sh -c '. "$1" && _FSB_ERRORS=0 && _fsb_heal_git / "$2" && echo "ERRS=$_FSB_ERRORS"' \
+    _ "$LIB" "$HGGRP" 2>&1)"
+if printf '%s\n' "$HG8OUT" | grep -qF 'never a heal root'; then
+    pass "heal: the $(/) root is refused loud by the driver (b S2)"
+else
+    fail "heal: the $(/) root is refused loud by the driver (b S2) — got: $HG8OUT"
+fi
+HG8BRC=0
+FS_SUDO="" sh -c '. "$1" && fs_baseline_root / "$2"' _ "$LIB" "$HGGRP" >/dev/null 2>&1 ||
+    HG8BRC=$?
+assert_eq "belt: the $(/) root is refused before any pass runs (b S2/C7)" "1" "$HG8BRC"
+
+# S1: the wc-guard degradation — a restricted PATH without wc over a
+# tree WITH a non-sample hook must stay rc 0, warn nothing, not abort.
+HG9="$WORK/healnowc"
+HG9BIN="$WORK/healnowc-bin"
+mkdir -p "$HG9/proj/.git/hooks" "$HG9BIN"
+printf 'c\n' >"$HG9/proj/.git/config"
+printf '#!/bin/sh\n' >"$HG9/proj/.git/hooks/planted-x"
+chmod 755 "$HG9/proj/.git/hooks/planted-x"
+for _t in sh find cat chgrp chmod setfacl chown mktemp dirname stat rm xargs; do
+    ln -s "$(command -v "$_t")" "$HG9BIN/$_t"
+done
+HG9RC=0
+HG9OUT="$(FS_SUDO="" PATH="$HG9BIN" \
+    sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$HG9/proj" "$HGGRP" 2>&1)" ||
+    HG9RC=$?
+assert_eq "heal: missing wc degrades to no-warn, no abort (rc 0, b S1)" "0" "$HG9RC"
+if printf '%s\n' "$HG9OUT" | grep -qF 'non-sample entries'; then
+    fail "heal: missing wc must not emit the warn (b S1)"
+else
+    pass "heal: missing wc must not emit the warn (b S1)"
+fi
+
+# S6: the ==0 control arm — a samples-only hooks dir stays silent
+# (HG4 carries only pre-commit.sample; capture the driver output).
+HG4OUT="$(FS_SUDO="" sh -c '. "$1" && _fsb_heal_git "$2/" "$3"' _ "$LIB" "$HG4/proj2" "$HGGRP" 2>&1)"
+if printf '%s\n' "$HG4OUT" | grep -qF 'non-sample entries'; then
+    fail "heal: samples-only hooks dir stays warn-silent (b S6)"
+else
+    pass "heal: samples-only hooks dir stays warn-silent (b S6)"
+fi
+
+rm -rf "$HG" "$HGS" "$HGF" "$HGFSTUB" "$HG4" "$HG5" "$HG6" "$HG7" "$HG8" "$HG9" "$HG9BIN"
 
 # A symlinked operand never gets pinned (the follow would write through
 # the link — the L5 class): a config swapped for a link is skipped with

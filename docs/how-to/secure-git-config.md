@@ -9,13 +9,14 @@ see the [security model](../concepts/security-model.md)).
 
 **What the toggle does not touch:** git itself. Plain commits, plain
 pushes and branch operations only *read* `.git/config` — but the
-exceptions are real and documented: a first `git push -u`, a
-`git branch --set-upstream-to`, repo-scope `git config` and
-`git submodule add` all *write* it, and under the `.git` heal (issue
-[#644](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/644))
-those writes fail with `Operation not permitted` while the operation's
-core work (the transfer, the commit) completes. Agents push without
-`-u`; the full cost list lives in the
+exceptions are real and documented: a first `git push -u` and
+`git branch --set-upstream-to` fail at their *tracking write* while the
+push transfer itself completes; repo-scope `git config` fails outright
+(the write IS the operation); `git submodule add` dies at the clone
+stage (the `modules` container accepts no agent writes). All of these
+fail with `Operation not permitted` under the `.git` heal (issue
+[#644](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/644)).
+Agents push without `-u`; the full cost list lives in the
 [security model](../concepts/security-model.md).
 
 ## Switch it on or off

@@ -115,10 +115,13 @@ expect the reported paths to exist locally.
 - The security model is deliberately **soft-only** — never re-introduce
   OS-level deny ACLs. Background: `internal/records/ddev-working.md`,
   current model: `docs/concepts/security-model.md`. Sanctioned exception
-  (#651, PR #655): the `.git` heal — sticky bit + developer-ownership
-  narrowing on `.git` metadata that the group baseline would otherwise
-  leave agent-writable (`fs-baseline.sh`); no deny ACLs involved, ddev
-  never touches the narrowed entries. (RM-0103)
+  (#651, PR #655): the `.git` heal — sticky bits (on `.git`, its
+  metadata containers, the project root and every `.git` ancestor
+  directory) plus developer-ownership narrowing on `.git` metadata that
+  the group baseline would otherwise leave agent-writable
+  (`fs-baseline.sh`); no deny ACLs involved, and the stickied
+  directories keep their sharing modes (sticky gates only rename/unlink
+  of foreign entries). (RM-0103)
 - **The kit never edits user-owned system config on its own — above all
   `/etc/wsl.conf`.** Install/update only *show* snippets or name opt-in
   commands the user runs themselves; `opk wsl-add-opencode-1-fix` is the

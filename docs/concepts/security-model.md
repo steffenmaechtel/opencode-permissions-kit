@@ -55,12 +55,14 @@ agent must be able to commit), but every baseline run *re-narrows the
 execution-bearing metadata* OS-side, because the developer's git executes
 from agent-writable surfaces there:
 
-- The **project root** gets the sticky bit (the wholesale arm —
-  `mv .git .git.old && mkdir .git` — dies on it), `.git` gets the sticky
-  bit, and `.git/config` and `.git/hooks` (and the `modules` containers
-  with their gitdirs, and the worktree `commondir`/`gitdir` pointer
-  files) are pinned **developer-owned, no group write, no extended
-  ACLs**.
+- The **project root**, every **ancestor directory of each `.git`**
+  (root-exclusive down to its parent — scan roots like
+  `/var/www/vhosts` are not every repo's parent, so the bit rides the
+  whole chain), and `.git` itself get the sticky bit; `.git/config` and
+  `.git/hooks` (and the `modules` containers with their gitdirs, and
+  the worktree `commondir`/`gitdir` pointer files — top gitdir and
+  submodule gitdirs alike) are pinned **developer-owned, no group
+  write, no extended ACLs**.
 - Why that works: the sticky bit sits on the PARENT of whatever must
   not be replaced — renaming or unlinking an entry needs write on its
   parent directory, and a developer-owned entry in a sticky parent is
@@ -75,13 +77,20 @@ from agent-writable surfaces there:
   out of the pure soft model, scoped to `.git` internals (and the
   project root's sticky bit) that ddev never touches. Workflow costs
   accepted with it: repo-scope `git config` and `git submodule add`
-  fail for the agent (both write `.git/config`) — including the
-  tracking write of a first `git push -u`, so agents push without `-u`
-  (`git push origin <branch>`; the transfer itself completes —
-  field-reported 2026-11-18, recorded in issue #644); the agent cannot
-  rename or delete developer-owned *top-level* entries (project-root
-  sticky — content edits and subdirectory renames are unaffected);
-  agent-side `git gc` can hit the sticky bit on `packed-refs`.
+  fail for the agent (`submodule add` dies at the clone stage — the
+  `modules` container accepts no agent writes; for `git config` the
+  write IS the operation); a first `git push -u` and
+  `git branch --set-upstream-to` fail at their tracking write while the
+  push transfer itself completes (field-reported 2026-11-18, recorded
+  in issue #644) — so agents push without `-u`
+  (`git push origin <branch>`); the agent cannot rename or delete
+  developer-owned entries in the project root and every `.git`
+  ancestor directory (sticky — content edits and renames in ordinary,
+  non-sticky subdirectories are unaffected); agent-side `git gc` can
+  hit the sticky bit on `packed-refs`; and a repo the agent cloned
+  INTO a developer-owned project tree is healed to the root's owner —
+  the agent loses repo-config writes in its own nested clone (work in
+  the main checkout or an agent-owned root instead).
 - What it does **not** close: the `.git` pointer *file* inside
   agent-created worktree trees (delete+recreate sidesteps a pin — work in
   the protected main checkout, not in agent worktrees), agent-owned
@@ -91,10 +100,12 @@ from agent-writable surfaces there:
   and removal stay human decisions). The full post-heal residual
   inventory lands with issue #652 once the heal is piloted.
 - The heal survives `opk uninstall` where it matters: the revert walks
-  never touch the sticky bit or the **uid** of pinned entries (their
-  *group* is reverted to the developer's login group by the gid-matched
-  chown pass — protection unaffected either way: no group write in
-  either group), and a healed `.git` keeps protecting the solo
+  never touch the sticky bit or the **uid** of developer-owned pinned
+  entries (their *group* is reverted to the developer's login group by
+  the gid-matched chown pass — protection unaffected either way: no
+  group write in either group). On an agent-owned healed root the uid
+  arm of the same walk flips the pinned entries to the developer — the
+  desirable direction there. A healed `.git` keeps protecting the solo
   developer.
 
 ## Download integrity (SHA256SUMS)
