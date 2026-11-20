@@ -8,12 +8,12 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**189 metas · 186 active · 3 retired · 6 review-pending · next due 2026-11-17**
+**189 metas · 186 active · 3 retired · 0 review-pending · next due 2026-11-17**
 
 ## Actionable
 
 - **Review pending:** none
-- **Amended — pending:** RM-0044 (2026-11-18), RM-0113 (2026-11-18), RM-0141 (2026-11-18), RM-0175 (2026-11-18), RM-0154 (2026-11-19), RM-0150 (2026-11-20)
+- **Amended — pending:** none
 
 ## AGENTS.md
 
@@ -80,7 +80,7 @@
 | [RM-0147](0/1/4/RM-0147.md) | Call sites consume the rc | active | approved | 1m | 2026-12-15 |
 | [RM-0148](0/1/4/RM-0148.md) | The death arm is EXECUTED | active | approved | 1m | 2026-12-15 |
 | [RM-0149](0/1/4/RM-0149.md) | The empty-scan-set leg fails | active | approved | 1m | 2026-12-15 |
-| [RM-0150](0/1/5/RM-0150.md) | Detector rc semantics are per-tool | active | **amended — pending** | 1m | 2026-12-15 |
+| [RM-0150](0/1/5/RM-0150.md) | Detector rc semantics are per-tool | active | approved | 1m | 2026-12-20 |
 | [RM-0181](0/1/8/RM-0181.md) | The channel is a property | active | approved | 1m | 2026-12-20 |
 | [RM-0187](0/1/8/RM-0187.md) | An absence assertion over captured | active | approved | 1m | 2026-12-20 |
 
@@ -101,7 +101,7 @@
 | [RM-0017](0/0/1/RM-0017.md) | Code extracted from shipped scripts and eval'd… | active | approved | 6m | 2027-05-17 |
 | [RM-0042](0/0/4/RM-0042.md) | Mutation check — a mutating verb | active | approved | 1m | 2026-11-17 |
 | [RM-0043](0/0/4/RM-0043.md) | Real-tree ratchet — any path-shaped | active | approved | 1m | 2026-11-17 |
-| [RM-0044](0/0/4/RM-0044.md) | rm suffix guard — any rm invocation | active | **amended — pending** | 1m | 2026-11-17 |
+| [RM-0044](0/0/4/RM-0044.md) | rm suffix guard — any rm invocation | active | approved | 1m | 2026-12-20 |
 | [RM-0137](0/1/3/RM-0137.md) | Scratch receivers in harness-sourcing suites… | active | approved | 1m | 2026-12-06 |
 | [RM-0151](0/1/5/RM-0151.md) | The decision rule for writing NEW | active | approved | 1m | 2026-12-15 |
 | [RM-0173](0/1/7/RM-0173.md) | A harness env override consumed | active | approved | 1m | 2026-12-17 |
@@ -160,7 +160,7 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0141](0/1/4/RM-0141.md) | New rule bullets in audit-scope | active | **amended — pending** | 1m | 2026-12-15 |
+| [RM-0141](0/1/4/RM-0141.md) | New rule bullets in audit-scope | active | approved | 1m | 2026-12-20 |
 | [RM-0142](0/1/4/RM-0142.md) | Run the rules-meta suite while | active | approved | 1m | 2026-12-15 |
 | [RM-0143](0/1/4/RM-0143.md) | New text cites its source | active | approved | 1m | 2026-12-15 |
 | [RM-0144](0/1/4/RM-0144.md) | learnings.md additions carry era-marked | active | approved | 1m | 2026-12-15 |
@@ -190,7 +190,7 @@
 | [RM-0122](0/1/2/RM-0122.md) | Scope brake (binding in | active | approved | 1m | 2026-11-28 |
 | [RM-0123](0/1/2/RM-0123.md) | Scope budget (autonomous commissions): the | active | approved | 1m | 2026-11-28 |
 | [RM-0138](0/1/3/RM-0138.md) | A fix-wave re-review is itself | active | approved | 1m | 2026-12-07 |
-| [RM-0175](0/1/7/RM-0175.md) | The posted.log entry is | active | **amended — pending** | 1m | 2026-12-17 |
+| [RM-0175](0/1/7/RM-0175.md) | The posted.log entry is | active | approved | 1m | 2026-12-20 |
 
 ### The loop and the stop rule
 
@@ -253,7 +253,7 @@
 | [RM-0128](0/1/2/RM-0128.md) | One comment per review | active | approved | 1m | 2026-11-28 |
 | [RM-0129](0/1/2/RM-0129.md) | Size guard: GitHub caps | active | approved | 1m | 2026-11-28 |
 | [RM-0153](0/1/5/RM-0153.md) | PR-body edits for wave-authored | active | approved | 1m | 2026-12-15 |
-| [RM-0154](0/1/5/RM-0154.md) | The CI status fields assert | active | **amended — pending** | 1m | 2026-12-15 |
+| [RM-0154](0/1/5/RM-0154.md) | The CI status fields assert | active | approved | 1m | 2026-12-20 |
 | [RM-0158](0/1/5/RM-0158.md) | names its observation scope | active | approved | 1m | 2026-12-16 |
 | [RM-0166](0/1/6/RM-0166.md) | The closing summary's marker carries | active | approved | 1m | 2026-12-17 |
 | [RM-0170](0/1/7/RM-0170.md) | Mechanical fields derive from the | active | approved | 1m | 2026-12-17 |
@@ -298,7 +298,7 @@
 | [RM-0077](0/0/7/RM-0077.md) | Root-script behavior changes owe | active | approved | 1m | 2026-11-19 |
 | [RM-0078](0/0/7/RM-0078.md) | Record the environment in | active | approved | 1m | 2026-12-17 |
 | [RM-0079](0/0/7/RM-0079.md) | A disposition claim | active | approved | 1m | 2026-11-19 |
-| [RM-0113](0/1/1/RM-0113.md) | The debt's due date splits | active | **amended — pending** | 1m | 2026-11-22 |
+| [RM-0113](0/1/1/RM-0113.md) | The debt's due date splits | active | approved | 1m | 2026-12-20 |
 
 ### Review focus: shipped code first, pins at a floor
 
