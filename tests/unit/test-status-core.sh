@@ -205,6 +205,48 @@ else
 fi
 printf '%s\n' "$WORK/ghs/root" >"$WORK/ghs/projects.conf"
 
+# Wholesale-swap detection row (#653 family, #703): with the top-folder
+# sticky gone, owner(.git) != owner(project dir) is the cheap
+# after-the-fact detector. Discrimination via a stat stub keyed on the
+# operand path: the gitdir reads "rogue"-owned, the project dir
+# "devuser"-owned — the row must render with both names; the CONTROL
+# (real stat, equal owners) renders nothing.
+mkdir -p "$WORK/detstub"
+cat >"$WORK/detstub/stat" <<'EOF'
+#!/bin/sh
+_p=$(eval "echo \${$#}")
+case "$_p" in
+*/.git) printf 'rogue\n' ;;
+*) printf 'devuser\n' ;;
+esac
+EOF
+chmod +x "$WORK/detstub/stat"
+_out=$(
+    (
+        PATH="$WORK/detstub:$STUB:$PATH"
+        export PATH NO_COLOR=1 GH_GITCONFIG="$WORK/ghs/devhome/.gitconfig"
+        . "$UI_LIB"
+        . "$LIB"
+        DEFAULT_USER="$(id -un)"
+        OPENCODE_USER=opencode-ghs-agent
+        LIBDIR="$WORK/ghs/lib"
+        PROJECTS_CONF="$WORK/ghs/projects.conf"
+        status_section_git_heal
+    ) 2>&1 || true
+)
+if printf '%s' "$_out" | grep -q "\.git owner.*$WORK/ghs/root/\.git is rogue-owned while the project dir" &&
+    printf '%s' "$_out" | grep -q "is devuser-owned — wholesale .git swap suspected"; then
+    pass "git-heal section: owner-mismatch detection row renders (#703)"
+else
+    fail "git-heal section: detection row missing (#703; out=$(printf '%s' "$_out" | grep -F '.git owner' | head -2))"
+fi
+_out=$(_ghs_run || true)
+if printf '%s' "$_out" | grep -qF '.git owner'; then
+    fail "git-heal section: equal owners render no detection row (#703 control)"
+else
+    pass "git-heal section: equal owners render no detection row (#703 control)"
+fi
+
 # The mktemp failure path EXECUTES for the status-core twin too
 # (#674 b D3): a dead TMPDIR drops the lockout rows with a loud warn,
 # never silently — and the state row above still renders.

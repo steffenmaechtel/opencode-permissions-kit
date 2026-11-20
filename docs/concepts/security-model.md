@@ -55,14 +55,24 @@ agent must be able to commit), but every baseline run *re-narrows the
 execution-bearing metadata* OS-side, because the developer's git executes
 from agent-writable surfaces there:
 
-- The **project root**, every **ancestor directory of each `.git`**
-  (root-exclusive down to its parent — scan roots like
-  `/var/www/vhosts` are not every repo's parent, so the bit rides the
-  whole chain), and `.git` itself get the sticky bit; `.git/config` and
-  `.git/hooks` (and the `modules` containers with their gitdirs, and
-  the worktree `commondir`/`gitdir` pointer files — top gitdir and
-  submodule gitdirs alike) are pinned **developer-owned, no group
-  write, no extended ACLs**.
+- `.git` itself (and the `worktrees` collections) get the sticky bit;
+  `.git/config` and `.git/hooks` (and the `modules` containers with
+  their gitdirs, and the worktree `commondir`/`gitdir` pointer files —
+  top gitdir and submodule gitdirs alike) are pinned
+  **developer-owned, no group write, no extended ACLs**. The project
+  root and the `.git` ancestor directories deliberately carry **no**
+  sticky bit (decision
+  [#702](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/702),
+  wave #703): the #655-era bits were removed again — measured on
+  kit-managed hosts, their everyday costs (issues
+  [#699](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/699),
+  [#682](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/682),
+  [#701](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/701),
+  [#697](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/697))
+  outweighed the wholesale-swap prevention, and a baseline run now
+  strips any legacy bit it finds (migration). What that trade reopens
+  — the wholesale `.git` / project-dir swap arms — is documented with
+  the residuals below.
 - Why that works: the sticky bit sits on the PARENT of whatever must
   not be replaced — renaming or unlinking an entry needs write on its
   parent directory, and a developer-owned entry in a sticky parent is
@@ -117,8 +127,8 @@ from agent-writable surfaces there:
   the kit's own hooks are the only ones left — root-owned, outside the
   agent's reach. See [the git heal hooks how-to](../how-to/git-heal-hooks.md).
 - This is OS-level narrowing — the one place the kit deliberately steps
-  out of the pure soft model, scoped to `.git` internals (and the
-  project root's sticky bit) that ddev never touches. Workflow costs
+  out of the pure soft model, scoped to `.git` internals that ddev
+  never touches. Workflow costs
   accepted with it: repo-scope `git config` and `git submodule add`
   fail for the agent (`submodule add` dies at the clone stage — the
   `modules` container accepts no agent writes; for `git config` the
@@ -126,14 +136,14 @@ from agent-writable surfaces there:
   `git branch --set-upstream-to` fail at their tracking write while the
   push transfer itself completes (field-reported 2026-11-18, recorded
   in issue #644) — so agents push without `-u`
-  (`git push origin <branch>`); the agent cannot rename or delete
-  developer-owned entries in the project root and every `.git`
-  ancestor directory (sticky — content edits and renames in ordinary,
-  non-sticky subdirectories are unaffected); agent-side `git gc` can
+  (`git push origin <branch>`); agent-side `git gc` can
   hit the sticky bit on `packed-refs`; and a repo the agent cloned
   INTO a developer-owned project tree is healed to the root's owner —
   the agent loses repo-config writes in its own nested clone (work in
-  the main checkout or an agent-owned root instead).
+  the main checkout or an agent-owned root instead). A cost that is
+  GONE again with #703: the agent once could not rename or delete
+  developer-owned top-level entries (project-root sticky) — see the
+  reopened-residual entries below for the flip side.
 - What it does **not** close: the post-heal residual inventory —
   agent-controlled worktree gitdirs, agent-owned trees, the timing
   class between heal runs, content planted before the heal, the
@@ -297,7 +307,59 @@ Operational notes:
   diff-driver bullet above). Issue
   [#653](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/653)
   tracks report-only detection (heal drift, planted hooks) for `opk
-  status`/`opk doctor`.
+  status`/`opk doctor`; the first row of that surface shipped with
+  #703 — both commands flag a project whose `.git` directory owner
+  differs from the project directory's owner (the cheap
+  wholesale-swap detector, see below).
+- **Wholesale swap of `.git` or a whole project dir (W1/W2 — the
+  #703 trade):** with the top-folder sticky bits removed (decision
+  [#702](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/702)),
+  the agent can again rename/unlink developer-owned TOP-LEVEL entries
+  on the group-writable project root. The #644 execution impact
+  returns with the stealth variants:
+  - **W1 — stealth `.git` swap:** `cp -a .git .git.new`, edit the
+    copy's `config`/`hooks` (agent-owned), `mv .git .git.old && mv
+    .git.new .git`. The repo keeps working, so the developer's next
+    `git status`/commit executes the planted hook or fsmonitor arm
+    as the developer. The sticky never blocked the copy — only the
+    final rename — and no pin inside `.git` survives the gitdir being
+    swapped wholesale.
+  - **W2 — project-dir swap at depth:** `mv <project> <project>.old &&
+    mkdir <project>` (or the stealth copy variant) in a grouping dir
+    — same class one level up.
+  - **W3 — rename/unlink of developer-owned top-level entries** by
+    the agent: marginal elevation only (the soft model already
+    grants content overwrite via group write; git-tracked files are
+    recoverable). Real loss surface: developer-owned *untracked*
+    top-level files become silently deletable.
+  Why the trade is still right: the sticky's documented costs were
+  the dominant, everyday failure classes, each reproduced live
+  (issues
+  [#699](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/699),
+  [#682](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/682),
+  [#701](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/701),
+  [#697](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/697)),
+  while W1–W3 need a deliberately malicious agent. Compensating
+  controls and dead ends:
+  - **Detection (#703, shipped):** `opk status` and `opk doctor`
+    flag `owner(.git) != owner(project dir)` per project — a
+    wholesale swap necessarily leaves an agent-owned `.git`
+    behind. Display-only, after the fact; run `opk status`
+    regularly. (An agent-cloned repo under a developer-owned tree
+    trips the same row — inspect, then trust.)
+  - **`fs.protected_regular` is irrelevant here:** it gates
+    O_CREAT opens, never renames — no sysctl value mitigates W1–W3.
+    The kit ships at the Ubuntu/WSL default (`=2`); the `=1`
+    hotfix once briefed for #699 is obsolete and may be reverted
+    (remove `/etc/sysctl.d/99-protected-regular.conf` if you wrote
+    it — the kit never writes it).
+  - **A global `core.hooksPath = /dev/null` does NOT defend W1:**
+    repo config overrides the global — `core.hooksPath` is not
+    protected config (established in issue #644). Do not "fix" it
+    this way.
+  - **The complete closure remains a separate agent-owned clone**
+    with developer-side fetch+review — a workflow change, out of
+    scope for the kit's shared-tree model.
 - **Nuisance arms of the shared `.git` (DoS-grade, no code
   execution):** the heal keeps `.git` itself group-writable — the
   agent's git must keep creating lockfiles, objects and refs — and

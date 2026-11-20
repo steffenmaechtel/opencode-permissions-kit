@@ -86,6 +86,13 @@ re-apply the group baseline **and** force the full rescan:
 opk update --refresh
 ```
 
+Updates into the #703 era print a one-time migration note: the
+project-root sticky bits of earlier heals are removed in this version,
+and `opk update --refresh` (or `sudo opk config refresh`) applies the
+strip — a plain `opk update` never re-runs the group baseline, so the
+legacy bits stay until one of those commands runs. `.git` itself and
+its pinned internals keep the heal unchanged.
+
 ### Update integrity (SHA256SUMS)
 
 Every `opk update` verifies each fetched kit file against the

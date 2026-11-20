@@ -443,19 +443,18 @@ _fsb_pass() {
 # git-config-write and rename-away probes all blocked — evidence in
 # issue #644):
 #
-#   <project root>   sticky +t — the wholesale arm of the attack
-#                     (mv .git .git.old && mkdir .git/hooks/…) dies
-#                     here: renaming or unlinking a developer-owned
-#                     TOP-LEVEL entry requires the directory owner.
-#                     The SAME sticky bit goes on every ANCESTOR
-#                     directory of each .git, root-exclusive down to
-#                     its parent (#655 b C1: a scan root is not the
-#                     parent of every .git — depth >= 2 grouping dirs
-#                     need it too). Cost: the agent cannot
-#                     rename/delete developer-owned entries of those
-#                     ancestor dirs (content edits unaffected — sticky
-#                     never blocks writes; renames in ordinary,
-#                     non-sticky subdirectories unaffected).
+#   <project root>   NO sticky bit (#702/#703 — the #655 a C1 root and
+#                     ancestor stickies are REMOVED, and a legacy bit
+#                     from an earlier heal is stripped as migration:
+#                     installed bases carry it). Measured on kit-managed
+#                     hosts, the sticky's everyday costs (#699 developer
+#                     O_CREAT writes, #682 rc-0 stale-dirty checkouts,
+#                     #701 tooling renames dying fail-open, #697
+#                     handback wipes) outweighed the wholesale-swap
+#                     prevention; W1/W2 (stealth .git swap, project-dir
+#                     swap) are accepted residuals — see
+#                     docs/concepts/security-model.md and the detection
+#                     row in opk status/doctor (#653/#703).
 #   .git              sticky +t only — mode and group stay (the agent
 #                     keeps creating lockfiles, objects, refs and worktree
 #                     registrations; it can no longer unlink or rename
@@ -508,9 +507,8 @@ _fsb_pass() {
 # and `git submodule add` fail for the agent (both write .git/config) —
 # including the tracking write of a first `git push -u`, so agents push
 # without -u (git push origin <branch>; the transfer itself completes —
-# field-reported 2026-11-18 and recorded in issue #644); the agent
-# cannot rename or delete developer-owned TOP-LEVEL entries (project
-# root sticky, #655 a C1); agent-side `git gc` can hit the sticky bit
+# field-reported 2026-11-18 and recorded in issue #644); agent-side
+# `git gc` can hit the sticky bit
 # renaming packed-refs (with the #678-heal hooks on, that flip heals
 # on the next developer git operation — the cost is then a window,
 # not a state); merges inside agent-created worktrees keep
@@ -520,6 +518,11 @@ _fsb_pass() {
 # project tree is healed to the root's owner as well — the agent loses
 # repo-config writes in its own nested clone (#655 a S3; work in the
 # main checkout or an agent-owned root instead).
+# REMOVED cost (#702/#703): the agent once could not rename or delete
+# developer-owned TOP-LEVEL entries (project root sticky, #655 a C1) —
+# the root/ancestor sticky is gone, so that friction is gone with it;
+# the flip side (the agent CAN rename/unlink dev-owned top-level
+# entries, W3) is an accepted residual like W1/W2 above.
 # Heal-operand lockout (#671, widened #678): the heal's operand
 # metadata (.git/index, .git/HEAD and the #678 carriers) stays
 # deliberately UNpinned here — git rewrites it via lock+rename, so
@@ -604,6 +607,28 @@ _fsb_heal_sticky() {
         return 0
     }
     _fsb_sudo chmod +t "$_fshs_p" || _fsb_heal_err "$_fshs_p" "chmod +t"
+    return 0
+}
+
+# _fsb_heal_unsticky <root> <path>: STRIP the sticky bit from ONE
+# directory (#702/#703 — the #655 root/ancestor sticky is removed;
+# installed bases carry the bit, so the strip is the migration). Twin
+# of _fsb_heal_sticky with identical gates (component walk + leaf
+# recheck first — L5; missing dirs a no-op), so the same enumeration
+# that once added the bit now takes it back. Symlinked operands skip
+# with the same warn, never a follow.
+_fsb_heal_unsticky() {
+    _fshu_p=$2
+    [ -L "$_fshu_p" ] && {
+        _fsb_heal_skip "$_fshu_p"
+        return 0
+    }
+    [ -d "$_fshu_p" ] || return 0
+    _fsb_comp_clear "$1" "$_fshu_p" || {
+        _fsb_heal_skip "$_fshu_p"
+        return 0
+    }
+    _fsb_sudo chmod -t "$_fshu_p" || _fsb_heal_err "$_fshu_p" "chmod -t"
     return 0
 }
 
@@ -768,9 +793,9 @@ _fsb_heal_gitdir() {
     return 0
 }
 
-# _fsb_heal_git <root> <group>: sticky the project root (#655 a C1 —
-# the wholesale .git swap dies on it), enumerate every .git directory
-# under the root and heal it. Newline-separated iteration (find -print):
+# _fsb_heal_git <root> <group>: strip the legacy root/ancestor sticky
+# (#702/#703), enumerate every .git directory under the root and heal
+# it. Newline-separated iteration (find -print):
 # the kit's root gates reject whitespace roots; a newline inside a path
 # below the root splits into two halves, and BOTH die as counted errors
 # in the un-gated scans (the modules find ENOENTs on each garbage half
@@ -809,13 +834,16 @@ _fsb_heal_git() {
         _fsb_heal_err "$_fsh_root" "the owner probe (stat)"
         return 0
     fi
-    # Project-root sticky (#655 a C1): the wholesale arm — mv .git
-    # .git.old && mkdir .git — renames a TOP-LEVEL entry, and the bit
-    # that gates that sits on the ROOT. Applied even when no .git is
-    # found: uniform, and a later clone lands protected. Sharing mode
-    # and group stay — the dirs pass re-adds its group bits every run
-    # and +t survives it (g+rwxs never touches the sticky column).
-    _fsb_sudo chmod +t "$_fsh_root" || _fsb_heal_err "$_fsh_root" "chmod +t (project root)"
+    # Project-root sticky STRIP (#702/#703 — migration): the #655 a C1
+    # bit is removed, and installed bases carry it from earlier heals,
+    # so the strip runs even when no .git is found (uniform — same
+    # enumeration discipline the add once had). Sharing mode and group
+    # stay; only the sticky column goes. The wholesale mv-.git arm
+    # (W1) reopens deliberately — measured everyday costs (#699/#682/
+    # #701/#697) outweighed it; the #653/#703 detection row in opk
+    # status/doctor reports owner(.git) != owner(project root) as the
+    # compensating control.
+    _fsb_sudo chmod -t "$_fsh_root" || _fsb_heal_err "$_fsh_root" "chmod -t (project root strip)"
     _fsh_list=$(mktemp "${TMPDIR:-/tmp}/opk-fsb-heal.XXXXXXXX") || {
         printf '  error: mktemp failed (is $TMPDIR writable?) — the git heal cannot run under %s\n' "$_fsh_root" >&2
         _FSB_ERRORS=$((_FSB_ERRORS + 1))
@@ -830,23 +858,25 @@ _fsb_heal_git() {
     while IFS= read -r _fsh_gd; do
         [ -n "$_fsh_gd" ] || continue
         printf '  git heal: %s (hooks/config pinned developer-owned, issue #644)\n' "$_fsh_gd" >&2
-        # Ancestor-chain sticky (#655 a C1, b C1): the wholesale swap of
-        # a project dir dies on ITS parent's bit — a scan root (the
-        # install default is a parent like /var/www/vhosts) is not the
-        # parent of every .git beneath it, and at depth >= 2 the
-        # intermediate grouping dirs need the bit just as much. Sticky
-        # every directory from the root (exclusive — the driver pinned
-        # it) down to the .git's parent (inclusive). Cost: no agent
-        # rename/delete of developer-owned entries in those ancestor
-        # dirs — grouping dirs, rarely file-bearing.
+        # Ancestor-chain sticky STRIP (#702/#703 — migration): the
+        # #655 a C1/b C1 bits are removed with the SAME enumeration
+        # that once added them (every directory from the root,
+        # exclusive — the driver strips the root itself — down to the
+        # .git's parent, inclusive), so previously healed ancestor
+        # chains lose the bit again. The wholesale project-dir swap
+        # (W2) reopens deliberately — see the project-root strip above.
+        # Corner residual: an ancestor stickied for a .git that has
+        # since been DELETED is outside every current walk — the bit
+        # lingers until the dir itself goes; strip manually if that
+        # tree still sees #699-style friction.
         _fshg_parent=$(dirname "$_fsh_gd")
         # Ancestor walk only for parents INSIDE the root (#655 c S1,
-        # d S4): parent == root needs no walk (the driver stickied the
+        # d S4): parent == root needs no walk (the driver stripped the
         # root), and a parent outside the root entirely (a heal root
         # that is itself a dir named .git — plausible misconfiguration)
         # must not make the walk chew the parent's absolute-path
         # segments: an in-tree dir named after a root segment could
-        # take an unintended sticky.
+        # take an unintended strip.
         case "$_fshg_parent" in
             "$_fsh_root"/*)
                 _fshg_anc=$_fsh_root
@@ -859,7 +889,7 @@ _fsb_heal_git() {
                             ;;
                         *) _fshg_anc=$_fshg_parent _fshg_rest="" ;;
                     esac
-                    _fsb_heal_sticky "$_fsh_root" "$_fshg_anc"
+                    _fsb_heal_unsticky "$_fsh_root" "$_fshg_anc"
                 done
                 ;;
         esac

@@ -1209,6 +1209,17 @@ if [ "$ONLY_BINARY" = true ]; then
 else
     ui_kv "Kit" "v$VERSION"
     ui_kv "Configs" "projects.conf and opencode.jsonc untouched"
+    # One-time migration notice (#703): this version removes the
+    # #655-era top-folder sticky bits — the .git heal itself is
+    # unchanged. The strip rides the group-baseline heal, which a
+    # plain update does not run (#696) — name the command instead of
+    # silently leaving legacy bits in place (they carry the measured
+    # #699/#682/#701 friction). SHOW, never run — the kit never edits
+    # user-owned system config on its own (AGENTS.md, Rules).
+    if [ "$REFRESH" != true ]; then
+        ui_info "Migration note (issue #703): the project-root sticky bits of earlier heals are gone;"
+        ui_detail "strip them once with: sudo opk update --refresh"
+    fi
 fi
 [ "$BINARY_UPDATE" = true ] || ui_kv "Binary" "untouched (use --binary to upgrade)"
 ui_info "Next:"

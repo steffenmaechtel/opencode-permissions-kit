@@ -212,8 +212,8 @@ check "2c: baseline runs with live per-pass progress (issue #14)" \
     E 'grep -q "group baseline on /var/www/vhosts" /tmp/install-out.log && grep -q "entries — done" /tmp/install-out.log'
 check "2c: .git dir shared + sticky-healed (dev-owned, setgid + group-writable + sticky, #651)" \
     E 'test "$(stat -c %U:%G:%a /var/www/vhosts/perm-check/.git)" = "dev:opencode:3770"'
-check "2c: project root sticky (wholesale .git swap dies on it, #655 a C1)" \
-    E 'test "$(stat -c %a /var/www/vhosts/perm-check)" = "3775"'
+check "2c: project root NOT sticky — legacy bit stripped by the heal (#703, W1/W2 residuals)" \
+    E 'test "$(stat -c %a /var/www/vhosts/perm-check)" = "2775"'
 check "2c: heal — .git/config healed dev-owned, no group write (issue #17 shared it; #651 re-narrows)" \
     E 'test "$(stat -c %U:%G:%a /var/www/vhosts/perm-check/.git/config)" = "dev:opencode:644"'
 check "2c: heal — .git/hooks dev-owned, no group write (#651)" \
@@ -224,8 +224,8 @@ check_fail "2c: heal — agent CANNOT plant a hook (sticky .git + dev-owned hook
     E 'sudo -u opencode -H touch /var/www/vhosts/perm-check/.git/hooks/planted'
 check_fail "2c: heal — agent CANNOT rewrite .git/config (lock+rename dies on sticky, #644/#651)" \
     E 'sudo -u opencode -H git -C /var/www/vhosts/perm-check config core.fsmonitor /tmp/opk-probe'
-check_fail "2c: heal — agent CANNOT wholesale-swap .git (root sticky, #655 a C1/C6)" \
-    E 'sudo -u opencode -H mv /var/www/vhosts/perm-check/.git /var/www/vhosts/perm-check/.git.old'
+check "2c: #703 — W1 REOPENED: agent CAN wholesale-swap .git (accepted residual, restored after)" \
+    E 'sudo -u opencode -H sh -c "mv /var/www/vhosts/perm-check/.git /var/www/vhosts/perm-check/.git.old && mv /var/www/vhosts/perm-check/.git.old /var/www/vhosts/perm-check/.git"'
 check_fail "2c: heal — agent CANNOT wholesale-swap a module gitdir (container sticky, #655 a C2/C6)" \
     E 'sudo -u opencode -H mv /var/www/vhosts/perm-check/.git/modules/sub /var/www/vhosts/perm-check/.git/modules/sub.old'
 check "2c: git safe.directory '*' set for the opencode user (issue #17)" \
@@ -571,6 +571,20 @@ check "4c: detected typo3 project root handed BACK to dev (2775)" \
     E 'test "$(stat -c %U /var/www/vhosts/detected-project)" = "dev" && test "$(stat -c %a /var/www/vhosts/detected-project)" = "2775"'
 check "4c: detected typo3 settings dir still handed over to opencode" \
     E 'test "$(stat -c %U /var/www/vhosts/detected-project/config/system)" = "opencode"'
+
+# --- 4c/#703: migration — a legacy #655-era sticky (root + ancestors)
+# is stripped by the next baseline run (installed bases carry the
+# bits; opk update alone never re-runs the heal, #696 — refresh does).
+E 'sudo chmod +t /var/www/vhosts /var/www/vhosts/perm-check'
+check "4c/#703: legacy root+ancestor sticky planted (migration fixture)" \
+    E 'test -k /var/www/vhosts && test -k /var/www/vhosts/perm-check'
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/config.sh --yes refresh'
+check "4c/#703: refresh strips the legacy sticky from the scan root" \
+    E '! test -k /var/www/vhosts'
+check "4c/#703: refresh strips the legacy sticky from the .git parent (ancestor walk)" \
+    E '! test -k /var/www/vhosts/perm-check'
+check "4c/#703: the .git heal itself is unchanged (.git keeps sticky + pins)" \
+    E 'test -k /var/www/vhosts/perm-check/.git && test "$(stat -c %U:%G:%a /var/www/vhosts/perm-check/.git/config)" = "dev:opencode:644"'
 
 echo ""
 echo "--- 4c-2. ddev() reshare: .ddev stays dev-writable (issue #94, widened in #279) ---"
