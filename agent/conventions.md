@@ -294,21 +294,26 @@ A docs pin's literal is chosen against the doc's WRAP, not the
 phrase's prose: `grep -qF` is line-based, house docs wrap at ~72-80
 columns, and a natural multi-word phrase spanning a hard line break
 misses while the disclosure is fully intact — pin the shortest
-distinctive single-line fragment, and verify each new literal with
-`grep -cF` (expect exactly 1) against the wrapped doc before the
-gate run. When a disclosure pin reds after a doc edit, check the
+distinctive single-line fragment, and know the count before the
+gate run: `grep -cF`
+gives it (1 for a distinctive fragment; recurring flags legitimately
+count higher — the `--only-binary` pin counts 2 in cli.md). When
+a disclosure pin reds after a doc edit, check the
 line-break split FIRST before suspecting content loss — the red
 message names the disclosure as missing and invites restoring text
 that was never lost (probed 2026-11-20: the drafted phrase "complete
 closure remains a separate agent clone" missed across a wrap between
-"agent" and "clone"; the surviving single-line fragment holds —
-#690, PR #689; the #483 literals share the latent shape). The
+"agent" and "clone" — and the doc's `*emphasis*` markers are a
+second single-line miss-maker the same fragment check catches; the
+surviving single-line fragment holds —
+#690, PR #689; the multi-word #483 literals share the latent shape,
+the single-token `OPENCODE_PODMAN_SOCKET` cannot split). The
 shell-side sibling — a pin over house-wrapped shell matches the
 WRAP, not the contiguous phrase — lives in "Formatting (shfmt)"
 above.
 
 When the JSONC `//` decision eventually lands it follows the
-same boundary — its own primitive or semantics, never the `#` strip
+same boundary as the markdown exemption above (#472) — its own primitive or semantics, never the `#` strip
 pointed at non-`#` syntax. The `sh -c`
 indirection of the same shape (`sh -c 'grep … "$1"' _ "$SRCVAR"`) is
 GATED too since the #470 wave (rule 3; was a down-only ratchet until
@@ -730,15 +735,18 @@ An e2e arm's default vocabulary is checkout/add/reset — git commands
 that create no commits and need no committer identity (the arms'
 whole vocabulary before the #678 wave). Arms that build diverged
 topologies, conflict states or merges WRITE git history, and the e2e
-container users carry no git identity by design. Four authoring
+container users carry no global git identity by design. Four authoring
 traps from the #678 fix wave — three of them reddening two full e2e
 runs before a container repro isolated the causes, none of them
 heal-behavior bugs (#686, PR #684):
 
-- Any e2e arm whose git command CREATES COMMITS (`git merge`,
-  `cherry-pick`, `rebase` conclude, `am`) passes the committer
-  identity inline — `git -c user.email=… -c user.name=… <cmd>` —
-  because the container users carry none: the refusal is rc 128
+- Any e2e arm whose git command CREATES COMMITS (`git commit`,
+  `merge`, `cherry-pick`, `rebase` conclude, `am`) passes the
+  committer identity inline — `git -c user.email=… -c user.name=…
+  <cmd>` — because the container users carry no global identity (a
+  repo-local `git config` identity satisfies commits too —
+  fixtures/make-bare-origin.sh — but inline `-c` keeps an arm
+  self-contained): the refusal is rc 128
   ("Committer identity unknown") with a stderr a blanket
   `>/dev/null 2>&1` eats, and the arm then fails downstream with
   zero evidence in the log (probed 2026-11-20; #686 item 1,
