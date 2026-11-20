@@ -2615,7 +2615,7 @@ grep -q 'warn: ddev settings handover incomplete' "$HANDOVER" &&
 # success echo (project-root handback/handover x3, dev-owned root-inode
 # handback). Extract the typo3-bootstrap site and drive it; the other
 # three are wiring-grepped by their warn lines.
-_w9_block="$(sed -n '/^                _dhq_ok=true$/,/^                fi$/p' "$HANDOVER" | sed -n '1,10p')"
+_w9_block="$(sed -n '/^                _dhq_ok=true$/,/^                fi$/p' "$HANDOVER" | sed -n '1,11p')"
 if [ -n "$_w9_block" ] && printf '%s' "$_w9_block" | grep -q 'project-root handover:'; then
     pass "typo3-bootstrap pair block extractable (#211 b W9)"
     _w9_run() {
@@ -2623,6 +2623,10 @@ if [ -n "$_w9_block" ] && printf '%s' "$_w9_block" | grep -q 'project-root hando
             dhq_proj=/x/p; dhq_user=oc; dhq_group=g
             chmod() { [ "$W9MODE" = chmodfail ] && return 1; return 0; }
             chown() { [ "$W9MODE" = chownfail ] && return 1; return 0; }
+            # #697 sandbox twin of the heal-sticky re-add: the extracted
+            # block calls it after the numeric chmod; a failed re-add
+            # must fold into the warn arm like the chown/chmod pair.
+            _ddev_heal_sticky() { [ "$W9MODE" = stickyfail ] && return 1; return 0; }
             eval "$1"
         ' sh "$_w9_block" 2>&1
     }
@@ -2640,6 +2644,11 @@ if [ -n "$_w9_block" ] && printf '%s' "$_w9_block" | grep -q 'project-root hando
     case "$_out" in
         *"warn: project-root handover incomplete"*) pass "chown failure: warn, no success line (#211 b W9)" ;;
         *) fail "chown failure: warn (got: $_out)" ;;
+    esac
+    _out=$(_w9_run stickyfail) || true
+    case "$_out" in
+        *"warn: project-root handover incomplete"*) pass "sticky re-add failure: warn, no success line (#697)" ;;
+        *) fail "sticky re-add failure: warn (got: $_out)" ;;
     esac
 else
     fail "typo3-bootstrap pair block extractable (#211 b W9)"

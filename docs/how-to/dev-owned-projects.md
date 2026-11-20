@@ -30,6 +30,12 @@ writes or chmods anything outside `.ddev/`:
 | `.ddev/` | `opencode` | 2775 / 664 (ddev's internal churn stays contained) |
 | settings dirs, project root, everything else | **you** | 2775 / 664 (group baseline, permanent) |
 
+A project root that holds a real `.git` directory carries the `.git`
+heal's sticky bit on top (`drwxrwsr-t`, see
+[the security model](../concepts/security-model.md)) — handover and
+handback re-pin it after every numeric mode set, so the wholesale-`.git`
+-swap protection survives their normalization runs.
+
 The trade-off: **your repo owns the CMS settings file.** ddev no longer
 generates `AdditionalConfiguration.php` (TYPO3) or `settings.ddev.php`
 (Drupal). For repos that commit their settings anyway — the common TYPO3
