@@ -124,8 +124,10 @@ sessions, one per PR).
   sibling text of its whole adjacent unit — every leg of that unit,
   not only the clause's origin line — and an edit to an enumerated
   rule unit reconciles its mirror texts (the meta's Check line
-  re-states the enumeration) against the full new enumeration: greps
-  find drift in what exists; mirrors drift by omission. Scope
+  re-states the enumeration) against the full new enumeration, and
+  every count comment about a list the wave grew or shrank is
+  re-derived or count-freed: greps find
+  drift in what exists; mirrors drift by omission. Scope
   models, phrasing, contradictions: two
   half-true descriptions of one mechanism give a reader opposite
   answers (pr-00629 round a A1–A3: a grep-dead pointer written into the
@@ -142,7 +144,10 @@ sessions, one per PR).
   pr-00643 round a Q2/Q1: the sweep's own second wave read a new
   clause at phrase depth (its origin line) and missed the adjacent
   unit's opposite answer, and an enumeration edit left the meta's
-  Check line legs behind the bullet, #645).
+  Check line legs behind the bullet, #645). The list-adjacency arm
+  came from that loop's own next reflection: a wave grew the audit's
+  ACTIVE_SECTIONS list and the stale count comment about that list
+  sat beside the sweep untouched (#685 a B1, #688).
   (RM-0182)
 - The self-application sweep's sibling-read is section-scoped by
   wording; same-mechanism rule texts in OTHER files are the class
