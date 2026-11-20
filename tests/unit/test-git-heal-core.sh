@@ -733,11 +733,19 @@ if [ "$_hr_rc" -eq 0 ] &&
     grep -q "^$(id -un) ALL=(root) NOPASSWD: /usr/local/lib/opencode-permissions-kit/git-heal/heal-index-head \*\$" \
         "$WORK/etc/sudoers" &&
     grep -qF "gitdir=$WORK/zone/onroot/.git" "$LOG" &&
-    printf '%s' "$_out" | grep -qF "heal ran for $WORK/zone/onroot/.git" &&
+    printf '%s' "$_out" | grep -qF "operand set re-pinned for $WORK/zone/onroot/.git" &&
     printf '%s' "$_out" | grep -qF 'success: git heal hooks active'; then
     pass "core: on renders sudoers, writes the dev gitconfig, heals the root once"
 else
     fail "core: on leg failed (rc=$_hr_rc gc=$(git config --file "$WORK/devhome/.gitconfig" core.hooksPath 2>&1) sudoers=$(grep -c heal-index-head "$WORK/etc/sudoers" 2>/dev/null) log=$(wc -l <"$LOG"))"
+fi
+# #695: the sweep must SAY it is operand-only — the old wording read as
+# "this .git is healed now" while the gitdir bits ride the fs baseline.
+if printf '%s' "$_out" | grep -qF 'operand sweep only: the gitdir-level bits (sticky .git,' &&
+    printf '%s' "$_out" | grep -qF "update' re-applies it when its semantics change"; then
+    pass "core: on separates the operand sweep from the fs-baseline bits (#695)"
+else
+    fail "core: on must separate operand sweep and fs-baseline bits (#695)"
 fi
 
 # `on` sweep conf gate (#674 a A1): a hand-edited system-path line is

@@ -21,7 +21,7 @@ asks before removing the kit block; your own entries always stay.
 |---|---|
 | `install.conf` | Install settings (keys below) |
 | `projects.conf` | Project roots, one per line (`#` comments) |
-| `handover/` | Scan-skip stamps for the ddev handover |
+| `handover/` | Scan-skip stamps for the ddev handover + group-baseline pass |
 | `sudoers` | Deployed sudoers rules (root-owned; symlinked as `/etc/sudoers.d/opencode-permissions-kit`) |
 | `ddev-browser-cmds.conf` | Extra ddev command names for the browser bridge (one per line, `#` comments) |
 
@@ -47,7 +47,12 @@ asks before removing the kit block; your own entries always stay.
 - `handover/` holds one root-owned file per project root recording the
   last completed handover pass. A matching stamp lets a plain `opk update`
   skip the rescan; `update --refresh` and the `opk config` paths always
-  re-scan. Purely an optimization — deleting it costs one extra scan.
+  re-scan. The record also carries the baseline-semantics revision: a kit
+  release that changes what the group baseline applies invalidates every
+  stamp, so the next plain `opk update` re-runs the baseline over each
+  root automatically — that rescan is the kit's migration path onto
+  existing installs, not waste. Deleting the directory still only costs
+  one extra scan.
 
 ### `install.conf` keys
 

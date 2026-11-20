@@ -1018,7 +1018,7 @@ _st_ddev_basic() {
         [ -n "$_st_home" ] || _st_home="/home/$DEFAULT_USER"
         if [ "$_st_dev_uid" = "0" ]; then
             ui_kv_warn "ddev() hook" "install broken — developer '$DEFAULT_USER' has uid 0"
-            ui_detail "the install ran from a root shell (issue #192); reinstall from your"
+            ui_detail "the install ran from a root shell; reinstall from your"
             ui_detail "normal user — opk update cannot fix this"
         else
             hooked=""

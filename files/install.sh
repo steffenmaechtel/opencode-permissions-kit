@@ -900,7 +900,7 @@ _distro_gate() {
         ui_warn "unsupported distro: Ubuntu $_dg_v — continuing (--force-unsupported-distro,""\
  at your own risk)"
         ui_detail "known blockers: sudo-rs freezes streamed installs, systemd fails user"
-        ui_detail "managers per boot — issue #145; there is no support for this combination"
+        ui_detail "managers per boot — there is no support for this combination"
         log "distro gate OVERRIDDEN (--force-unsupported-distro): Ubuntu $_dg_v"
         return 0
     fi

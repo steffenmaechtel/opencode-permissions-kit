@@ -19,7 +19,9 @@ you create are readable/writable for the agent — no chgrp chores.
 
 The group baseline is applied **recursively** over every project root
 (install, `opk config projects add`, `opk config refresh`,
-`opk update --refresh`):
+`opk update --refresh` — and every plain `opk update` whose handover
+stamp invalidated, e.g. after a release that changed the baseline's
+semantics):
 
 | Operation | Scope |
 |---|---|
@@ -84,6 +86,11 @@ If group bits drift (e.g. after unpacking an archive as root), re-apply:
 ```bash
 opk update --refresh
 ```
+
+A plain `opk update` re-applies the baseline automatically whenever the
+handover stamp invalidates — a group re-base, a dev-owned toggle, or a kit
+release whose baseline semantics changed. `--refresh` is the manual path
+for drift the stamps cannot see.
 
 A pass that fails wholesale aborts with a per-pass warning instead of
 reporting success — the green "group baseline refreshed" line always means

@@ -163,6 +163,63 @@ _ghc_heal_once() {
     "$(_ghc_libdir)/git-heal/heal-index-head" "$1"
 }
 
+# _ghc_progress_tee <label>: newline-separated stdin -> stdout verbatim,
+# plus — when stderr is a tty — a "<label> — N done, M:SS" line rewritten
+# once a second and erased at EOF. The status-core _st_progress_tee
+# shape, line-based here (issue #695: the sweeps read newline lists, not
+# NUL streams — the long walks used to run silent for minutes). python3
+# -I like every kit inline (a poisoned PYTHONHOME must not kill the
+# display); non-tty stderr (pipes, captured output) sees the plain
+# stream only, so nothing downstream parses progress frames.
+_ghc_progress_tee() {
+    python3 -I -c '
+import sys, threading, time
+# Pure-ASCII source, glyphs via \u escapes (the argv-decode rule every
+# kit python inline follows on 7-bit locales).
+label = sys.argv[1]
+count = 0
+start = time.monotonic()
+done = threading.Event()
+
+def out(text):
+    sys.stderr.buffer.write(text.encode("utf-8", "replace"))
+    sys.stderr.flush()
+
+def draw():
+    if not sys.stderr.isatty():
+        return
+    el = int(time.monotonic() - start)
+    line = "  %s \u2014 %d done, %d:%02d" % (label, count, el // 60, el % 60)
+    if len(line) > 76:
+        line = "  \u2026" + line[-73:]
+    out("\r%-76s" % line)
+
+def ticker():
+    while not done.is_set():
+        draw()
+        done.wait(1)
+
+draw()  # first frame at once: a slow walk with zero hits still shows life
+t = threading.Thread(target=ticker)
+t.start()
+try:
+    while True:
+        line = sys.stdin.buffer.readline()
+        if not line:
+            break
+        count += 1
+        sys.stdout.buffer.write(line)
+        sys.stdout.buffer.flush()
+except BrokenPipeError:
+    pass
+finally:
+    done.set()
+    t.join()
+    if sys.stderr.isatty():
+        out("\r" + " " * 76 + "\r")
+' "$1"
+}
+
 # _ghc_root_ok <line>: reader-side conf-line gate for the on-sweep
 # (files.md contract — every consumer that runs root operations over
 # the roots re-validates each line; the uninstall-core reader mirror,
@@ -283,25 +340,37 @@ _git_heal_on() {
             fi
             _ghc_on_root="$_ghc_root_norm"
             [ -d "$_ghc_on_root" ] || continue
-            find "$_ghc_on_root" -type d -name .git >>"$_ghc_on_list" 2>/dev/null || true
+            find "$_ghc_on_root" -type d -name .git 2>/dev/null |
+                _ghc_progress_tee "finding .git dirs" >>"$_ghc_on_list" || true
         done <"$_ghc_on_conf"
-        while IFS= read -r _ghc_on_gd; do
-            if _ghc_heal_once "$_ghc_on_gd"; then
-                # rc-true is "the heal ran", not "every chown
-                # succeeded": the heal exits 0 even when an operand's
-                # chown failed (it must never break a git op), so the
-                # detail line names the run, not a per-file result
-                # (#674 a A2 — the audit log carries those).
-                ui_detail "heal ran for $_ghc_on_gd"
-            else
-                ui_detail "heal skipped for $_ghc_on_gd (see messages above)"
-            fi
-        done <"$_ghc_on_list"
+        _ghc_progress_tee "re-pinning operands" <"$_ghc_on_list" |
+            while IFS= read -r _ghc_on_gd; do
+                if _ghc_heal_once "$_ghc_on_gd"; then
+                    # rc-true is "the heal ran", not "every chown
+                    # succeeded": the heal exits 0 even when an operand's
+                    # chown failed (it must never break a git op), so the
+                    # detail line names the run, not a per-file result
+                    # (#674 a A2 — the audit log carries those).
+                    ui_detail "operand set re-pinned for $_ghc_on_gd"
+                else
+                    ui_detail "operand heal skipped for $_ghc_on_gd (see messages above)"
+                fi
+            done
+        # Layer separation (issue #695: the old "heal ran for" wording
+        # read as "this .git is healed now" while only the operand set
+        # was re-pinned): name what the sweep did NOT do, and where
+        # those bits come from — the fs baseline, which a plain
+        # `opk update` re-applies when its semantics change (issue #696).
+        if [ -s "$_ghc_on_list" ]; then
+            ui_detail "operand sweep only: the gitdir-level bits (sticky .git,"
+            ui_detail "dev-owned config/hooks) ride the group baseline — 'sudo opk"
+            ui_detail "update' re-applies it when its semantics change"
+        fi
         rm -f "$_ghc_on_list"
     fi
     ui_success "git heal hooks active — developer git operations now re-pin"
     ui_success "the measured operand set (.git/index, .git/HEAD and the widened"
-    ui_success "#678 carriers, each only when present) to the agent user (repo"
+    ui_success "operand carriers, each only when present) to the agent user (repo"
     ui_success "hooks stay off for the developer; hooksPath=$(_ghc_hooksdir))"
 }
 
@@ -383,6 +452,7 @@ _git_heal_status() {
         ui_detail "git-heal: lockout rows unavailable (mktemp failed)"
         return 0
     }
+    ui_detail "git-heal: scanning conf roots for .git dirs (large trees: this can take a while) ..."
     while IFS= read -r _ghc_stt_root; do
         case "$_ghc_stt_root" in '' | '#'*) continue ;; esac
         [ -d "$_ghc_stt_root" ] || continue
@@ -393,23 +463,24 @@ _git_heal_status() {
         find "$_ghc_stt_root" -type d -name .git >>"$_ghc_stt_list" 2>/dev/null ||
             ui_detail "git-heal: lockout rows may be incomplete under $_ghc_stt_root (unreadable)"
     done <"$_ghc_stt_conf"
-    while IFS= read -r _ghc_stt_gd; do
-        [ -n "$_ghc_stt_gd" ] || continue
-        for _ghc_stt_f in index HEAD ORIG_HEAD REBASE_HEAD packed-refs \
-            MERGE_HEAD MERGE_MSG MERGE_MODE AUTO_MERGE \
-            CHERRY_PICK_HEAD REVERT_HEAD; do
-            _ghc_stt_own=$(stat -c %U "$_ghc_stt_gd/$_ghc_stt_f" 2>/dev/null) || continue
-            if [ "$_ghc_stt_own" != "$_ghc_stt_agent" ]; then
-                if [ "$_ghc_stt_state" = on ]; then
-                    ui_detail "lockout (transient — the next developer git operation"
-                    ui_detail "heals it): $_ghc_stt_gd/$_ghc_stt_f is $_ghc_stt_own-owned"
-                else
-                    ui_detail "lockout risk: $_ghc_stt_gd/$_ghc_stt_f is $_ghc_stt_own-owned —"
-                    ui_detail "'sudo opk git-heal on' heals and keeps it healed"
+    _ghc_progress_tee "checking lockouts" <"$_ghc_stt_list" |
+        while IFS= read -r _ghc_stt_gd; do
+            [ -n "$_ghc_stt_gd" ] || continue
+            for _ghc_stt_f in index HEAD ORIG_HEAD REBASE_HEAD packed-refs \
+                MERGE_HEAD MERGE_MSG MERGE_MODE AUTO_MERGE \
+                CHERRY_PICK_HEAD REVERT_HEAD; do
+                _ghc_stt_own=$(stat -c %U "$_ghc_stt_gd/$_ghc_stt_f" 2>/dev/null) || continue
+                if [ "$_ghc_stt_own" != "$_ghc_stt_agent" ]; then
+                    if [ "$_ghc_stt_state" = on ]; then
+                        ui_detail "lockout (transient — the next developer git operation"
+                        ui_detail "heals it): $_ghc_stt_gd/$_ghc_stt_f is $_ghc_stt_own-owned"
+                    else
+                        ui_detail "lockout risk: $_ghc_stt_gd/$_ghc_stt_f is $_ghc_stt_own-owned —"
+                        ui_detail "'sudo opk git-heal on' heals and keeps it healed"
+                    fi
                 fi
-            fi
+            done
         done
-    done <"$_ghc_stt_list"
     rm -f "$_ghc_stt_list"
 }
 

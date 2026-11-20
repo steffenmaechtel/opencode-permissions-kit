@@ -313,7 +313,7 @@ PYEOF
                         esac
                         ui_warn "handover me: '$_ho_a' takes back the declared container tree '$_ho_decl'"
                         ui_detail "you are taking back a declared container tree -- expect a clean rebuild of its outputs"
-                        ui_detail "'opk doctor' reports the state after; re-declare nothing, rebuild the outputs (#312)"
+                        ui_detail "'opk doctor' reports the state after; re-declare nothing, rebuild the outputs"
                         break
                     done
                 done

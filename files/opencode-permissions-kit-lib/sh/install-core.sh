@@ -1721,7 +1721,7 @@ do_deploy_phase() {
             2>/dev/null | tail -1 || true)
         OPENCODE_MAJOR="${OPENCODE_MAJOR:-1}"
         ui_warn "opencode version probe unparseable — OPENCODE_MAJOR stamp left unchanged"
-        ui_detail "if the binary hangs (issue #80), fix it and re-run install.sh — an unset stamp is detected at runtime"
+        ui_detail "if the binary hangs, fix it and re-run install.sh — an unset stamp is detected at runtime"
         log "major stamp skipped: version probe unparseable (resolved OPENCODE_MAJOR=$OPENCODE_MAJOR)"
     fi
 

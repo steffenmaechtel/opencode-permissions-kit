@@ -851,7 +851,7 @@ doctor_ranges() {
 
 # --- report header ----------------------------------------------------------------
 doctor_header() {
-    ui_section "Doctor -- container-tree ownership (#312 class)"
+    ui_section "Doctor -- container-tree ownership"
     # Root rows display-sanitized (#660 M7): scan mode has no cntrl gate
     # on the root (the fix/detect gates are operand-safety, deliberately
     # mode-scoped) -- a control byte in the path must not reach the
@@ -1181,7 +1181,7 @@ doctor_scan_trees() {
             ui_kv_bad "container tree" "$DOCTOR_PATH -- $_cl_risk of $_cl_total entries at-risk (unmapped owners)"
             [ -n "$_cl_uids" ] && ui_detail "at-risk owners: uid ${_cl_uids%, }"
             [ -n "$_cl_ex" ] && ui_detail "examples: $(doctor_show_sanitize "$_cl_ex")"
-            ui_detail "container metadata ops (futimes/chmod/chown) EPERM on these -- the #312 build-breaker class"
+            ui_detail "container metadata ops (futimes/chmod/chown) EPERM on these -- the known build-breaker class"
             ui_detail "fix: opk doctor fix"
             ui_detail "or rebuild the affected outputs clean (docs/troubleshooting.md, EPERM entry)"
             if [ "$DOCTOR_MODE" = "fix" ]; then
@@ -1294,7 +1294,7 @@ doctor_detect() {
     ' "$WORK/dwalk" >"$WORK/dcls"
     if [ -f "$WORK/ddrop" ]; then
         ui_kv_warn "scan" "$(cat "$WORK/ddrop") entries dropped -- unusable path forms"
-        ui_detail "non-ASCII, control or shell-significant characters -- declare such trees manually (#356 a A1)"
+        ui_detail "non-ASCII, control or shell-significant characters -- declare such trees manually"
         rm -f "${WORK:?}/ddrop"
     fi
 

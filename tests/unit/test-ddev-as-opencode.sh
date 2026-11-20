@@ -2298,6 +2298,38 @@ if (. "$HANDOVER" && if ddev_handover_stamp_valid "/srv/projects" ocuser ocgroup
 else
     fail "stamp: a scan-rev mismatch invalidates"
 fi
+# #696: FS_BASELINE_STAMP_REV rides the same record — a baseline-semantics
+# bump must invalidate exactly like an ownership change, or a plain
+# `opk update` would skip the re-apply the bump exists for. Assignment
+# AFTER the dot (inverse of the #342 DDEV_DEV_OWNED shape): the lib
+# DEFINES this rev, so a pre-dot override is simply overwritten by the
+# sourcing itself.
+sh -c ". \"\$1\" && ddev_handover_stamp_write \"\$2\" \"\$3\" \"\$4\" \"\$5\"" _ "$HANDOVER" "/srv/projects" ocuser ocgroup devuser || true
+if (
+    . "$HANDOVER" &&
+        FS_BASELINE_STAMP_REV=99 &&
+        if ddev_handover_stamp_valid "/srv/projects" ocuser ocgroup devuser; then
+            exit 1
+        fi
+); then
+    pass "stamp: an FS_BASELINE_STAMP_REV mismatch invalidates (#696)"
+else
+    fail "stamp: an FS_BASELINE_STAMP_REV mismatch invalidates (#696)"
+fi
+# #696 rollout leg: a stamp in the PRE-#696 6-field format (no baseline
+# rev) must read invalid — the format change itself is what re-heals
+# every existing install on its first plain update after the release.
+_112_stampfile=$(ls "$_112_dir/stamps"/*.stamp 2>/dev/null || true)
+if [ -n "$_112_stampfile" ]; then
+    printf '%s\n' '/srv/projects|ocuser|ocgroup|1|off|devuser' >"$_112_stampfile"
+fi
+if (. "$HANDOVER" && if ddev_handover_stamp_valid "/srv/projects" ocuser ocgroup devuser; then exit 1; fi); then
+    pass "stamp: a legacy 6-field stamp reads invalid (#696 rollout)"
+else
+    fail "stamp: a legacy 6-field stamp reads invalid (#696 rollout)"
+fi
+check_live "ddev-handover: the stamp record carries FS_BASELINE_STAMP_REV (#696)" "$HANDOVER" \
+    -qF '|$FS_BASELINE_STAMP_REV'
 rm -rf "$_112_dir"
 unset OPK_HANDOVER_STAMP_DIR
 
@@ -2421,26 +2453,28 @@ if live_src "$UPDATE_CORE" | grep -q 'opk update --refresh' &&
 else
     fail "update.sh: skip message names both force paths"
 fi
-# pr-00381 a1/a2/a7 + b1/b2 (reworked for #568 a D2): the file-global
-# presence/order pins were comment-blind and position-free — hoisting
-# the arm out of the loop, dropping its REFRESH wrapper or commenting
-# it out all stayed green. The loop-body range pin below is
-# comment-stripped (#261) and asserts the arm's REFRESH gate, the arm
-# itself and the handover call INSIDE the single loop, each EXACTLY
-# ONCE, in order arm < handover, plus ZERO stamp writes (the stamp
-# moved inside ddev_handover_root; a caller-side stamp write is
-# exactly the regression this pin exists for). The awk end pattern is
-# deliberately UNANCHORED (b1: an indent-anchored one silently
-# captured the file tail after a re-nest, all pins green). A stray
-# done-text occurrence is loud in EVERY placement (c1): anywhere it
-# reds the loops==1 pin, and inside the range it additionally shortens
-# this capture, which reds the in-body counts.
+# pr-00381 a1/a2/a7 + b1/b2 (reworked for #568 a D2, re-contracted for
+# #696): the file-global presence/order pins were comment-blind and
+# position-free — hoisting the arm out of the loop or commenting it out
+# all stayed green. The loop-body range pin below is comment-stripped
+# (#261) and asserts ZERO REFRESH gates (the #696 contract: the arm
+# rides EVERY executed pass — a REFRESH wrapper around it is exactly
+# the bug that left plain-update hosts unhealed), the arm itself and
+# the handover call INSIDE the single loop, each EXACTLY ONCE, in
+# order arm < handover, plus ZERO stamp writes (the stamp moved inside
+# ddev_handover_root; a caller-side stamp write is exactly the
+# regression this pin exists for). The awk end pattern is deliberately
+# UNANCHORED (b1: an indent-anchored one silently captured the file
+# tail after a re-nest, all pins green). A stray done-text occurrence
+# is loud in EVERY placement (c1): anywhere it reds the loops==1 pin,
+# and inside the range it additionally shortens this capture, which
+# reds the in-body counts.
 _upd_loop="$(live_src "$UPDATE_CORE" | awk '/while IFS= read -r root; do/,/done <"\$PROJECTS_CONF"/')"
 _upd_gate_n="$(printf '%s\n' "$_upd_loop" | grep -c 'if \[ "\$REFRESH" = true \]; then' || true)"
 _upd_arm_n="$(printf '%s\n' "$_upd_loop" | grep -c 'fs_baseline_root "\$root"' || true)"
 _upd_stmp_n="$(printf '%s\n' "$_upd_loop" | grep -c 'ddev_handover_stamp_write' || true)"
-check "update.sh: loop body = 1× REFRESH gate + arm + handover, 0 stamp writes (${_upd_gate_n}/${_upd_arm_n}/${_upd_stmp_n} — pr-00381, a D2)" \
-    sh -c '[ "$1" -eq 1 ] && [ "$2" -eq 1 ] && [ "$3" -eq 0 ]' _ "$_upd_gate_n" "$_upd_arm_n" "$_upd_stmp_n"
+check "update.sh: loop body = 0× REFRESH gate (#696) + 1× arm + handover, 0 stamp writes (${_upd_gate_n}/${_upd_arm_n}/${_upd_stmp_n} — pr-00381, a D2)" \
+    sh -c '[ "$1" -eq 0 ] && [ "$2" -eq 1 ] && [ "$3" -eq 0 ]' _ "$_upd_gate_n" "$_upd_arm_n" "$_upd_stmp_n"
 _upd_arm_ln="$(printf '%s\n' "$_upd_loop" | grep -n 'fs_baseline_root "\$root"' | head -1 | cut -d: -f1)"
 _upd_ho_ln="$(printf '%s\n' "$_upd_loop" | grep -n 'ddev_handover_root "\$root"' | head -1 | cut -d: -f1)"
 check "update.sh: in-loop order arm < handover (${_upd_arm_ln}<${_upd_ho_ln} — pr-00381 a7)" \
@@ -2455,8 +2489,12 @@ check_live "update.sh: refresh success line kept verbatim (issue #219 move)" "$U
     -qF 'ui_success "group baseline refreshed (chgrp + setgid + g+rw + default ACLs)"'
 check_live "update.sh: refresh section header kept (issue #219 move)" "$UPDATE_CORE" \
     -qF 'ui_section "Refreshing group baseline"'
-check_live "update.sh: routine skip hint kept verbatim (issue #219 move)" "$UPDATE_CORE" \
-    -qF 'skipped group-baseline refresh (use --refresh to re-apply chgrp/setgid/default ACLs)'
+check_live "update.sh: routine skip hint names the valid-stamp case (#696)" "$UPDATE_CORE" \
+    -qF 'skipped group-baseline re-apply (stamps valid — --refresh forces it)'
+check_live "update.sh: stamp-triggered re-apply arm present (#696)" "$UPDATE_CORE" \
+    -qF 'group baseline re-applied for $_ho_ran root(s)'
+check_live "update.sh: stamp-triggered arm explains its trigger (#696)" "$UPDATE_CORE" \
+    -qF 'invalid (ownership/mode or baseline semantics changed since the last pass)'
 # a D2 wiring: the stamp call lives ONLY inside ddev_handover_root's
 # completed-pass gate — no shipped caller stamps on its own anymore
 # (if-found-then-fail absence shapes, comment-stripped).

@@ -354,16 +354,29 @@ ddev_reshare_needed() {
 # every install then re-scans once on the next update.
 DDEV_HANDOVER_STAMP_REV=1
 
+# Bump when a wave changes what fs_baseline_root APPLIES (a new heal
+# arm, changed pins/modes — the .git metadata heal and the legacy
+# sticky strip were such waves): a recorded-value mismatch invalidates
+# the stamp, and the next plain `opk update` re-runs the baseline over
+# every stamped root (issue #696 — before this rev the baseline
+# re-applied only under --refresh, fresh install or a config path).
+# Cosmetic fs-baseline.sh changes do NOT bump this: every bump costs
+# every installed host one full recursive pass.
+FS_BASELINE_STAMP_REV=1
+
 ddev_handover_stamp_dir() {
     printf '%s\n' "${OPK_HANDOVER_STAMP_DIR:-/etc/opencode-permissions-kit/handover}"
 }
 
 # ddev_handover_stamp_valid <root> <user> <group> [dev-user]: 0 when a
-# stamp for <root> matches the current scan shape. The root path is ALSO
-# part of the compared content — a cksum filename collision must never
-# skip a different root's scan. The dev user (the handover's 4th input,
-# handback target) is part of the shape too (0.0.40a F1): a DEFAULT_USER
-# re-base must invalidate, or pending handbacks would wait for --refresh.
+# stamp for <root> matches the current scan + baseline shape. The root
+# path is ALSO part of the compared content — a cksum filename collision
+# must never skip a different root's scan. The dev user (the handover's
+# 4th input, handback target) is part of the shape too (0.0.40a F1): a
+# DEFAULT_USER re-base must invalidate, or pending handbacks would wait
+# for --refresh. FS_BASELINE_STAMP_REV rides the same record (#696): a
+# baseline-semantics bump invalidates like an ownership change, so the
+# next plain update re-applies fs_baseline_root instead of skipping.
 ddev_handover_stamp_valid() {
     dhv_root="${1:-}"
     dhv_user="${2:-}"
@@ -374,7 +387,7 @@ ddev_handover_stamp_valid() {
     [ -f "$dhv_file" ] || return 1
     if ddev_devowned_enabled; then dhv_mode=on; else dhv_mode=off; fi
     [ "$(cat "$dhv_file" 2>/dev/null)" = \
-        "$dhv_root|$dhv_user|$dhv_group|$DDEV_HANDOVER_STAMP_REV|$dhv_mode|$dhv_dev" ]
+        "$dhv_root|$dhv_user|$dhv_group|$DDEV_HANDOVER_STAMP_REV|$dhv_mode|$dhv_dev|$FS_BASELINE_STAMP_REV" ]
 }
 
 # ddev_handover_stamp_write <root> <user> <group> [dev-user]: records a
@@ -393,7 +406,7 @@ ddev_handover_stamp_write() {
     if ddev_devowned_enabled; then dhw_mode=on; else dhw_mode=off; fi
     dhw_dir="$(ddev_handover_stamp_dir)"
     mkdir -p "$dhw_dir" 2>/dev/null || return 0
-    printf '%s\n' "$dhw_root|$dhw_user|$dhw_group|$DDEV_HANDOVER_STAMP_REV|$dhw_mode|$dhw_dev" \
+    printf '%s\n' "$dhw_root|$dhw_user|$dhw_group|$DDEV_HANDOVER_STAMP_REV|$dhw_mode|$dhw_dev|$FS_BASELINE_STAMP_REV" \
         >"$dhw_dir/$(printf '%s' "$dhw_root" | cksum | cut -d' ' -f1).stamp" 2>/dev/null || true
     return 0
 }

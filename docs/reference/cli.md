@@ -590,7 +590,7 @@ error; `KIT_SHA_VERIFY=0` is the break-glass) — details in the
 | Flag | Meaning |
 |---|---|
 | `--yes`, `-y` | Skip the confirmation prompt |
-| `--refresh` | Also re-apply the group baseline |
+| `--refresh` | Force the full rescan; re-apply the group baseline (plain updates re-apply when stamps invalidate) |
 | `--binary` | Also upgrade the opencode binary to the latest release **of the current major** |
 | `--only-binary` | Skip every kit step, only upgrade the opencode binary |
 | `--binary-path <file>` | Install a specific binary file instead |
