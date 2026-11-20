@@ -558,19 +558,27 @@ ddev_rootless_bindmounts() {
 # _ddev_heal_sticky <proj>: re-pin the .git heal's root sticky after a
 # numeric mode set (#697). The handover/handback arms below normalize
 # the project root with chmod 27NN — a numeric chmod REPLACES the mode,
-# taking the sticky bit the fs-baseline heal put on every real .git
-# parent along with it (the wholesale .git swap dies on that bit,
-# #644/#651; measured on a kit-managed host: heal 02:43:27, handback
-# wipe 02:43:35, examples/agent-project-{a,b-checkout}). The ddev skip
-# logic is unaffected: Perm() masks to 0777, sticky rides along outside
-# it. The anchor mirrors the heal's enumeration exactly — a REAL .git
-# dir (find -type d -name .git): a .git-less root was never stickied by
-# the heal, a worktree's .git FILE or a symlinked .git never triggered
-# it either ([ -d ] follows links — the 0.0.39g S2 double gate). rc
-# nonzero only when the re-add itself failed; callers fold it into
-# their ok-flag like the chown/chmod pair above it.
+# taking the sticky bit the fs-baseline heal put on the root along
+# with it (the wholesale .git swap dies on that bit — heal #644/#651,
+# root/ancestor sticky #655 a C1; measured on a kit-managed host: heal
+# 02:43:27, handback wipe 02:43:35, examples/agent-project-{a,b
+# -checkout}). The ddev skip logic is unaffected: Perm() masks to
+# 0777, sticky rides along outside it. The anchor mirrors the heal's
+# ancestor walk — a REAL .git dir at ANY depth beneath the root
+# (find -type d -name .git, links never followed): the walk stickies
+# every ancestor down to each .git's parent, so a nested-only repo
+# root re-pins too; a .git-less root, a worktree's .git FILE and a
+# symlinked .git never matched the walk and stay unsticked. Residual
+# (#698 a S1): the heal ALSO stickies a registered heal root
+# unconditionally, .git or not ("a later clone lands protected",
+# fs-baseline.sh) — that uniform bit is not re-pinned here (the arms
+# cannot know the baseline registration); the next baseline run
+# restores it. rc nonzero only when the anchor probe or the re-add
+# itself failed; callers fold it into their ok-flag like the
+# chown/chmod pair above it.
 _ddev_heal_sticky() {
-    [ -d "$1/.git" ] && [ ! -L "$1/.git" ] || return 0
+    _dhs_hit=$(find "$1" -type d -name .git -print -quit 2>/dev/null) || return 1
+    [ -n "$_dhs_hit" ] || return 0
     chmod +t "$1" 2>/dev/null
 }
 

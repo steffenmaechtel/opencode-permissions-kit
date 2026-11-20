@@ -426,15 +426,19 @@ else
 fi
 
 # --- 2e-2. #697: every numeric root chmod re-pins the heal's sticky on
-# REAL .git parents, and only there. The heal (fs-baseline, #651)
-# stickies each .git parent — the wholesale .git swap dies on that bit
-# (#644) — while the handover/handback arms' numeric chmod 2755/2775
-# REPLACE the mode and used to take the bit with them (measured on a
-# kit-managed host: heal 02:43:27, wipe 02:43:35, examples/agent-project
-# -{a,b-checkout}). Pins: the re-add fires in all four arms, AFTER the
-# numeric chmod (order), anchored to a real .git dir — never for a
+# roots the heal's ancestor walk stickied — a REAL .git dir at ANY
+# depth beneath the root (heal #644/#651, walk #655 a C1) — and only
+# there: the wholesale .git swap dies on the root bit while the
+# handover/handback arms' numeric chmod 2755/2775 REPLACE the mode and
+# used to take the bit with them (measured on a kit-managed host: heal
+# 02:43:27, wipe 02:43:35, examples/agent-project-{a,b-checkout}).
+# Pins: the re-add fires in all four arms, AFTER the numeric chmod
+# (order), for a direct .git AND a nested-only .git — never for a
 # .git-less root, a worktree's .git FILE or a symlinked .git — and a
-# failed re-add folds into the arm's ok-contract (warn, never success).
+# failed re-add folds into the arm's ok-contract (warn, never
+# success). The heal's UNCONDITIONAL registered-root sticky (.git-less
+# included, "a later clone lands protected") is the documented
+# residual (#698 a S1), restored by the next baseline run.
 mkdir -p "$WORK/bk2/proj/.ddev" "$WORK/bk2/proj/.git"
 printf 'type: typo3\ndocroot: web\n' >"$WORK/bk2/proj/.ddev/config.yaml"
 _bk2_run() {
@@ -487,9 +491,23 @@ if [ -n "$_2755" ] && [ -n "$_plust" ] && [ "$_2755" -lt "$_plust" ]; then
 else
     fail "project_root: root-file sticky re-add missing (#697; 2755=$_2755 +t=$_plust)"
 fi
-# (c1) anchor: a .git-less root was never stickied by the heal — the
-# re-add must stay silent (uniform sticky would gate agent renames of
-# dev-owned entries the heal deliberately leaves open there).
+# (a-nested) #698 a S1: a nested-only .git root (no direct .git) is in
+# the walk's sticky set as an ANCESTOR — the widened anchor re-pins it
+# too, after the numeric chmod.
+mkdir -p "$WORK/bk7/proj/.ddev" "$WORK/bk7/proj/sub/.git"
+printf 'type: typo3\ndocroot: web\n' >"$WORK/bk7/proj/.ddev/config.yaml"
+_bk2_run ddev_handover_project_back "$WORK/bk7/proj"
+_2775=$(grep -n "^chmod 2775 $WORK/bk7/proj$" "$OPS_BK_LOG" | cut -d: -f1)
+_plust=$(grep -n "^chmod +t $WORK/bk7/proj$" "$OPS_BK_LOG" | cut -d: -f1)
+if [ -n "$_2775" ] && [ -n "$_plust" ] && [ "$_2775" -lt "$_plust" ]; then
+    pass "project_back: nested-only .git root re-adds the heal sticky (#698 a S1)"
+else
+    fail "project_back: nested .git sticky re-add missing (#698 a S1; 2775=$_2775 +t=$_plust)"
+fi
+# (c1) anchor: a .git-less root is outside the heal walk's sticky set
+# (no .git to chain from) — the re-add must stay silent; the heal's
+# UNCONDITIONAL registered-root sticky is the documented residual
+# (#698 a S1, next baseline run restores it).
 mkdir -p "$WORK/bk3/proj/.ddev"
 printf 'type: typo3\ndocroot: web\n' >"$WORK/bk3/proj/.ddev/config.yaml"
 _bk2_run ddev_handover_project_back "$WORK/bk3/proj"
@@ -509,8 +527,10 @@ if grep -q "^chmod +t $WORK/bk4/proj$" "$OPS_BK_LOG"; then
 else
     pass "project_back: worktree .git FILE root stays unsticked (#697 anchor)"
 fi
-# (c3) anchor: a symlinked .git dodges find -type d; [ -d ] alone would
-# follow the link (0.0.39g S2 double gate) — the re-add must not fire.
+# (c3) anchor: a symlinked .git is -type l, never matched by the walk
+# (links never followed, the heal's warn arm) — the re-add must not
+# fire (the 0.0.39g S2 [ ! -L ] gate guarded the old depth-1 anchor;
+# the walk anchor inherits the exclusion from find itself).
 mkdir -p "$WORK/bk5/proj/.ddev" "$WORK/bk5/realgit"
 printf 'type: typo3\ndocroot: web\n' >"$WORK/bk5/proj/.ddev/config.yaml"
 ln -s "$WORK/bk5/realgit" "$WORK/bk5/proj/.git"

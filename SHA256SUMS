@@ -24,7 +24,7 @@ f547a32d7ad24391f5c9ebd143506d46140d8981af2ce5b6574c7c9cce6f8d4b  files/opencode
 d9f9fb0aae130f10c300153b745f4768b9a763e07f82298f6f156a671a07e37a  files/opencode-permissions-kit-lib/py/tui-register.py
 dcb8b17188cab386608f95f5e4b2fe3ae0a0cf87e624c4661be08074f32fa1e8  files/opencode-permissions-kit-lib/sh/advisories.sh
 b39cd4d494f078317e94a32c7f8e96731d037c15c6b3012576741f5d63cd6189  files/opencode-permissions-kit-lib/sh/as-opencode-core.sh
-f567bcda38f1c1c4a7f6f85984da22c2f41b8bbcdf90ebb079e8c1ff6292487b  files/opencode-permissions-kit-lib/sh/ddev-handover.sh
+6a33b0134c681fdd08193c7f593d90ca652505d81740f43f7599c08fa181dbce  files/opencode-permissions-kit-lib/sh/ddev-handover.sh
 2b6e687d11d2b3b623799eef7a67c4a6356e4ac692649b5782cb18da947ba3c9  files/opencode-permissions-kit-lib/sh/ddev-hosts.sh
 b46ff01a242272adc09abb83b12f7c7982d836212cbbac5d3cce05965302ba78  files/opencode-permissions-kit-lib/sh/ddev-migrate.sh
 34a6a6b1bf19af571ba33dc8878f4e6e78e2efe3dc0e14d23e95ebed9834608d  files/opencode-permissions-kit-lib/sh/ddev-terminal.sh
