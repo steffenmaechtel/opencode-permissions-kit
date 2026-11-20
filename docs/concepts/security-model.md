@@ -69,7 +69,8 @@ from agent-writable surfaces there:
   untouchable for the agent. Git *reads* the config for plain
   commits/pushes but writes it through lock+rename — that rename dies
   on the sticky bit. Planted hooks, `core.fsmonitor`, `core.hooksPath`
-  overrides and diff-driver registrations can no longer be placed or
+  overrides, diff-driver registrations and repo-config
+  `core.pager`/`core.editor` arms can no longer be placed or
   rewritten by the agent. The agent's commit/push workflow stays green
   on files the heal pinned; `index` and `HEAD` were deliberately left
   floating (the agent must stage and switch branches), which has its
@@ -133,14 +134,11 @@ from agent-writable surfaces there:
   INTO a developer-owned project tree is healed to the root's owner —
   the agent loses repo-config writes in its own nested clone (work in
   the main checkout or an agent-owned root instead).
-- What it does **not** close: the `.git` pointer *file* inside
-  agent-created worktree trees (delete+recreate sidesteps a pin — work in
-  the protected main checkout, not in agent worktrees), agent-owned
-  trees as a whole, and CONTENT planted before the heal — metadata
-  pinning preserves a planted hook file's exec bits and contents (the
-  heal warns about non-sample files it finds in `hooks/`; inspection
-  and removal stay human decisions). The full post-heal residual
-  inventory lands with issue #652 once the heal is piloted.
+- What it does **not** close: the post-heal residual inventory —
+  agent-controlled worktree gitdirs, agent-owned trees, the nuisance
+  arms of the shared `.git`, content planted before the heal — lives
+  in [Known residual gaps](#known-residual-gaps) below (documented
+  with issue #652 after the heal was piloted).
 - The heal survives `opk uninstall` where it matters: the revert walks
   never touch the sticky bit or the **uid** of developer-owned pinned
   entries (their *group* is reverted to the developer's login group by
@@ -263,6 +261,64 @@ Operational notes:
   --global diff.secret.command cat` hits no allow and no tripwire and
   persists across sessions for every repo — but it only affects the
   AGENT's own git runs, never the developer's.
+- **Git execution in agent-controlled gitdirs (the `.git` heal's main
+  residual):** the heal protects the developer's git in the shared
+  main checkout; wherever the agent controls the gitdir, its
+  protection is absent or moot:
+  - an **agent-created worktree** keeps an agent-writable `.git`
+    pointer *file* in its tree — delete+recreate repoints git at any
+    gitdir the agent chooses, and the config and hooks there execute
+    as whoever runs git in that worktree (the developer, if they cd
+    into it; `opk git-heal on` bypasses those repo hooks for the
+    developer via the global `core.hooksPath`, but the opt-in is off
+    by default and the repointed gitdir's config arms stay armed).
+    Rule: the developer works in the protected main checkout, not in
+    agent worktrees (the agent's own worktree use is the designed
+    fallback while the git heal hooks are off).
+  - an **agent-owned tree as a whole** (a root the agent created):
+    the heal pins to the tree's owner — it buys nothing there.
+  - **state created between heal runs:** the heal re-runs with the
+    group baseline (install, `opk config projects add`/`refresh`,
+    `opk update --refresh`) — a worktree registration created after
+    the last run keeps agent-owned `gitdir`/`commondir` pointer files
+    until the next. The git heal hooks do not close this either:
+    they re-pin only the measured operand set inside a validated
+    gitdir; worktree registrations stay agent-manageable by design.
+  - **content planted before the heal** survives metadata pinning (a
+    planted hook keeps its exec bit and contents; the heal warns
+    about non-sample entries in `hooks/` — removal stays a human
+    decision), and a symlinked `modules` container is never followed
+    (warned, not healed).
+
+  What the heal closes repo-side can still be armed in the agent's
+  own global gitconfig — scoped to the agent's own runs (the
+  diff-driver bullet above). Issue
+  [#653](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/653)
+  tracks report-only detection (heal drift, planted hooks) for `opk
+  status`/`opk doctor`.
+- **Nuisance arms of the shared `.git` (DoS-grade, no code
+  execution):** the heal keeps `.git` itself group-writable — the
+  agent's git must keep creating lockfiles, objects and refs — and
+  the sticky bit blocks replacing developer-owned entries, not
+  creating new ones. So the agent can still plant a stale
+  `config.lock` (every config write then fails with `File exists`
+  until it is removed) and junk top-level entries in `.git` (git
+  ignores unknown names). Both are trivially removed by the directory
+  owner; neither executes anything.
+- **Git execution — pre-heal context and the complete closure:** the
+  soft layer alone never closed this. Its tripwires match command
+  text, so `cd .git && mv config-evil config` renamed a planted
+  config into place naming nothing protected — and live probes (issue
+  [#644](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/644))
+  showed agent-planted hooks executing as the developer uid (groups
+  including `sudo` and `docker`, `~/.ssh` readable). The heal — the
+  baseline plus the opt-in git heal hooks — closes the shared-tree
+  arms OS-side at accepted workflow costs (repo-scope `git config`
+  and `git submodule add` fail for the agent, the first `push -u`
+  tracking-write cost, the gc/packed-refs nuance; listed with the
+  heal above). The one *complete* closure remains a separate agent
+  clone — a workflow change, the conclusion of the upstream
+  ddev.com discussion referenced in issue #644.
 - **Bind-mounted containers** read the mounted tree freely (they run as the
   opencode host UID).
 - **Renamed copies** of secrets are invisible to the name-based
