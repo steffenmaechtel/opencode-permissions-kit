@@ -555,6 +555,33 @@ ddev_rootless_bindmounts() {
 #                  root: hand the root BACK to [dev-user] with 2775 so
 #                  the developer regains full top-level write access.
 #                  Only roots currently owned by <oc-user> are touched.
+# _ddev_heal_sticky <proj>: re-pin the .git heal's root sticky after a
+# numeric mode set (#697). The handover/handback arms below normalize
+# the project root with chmod 27NN — a numeric chmod REPLACES the mode,
+# taking the sticky bit the fs-baseline heal put on the root along
+# with it (the wholesale .git swap dies on that bit — heal #644/#651,
+# root/ancestor sticky #655 a C1; measured on a kit-managed host: heal
+# 02:43:27, handback wipe 02:43:35, examples/agent-project-{a,b
+# -checkout}). The ddev skip logic is unaffected: Perm() masks to
+# 0777, sticky rides along outside it. The anchor mirrors the heal's
+# ancestor walk — a REAL .git dir at ANY depth beneath the root
+# (find -type d -name .git, links never followed): the walk stickies
+# every ancestor down to each .git's parent, so a nested-only repo
+# root re-pins too; a .git-less root, a worktree's .git FILE and a
+# symlinked .git never matched the walk and stay unsticked. Residual
+# (#698 a S1): the heal ALSO stickies a registered heal root
+# unconditionally, .git or not ("a later clone lands protected",
+# fs-baseline.sh) — that uniform bit is not re-pinned here (the arms
+# cannot know the baseline registration); the next baseline run
+# restores it. rc nonzero only when the anchor probe or the re-add
+# itself failed; callers fold it into their ok-flag like the
+# chown/chmod pair above it.
+_ddev_heal_sticky() {
+    _dhs_hit=$(find "$1" -type d -name .git -print -quit 2>/dev/null) || return 1
+    [ -n "$_dhs_hit" ] || return 0
+    chmod +t "$1" 2>/dev/null
+}
+
 ddev_handover_project_root() {
     dhq_proj="${1:-}"
     dhq_user="${2:-}"
@@ -594,11 +621,12 @@ ddev_handover_project_root() {
                     _dhq_ok=true
                     chown "$dhq_dev:$dhq_group" "$dhq_proj" 2>/dev/null || _dhq_ok=false
                     chmod 2775 "$dhq_proj" 2>/dev/null || _dhq_ok=false
+                    _ddev_heal_sticky "$dhq_proj" || _dhq_ok=false
                     if [ "$_dhq_ok" = true ]; then
                         echo "  project-root handback: $dhq_proj -> $dhq_dev (TYPO3 detected, ddev no longer targets the root)"
                     else
                         echo "  warn: project-root handback incomplete for $dhq_proj""\
- (chown/chmod errors — the next update rescans and heals)" >&2
+ (chown/chmod/sticky-re-add errors — the next update rescans and heals)" >&2
                         _dhr_partial=1
                     fi
                 fi
@@ -606,11 +634,12 @@ ddev_handover_project_root() {
                 _dhq_ok=true
                 chown "$dhq_user:$dhq_group" "$dhq_proj" 2>/dev/null || _dhq_ok=false
                 chmod 2755 "$dhq_proj" 2>/dev/null || _dhq_ok=false
+                _ddev_heal_sticky "$dhq_proj" || _dhq_ok=false
                 if [ "$_dhq_ok" = true ]; then
                     echo "  project-root handover: $dhq_proj -> $dhq_user (TYPO3 not yet installed, bootstrap needs root ownership)"
                 else
                     echo "  warn: project-root handover incomplete for $dhq_proj""\
- (chown/chmod errors — the next update rescans and heals)" >&2
+ (chown/chmod/sticky-re-add errors — the next update rescans and heals)" >&2
                     _dhr_partial=1
                 fi
             fi
@@ -622,12 +651,13 @@ ddev_handover_project_root() {
             _dhq_ok=true
             chown "$dhq_user:$dhq_group" "$dhq_proj" 2>/dev/null || _dhq_ok=false
             chmod 2755 "$dhq_proj" 2>/dev/null || _dhq_ok=false
+            _ddev_heal_sticky "$dhq_proj" || _dhq_ok=false
             if [ "$_dhq_ok" = true ]; then
                 echo "  project-root handover: $dhq_proj -> $dhq_user ($dhq_type settings"
                 echo "  file lives at the root; the dev-owned flag hands it back)"
             else
                 echo "  warn: project-root handover incomplete for $dhq_proj""\
- (chown/chmod errors — the next update rescans and heals)" >&2
+ (chown/chmod/sticky-re-add errors — the next update rescans and heals)" >&2
                 _dhr_partial=1
             fi
             ;;
@@ -1082,11 +1112,12 @@ ddev_handover_project_back() {
         _dhb_ok=true
         chown "$dhb_dev:$dhb_group" "$dhb_proj" 2>/dev/null || _dhb_ok=false
         chmod 2775 "$dhb_proj" 2>/dev/null || _dhb_ok=false
+        _ddev_heal_sticky "$dhb_proj" || _dhb_ok=false
         if [ "$_dhb_ok" = true ]; then
             echo "  dev-owned handback: $dhb_proj (root) -> $dhb_dev (2775)"
         else
             echo "  warn: dev-owned handback incomplete for $dhb_proj (root inode""\
- — chown/chmod errors, the next update rescans and heals)" >&2
+ — chown/chmod/sticky-re-add errors, the next update rescans and heals)" >&2
             _dhr_partial=1
         fi
     fi

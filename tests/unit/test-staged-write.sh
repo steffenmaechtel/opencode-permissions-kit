@@ -425,6 +425,155 @@ else
     pass "project_back: developer-owned root (stat=devuser) is NOT touched"
 fi
 
+# --- 2e-2. #697: every numeric root chmod re-pins the heal's sticky on
+# roots the heal's ancestor walk stickied — a REAL .git dir at ANY
+# depth beneath the root (heal #644/#651, walk #655 a C1) — and only
+# there: the wholesale .git swap dies on the root bit while the
+# handover/handback arms' numeric chmod 2755/2775 REPLACE the mode and
+# used to take the bit with them (measured on a kit-managed host: heal
+# 02:43:27, wipe 02:43:35, examples/agent-project-{a,b-checkout}).
+# Pins: the re-add fires in all four arms, AFTER the numeric chmod
+# (order), for a direct .git AND a nested-only .git — never for a
+# .git-less root, a worktree's .git FILE or a symlinked .git — and a
+# failed re-add folds into the arm's ok-contract (warn, never
+# success). The heal's UNCONDITIONAL registered-root sticky (.git-less
+# included, "a later clone lands protected") is the documented
+# residual (#698 a S1), restored by the next baseline run.
+mkdir -p "$WORK/bk2/proj/.ddev" "$WORK/bk2/proj/.git"
+printf 'type: typo3\ndocroot: web\n' >"$WORK/bk2/proj/.ddev/config.yaml"
+_bk2_run() {
+    _bk2_fn=$1 _bk2_p=$2
+    : >"$OPS_BK_LOG"
+    PATH="$WORK/stubbk:$PATH" OPK_INSTALL_CONF=/nonexistent sh -c \
+        '. "$1" && "$2" "$3" ocuser ocgroup devuser' _ "$HANDOVER" "$_bk2_fn" "$_bk2_p" \
+        >/dev/null 2>&1
+}
+# (a+b) dev-owned handback root arm: kit-owned root (stubbed stat) with
+# a real .git dir re-adds the sticky after the numeric chmod.
+STAT_OWNER=ocuser
+_bk2_run ddev_handover_project_back "$WORK/bk2/proj"
+_2775=$(grep -n "^chmod 2775 $WORK/bk2/proj$" "$OPS_BK_LOG" | cut -d: -f1)
+_plust=$(grep -n "^chmod +t $WORK/bk2/proj$" "$OPS_BK_LOG" | cut -d: -f1)
+if [ -n "$_2775" ] && [ -n "$_plust" ] && [ "$_2775" -lt "$_plust" ]; then
+    pass "project_back: numeric 2775 re-adds the heal sticky, after the chmod (#697)"
+else
+    fail "project_back: sticky re-add missing/out of order (#697; 2775=$_2775 +t=$_plust)"
+fi
+# (a) typo3 bootstrap handover (TYPO3 not detected): 2755 arm re-adds too.
+_bk2_run ddev_handover_project_root "$WORK/bk2/proj"
+_2755=$(grep -n "^chmod 2755 $WORK/bk2/proj$" "$OPS_BK_LOG" | cut -d: -f1)
+_plust=$(grep -n "^chmod +t $WORK/bk2/proj$" "$OPS_BK_LOG" | cut -d: -f1)
+if [ -n "$_2755" ] && [ -n "$_plust" ] && [ "$_2755" -lt "$_plust" ]; then
+    pass "project_root: typo3 bootstrap 2755 re-adds the heal sticky (#697)"
+else
+    fail "project_root: bootstrap sticky re-add missing (#697; 2755=$_2755 +t=$_plust)"
+fi
+# (a) typo3 detected handback: vendor marker flips the detection, the
+# kit-owned root (stubbed stat) hands back with 2775 + the re-add.
+mkdir -p "$WORK/bk2/proj/vendor/typo3/cms-core/Classes/Information"
+: >"$WORK/bk2/proj/vendor/typo3/cms-core/Classes/Information/Typo3Version.php"
+_bk2_run ddev_handover_project_root "$WORK/bk2/proj"
+_2775=$(grep -n "^chmod 2775 $WORK/bk2/proj$" "$OPS_BK_LOG" | cut -d: -f1)
+_plust=$(grep -n "^chmod +t $WORK/bk2/proj$" "$OPS_BK_LOG" | cut -d: -f1)
+if [ -n "$_2775" ] && [ -n "$_plust" ] && [ "$_2775" -lt "$_plust" ]; then
+    pass "project_root: typo3 handback 2775 re-adds the heal sticky (#697)"
+else
+    fail "project_root: typo3 handback sticky re-add missing (#697; 2775=$_2775 +t=$_plust)"
+fi
+# (a) root-file type handover (symfony): the permanent-chmod arm too.
+mkdir -p "$WORK/bk6/proj/.ddev" "$WORK/bk6/proj/.git"
+printf 'type: symfony\n' >"$WORK/bk6/proj/.ddev/config.yaml"
+_bk2_run ddev_handover_project_root "$WORK/bk6/proj"
+_2755=$(grep -n "^chmod 2755 $WORK/bk6/proj$" "$OPS_BK_LOG" | cut -d: -f1)
+_plust=$(grep -n "^chmod +t $WORK/bk6/proj$" "$OPS_BK_LOG" | cut -d: -f1)
+if [ -n "$_2755" ] && [ -n "$_plust" ] && [ "$_2755" -lt "$_plust" ]; then
+    pass "project_root: root-file type 2755 re-adds the heal sticky (#697)"
+else
+    fail "project_root: root-file sticky re-add missing (#697; 2755=$_2755 +t=$_plust)"
+fi
+# (a-nested) #698 a S1: a nested-only .git root (no direct .git) is in
+# the walk's sticky set as an ANCESTOR — the widened anchor re-pins it
+# too, after the numeric chmod.
+mkdir -p "$WORK/bk7/proj/.ddev" "$WORK/bk7/proj/sub/.git"
+printf 'type: typo3\ndocroot: web\n' >"$WORK/bk7/proj/.ddev/config.yaml"
+_bk2_run ddev_handover_project_back "$WORK/bk7/proj"
+_2775=$(grep -n "^chmod 2775 $WORK/bk7/proj$" "$OPS_BK_LOG" | cut -d: -f1)
+_plust=$(grep -n "^chmod +t $WORK/bk7/proj$" "$OPS_BK_LOG" | cut -d: -f1)
+if [ -n "$_2775" ] && [ -n "$_plust" ] && [ "$_2775" -lt "$_plust" ]; then
+    pass "project_back: nested-only .git root re-adds the heal sticky (#698 a S1)"
+else
+    fail "project_back: nested .git sticky re-add missing (#698 a S1; 2775=$_2775 +t=$_plust)"
+fi
+# (c1) anchor: a .git-less root is outside the heal walk's sticky set
+# (no .git to chain from) — the re-add must stay silent; the heal's
+# UNCONDITIONAL registered-root sticky is the documented residual
+# (#698 a S1, next baseline run restores it).
+mkdir -p "$WORK/bk3/proj/.ddev"
+printf 'type: typo3\ndocroot: web\n' >"$WORK/bk3/proj/.ddev/config.yaml"
+_bk2_run ddev_handover_project_back "$WORK/bk3/proj"
+if grep -q "^chmod +t $WORK/bk3/proj$" "$OPS_BK_LOG"; then
+    fail "project_back: .git-less root must not get the sticky (#697 anchor)"
+else
+    pass "project_back: .git-less root stays unsticked (#697 anchor)"
+fi
+# (c2) anchor: a worktree's .git FILE never triggered the heal's
+# enumeration (find -type d) — not the re-add's anchor either.
+mkdir -p "$WORK/bk4/proj/.ddev"
+printf 'type: typo3\ndocroot: web\n' >"$WORK/bk4/proj/.ddev/config.yaml"
+: >"$WORK/bk4/proj/.git"
+_bk2_run ddev_handover_project_back "$WORK/bk4/proj"
+if grep -q "^chmod +t $WORK/bk4/proj$" "$OPS_BK_LOG"; then
+    fail "project_back: .git FILE root must not get the sticky (#697 anchor)"
+else
+    pass "project_back: worktree .git FILE root stays unsticked (#697 anchor)"
+fi
+# (c3) anchor: a symlinked .git is -type l, never matched by the walk
+# (links never followed, the heal's warn arm) — the re-add must not
+# fire (the 0.0.39g S2 [ ! -L ] gate guarded the old depth-1 anchor;
+# the walk anchor inherits the exclusion from find itself).
+mkdir -p "$WORK/bk5/proj/.ddev" "$WORK/bk5/realgit"
+printf 'type: typo3\ndocroot: web\n' >"$WORK/bk5/proj/.ddev/config.yaml"
+ln -s "$WORK/bk5/realgit" "$WORK/bk5/proj/.git"
+_bk2_run ddev_handover_project_back "$WORK/bk5/proj"
+if grep -q "^chmod +t $WORK/bk5/proj$" "$OPS_BK_LOG"; then
+    fail "project_back: symlinked .git root must not get the sticky (#697 anchor)"
+else
+    pass "project_back: symlinked .git root stays unsticked (#697 anchor)"
+fi
+# (d) ok-contract: a chmod stub failing ONLY on +t makes the arm warn
+# "incomplete" — a failed re-add never claims success.
+mkdir -p "$WORK/stubfail"
+printf '#!/bin/sh\n[ "$1" = "+t" ] && exit 1\necho "chmod $*" >> "$OPS_BK_LOG"\nexit 0\n' \
+    >"$WORK/stubfail/chmod"
+chmod +x "$WORK/stubfail/chmod"
+: >"$OPS_BK_LOG"
+_bk2_out=$(PATH="$WORK/stubfail:$WORK/stubbk:$PATH" OPK_INSTALL_CONF=/nonexistent sh -c \
+    '. "$1" && ddev_handover_project_back "$2" ocuser ocgroup devuser' _ "$HANDOVER" "$WORK/bk2/proj" 2>&1 || true)
+if printf '%s' "$_bk2_out" | grep -q "handback incomplete for $WORK/bk2/proj"; then
+    pass "project_back: failed sticky re-add warns incomplete (#697 ok-contract)"
+else
+    fail "project_back: failed re-add must warn (out=$_bk2_out)"
+fi
+# (d2) #698 b D2: the anchor probe's OWN failure leg, through the REAL
+# function (learnings L1: every new probe gets a pin that executes the
+# failure path). A PATH find stub failing outright — the chown/chmod
+# stubs run green (the numeric chmod lands in the ops log, the +t
+# never fires because the probe dies first), so the warn can only come
+# from the probe's rc fold.
+mkdir -p "$WORK/stubfindfail"
+printf '#!/bin/sh\nexit 1\n' >"$WORK/stubfindfail/find"
+chmod +x "$WORK/stubfindfail/find"
+: >"$OPS_BK_LOG"
+_d2_out=$(PATH="$WORK/stubfindfail:$WORK/stubbk:$PATH" OPK_INSTALL_CONF=/nonexistent sh -c \
+    '. "$1" && ddev_handover_project_back "$2" ocuser ocgroup devuser' _ "$HANDOVER" "$WORK/bk2/proj" 2>&1 || true)
+if printf '%s' "$_d2_out" | grep -q "handback incomplete for $WORK/bk2/proj" &&
+    grep -q "^chmod 2775 $WORK/bk2/proj$" "$OPS_BK_LOG" &&
+    ! grep -q "^chmod +t $WORK/bk2/proj$" "$OPS_BK_LOG"; then
+    pass "project_back: find-failure leg warns, sticky probe isolated (#698 b D2)"
+else
+    fail "project_back: find-failure leg must warn (#698 b D2; out=$_d2_out log=$(cat "$OPS_BK_LOG" 2>/dev/null))"
+fi
+
 # --- 2f. 0.0.45e W1 static order pins (mirroring bin/opk's direction-
 # aware pins): the two dev->agent executors chmod FIRST (walk while the
 # tree is still dev-owned), the back executor chowns FIRST. Line order
