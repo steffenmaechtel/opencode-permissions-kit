@@ -305,6 +305,25 @@ for _i483_lit in \
     grep -qF -- "$_i483_lit" "$REPO_ROOT/docs/concepts/security-model.md" ||
         echo "FAIL security-model.md: residual-gap disclosure '$_i483_lit' missing (#483)" >>"$TMP"
 done
+# --- #652: the post-heal git-execution residual inventory stays ---
+# disclosed (agent-controlled gitdirs, nuisance arms, pre-heal context
+# + complete closure) and the heal section keeps pointing at it.
+# One distinctive literal per entry, including the nested sub-bullets
+# (fix #689 a A2: "delete any bullet" overstated flat-bullet coverage);
+# sabotage: delete any PINNED bullet -- this goes red.
+for _i652_lit in \
+    'Git execution in agent-controlled gitdirs' \
+    'the developer works in the protected main' \
+    'an **agent-owned tree as a whole**' \
+    '**state created between heal runs:**' \
+    '**content planted before the heal**' \
+    'tracks report-only detection' \
+    'Nuisance arms of the shared `.git`' \
+    'closure remains a separate agent' \
+    'post-heal residual inventory'; do
+    grep -qF -- "$_i652_lit" "$REPO_ROOT/docs/concepts/security-model.md" ||
+        echo "FAIL security-model.md: post-heal residual disclosure '$_i652_lit' missing (#652)" >>"$TMP"
+done
 # The F13 siblings (the class sweep carried the evasion list into the
 # how-to and the glossary too) -- pinned since #506 round a A1.
 grep -qF -- 'planted git diff driver' "$REPO_ROOT/docs/how-to/customize-deny-list.md" ||
