@@ -479,9 +479,11 @@ status_section_git_heal() {
         [ -n "$_st_gh_gd" ] || continue
         # Wholesale-swap detection row (#653 family, #702/#703): with
         # the top-folder sticky gone (W1/W2 residuals, fs-baseline.sh
-        # #703), a swapped-in .git is necessarily owned by the
-        # swapper — flag when a gitdir's owner differs from its
-        # project dir's owner. Display-only, no verdict: an
+        # #703), the CANONICAL W1 shape (cp-a-copy + swap) leaves a
+        # swapper-owned .git under a developer-owned project dir —
+        # flag when a gitdir's owner differs from its project dir's
+        # owner (#706 b B2/B3: rename-shaped or W2 variants can keep
+        # the owners equal and stay quiet; display-only either way). Display-only, no verdict: an
         # agent-cloned repo under a dev-owned tree (the #655 a S3
         # class) trips it too. Catches the quiet variant after the
         # fact; the dev runs opk status regularly.

@@ -350,16 +350,18 @@ Operational notes:
   controls and dead ends:
   - **Detection (#703, shipped):** `opk status` and `opk doctor`
     flag `owner(.git) != owner(project dir)` per project. That
-    catches the W1 class — a swapped-in `.git` under a
-    developer-owned project dir is necessarily owned by the
-    swapper. It does **not** catch the W2 variants: the stealth
-    project-dir swap leaves dir and `.git` both agent-owned
-    (owners equal, row quiet), and the move-original variant keeps
-    a developer-owned `.git` inside the renamed dir — for W2 the
-    row is no control at all. Display-only, after the fact; run
-    `opk status` regularly. (An agent-cloned repo under a
-    developer-owned tree trips the same row — inspect, then
-    trust.)
+    catches the canonical W1 shape — the cp-a-copy-and-swap arm,
+    where the swapped-in `.git` under a developer-owned project dir
+    is owned by the swapper (a cross-project rename of a
+    developer-owned `.git` evades the row: rename preserves
+    ownership, owners stay equal). It does **not** catch the W2
+    variants: the stealth project-dir swap leaves dir and `.git`
+    both agent-owned (owners equal, row quiet), and the
+    move-original variant keeps a developer-owned `.git` inside the
+    renamed dir — for W2 the row is no control at all. Display-only,
+    after the fact; run `opk status` regularly. (An agent-cloned
+    repo under a developer-owned tree trips the same row — inspect,
+    then trust.)
   - **`fs.protected_regular` is irrelevant here:** it gates
     O_CREAT opens, never renames — no sysctl value mitigates W1–W3.
     The kit ships at the Ubuntu/WSL default (`=2`); the `=1`

@@ -692,11 +692,13 @@ doctor_git_heal() {
         # Wholesale-swap detection row (#653 family, #702/#703 — the
         # status-core twin enumerates every conf-root gitdir): with the
         # top-folder sticky gone (W1/W2 residuals, fs-baseline.sh
-        # #703), a swapped-in .git is necessarily owned by the
-        # swapper — flag when the gitdir's owner differs from the
-        # project root's owner. Display-only, no verdict: an
+        # #703), the CANONICAL W1 shape (cp-a-copy + swap) leaves a
+        # swapper-owned .git under a developer-owned project dir —
+        # flag when the gitdir's owner differs from the project
+        # root's owner (#706 b B2/B3: rename-shaped or W2 variants
+        # can keep the owners equal and stay quiet; display-only). An
         # agent-cloned repo under a dev-owned tree (#655 a S3 class)
-        # trips it too.
+        # trips the row too — no verdict, inspect.
         _dgh_gown=$(stat -c %U "$_dgh_gd" 2>/dev/null) || _dgh_gown=""
         _dgh_pown=""
         [ -n "$_dgh_gown" ] && { _dgh_pown=$(stat -c %U "$DOCTOR_ROOT" 2>/dev/null) || _dgh_pown=""; }
