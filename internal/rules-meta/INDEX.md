@@ -398,7 +398,7 @@
 | [RM-0035](0/0/3/RM-0035.md) | Examples use the abstract token | active | approved | 6m | 2027-05-17 |
 | [RM-0093](0/0/9/RM-0093.md) | In meta bodies, cross-references | active | approved | 6m | 2027-05-20 |
 | [RM-0094](0/0/9/RM-0094.md) | The review log names the | active | approved | 6m | 2027-05-20 |
-| [RM-0135](0/1/3/RM-0135.md) | Post-approval changes set | active | approved | 1m | 2026-11-30 |
+| [RM-0135](0/1/3/RM-0135.md) | Post-approval changes set | active | approved | 1m | 2026-12-20 |
 | [RM-0156](0/1/5/RM-0156.md) | The quote: needle is the | active | approved | 1m | 2026-12-17 |
 | [RM-0159](0/1/5/RM-0159.md) | Quoted strings in meta bodies | active | approved | 1m | 2026-12-16 |
 
