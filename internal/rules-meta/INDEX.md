@@ -8,11 +8,11 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**189 metas · 186 active · 3 retired · 19 review-pending · next due 2026-11-17**
+**189 metas · 186 active · 3 retired · 6 review-pending · next due 2026-11-17**
 
 ## Actionable
 
-- **Review pending:** RM-0177, RM-0178, RM-0179, RM-0180, RM-0181, RM-0182, RM-0183, RM-0184, RM-0185, RM-0186, RM-0187, RM-0188, RM-0189
+- **Review pending:** none
 - **Amended — pending:** RM-0044 (2026-11-18), RM-0113 (2026-11-18), RM-0141 (2026-11-18), RM-0175 (2026-11-18), RM-0154 (2026-11-19), RM-0150 (2026-11-20)
 
 ## AGENTS.md
@@ -81,8 +81,8 @@
 | [RM-0148](0/1/4/RM-0148.md) | The death arm is EXECUTED | active | approved | 1m | 2026-12-15 |
 | [RM-0149](0/1/4/RM-0149.md) | The empty-scan-set leg fails | active | approved | 1m | 2026-12-15 |
 | [RM-0150](0/1/5/RM-0150.md) | Detector rc semantics are per-tool | active | **amended — pending** | 1m | 2026-12-15 |
-| [RM-0181](0/1/8/RM-0181.md) | The channel is a property | active | **pending** | 1m | 2026-12-18 |
-| [RM-0187](0/1/8/RM-0187.md) | An absence assertion over captured | active | **pending** | 1m | 2026-12-20 |
+| [RM-0181](0/1/8/RM-0181.md) | The channel is a property | active | approved | 1m | 2026-12-20 |
+| [RM-0187](0/1/8/RM-0187.md) | An absence assertion over captured | active | approved | 1m | 2026-12-20 |
 
 ### Named-cause failure guards (shipped runners)
 
@@ -105,14 +105,14 @@
 | [RM-0137](0/1/3/RM-0137.md) | Scratch receivers in harness-sourcing suites… | active | approved | 1m | 2026-12-06 |
 | [RM-0151](0/1/5/RM-0151.md) | The decision rule for writing NEW | active | approved | 1m | 2026-12-15 |
 | [RM-0173](0/1/7/RM-0173.md) | A harness env override consumed | active | approved | 1m | 2026-12-17 |
-| [RM-0179](0/1/7/RM-0179.md) | The controlled PATH of an | active | **pending** | 1m | 2026-12-18 |
+| [RM-0179](0/1/7/RM-0179.md) | The controlled PATH of an | active | approved | 1m | 2026-12-20 |
 
 ### Never-write pins (unit suites)
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0177](0/1/7/RM-0177.md) | A never-write pin asserts mtime, | active | **pending** | 1m | 2026-12-18 |
-| [RM-0178](0/1/7/RM-0178.md) | The pin's red path never | active | **pending** | 1m | 2026-12-18 |
+| [RM-0177](0/1/7/RM-0177.md) | A never-write pin asserts mtime, | active | approved | 1m | 2026-12-20 |
+| [RM-0178](0/1/7/RM-0178.md) | The pin's red path never | active | approved | 1m | 2026-12-20 |
 
 ### Referencing review findings
 
@@ -126,20 +126,20 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0116](0/1/1/RM-0116.md) | Every RM key appears at exactly three sites | active | approved | 1m | 2026-11-24 |
-| [RM-0180](0/1/8/RM-0180.md) | Citation-FIXING waves are the prime | active | **pending** | 1m | 2026-12-18 |
+| [RM-0180](0/1/8/RM-0180.md) | Citation-FIXING waves are the prime | active | approved | 1m | 2026-12-20 |
 
 ### Standing prose: history, not rosters
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0157](0/1/5/RM-0157.md) | enumerates them as history | active | approved | 1m | 2026-12-16 |
-| [RM-0188](0/1/8/RM-0188.md) | A capability claim over | active | **pending** | 1m | 2026-12-20 |
+| [RM-0188](0/1/8/RM-0188.md) | A capability claim over | active | approved | 1m | 2026-12-20 |
 
 ### Wave-record claims: classes, not counts
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0189](0/1/8/RM-0189.md) | An exhaustive claim in | active | **pending** | 1m | 2026-12-20 |
+| [RM-0189](0/1/8/RM-0189.md) | An exhaustive claim in | active | approved | 1m | 2026-12-20 |
 
 ### Docs code blocks (paste-safe commands)
 
@@ -166,8 +166,8 @@
 | [RM-0144](0/1/4/RM-0144.md) | learnings.md additions carry era-marked | active | approved | 1m | 2026-12-15 |
 | [RM-0145](0/1/4/RM-0145.md) | Shipped content is English and | active | approved | 1m | 2026-12-15 |
 | [RM-0167](0/1/6/RM-0167.md) | A wave codifying a reflection | active | approved | 1m | 2026-12-17 |
-| [RM-0182](0/1/8/RM-0182.md) | The wave's own new prose | active | **pending** | 1m | 2026-12-18 |
-| [RM-0183](0/1/8/RM-0183.md) | The self-application sweep's sibling-read is | active | **pending** | 1m | 2026-12-18 |
+| [RM-0182](0/1/8/RM-0182.md) | The wave's own new prose | active | approved | 1m | 2026-12-20 |
+| [RM-0183](0/1/8/RM-0183.md) | The self-application sweep's sibling-read is | active | approved | 1m | 2026-12-20 |
 
 ## agent/review-concept.md
 
@@ -176,7 +176,7 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0057](0/0/5/RM-0057.md) | A diff of ~2.5k lines | active | approved | 1m | 2026-11-19 |
-| [RM-0184](0/1/8/RM-0184.md) | The round diff range is | active | **pending** | 1m | 2026-12-18 |
+| [RM-0184](0/1/8/RM-0184.md) | The round diff range is | active | approved | 1m | 2026-12-20 |
 
 ### The PR-native loop
 
@@ -209,7 +209,7 @@
 | [RM-0136](0/1/3/RM-0136.md) | Deferred work orders collected during | active | approved | 1m | 2026-12-17 |
 | [RM-0140](0/1/4/RM-0140.md) | After the work-order gate settles | active | approved | 1m | 2026-12-15 |
 | [RM-0161](0/1/6/RM-0161.md) | A FILED work order is self-contained at creation | active | approved | 1m | 2026-12-17 |
-| [RM-0185](0/1/8/RM-0185.md) | A deferred-findings COLLECTION issue states | active | **pending** | 1m | 2026-12-19 |
+| [RM-0185](0/1/8/RM-0185.md) | A deferred-findings COLLECTION issue states | active | approved | 1m | 2026-12-20 |
 
 ### Round typing and tiering
 
@@ -326,7 +326,7 @@
 | [RM-0111](0/1/1/RM-0111.md) | Sabotage spot-checks mutate the | active | approved | 1m | 2026-11-22 |
 | [RM-0114](0/1/1/RM-0114.md) | Agents stamp with their own | active | approved | 1m | 2026-11-22 |
 | [RM-0172](0/1/7/RM-0172.md) | A shipped code block is | active | approved | 1m | 2026-12-17 |
-| [RM-0186](0/1/8/RM-0186.md) | A session close (window, terminal, host) | active | **pending** | 1m | 2026-12-19 |
+| [RM-0186](0/1/8/RM-0186.md) | A session close (window, terminal, host) | active | approved | 1m | 2026-12-20 |
 
 ### Release gate
 
