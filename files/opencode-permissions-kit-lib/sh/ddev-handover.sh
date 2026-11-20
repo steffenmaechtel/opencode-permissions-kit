@@ -569,7 +569,13 @@ ddev_rootless_bindmounts() {
 # followed): the walk strips every ancestor down to each .git's
 # parent, so a nested-only repo root strips too; a .git-less root, a
 # worktree's .git FILE and a symlinked .git never matched the walk and
-# get no strip here. rc nonzero only when the anchor probe or the
+# get no strip here. Migration-reach residual (#703, the #698 a S1
+# shape inverted): the #655-era DRIVER stickied registered roots
+# UNCONDITIONALLY — .git-less roots included — so installed .git-less
+# roots do carry a legacy bit this anchor-gated belt skips; the
+# primary channel (the fs-baseline heal's unconditional root strip on
+# the next baseline run) removes it. rc nonzero only when the anchor
+# probe or the
 # strip itself failed; callers fold it into their ok-flag like the
 # chown/chmod pair above it.
 _ddev_heal_unsticky() {

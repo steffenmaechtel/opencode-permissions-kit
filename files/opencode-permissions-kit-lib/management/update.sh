@@ -1209,7 +1209,9 @@ if [ "$ONLY_BINARY" = true ]; then
 else
     ui_kv "Kit" "v$VERSION"
     ui_kv "Configs" "projects.conf and opencode.jsonc untouched"
-    # One-time migration notice (#703): this version removes the
+    # Migration notice (#703 — prints on every plain full update
+    # until a refresh ran; deliberately no once-state, #706 a S1):
+    # this version removes the
     # #655-era top-folder sticky bits — the .git heal itself is
     # unchanged. The strip rides the group-baseline heal, which a
     # plain update does not run (#696) — name the command instead of

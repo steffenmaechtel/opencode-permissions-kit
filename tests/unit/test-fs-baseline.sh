@@ -492,7 +492,38 @@ if printf '%s' "$HGF2OUT" | grep -qF 'chmod -t (project root strip)'; then
 else
     fail "heal: the failing strip is named (out=$(printf '%s' "$HGF2OUT" | grep -F 'chmod -t' | head -2))"
 fi
-rm -rf "$HG" "$HGS" "$HGF" "$HGFSTUB" "$HGF2" "$HGF2STUB"
+
+# #706 a S3: the WALK twin's own failure leg (_fsb_heal_unsticky, the
+# ancestor strip — distinct from the driver's root strip above): the
+# HGF2 fixture sits .git at depth 1 (parent == root, no walk), so this
+# arm drives a DEPTH-2 .git whose ancestors (proj/grp, proj/grp/site)
+# go through _fsb_heal_unsticky — a chmod stub failing only on -t must
+# fail the baseline loud AND name the ANCESTOR operand (the driver's
+# root error alone would not discriminate the twin's fold).
+HGF3="$WORK/healwalkfail"
+HGF3STUB="$WORK/healwalkfail-bin"
+mkdir -p "$HGF3/proj/grp/site/.git/hooks" "$HGF3STUB"
+printf 'c\n' >"$HGF3/proj/grp/site/.git/config"
+cat >"$HGF3STUB/chmod" <<EOF
+#!/bin/sh
+[ "\$1" = "-t" ] && exit 1
+exec "$_real_chmod" "\$@"
+EOF
+chmod +x "$HGF3STUB/chmod"
+HGF3OUT="$(PATH="$HGF3STUB:$PATH" FS_SUDO="" \
+    sh -c '. "$1" && fs_baseline_root "$2" "$3" && echo BASELINE-RC0' \
+    _ "$LIB" "$HGF3/proj" "$HGGRP" 2>&1 || true)"
+if printf '%s' "$HGF3OUT" | grep -q BASELINE-RC0; then
+    fail "heal: a failing ancestor strip must fail the baseline (#706 a S3)"
+else
+    pass "heal: a failing ancestor strip must fail the baseline (#706 a S3)"
+fi
+if printf '%s' "$HGF3OUT" | grep -qF "chmod -t failed on $HGF3/proj/grp"; then
+    pass "heal: the failing ANCESTOR strip is named (the walk twin's fold, #706 a S3)"
+else
+    fail "heal: the failing ancestor strip is named (out=$(printf '%s' "$HGF3OUT" | grep -F 'chmod -t failed' | head -3))"
+fi
+rm -rf "$HG" "$HGS" "$HGF" "$HGFSTUB" "$HGF2" "$HGF2STUB" "$HGF3" "$HGF3STUB"
 
 # A bare `chgrp <link>` follows the TARGET; chgrp -R (the old code) did
 # not. The pass must skip symlinks entirely — the link's TARGET (here a

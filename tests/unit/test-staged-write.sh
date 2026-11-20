@@ -431,8 +431,10 @@ fi
 # #644/#651, walk #655 a C1, strip #702/#703) — and only there: the
 # top-folder sticky is REMOVED now (W1/W2 reopen as accepted
 # residuals), the handover/handback arms' numeric chmod 2755/2775
-# REPLACE the mode anyway, and the explicit strip is the belt for
-# legacy bits the chmod cannot take (a failed chmod, a pre-#703 heal).
+# REPLACE the mode anyway — taking any sticky along with it — and the
+# explicit strip is the belt for the one case that leaves the bit
+# behind: a FAILED chmod (#706 a Q4 — a numeric mode takes the bit,
+# 3775 -> chmod 2775 -> 2775).
 # Pins: the strip fires in all four arms, AFTER the numeric chmod
 # (order), for a direct .git AND a nested-only .git — never for a
 # .git-less root, a worktree's .git FILE or a symlinked .git — and a

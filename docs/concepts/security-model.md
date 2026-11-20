@@ -70,7 +70,14 @@ from agent-writable surfaces there:
   [#701](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/701),
   [#697](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/697))
   outweighed the wholesale-swap prevention, and a baseline run now
-  strips any legacy bit it finds (migration). What that trade reopens
+  strips any sticky it finds on those directories (migration —
+  indiscriminate by necessity: the mechanism cannot tell a kit-era
+  bit from an operator's, so an operator-set sticky on a scan root
+  or `.git` ancestor goes with it at every baseline run). The strip
+  covers registered roots and the ancestors of every `.git` found
+  under them; one corner lingers — an ancestor stickied for a
+  `.git` that has since been deleted is outside every current walk
+  (strip those manually: `sudo chmod -t <dir>`). What that trade reopens
   — the wholesale `.git` / project-dir swap arms — is documented with
   the residuals below.
 - Why that works: the sticky bit sits on the PARENT of whatever must
@@ -342,11 +349,17 @@ Operational notes:
   while W1–W3 need a deliberately malicious agent. Compensating
   controls and dead ends:
   - **Detection (#703, shipped):** `opk status` and `opk doctor`
-    flag `owner(.git) != owner(project dir)` per project — a
-    wholesale swap necessarily leaves an agent-owned `.git`
-    behind. Display-only, after the fact; run `opk status`
-    regularly. (An agent-cloned repo under a developer-owned tree
-    trips the same row — inspect, then trust.)
+    flag `owner(.git) != owner(project dir)` per project. That
+    catches the W1 class — a swapped-in `.git` under a
+    developer-owned project dir is necessarily owned by the
+    swapper. It does **not** catch the W2 variants: the stealth
+    project-dir swap leaves dir and `.git` both agent-owned
+    (owners equal, row quiet), and the move-original variant keeps
+    a developer-owned `.git` inside the renamed dir — for W2 the
+    row is no control at all. Display-only, after the fact; run
+    `opk status` regularly. (An agent-cloned repo under a
+    developer-owned tree trips the same row — inspect, then
+    trust.)
   - **`fs.protected_regular` is irrelevant here:** it gates
     O_CREAT opens, never renames — no sysctl value mitigates W1–W3.
     The kit ships at the Ubuntu/WSL default (`=2`); the `=1`

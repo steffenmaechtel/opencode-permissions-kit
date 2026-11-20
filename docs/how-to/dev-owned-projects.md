@@ -38,7 +38,10 @@ run strips legacy bits as migration; see
 wholesale-swap residuals and the `opk status`/`opk doctor` detection
 row). Handover and handback strip the bit after every numeric mode set
 (the numeric chmod drops it anyway) — only `.git` itself and its
-pinned internals keep the heal.
+pinned internals keep the heal. A `.git`-less root never matched the
+heal's walk: if it still carries the #655-era bit, the next
+`sudo opk config refresh` (or `opk update --refresh`) strips it — the
+handover arms cannot know a `.git`-less root is a registered heal root.
 
 The trade-off: **your repo owns the CMS settings file.** ddev no longer
 generates `AdditionalConfiguration.php` (TYPO3) or `settings.ddev.php`
