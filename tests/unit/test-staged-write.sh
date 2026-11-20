@@ -554,6 +554,25 @@ if printf '%s' "$_bk2_out" | grep -q "handback incomplete for $WORK/bk2/proj"; t
 else
     fail "project_back: failed re-add must warn (out=$_bk2_out)"
 fi
+# (d2) #698 b D2: the anchor probe's OWN failure leg, through the REAL
+# function (learnings L1: every new probe gets a pin that executes the
+# failure path). A PATH find stub failing outright — the chown/chmod
+# stubs run green (the numeric chmod lands in the ops log, the +t
+# never fires because the probe dies first), so the warn can only come
+# from the probe's rc fold.
+mkdir -p "$WORK/stubfindfail"
+printf '#!/bin/sh\nexit 1\n' >"$WORK/stubfindfail/find"
+chmod +x "$WORK/stubfindfail/find"
+: >"$OPS_BK_LOG"
+_d2_out=$(PATH="$WORK/stubfindfail:$WORK/stubbk:$PATH" OPK_INSTALL_CONF=/nonexistent sh -c \
+    '. "$1" && ddev_handover_project_back "$2" ocuser ocgroup devuser' _ "$HANDOVER" "$WORK/bk2/proj" 2>&1 || true)
+if printf '%s' "$_d2_out" | grep -q "handback incomplete for $WORK/bk2/proj" &&
+    grep -q "^chmod 2775 $WORK/bk2/proj$" "$OPS_BK_LOG" &&
+    ! grep -q "^chmod +t $WORK/bk2/proj$" "$OPS_BK_LOG"; then
+    pass "project_back: find-failure leg warns, sticky probe isolated (#698 b D2)"
+else
+    fail "project_back: find-failure leg must warn (#698 b D2; out=$_d2_out log=$(cat "$OPS_BK_LOG" 2>/dev/null))"
+fi
 
 # --- 2f. 0.0.45e W1 static order pins (mirroring bin/opk's direction-
 # aware pins): the two dev->agent executors chmod FIRST (walk while the

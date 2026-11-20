@@ -626,7 +626,7 @@ ddev_handover_project_root() {
                         echo "  project-root handback: $dhq_proj -> $dhq_dev (TYPO3 detected, ddev no longer targets the root)"
                     else
                         echo "  warn: project-root handback incomplete for $dhq_proj""\
- (chown/chmod errors — the next update rescans and heals)" >&2
+ (chown/chmod/sticky-re-add errors — the next update rescans and heals)" >&2
                         _dhr_partial=1
                     fi
                 fi
@@ -639,7 +639,7 @@ ddev_handover_project_root() {
                     echo "  project-root handover: $dhq_proj -> $dhq_user (TYPO3 not yet installed, bootstrap needs root ownership)"
                 else
                     echo "  warn: project-root handover incomplete for $dhq_proj""\
- (chown/chmod errors — the next update rescans and heals)" >&2
+ (chown/chmod/sticky-re-add errors — the next update rescans and heals)" >&2
                     _dhr_partial=1
                 fi
             fi
@@ -657,7 +657,7 @@ ddev_handover_project_root() {
                 echo "  file lives at the root; the dev-owned flag hands it back)"
             else
                 echo "  warn: project-root handover incomplete for $dhq_proj""\
- (chown/chmod errors — the next update rescans and heals)" >&2
+ (chown/chmod/sticky-re-add errors — the next update rescans and heals)" >&2
                 _dhr_partial=1
             fi
             ;;
@@ -1117,7 +1117,7 @@ ddev_handover_project_back() {
             echo "  dev-owned handback: $dhb_proj (root) -> $dhb_dev (2775)"
         else
             echo "  warn: dev-owned handback incomplete for $dhb_proj (root inode""\
- — chown/chmod errors, the next update rescans and heals)" >&2
+ — chown/chmod/sticky-re-add errors, the next update rescans and heals)" >&2
             _dhr_partial=1
         fi
     fi
