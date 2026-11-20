@@ -745,8 +745,8 @@ heal-behavior bugs (#686, PR #684):
   committer identity inline — `git -c user.email=… -c user.name=…
   <cmd>` — because the container users carry no global identity (a
   repo-local `git config` identity satisfies commits too —
-  fixtures/make-bare-origin.sh — but inline `-c` keeps an arm
-  self-contained): the refusal is rc 128
+  tests/e2e/fixtures/make-bare-origin.sh — but inline `-c` keeps
+  an arm self-contained): the refusal is rc 128
   ("Committer identity unknown") with a stderr a blanket
   `>/dev/null 2>&1` eats, and the arm then fails downstream with
   zero evidence in the log (probed 2026-11-20; #686 item 1,
