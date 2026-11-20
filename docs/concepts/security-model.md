@@ -135,10 +135,12 @@ from agent-writable surfaces there:
   the agent loses repo-config writes in its own nested clone (work in
   the main checkout or an agent-owned root instead).
 - What it does **not** close: the post-heal residual inventory —
-  agent-controlled worktree gitdirs, agent-owned trees, the nuisance
-  arms of the shared `.git`, content planted before the heal — lives
-  in [Known residual gaps](#known-residual-gaps) below (documented
-  with issue #652 after the heal was piloted).
+  agent-controlled worktree gitdirs, agent-owned trees, the timing
+  class between heal runs, content planted before the heal, the
+  nuisance arms of the shared `.git`, and the pre-heal context with
+  the one complete closure — lives in
+  [Known residual gaps](#known-residual-gaps) below (documented with
+  issue #652 after the heal was piloted).
 - The heal survives `opk uninstall` where it matters: the revert walks
   never touch the sticky bit or the **uid** of developer-owned pinned
   entries (their *group* is reverted to the developer's login group by

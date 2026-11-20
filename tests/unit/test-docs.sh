@@ -308,11 +308,15 @@ done
 # --- #652: the post-heal git-execution residual inventory stays ---
 # disclosed (agent-controlled gitdirs, nuisance arms, pre-heal context
 # + complete closure) and the heal section keeps pointing at it.
-# One distinctive literal per entry; sabotage: delete any bullet --
-# this goes red.
+# One distinctive literal per entry, including the nested sub-bullets
+# (fix #689 a A2: "delete any bullet" overstated flat-bullet coverage);
+# sabotage: delete any PINNED bullet -- this goes red.
 for _i652_lit in \
     'Git execution in agent-controlled gitdirs' \
     'the developer works in the protected main' \
+    'an **agent-owned tree as a whole**' \
+    '**state created between heal runs:**' \
+    '**content planted before the heal**' \
     'tracks report-only detection' \
     'Nuisance arms of the shared `.git`' \
     'closure remains a separate agent' \
