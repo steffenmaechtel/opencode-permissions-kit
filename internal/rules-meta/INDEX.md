@@ -8,12 +8,12 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**189 metas · 186 active · 3 retired · 0 review-pending · next due 2026-11-17**
+**193 metas · 190 active · 3 retired · 5 review-pending · next due 2026-11-17**
 
 ## Actionable
 
-- **Review pending:** none
-- **Amended — pending:** none
+- **Review pending:** RM-0190, RM-0191, RM-0192, RM-0193
+- **Amended — pending:** RM-0182 (2026-11-20)
 
 ## AGENTS.md
 
@@ -114,6 +114,15 @@
 | [RM-0177](0/1/7/RM-0177.md) | A never-write pin asserts mtime, | active | approved | 1m | 2026-12-20 |
 | [RM-0178](0/1/7/RM-0178.md) | The pin's red path never | active | approved | 1m | 2026-12-20 |
 
+### E2E arm authoring (git-writing arms)
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0190](0/1/9/RM-0190.md) | Any e2e arm whose git | active | **pending** | 1m | 2026-12-20 |
+| [RM-0191](0/1/9/RM-0191.md) | Never silence a git command | active | **pending** | 1m | 2026-12-20 |
+| [RM-0192](0/1/9/RM-0192.md) | Recreate pruned directories after every | active | **pending** | 1m | 2026-12-20 |
+| [RM-0193](0/1/9/RM-0193.md) | Fixture state constrains every later | active | **pending** | 1m | 2026-12-20 |
+
 ### Referencing review findings
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
@@ -166,7 +175,7 @@
 | [RM-0144](0/1/4/RM-0144.md) | learnings.md additions carry era-marked | active | approved | 1m | 2026-12-15 |
 | [RM-0145](0/1/4/RM-0145.md) | Shipped content is English and | active | approved | 1m | 2026-12-15 |
 | [RM-0167](0/1/6/RM-0167.md) | A wave codifying a reflection | active | approved | 1m | 2026-12-17 |
-| [RM-0182](0/1/8/RM-0182.md) | The wave's own new prose | active | approved | 1m | 2026-12-20 |
+| [RM-0182](0/1/8/RM-0182.md) | The wave's own new prose | active | **amended — pending** | 1m | 2026-12-20 |
 | [RM-0183](0/1/8/RM-0183.md) | The self-application sweep's sibling-read is | active | approved | 1m | 2026-12-20 |
 
 ## agent/review-concept.md

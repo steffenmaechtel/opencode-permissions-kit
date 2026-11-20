@@ -113,6 +113,7 @@ ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#standing-prose-history-no
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#wave-record-claims-classes-not-counts"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#shell-semantics-dash-and-posix-sh"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#docs-code-blocks-paste-safe-commands"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#e2e-arm-authoring-git-writing-arms"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS internal/records/rules-meta.md#revisit-ladder"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS internal/records/rules-meta.md#the-main-rule"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS internal/records/rules-meta.md#meta-format-v12"

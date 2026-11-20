@@ -111,7 +111,18 @@ inherits an UNVERIFIED claim as if audited — issue #594's own
 pr-00621 round a Q2 (#626). For the shipping wave, an issue's
 mechanism claims are claim-audit objects like any other: verify, do
 not inherit (the docs-loop's re-probe duty for mechanism claims is
-the rule-text sibling). Subagent research summaries are the same
+the rule-text sibling). The issue's own QUOTATION MARKS are the
+arm's deepest channel (2026-11-20, PR #685 round a A2 plus the
+fix-wave sweep sibling, #688): a reflection issue compresses and
+re-wraps its sources, so quotation marks in an issue body are not
+evidence — a wave re-quoting an issue's quoted strings in rule
+text, metas or PR bodies verifies each at the PRIMARY source
+(shipped bytes, test files, the PR timeline) before re-quoting, or
+paraphrases without quotes; the compressed-header channel rides the
+same arm (an item header's finding-ID parenthetical can disagree
+with its own narrative three sentences later — derive citations
+from the narrative and the PR timeline, never the header shape).
+Subagent research summaries are the same
 arm's second carrier (2026-11-18, PR #642): a delegated researcher's
 external-tool claims read authoritative enough to skip the audit —
 re-measure every claim against the primary source (the local clone

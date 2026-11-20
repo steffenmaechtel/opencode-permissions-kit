@@ -265,7 +265,20 @@ rc=$?; tail -3 /tmp/opencode/<case>/test.log; echo "RC=$rc"
 
 Diagnosis only on red: `tail -40 /tmp/opencode/<case>/<offender>.log`.
 Check-then-commit is only protection if the
-check can fail the chain. The chain's SCOPE for fix waves is the full
+check can fail the chain. A RUNNING chain freezes the tree it
+reads: while a gate chain runs — a background chain above all — no
+file its suites read is edited; pin-block additions, literal fixes
+and every other edit wait for the chain's completion or land before
+its start. A green `make test` over a tree that changed mid-run
+covered a MIXED state — some suites before the edit, some after, and
+a suite hitting the file inside an edit window can red on a
+half-written file or pass without seeing the final pins — so
+an edit that slipped
+in anyway voids the green for the edited files' suites — the full
+gate re-runs over the final state before the commit rides it
+(mandatory re-run, not a remembered favor; #692, PR #689 session —
+the tell was 0 pin-marker hits in the chain's log, ambiguous
+because passing pins grep silently). The chain's SCOPE for fix waves is the full
 gate (`make test`), never only the touched suites: tree-wide invariant
 suites (rules-meta, sandbox-policy, workflows, format-gate) redden on
 changes their own files never touched — #412's round-b B3 (bare
@@ -298,7 +311,20 @@ root, not under `files/` (a guessed `files/SHA256SUMS` pathspec-kills
 the chain at the add, exit 128, after the gates already ran green;
 #637, PR #633), and the chain regenerates the file, which the path
 list does not know (twice amended in one session, pr-00599 commits
-8f7cae87 and c09f13f2; issue #602). The entry-checksum blocks in README and
+8f7cae87 and c09f13f2; issue #602). The POST-REBASE shape inverts
+that order duty: after rebasing a branch whose per-commit
+`SHA256SUMS` conflicted (any rebase onto a master that touched
+`files/` — resolve the conflicts `--theirs` per commit), the final
+regenerated manifest needs its OWN commit BEFORE `make test` runs.
+The fetch-integrity committed-manifest leg compares the manifest at
+HEAD against HEAD's tree, and the post-rebase state is exactly
+inputs-clean-plus-manifest-stale — the documented
+`sums && test && add && commit` order cannot complete there,
+because the check that must gate the commit reads a commit that has
+not happened yet. Working sequence (probed 2026-11-20; one red
+cycle paid for it in the #687 session): `make sums && git add
+SHA256SUMS && git commit -m "…" && make test` — from there the
+normal chain order applies again. The entry-checksum blocks in README and
 `docs/getting-started.md` are the ONE checksum artifact mid-cycle
 waves never touch: `make release-sums` rewrites them from the tree's
 `files/install.sh` **release PR only** (issue #492) — a mid-cycle
