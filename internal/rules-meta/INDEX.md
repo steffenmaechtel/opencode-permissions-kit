@@ -8,12 +8,12 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**189 metas · 186 active · 3 retired · 19 review-pending · next due 2026-11-17**
+**189 metas · 186 active · 3 retired · 0 review-pending · next due 2026-11-17**
 
 ## Actionable
 
-- **Review pending:** RM-0177, RM-0178, RM-0179, RM-0180, RM-0181, RM-0182, RM-0183, RM-0184, RM-0185, RM-0186, RM-0187, RM-0188, RM-0189
-- **Amended — pending:** RM-0044 (2026-11-18), RM-0113 (2026-11-18), RM-0141 (2026-11-18), RM-0175 (2026-11-18), RM-0154 (2026-11-19), RM-0150 (2026-11-20)
+- **Review pending:** none
+- **Amended — pending:** none
 
 ## AGENTS.md
 
@@ -42,7 +42,7 @@
 | [RM-0005](0/0/0/RM-0005.md) | Enter accepts the default (empty answer =… | active | approved | 6m | 2027-05-17 |
 | [RM-0006](0/0/0/RM-0006.md) | Accepted input: y, yes, n, no — case-insensitive | active | approved | 6m | 2027-05-17 |
 | [RM-0007](0/0/0/RM-0007.md) | Don't invent alternatives | active | approved | 6m | 2027-05-17 |
-| [RM-0036](0/0/3/RM-0036.md) | Free-text questions (ui_ask) show [default] | active | approved | 1m | 2026-11-17 |
+| [RM-0036](0/0/3/RM-0036.md) | Free-text questions (ui_ask) show [default] | active | approved | 6m | 2027-05-20 |
 
 ### Script output style
 
@@ -50,9 +50,9 @@
 |---|---|---|---|---|---|
 | [RM-0008](0/0/0/RM-0008.md) | Rows printed inside a pipeline | active | approved | 6m | 2027-05-17 |
 | [RM-0009](0/0/0/RM-0009.md) | UI_SILENT=1 mutes every non-interactive print… | active | approved | 6m | 2027-05-17 |
-| [RM-0037](0/0/3/RM-0037.md) | Severity rows are semantic, not | active | approved | 1m | 2026-11-17 |
+| [RM-0037](0/0/3/RM-0037.md) | Severity rows are semantic, not | active | approved | 6m | 2027-05-20 |
 | [RM-0038](0/0/3/RM-0038.md) | Report commands carry their verdict in | active | approved | 1m | 2026-12-17 |
-| [RM-0039](0/0/3/RM-0039.md) | File lists in code (fetch/deploy | active | approved | 1m | 2026-11-17 |
+| [RM-0039](0/0/3/RM-0039.md) | File lists in code (fetch/deploy | active | approved | 6m | 2027-05-20 |
 
 ### Shell security (untrusted input)
 
@@ -62,8 +62,8 @@
 | [RM-0011](0/0/1/RM-0011.md) | printf '%s' style | active | approved | 6m | 2027-05-17 |
 | [RM-0012](0/0/1/RM-0012.md) | Free text flows through files, not argv | active | approved | 6m | 2027-05-17 |
 | [RM-0013](0/0/1/RM-0013.md) | Allowlist before argv/query | active | approved | 6m | 2027-05-17 |
-| [RM-0040](0/0/4/RM-0040.md) | Fail loud vs. fail open. Maintainer | active | approved | 1m | 2026-11-17 |
-| [RM-0041](0/0/4/RM-0041.md) | Prove it in tests. Payload attempts | active | approved | 1m | 2026-11-17 |
+| [RM-0040](0/0/4/RM-0040.md) | Fail loud vs. fail open. Maintainer | active | approved | 6m | 2027-05-20 |
+| [RM-0041](0/0/4/RM-0041.md) | Prove it in tests. Payload attempts | active | approved | 6m | 2027-05-20 |
 
 ### Shell semantics (dash and POSIX sh)
 
@@ -80,9 +80,9 @@
 | [RM-0147](0/1/4/RM-0147.md) | Call sites consume the rc | active | approved | 1m | 2026-12-15 |
 | [RM-0148](0/1/4/RM-0148.md) | The death arm is EXECUTED | active | approved | 1m | 2026-12-15 |
 | [RM-0149](0/1/4/RM-0149.md) | The empty-scan-set leg fails | active | approved | 1m | 2026-12-15 |
-| [RM-0150](0/1/5/RM-0150.md) | Detector rc semantics are per-tool | active | **amended — pending** | 1m | 2026-12-15 |
-| [RM-0181](0/1/8/RM-0181.md) | The channel is a property | active | **pending** | 1m | 2026-12-18 |
-| [RM-0187](0/1/8/RM-0187.md) | An absence assertion over captured | active | **pending** | 1m | 2026-12-20 |
+| [RM-0150](0/1/5/RM-0150.md) | Detector rc semantics are per-tool | active | approved | 1m | 2026-12-20 |
+| [RM-0181](0/1/8/RM-0181.md) | The channel is a property | active | approved | 1m | 2026-12-20 |
+| [RM-0187](0/1/8/RM-0187.md) | An absence assertion over captured | active | approved | 1m | 2026-12-20 |
 
 ### Named-cause failure guards (shipped runners)
 
@@ -99,20 +99,20 @@
 | [RM-0015](0/0/1/RM-0015.md) | Never touch real project or system trees | active | approved | 6m | 2027-05-17 |
 | [RM-0016](0/0/1/RM-0016.md) | Fixture data is written sandboxed at the source | active | approved | 6m | 2027-05-17 |
 | [RM-0017](0/0/1/RM-0017.md) | Code extracted from shipped scripts and eval'd… | active | approved | 6m | 2027-05-17 |
-| [RM-0042](0/0/4/RM-0042.md) | Mutation check — a mutating verb | active | approved | 1m | 2026-11-17 |
-| [RM-0043](0/0/4/RM-0043.md) | Real-tree ratchet — any path-shaped | active | approved | 1m | 2026-11-17 |
-| [RM-0044](0/0/4/RM-0044.md) | rm suffix guard — any rm invocation | active | **amended — pending** | 1m | 2026-11-17 |
+| [RM-0042](0/0/4/RM-0042.md) | Mutation check — a mutating verb | active | approved | 6m | 2027-05-20 |
+| [RM-0043](0/0/4/RM-0043.md) | Real-tree ratchet — any path-shaped | active | approved | 6m | 2027-05-20 |
+| [RM-0044](0/0/4/RM-0044.md) | rm suffix guard — any rm invocation | active | approved | 1m | 2026-12-20 |
 | [RM-0137](0/1/3/RM-0137.md) | Scratch receivers in harness-sourcing suites… | active | approved | 1m | 2026-12-06 |
 | [RM-0151](0/1/5/RM-0151.md) | The decision rule for writing NEW | active | approved | 1m | 2026-12-15 |
 | [RM-0173](0/1/7/RM-0173.md) | A harness env override consumed | active | approved | 1m | 2026-12-17 |
-| [RM-0179](0/1/7/RM-0179.md) | The controlled PATH of an | active | **pending** | 1m | 2026-12-18 |
+| [RM-0179](0/1/7/RM-0179.md) | The controlled PATH of an | active | approved | 1m | 2026-12-20 |
 
 ### Never-write pins (unit suites)
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0177](0/1/7/RM-0177.md) | A never-write pin asserts mtime, | active | **pending** | 1m | 2026-12-18 |
-| [RM-0178](0/1/7/RM-0178.md) | The pin's red path never | active | **pending** | 1m | 2026-12-18 |
+| [RM-0177](0/1/7/RM-0177.md) | A never-write pin asserts mtime, | active | approved | 1m | 2026-12-20 |
+| [RM-0178](0/1/7/RM-0178.md) | The pin's red path never | active | approved | 1m | 2026-12-20 |
 
 ### Referencing review findings
 
@@ -126,20 +126,20 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0116](0/1/1/RM-0116.md) | Every RM key appears at exactly three sites | active | approved | 1m | 2026-11-24 |
-| [RM-0180](0/1/8/RM-0180.md) | Citation-FIXING waves are the prime | active | **pending** | 1m | 2026-12-18 |
+| [RM-0180](0/1/8/RM-0180.md) | Citation-FIXING waves are the prime | active | approved | 1m | 2026-12-20 |
 
 ### Standing prose: history, not rosters
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0157](0/1/5/RM-0157.md) | enumerates them as history | active | approved | 1m | 2026-12-16 |
-| [RM-0188](0/1/8/RM-0188.md) | A capability claim over | active | **pending** | 1m | 2026-12-20 |
+| [RM-0188](0/1/8/RM-0188.md) | A capability claim over | active | approved | 1m | 2026-12-20 |
 
 ### Wave-record claims: classes, not counts
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0189](0/1/8/RM-0189.md) | An exhaustive claim in | active | **pending** | 1m | 2026-12-20 |
+| [RM-0189](0/1/8/RM-0189.md) | An exhaustive claim in | active | approved | 1m | 2026-12-20 |
 
 ### Docs code blocks (paste-safe commands)
 
@@ -160,14 +160,14 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0141](0/1/4/RM-0141.md) | New rule bullets in audit-scope | active | **amended — pending** | 1m | 2026-12-15 |
+| [RM-0141](0/1/4/RM-0141.md) | New rule bullets in audit-scope | active | approved | 1m | 2026-12-20 |
 | [RM-0142](0/1/4/RM-0142.md) | Run the rules-meta suite while | active | approved | 1m | 2026-12-15 |
 | [RM-0143](0/1/4/RM-0143.md) | New text cites its source | active | approved | 1m | 2026-12-15 |
 | [RM-0144](0/1/4/RM-0144.md) | learnings.md additions carry era-marked | active | approved | 1m | 2026-12-15 |
 | [RM-0145](0/1/4/RM-0145.md) | Shipped content is English and | active | approved | 1m | 2026-12-15 |
 | [RM-0167](0/1/6/RM-0167.md) | A wave codifying a reflection | active | approved | 1m | 2026-12-17 |
-| [RM-0182](0/1/8/RM-0182.md) | The wave's own new prose | active | **pending** | 1m | 2026-12-18 |
-| [RM-0183](0/1/8/RM-0183.md) | The self-application sweep's sibling-read is | active | **pending** | 1m | 2026-12-18 |
+| [RM-0182](0/1/8/RM-0182.md) | The wave's own new prose | active | approved | 1m | 2026-12-20 |
+| [RM-0183](0/1/8/RM-0183.md) | The self-application sweep's sibling-read is | active | approved | 1m | 2026-12-20 |
 
 ## agent/review-concept.md
 
@@ -175,8 +175,8 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0057](0/0/5/RM-0057.md) | A diff of ~2.5k lines | active | approved | 1m | 2026-11-19 |
-| [RM-0184](0/1/8/RM-0184.md) | The round diff range is | active | **pending** | 1m | 2026-12-18 |
+| [RM-0057](0/0/5/RM-0057.md) | A diff of ~2.5k lines | active | approved | 6m | 2027-05-20 |
+| [RM-0184](0/1/8/RM-0184.md) | The round diff range is | active | approved | 1m | 2026-12-20 |
 
 ### The PR-native loop
 
@@ -190,13 +190,13 @@
 | [RM-0122](0/1/2/RM-0122.md) | Scope brake (binding in | active | approved | 1m | 2026-11-28 |
 | [RM-0123](0/1/2/RM-0123.md) | Scope budget (autonomous commissions): the | active | approved | 1m | 2026-11-28 |
 | [RM-0138](0/1/3/RM-0138.md) | A fix-wave re-review is itself | active | approved | 1m | 2026-12-07 |
-| [RM-0175](0/1/7/RM-0175.md) | The posted.log entry is | active | **amended — pending** | 1m | 2026-12-17 |
+| [RM-0175](0/1/7/RM-0175.md) | The posted.log entry is | active | approved | 1m | 2026-12-20 |
 
 ### The loop and the stop rule
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0064](0/0/6/RM-0064.md) | Stop when a round leaves | active | approved | 1m | 2026-11-19 |
+| [RM-0064](0/0/6/RM-0064.md) | Stop when a round leaves | active | approved | 6m | 2027-05-20 |
 | [RM-0065](0/0/6/RM-0065.md) | Review-relevant is everything that has | active | approved | 1m | 2026-12-17 |
 | [RM-0066](0/0/6/RM-0066.md) | A round whose fixes stay | active | approved | 1m | 2026-12-17 |
 | [RM-0067](0/0/6/RM-0067.md) | Any round whose fixes touch | active | approved | 1m | 2026-12-17 |
@@ -209,7 +209,7 @@
 | [RM-0136](0/1/3/RM-0136.md) | Deferred work orders collected during | active | approved | 1m | 2026-12-17 |
 | [RM-0140](0/1/4/RM-0140.md) | After the work-order gate settles | active | approved | 1m | 2026-12-15 |
 | [RM-0161](0/1/6/RM-0161.md) | A FILED work order is self-contained at creation | active | approved | 1m | 2026-12-17 |
-| [RM-0185](0/1/8/RM-0185.md) | A deferred-findings COLLECTION issue states | active | **pending** | 1m | 2026-12-19 |
+| [RM-0185](0/1/8/RM-0185.md) | A deferred-findings COLLECTION issue states | active | approved | 1m | 2026-12-20 |
 
 ### Round typing and tiering
 
@@ -253,7 +253,7 @@
 | [RM-0128](0/1/2/RM-0128.md) | One comment per review | active | approved | 1m | 2026-11-28 |
 | [RM-0129](0/1/2/RM-0129.md) | Size guard: GitHub caps | active | approved | 1m | 2026-11-28 |
 | [RM-0153](0/1/5/RM-0153.md) | PR-body edits for wave-authored | active | approved | 1m | 2026-12-15 |
-| [RM-0154](0/1/5/RM-0154.md) | The CI status fields assert | active | **amended — pending** | 1m | 2026-12-15 |
+| [RM-0154](0/1/5/RM-0154.md) | The CI status fields assert | active | approved | 1m | 2026-12-20 |
 | [RM-0158](0/1/5/RM-0158.md) | names its observation scope | active | approved | 1m | 2026-12-16 |
 | [RM-0166](0/1/6/RM-0166.md) | The closing summary's marker carries | active | approved | 1m | 2026-12-17 |
 | [RM-0170](0/1/7/RM-0170.md) | Mechanical fields derive from the | active | approved | 1m | 2026-12-17 |
@@ -262,7 +262,7 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0069](0/0/6/RM-0069.md) | A fix wave owes a class | active | approved | 1m | 2026-11-19 |
+| [RM-0069](0/0/6/RM-0069.md) | A fix wave owes a class | active | approved | 6m | 2027-05-20 |
 | [RM-0070](0/0/7/RM-0070.md) | The sweep result is recorded | active | approved | 1m | 2026-12-17 |
 
 ### Who records what
@@ -284,7 +284,7 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0074](0/0/7/RM-0074.md) | Every reviewer-agent finding is | active | approved | 1m | 2026-11-28 |
-| [RM-0075](0/0/7/RM-0075.md) | Retractions stay visible in | active | approved | 1m | 2026-11-19 |
+| [RM-0075](0/0/7/RM-0075.md) | Retractions stay visible in | active | approved | 6m | 2027-05-20 |
 | [RM-0112](0/1/1/RM-0112.md) | A review round MAY run | active | approved | 1m | 2026-12-17 |
 | [RM-0139](0/1/3/RM-0139.md) | Sabotage spot-checks run only against | active | approved | 1m | 2026-12-10 |
 | [RM-0162](0/1/6/RM-0162.md) | A finding whose mechanism rests on shell… | active | approved | 1m | 2026-12-17 |
@@ -294,11 +294,11 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0076](0/0/7/RM-0076.md) | Every finding class that can | active | approved | 1m | 2026-11-19 |
-| [RM-0077](0/0/7/RM-0077.md) | Root-script behavior changes owe | active | approved | 1m | 2026-11-19 |
+| [RM-0076](0/0/7/RM-0076.md) | Every finding class that can | active | approved | 6m | 2027-05-20 |
+| [RM-0077](0/0/7/RM-0077.md) | Root-script behavior changes owe | active | approved | 6m | 2027-05-20 |
 | [RM-0078](0/0/7/RM-0078.md) | Record the environment in | active | approved | 1m | 2026-12-17 |
-| [RM-0079](0/0/7/RM-0079.md) | A disposition claim | active | approved | 1m | 2026-11-19 |
-| [RM-0113](0/1/1/RM-0113.md) | The debt's due date splits | active | **amended — pending** | 1m | 2026-11-22 |
+| [RM-0079](0/0/7/RM-0079.md) | A disposition claim | active | approved | 6m | 2027-05-20 |
+| [RM-0113](0/1/1/RM-0113.md) | The debt's due date splits | active | approved | 1m | 2026-12-20 |
 
 ### Review focus: shipped code first, pins at a floor
 
@@ -310,23 +310,23 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0080](0/0/8/RM-0080.md) | The main agent runs a strong | active | approved | 1m | 2026-11-19 |
-| [RM-0081](0/0/8/RM-0081.md) | Reviewer subagents get ad-hoc | active | approved | 1m | 2026-11-19 |
+| [RM-0080](0/0/8/RM-0080.md) | The main agent runs a strong | active | approved | 6m | 2027-05-20 |
+| [RM-0081](0/0/8/RM-0081.md) | Reviewer subagents get ad-hoc | active | approved | 6m | 2027-05-20 |
 | [RM-0082](0/0/8/RM-0082.md) | A coverage claim is NEVER | active | approved | 1m | 2026-12-17 |
 | [RM-0083](0/0/8/RM-0083.md) | For snapshot-scope reviews (the | active | approved | 1m | 2026-12-17 |
 | [RM-0084](0/0/8/RM-0084.md) | Invocation shape governs orchestration | active | approved | 1m | 2026-12-17 |
-| [RM-0085](0/0/8/RM-0085.md) | Reviewer prompts for recurring blind-spot | active | approved | 1m | 2026-11-19 |
-| [RM-0086](0/0/8/RM-0086.md) | Checkpoint discipline: each reviewer agent | active | approved | 1m | 2026-11-19 |
-| [RM-0087](0/0/8/RM-0087.md) | Med-tier diff-scope rounds: ~8 | active | approved | 1m | 2026-11-19 |
-| [RM-0088](0/0/8/RM-0088.md) | High-tier snapshot-scope passes: ~15 | active | approved | 1m | 2026-11-19 |
-| [RM-0089](0/0/8/RM-0089.md) | Release-critical high-tier passes: | active | approved | 1m | 2026-11-19 |
+| [RM-0085](0/0/8/RM-0085.md) | Reviewer prompts for recurring blind-spot | active | approved | 6m | 2027-05-20 |
+| [RM-0086](0/0/8/RM-0086.md) | Checkpoint discipline: each reviewer agent | active | approved | 6m | 2027-05-20 |
+| [RM-0087](0/0/8/RM-0087.md) | Med-tier diff-scope rounds: ~8 | active | approved | 6m | 2027-05-20 |
+| [RM-0088](0/0/8/RM-0088.md) | High-tier snapshot-scope passes: ~15 | active | approved | 6m | 2027-05-20 |
+| [RM-0089](0/0/8/RM-0089.md) | Release-critical high-tier passes: | active | approved | 6m | 2027-05-20 |
 | [RM-0090](0/0/9/RM-0090.md) | Final chat answers are | active | approved | 1m | 2026-11-28 |
-| [RM-0092](0/0/9/RM-0092.md) | Checkpoint files timestamp every subagent | active | approved | 1m | 2026-11-19 |
+| [RM-0092](0/0/9/RM-0092.md) | Checkpoint files timestamp every subagent | active | approved | 6m | 2027-05-20 |
 | [RM-0108](0/1/0/RM-0108.md) | Fan-out is staged, never launched | active | approved | 1m | 2026-11-22 |
 | [RM-0111](0/1/1/RM-0111.md) | Sabotage spot-checks mutate the | active | approved | 1m | 2026-11-22 |
 | [RM-0114](0/1/1/RM-0114.md) | Agents stamp with their own | active | approved | 1m | 2026-11-22 |
 | [RM-0172](0/1/7/RM-0172.md) | A shipped code block is | active | approved | 1m | 2026-12-17 |
-| [RM-0186](0/1/8/RM-0186.md) | A session close (window, terminal, host) | active | **pending** | 1m | 2026-12-19 |
+| [RM-0186](0/1/8/RM-0186.md) | A session close (window, terminal, host) | active | approved | 1m | 2026-12-20 |
 
 ### Release gate
 
@@ -346,26 +346,26 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0047](0/0/4/RM-0047.md) | A double must replicate every observable | active | approved | 1m | 2026-11-17 |
+| [RM-0047](0/0/4/RM-0047.md) | A double must replicate every observable | active | approved | 6m | 2027-05-20 |
 
 ### 4. Patterns that close the gaps
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0048](0/0/4/RM-0048.md) | Behavioral doubles + contract lock | active | approved | 1m | 2026-11-17 |
-| [RM-0049](0/0/4/RM-0049.md) | Real-binary tiers | active | approved | 1m | 2026-11-17 |
-| [RM-0050](0/0/5/RM-0050.md) | Environment matrix as a test | active | approved | 1m | 2026-11-17 |
+| [RM-0048](0/0/4/RM-0048.md) | Behavioral doubles + contract lock | active | approved | 6m | 2027-05-20 |
+| [RM-0049](0/0/4/RM-0049.md) | Real-binary tiers | active | approved | 6m | 2027-05-20 |
+| [RM-0050](0/0/5/RM-0050.md) | Environment matrix as a test | active | approved | 6m | 2027-05-20 |
 | [RM-0165](0/1/6/RM-0165.md) | No controlling tty in containers — split display | active | approved | 1m | 2026-12-17 |
 
 ### 6. Checklist for new kit code
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0051](0/0/5/RM-0051.md) | Child process inside a while | active | approved | 1m | 2026-11-17 |
-| [RM-0052](0/0/5/RM-0052.md) | Prompt → read </dev/tty via | active | approved | 1m | 2026-11-17 |
-| [RM-0053](0/0/5/RM-0053.md) | New fake/shim → replicate the | active | approved | 1m | 2026-11-17 |
+| [RM-0051](0/0/5/RM-0051.md) | Child process inside a while | active | approved | 6m | 2027-05-20 |
+| [RM-0052](0/0/5/RM-0052.md) | Prompt → read </dev/tty via | active | approved | 6m | 2027-05-20 |
+| [RM-0053](0/0/5/RM-0053.md) | New fake/shim → replicate the | active | approved | 6m | 2027-05-20 |
 | [RM-0054](0/0/5/RM-0054.md) | rc-installed behavior (functions, hooks, PATH) | active | approved | 1m | 2026-11-17 |
-| [RM-0055](0/0/5/RM-0055.md) | Interactive-only surfaces (browser launch,… | active | approved | 1m | 2026-11-17 |
+| [RM-0055](0/0/5/RM-0055.md) | Interactive-only surfaces (browser launch,… | active | approved | 6m | 2027-05-20 |
 
 ## internal/records/rules-meta.md
 
@@ -386,9 +386,9 @@
 | [RM-0024](0/0/2/RM-0024.md) | three one-digit levels | active | approved | 6m | 2027-05-17 |
 | [RM-0025](0/0/2/RM-0025.md) | regenerated per audit run | active | approved | 1m | 2026-12-17 |
 | [RM-0026](0/0/2/RM-0026.md) | all content is English | active | approved | 6m | 2027-05-17 |
-| [RM-0045](0/0/4/RM-0045.md) | rule-bearing paragraphs are rewritten as | active | approved | 1m | 2026-11-17 |
-| [RM-0046](0/0/4/RM-0046.md) | out of meta scope: rationale = | active | approved | 1m | 2026-11-17 |
-| [RM-0056](0/0/5/RM-0056.md) | the rule plus a one-line why; | active | approved | 1m | 2026-11-18 |
+| [RM-0045](0/0/4/RM-0045.md) | rule-bearing paragraphs are rewritten as | active | approved | 6m | 2027-05-20 |
+| [RM-0046](0/0/4/RM-0046.md) | out of meta scope: rationale = | active | approved | 6m | 2027-05-20 |
+| [RM-0056](0/0/5/RM-0056.md) | the rule plus a one-line why; | active | approved | 6m | 2027-05-20 |
 
 ### Meta format v1.2
 
@@ -396,9 +396,9 @@
 |---|---|---|---|---|---|
 | [RM-0034](0/0/3/RM-0034.md) | only where load-bearing | active | approved | 6m | 2027-05-17 |
 | [RM-0035](0/0/3/RM-0035.md) | Examples use the abstract token | active | approved | 6m | 2027-05-17 |
-| [RM-0093](0/0/9/RM-0093.md) | In meta bodies, cross-references | active | approved | 1m | 2026-11-19 |
-| [RM-0094](0/0/9/RM-0094.md) | The review log names the | active | approved | 1m | 2026-11-19 |
-| [RM-0135](0/1/3/RM-0135.md) | Post-approval changes set | active | approved | 1m | 2026-11-30 |
+| [RM-0093](0/0/9/RM-0093.md) | In meta bodies, cross-references | active | approved | 6m | 2027-05-20 |
+| [RM-0094](0/0/9/RM-0094.md) | The review log names the | active | approved | 6m | 2027-05-20 |
+| [RM-0135](0/1/3/RM-0135.md) | Post-approval changes set | active | approved | 1m | 2026-12-20 |
 | [RM-0156](0/1/5/RM-0156.md) | The quote: needle is the | active | approved | 1m | 2026-12-17 |
 | [RM-0159](0/1/5/RM-0159.md) | Quoted strings in meta bodies | active | approved | 1m | 2026-12-16 |
 
@@ -433,5 +433,5 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0095](0/0/9/RM-0095.md) | Table rows in rule files | active | approved | 1m | 2026-11-19 |
-| [RM-0096](0/0/9/RM-0096.md) | Narrative-heavy sections start outside | active | approved | 1m | 2026-11-19 |
+| [RM-0095](0/0/9/RM-0095.md) | Table rows in rule files | active | approved | 6m | 2027-05-20 |
+| [RM-0096](0/0/9/RM-0096.md) | Narrative-heavy sections start outside | active | approved | 6m | 2027-05-20 |

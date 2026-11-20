@@ -55,10 +55,13 @@ amended: 2026-10-31       # optional: APPROVED meta changed after that
 revisit-interval: 1m      # ladder: 1m 6m 1y 2y — always starts at 1m
 next-revisit: 2026-11-14
 ---
+
 <!-- 3-6 plain sentences, an approximate guide: the external,
      checkable fact that makes the rule necessary — not a paraphrase
      of the rule. -->
+
 Check: <!-- optional: one sentence — how a revisit verifies the fact still holds. -->
+
 Source: <!-- one line finding/directive/issue — only if one exists. -->
 
 ## Review log
@@ -84,7 +87,9 @@ Body rules:
 - **Post-approval changes set `amended:`** — any change to an approved
   meta appends an amendment log line and sets `amended:` to its date;
   the meta re-joins the approval queue (rendered *amended — pending*)
-  until a fresh maintainer approval drops the field. (RM-0135)
+  until a fresh maintainer approval drops the field. Whitespace-only
+  layout normalization under a maintainer directive is exempt — no
+  amendment, no re-queue. (RM-0135)
 - **The `quote:` needle is the bullet's first five words,
   character-normalized** — write the rule bullet first, then take its
   joined first five words: parentheticals and backtick content are
