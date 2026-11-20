@@ -477,6 +477,26 @@ status_section_git_heal() {
     done <"$PROJECTS_CONF"
     while IFS= read -r _st_gh_gd; do
         [ -n "$_st_gh_gd" ] || continue
+        # Wholesale-swap detection row (#653 family, #702/#703): with
+        # the top-folder sticky gone (W1/W2 residuals, fs-baseline.sh
+        # #703), the CANONICAL W1 shape (cp-a-copy + swap) leaves a
+        # swapper-owned .git under a developer-owned project dir —
+        # flag when a gitdir's owner differs from its project dir's
+        # owner (#706 b B2/B3: rename-shaped or W2 variants can keep
+        # the owners equal and stay quiet; display-only either way). Display-only, no verdict: an
+        # agent-cloned repo under a dev-owned tree (the #655 a S3
+        # class) trips it too. Catches the quiet variant after the
+        # fact; the dev runs opk status regularly.
+        _st_gh_pr=$(dirname "$_st_gh_gd")
+        _st_gh_gown=$(stat -c %U "$_st_gh_gd" 2>/dev/null) || _st_gh_gown=""
+        _st_gh_pown=""
+        [ -n "$_st_gh_gown" ] && { _st_gh_pown=$(stat -c %U "$_st_gh_pr" 2>/dev/null) || _st_gh_pown=""; }
+        if [ -n "$_st_gh_gown" ] && [ -n "$_st_gh_pown" ] &&
+            [ "$_st_gh_gown" != "$_st_gh_pown" ]; then
+            ui_kv_warn ".git owner" "$_st_gh_gd is $_st_gh_gown-owned while the project dir"
+            ui_detail "is $_st_gh_pown-owned — wholesale .git swap suspected (or an agent-"
+            ui_detail "cloned repo); inspect before trusting git output"
+        fi
         for _st_gh_f in index HEAD ORIG_HEAD REBASE_HEAD packed-refs \
             MERGE_HEAD MERGE_MSG MERGE_MODE AUTO_MERGE \
             CHERRY_PICK_HEAD REVERT_HEAD; do

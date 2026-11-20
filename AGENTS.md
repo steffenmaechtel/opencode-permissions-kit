@@ -124,9 +124,10 @@ expect the reported paths to exist locally.
 - The security model is deliberately **soft-only** — never re-introduce
   OS-level deny ACLs. Background: `internal/records/ddev-working.md`,
   current model: `docs/concepts/security-model.md`. Sanctioned exception
-  (#651, PR #655): the `.git` heal — sticky bits (on `.git`, its
-  metadata containers, the project root and every `.git` ancestor
-  directory) plus developer-ownership narrowing on `.git` metadata that
+  (#651, PR #655): the `.git` heal — sticky bits on `.git` and its
+  metadata containers (the #655-era project-root/ancestor stickies were
+  REMOVED again by #702/#703; a baseline run strips legacy bits as
+  migration) plus developer-ownership narrowing on `.git` metadata that
   the group baseline would otherwise leave agent-writable
   (`fs-baseline.sh`); no deny ACLs involved, and the stickied
   directories keep their sharing modes (sticky gates only rename/unlink

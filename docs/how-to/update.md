@@ -86,6 +86,17 @@ re-apply the group baseline **and** force the full rescan:
 opk update --refresh
 ```
 
+Plain `opk update` runs print a migration note (on every such run —
+there is no once-only state): the project-root sticky bits of earlier
+heals are removed in the #703 era, and `opk update --refresh` (or
+`sudo opk config refresh`) applies the strip — a plain `opk update`
+never re-runs the group baseline, so the legacy bits stay until one of
+those commands runs. `.git` itself and its pinned internals keep the
+heal unchanged. The strip covers registered roots and the ancestors of
+every `.git` found under them; one corner lingers — an ancestor
+stickied for a `.git` that has since been deleted is outside every
+current walk (strip those manually: `sudo chmod -t <dir>`).
+
 ### Update integrity (SHA256SUMS)
 
 Every `opk update` verifies each fetched kit file against the

@@ -130,7 +130,11 @@ scans every project at once — but repair never sweeps: `fix` and
 Without a path argument, doctor searches **upward** from the current
 directory for the project's `opk.json` — like git locates `.git`: the
 nearest one wins, a nested `opk.json` shadows any parent's, and the
-filesystem root is the stop. A marker is an existing regular file (a
+filesystem root is the stop. The doctor report includes the #703
+wholesale-swap detection row: a `.git owner` warn when this project's
+`.git` directory owner differs from the project root's owner
+(`opk status` carries the install-wide twin across every registered
+root — display-only either way). A marker is an existing regular file (a
 symlink to one counts; a dangling symlink or a directory named
 `opk.json` does not — discovery continues to the next ancestor, and
 that ancestor's policy governs). The header reports the root it used:
@@ -620,7 +624,11 @@ the security-advisory check, the WSL2 `/mnt/c` exposure (including the
 browser-bridge state), the
 root-equivalent-access audit, and the leak scan — followed by management
 hints and the one-line verdict (the **Summary** row: *All green* or the
-alert/warning tally).
+alert/warning tally). The git-heal section also carries the #703
+wholesale-swap detection: a `.git owner` warn row per repository whose
+`.git` directory owner differs from its project directory's owner
+(display-only — inspect before trusting git output; see
+[the security model](../concepts/security-model.md)).
 
 `status` is the install-wide **green-board**: run it from anywhere —
 it reads state and reports, never prompts, never repairs. Per-project

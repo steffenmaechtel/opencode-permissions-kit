@@ -31,13 +31,17 @@ writes or chmods anything outside `.ddev/`:
 | settings dirs, project root, everything else | **you** | 2775 / 664 (group baseline, permanent) |
 
 A project root that holds a real `.git` directory — directly or nested
-anywhere beneath it — carries the `.git` heal's sticky bit on top
-(`drwxrwsr-t`, see [the security model](../concepts/security-model.md))
-— handover and handback re-pin it after every numeric mode set, so the
-wholesale-`.git`-swap protection survives their normalization runs. (A
-`.git`-less root that is itself a registered heal root carries the
-heal's unconditional sticky, which the handover arms do not re-pin —
-the next baseline run restores it.)
+anywhere beneath it — carries **no** sticky bit on top (#703: the
+top-folder stickies of the #655 era are removed again, and a baseline
+run strips legacy bits as migration; see
+[the security model](../concepts/security-model.md) for the reopened
+wholesale-swap residuals and the `opk status`/`opk doctor` detection
+row). Handover and handback strip the bit after every numeric mode set
+(the numeric chmod drops it anyway) — only `.git` itself and its
+pinned internals keep the heal. A `.git`-less root never matched the
+heal's walk: if it still carries the #655-era bit, the next
+`sudo opk config refresh` (or `opk update --refresh`) strips it — the
+handover arms cannot know a `.git`-less root is a registered heal root.
 
 The trade-off: **your repo owns the CMS settings file.** ddev no longer
 generates `AdditionalConfiguration.php` (TYPO3) or `settings.ddev.php`

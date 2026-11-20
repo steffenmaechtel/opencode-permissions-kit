@@ -689,6 +689,25 @@ doctor_git_heal() {
     # status-core twin).
     _dgh_gd="$DOCTOR_ROOT/.git"
     if [ -d "$_dgh_gd" ]; then
+        # Wholesale-swap detection row (#653 family, #702/#703 — the
+        # status-core twin enumerates every conf-root gitdir): with the
+        # top-folder sticky gone (W1/W2 residuals, fs-baseline.sh
+        # #703), the CANONICAL W1 shape (cp-a-copy + swap) leaves a
+        # swapper-owned .git under a developer-owned project dir —
+        # flag when the gitdir's owner differs from the project
+        # root's owner (#706 b B2/B3: rename-shaped or W2 variants
+        # can keep the owners equal and stay quiet; display-only). An
+        # agent-cloned repo under a dev-owned tree (#655 a S3 class)
+        # trips the row too — no verdict, inspect.
+        _dgh_gown=$(stat -c %U "$_dgh_gd" 2>/dev/null) || _dgh_gown=""
+        _dgh_pown=""
+        [ -n "$_dgh_gown" ] && { _dgh_pown=$(stat -c %U "$DOCTOR_ROOT" 2>/dev/null) || _dgh_pown=""; }
+        if [ -n "$_dgh_gown" ] && [ -n "$_dgh_pown" ] &&
+            [ "$_dgh_gown" != "$_dgh_pown" ]; then
+            ui_kv_warn ".git owner" "$_dgh_gd is $_dgh_gown-owned while the project dir"
+            ui_detail "is $_dgh_pown-owned — wholesale .git swap suspected (or an agent-"
+            ui_detail "cloned repo); inspect before trusting git output"
+        fi
         for _dgh_f in index HEAD ORIG_HEAD REBASE_HEAD packed-refs \
             MERGE_HEAD MERGE_MSG MERGE_MODE AUTO_MERGE \
             CHERRY_PICK_HEAD REVERT_HEAD; do

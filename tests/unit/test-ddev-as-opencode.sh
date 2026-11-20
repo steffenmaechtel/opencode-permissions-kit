@@ -2623,10 +2623,10 @@ if [ -n "$_w9_block" ] && printf '%s' "$_w9_block" | grep -q 'project-root hando
             dhq_proj=/x/p; dhq_user=oc; dhq_group=g
             chmod() { [ "$W9MODE" = chmodfail ] && return 1; return 0; }
             chown() { [ "$W9MODE" = chownfail ] && return 1; return 0; }
-            # #697 sandbox twin of the heal-sticky re-add: the extracted
-            # block calls it after the numeric chmod; a failed re-add
+            # #703 sandbox twin of the sticky strip: the extracted
+            # block calls it after the numeric chmod; a failed strip
             # must fold into the warn arm like the chown/chmod pair.
-            _ddev_heal_sticky() { [ "$W9MODE" = stickyfail ] && return 1; return 0; }
+            _ddev_heal_unsticky() { [ "$W9MODE" = stickyfail ] && return 1; return 0; }
             eval "$1"
         ' sh "$_w9_block" 2>&1
     }
@@ -2647,8 +2647,8 @@ if [ -n "$_w9_block" ] && printf '%s' "$_w9_block" | grep -q 'project-root hando
     esac
     _out=$(_w9_run stickyfail) || true
     case "$_out" in
-        *"warn: project-root handover incomplete"*) pass "sticky re-add failure: warn, no success line (#697)" ;;
-        *) fail "sticky re-add failure: warn (got: $_out)" ;;
+        *"warn: project-root handover incomplete"*) pass "sticky strip failure: warn, no success line (#703)" ;;
+        *) fail "sticky strip failure: warn (got: $_out)" ;;
     esac
 else
     fail "typo3-bootstrap pair block extractable (#211 b W9)"

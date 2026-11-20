@@ -341,6 +341,47 @@ else
     fail "doctor git-heal: ON rows broken (out=$(printf '%s' "$_out" | head -4))"
 fi
 
+# Wholesale-swap detection row (#653 family, #703): the doctor twin
+# flags owner($DOCTOR_ROOT/.git) != owner($DOCTOR_ROOT). Same stat-stub
+# discrimination as the status-core pin: gitdir "rogue"-owned, project
+# dir "devuser"-owned renders the row; the control (real stat, equal
+# owners) renders nothing.
+mkdir -p "$WORK/dgh/detstub"
+cat >"$WORK/dgh/detstub/stat" <<'EOF'
+#!/bin/sh
+_p=$(eval "echo \${$#}")
+case "$_p" in
+*/.git) printf 'rogue\n' ;;
+*) printf 'devuser\n' ;;
+esac
+EOF
+chmod +x "$WORK/dgh/detstub/stat"
+_out=$(
+    (
+        PATH="$WORK/dgh/detstub:$STUB:$PATH"
+        export PATH NO_COLOR=1 GH_GITCONFIG="$WORK/dgh/devhome/.gitconfig" \
+            GH_LIBDIR="$WORK/dgh/lib"
+        . "$UI_LIB"
+        . "$LIB"
+        INSTALL_CONF="$WORK/dgh/install.conf"
+        DOCTOR_ROOT="$WORK/dgh/proj"
+        DOCTOR_USER=opencode-dgh-agent
+        doctor_git_heal
+    ) 2>&1 || true
+)
+if printf '%s' "$_out" | grep -q "\.git owner.*$WORK/dgh/proj/\.git is rogue-owned while the project dir" &&
+    printf '%s' "$_out" | grep -q "is devuser-owned — wholesale .git swap suspected"; then
+    pass "doctor git-heal: owner-mismatch detection row renders (#703)"
+else
+    fail "doctor git-heal: detection row missing (#703; out=$(printf '%s' "$_out" | grep -F '.git owner' | head -2))"
+fi
+_out=$(_dgh_run || true)
+if printf '%s' "$_out" | grep -qF '.git owner'; then
+    fail "doctor git-heal: equal owners render no detection row (#703 control)"
+else
+    pass "doctor git-heal: equal owners render no detection row (#703 control)"
+fi
+
 # --- sweep floor: doctor-core's python3 sites run -I (#249) ------------------------
 # Comment-strip rider per conventions.md ("Source-counting pins") -- a
 # commented-out site must not count. Four sites: cntrl_bad,

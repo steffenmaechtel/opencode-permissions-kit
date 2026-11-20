@@ -63,7 +63,7 @@ chmod 600 "$WORK/proj/file.txt" "$WORK/proj/.git/config"
 OUT="$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$WORK/proj" "$GRP" 2>&1)"
 
 # --- 1. final state -------------------------------------------------------------
-assert_eq "root dir: group + setgid + group rwx + sticky (700 -> 3770, #655 a C1)" "3770" \
+assert_eq "root dir: group + setgid + group rwx, NO sticky (700 -> 2770, root un-stickied #703)" "2770" \
     "$(stat -c %a "$WORK/proj")"
 assert_eq "subdir carries setgid" "2770" "$(stat -c %a "$WORK/proj/sub")"
 assert_eq ".git shared and sticky-healed (issue #17 + #651)" "3770" "$(stat -c %a "$WORK/proj/.git")"
@@ -107,10 +107,10 @@ printf 'wh\n' >"$HG/proj/.git/worktrees/wt1/HEAD"
 printf 'log\n' >"$HG/proj/.git/logs/HEAD"
 chmod 700 "$HG/proj/.git" "$HG/proj/.git/hooks"
 HGOUT="$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$HG/proj" "$HGGRP" 2>&1)"
-assert_eq "heal: project root sticky (sharing mode stays, #655 a C1)" "3775" \
+assert_eq "heal: project root NOT sticky — legacy bit stripped (#703)" "2775" \
     "$(stat -c %a "$HG/proj")"
-assert_eq "heal: NESTED .git parent sticky (scan roots are parents — the bit belongs on the direct parent, #655 a C1)" \
-    "3775" "$(stat -c %a "$HG/proj/nested")"
+assert_eq "heal: NESTED .git parent NOT sticky — ancestor walk strips (#703)" \
+    "2775" "$(stat -c %a "$HG/proj/nested")"
 assert_eq "heal: nested .git healed like any other" "644" \
     "$(stat -c %a "$HG/proj/nested/.git/config")"
 assert_eq "heal: .git keeps sharing mode + sticky (dirs pass then +t)" "3770" \
@@ -187,7 +187,7 @@ FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$HG/proj" "$HG
     >/dev/null 2>&1 || HGRC2=$?
 assert_eq "heal: idempotent re-run rc 0" "0" "$HGRC2"
 assert_eq "heal: idempotent re-run state stable (root/config/hooks/.git/worktrees)" \
-    "3775/644/2755/3770/3775" \
+    "2775/644/2755/3770/3775" \
     "$(stat -c %a "$HG/proj")/$(stat -c %a "$HG/proj/.git/config")/$(stat -c %a "$HG/proj/.git/hooks")/$(stat -c %a "$HG/proj/.git")/$(stat -c %a "$HG/proj/.git/worktrees")"
 
 # Trailing-slash root (#655 a C4): the belt accepts the spelling; the
@@ -201,15 +201,19 @@ printf 'h\n' >"$HG4/proj2/.git/hooks/pre-commit.sample"
 FS_SUDO="" sh -c '. "$1" && _fsb_heal_git "$2/" "$3"' _ "$LIB" "$HG4/proj2" "$HGGRP" >/dev/null 2>&1
 assert_eq "heal: trailing-slash root still pins (walk normalized, #655 a C4)" "644" \
     "$(stat -c %a "$HG4/proj2/.git/config")"
-# Sticky assertion, not absolute mode: this host's /tmp grants group
-# write through default ACLs at mkdir time (1775, not 1755) — the
-# direct-driver pin cares about the sticky bit alone (leading 1).
+# Sticky-ABSENCE assertion, not absolute mode: this host's /tmp grants
+# group write through default ACLs at mkdir time (1775, not 1755) — the
+# direct-driver pin cares about the sticky bit alone (leading 1), which
+# the #703 driver must have STRIPPED (the fixture is chmod +t'd first:
+# the migration shape — installed bases carry the bit).
+chmod 3775 "$HG4/proj2"
+FS_SUDO="" sh -c '. "$1" && _fsb_heal_git "$2/" "$3"' _ "$LIB" "$HG4/proj2" "$HGGRP" >/dev/null 2>&1
 case "$(stat -c %a "$HG4/proj2")" in
-    1*)
-        pass "heal: trailing-slash root sticky applies"
+    [1357]???)
+        fail "heal: trailing-slash root strip applies (#703; got $(stat -c %a "$HG4/proj2"))"
         ;;
     *)
-        fail "heal: trailing-slash root sticky applies (got $(stat -c %a "$HG4/proj2"))"
+        pass "heal: trailing-slash root strip applies (#703)"
         ;;
 esac
 
@@ -234,15 +238,21 @@ else
 fi
 
 # --- 1c. fix-wave-b arms (#655 b) ------------------------------------------------
-# C1 ancestor chain: a .git at depth 2 stickies BOTH intermediate dirs.
+# C1 ancestor chain (inverted by #703): a .git at depth 2 — BOTH
+# intermediate dirs must be STRIPPED of the legacy sticky.
 HG6="$WORK/healdepth2"
 mkdir -p "$HG6/proj/grp/site/.git/hooks"
 printf 'c\n' >"$HG6/proj/grp/site/.git/config"
+# Migration shape: plant the legacy bits the #655-era heal would have
+# left (root, both ancestors) — the #703 run must take all three off.
+chmod 3775 "$HG6/proj" "$HG6/proj/grp" "$HG6/proj/grp/site"
 FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$HG6/proj" "$HGGRP" >/dev/null 2>&1
-assert_eq "heal: depth-2 ancestor dir sticky (b C1)" "3775" \
+assert_eq "heal: depth-2 ancestor dir NOT sticky (stripped, #703)" "2775" \
     "$(stat -c %a "$HG6/proj/grp")"
-assert_eq "heal: depth-2 .git parent sticky (b C1)" "3775" \
+assert_eq "heal: depth-2 .git parent NOT sticky (stripped, #703)" "2775" \
     "$(stat -c %a "$HG6/proj/grp/site")"
+assert_eq "heal: depth-2 root NOT sticky (stripped, #703)" "2775" \
+    "$(stat -c %a "$HG6/proj")"
 assert_eq "heal: depth-2 .git healed like any other" "644" \
     "$(stat -c %a "$HG6/proj/grp/site/.git/config")"
 
@@ -347,25 +357,30 @@ fi
 # a root-path segment (here: "tmp", a segment of every /tmp/... root)
 # must stay UN-sticky when the .git sits directly under the root;
 # without the guard the walk would chew the parent's absolute segments
-# and sticky exactly this dir.
+# and strip exactly this dir of a sticky it may legitimately carry.
 HG10="$WORK/healneg"
 mkdir -p "$HG10/proj/tmp" "$HG10/proj/.git/hooks"
 printf 'c\n' >"$HG10/proj/.git/config"
+# #703 flip: the .git parent at depth 1 IS the scan root, and the root
+# is stripped — the control arm pins sticky ABSENCE now (and a
+# deliberately planted sticky on the segment-named sibling must
+# SURVIVE: the walk never touches it).
+chmod 3775 "$HG10/proj/tmp"
 FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$HG10/proj" "$HGGRP" >/dev/null 2>&1
 case "$(stat -c %a "$HG10/proj/tmp")" in
     [1357]???)
-        fail "heal: segment-named dir stays un-sticky at depth 1 (d S1)"
+        pass "heal: segment-named dir keeps its sticky at depth 1 (d S1, #703)"
         ;;
     *)
-        pass "heal: segment-named dir stays un-sticky at depth 1 (d S1)"
+        fail "heal: segment-named dir keeps its sticky at depth 1 (d S1, #703; got $(stat -c %a "$HG10/proj/tmp"))"
         ;;
 esac
 case "$(stat -c %a "$HG10/proj")" in
     [1357]???)
-        pass "heal: the .git parent itself IS sticky at depth 1 (control)"
+        fail "heal: the .git parent (== root at depth 1) is NOT sticky (control, #703)"
         ;;
     *)
-        fail "heal: the .git parent itself IS sticky at depth 1 (control)"
+        pass "heal: the .git parent (== root at depth 1) is NOT sticky (control, #703)"
         ;;
 esac
 
@@ -447,7 +462,68 @@ if printf '%s\n' "$HGFOUT" | grep -qF 'git heal: chown'; then
 else
     fail "heal: the failing op is named (chown)"
 fi
-rm -rf "$HG" "$HGS" "$HGF" "$HGFSTUB"
+
+# #703: the root STRIP's own failure path (L1 — the twin arm of the
+# chown stub above): a PATH-stubbed chmod failing ONLY on -t must
+# count into _FSB_ERRORS and fail the baseline loud — a silent strip
+# failure would leave legacy stickies behind while the caller prints
+# "applied" (the #699/#682/#701 friction this wave exists to remove).
+HGF2="$WORK/healstripfail"
+HGF2STUB="$WORK/healstripfail-bin"
+mkdir -p "$HGF2/proj/.git/hooks" "$HGF2STUB"
+printf 'c\n' >"$HGF2/proj/.git/config"
+_real_chmod="$(command -v chmod)"
+cat >"$HGF2STUB/chmod" <<EOF
+#!/bin/sh
+[ "\$1" = "-t" ] && exit 1
+exec "$_real_chmod" "\$@"
+EOF
+chmod +x "$HGF2STUB/chmod"
+HGF2OUT="$(PATH="$HGF2STUB:$PATH" FS_SUDO="" \
+    sh -c '. "$1" && fs_baseline_root "$2" "$3" && echo BASELINE-RC0' \
+    _ "$LIB" "$HGF2/proj" "$HGGRP" 2>&1 || true)"
+if printf '%s' "$HGF2OUT" | grep -q BASELINE-RC0; then
+    fail "heal: a failing root strip must fail the baseline (#703, loud)"
+else
+    pass "heal: a failing root strip must fail the baseline (#703, loud)"
+fi
+if printf '%s' "$HGF2OUT" | grep -qF 'chmod -t (project root strip)'; then
+    pass "heal: the failing strip is named (project root, #703)"
+else
+    fail "heal: the failing strip is named (out=$(printf '%s' "$HGF2OUT" | grep -F 'chmod -t' | head -2))"
+fi
+
+# #706 a S3: the WALK twin's own failure leg (_fsb_heal_unsticky, the
+# ancestor strip — distinct from the driver's root strip above): the
+# HGF2 fixture sits .git at depth 1 (parent == root, no walk), so this
+# arm drives a DEPTH-2 .git whose ancestors (proj/grp, proj/grp/site)
+# go through _fsb_heal_unsticky — a chmod stub failing only on -t must
+# fail the baseline loud AND name the ANCESTOR operand (the driver's
+# root error alone would not discriminate the twin's fold).
+HGF3="$WORK/healwalkfail"
+HGF3STUB="$WORK/healwalkfail-bin"
+mkdir -p "$HGF3/proj/grp/site/.git/hooks" "$HGF3STUB"
+printf 'c\n' >"$HGF3/proj/grp/site/.git/config"
+cat >"$HGF3STUB/chmod" <<EOF
+#!/bin/sh
+[ "\$1" = "-t" ] && exit 1
+exec "$_real_chmod" "\$@"
+EOF
+chmod +x "$HGF3STUB/chmod"
+HGF3OUT="$(PATH="$HGF3STUB:$PATH" FS_SUDO="" \
+    sh -c '. "$1" && fs_baseline_root "$2" "$3" && echo BASELINE-RC0' \
+    _ "$LIB" "$HGF3/proj" "$HGGRP" 2>&1 || true)"
+if printf '%s' "$HGF3OUT" | grep -q BASELINE-RC0; then
+    fail "heal: a failing ancestor strip must fail the baseline (#706 a S3)"
+else
+    pass "heal: a failing ancestor strip must fail the baseline (#706 a S3)"
+fi
+if printf '%s' "$HGF3OUT" | grep -qF "chmod -t failed on $HGF3/proj/grp"; then
+    pass "heal: the failing ANCESTOR strip is named (the walk twin's fold, #706 a S3)"
+else
+    fail "heal: the failing ancestor strip is named (out=$(printf '%s' "$HGF3OUT" | grep -F 'chmod -t failed' | head -3))"
+fi
+rm -rf "$HG" "$HGS" "$HGF" "$HGFSTUB" "$HGF2" "$HGF2STUB" "$HGF3" "$HGF3STUB"
 
 # A bare `chgrp <link>` follows the TARGET; chgrp -R (the old code) did
 # not. The pass must skip symlinks entirely — the link's TARGET (here a
@@ -481,8 +557,8 @@ _idem_rc=0
 FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$WORK/proj" "$GRP" >/dev/null 2>&1 ||
     _idem_rc=$?
 assert_eq "idempotent re-run exits 0" "0" "$_idem_rc"
-assert_eq "re-run is idempotent (modes stable; root keeps sticky, #655 a C1)" \
-    "3770 2770 660" \
+assert_eq "re-run is idempotent (modes stable; root stays un-stickied, #703)" \
+    "2770 2770 660" \
     "$(stat -c %a "$WORK/proj") $(stat -c %a "$WORK/proj/sub") $(stat -c %a "$WORK/proj/file.txt")"
 
 # --- 5. empty/missing root is a silent no-op ----------------------------------------
