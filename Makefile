@@ -382,9 +382,9 @@ fmt:
 # the committed file byte-for-byte. Temp+mv on purpose (#493 a C6): a
 # red run must never delete or truncate the committed manifest in the
 # working tree. Fail-loud (#701): a manifest target that exists but is
-# no regular file, and a failing mv, both abort rc != 0 with the temp
-# cleaned up — the old `mv …; echo …` chain reported rc 0 over a
-# never-written manifest.
+# no regular file, and a failing mv, both abort rc != 0 — the refusal
+# fires before the temp exists, a failed mv cleans it up; the old
+# `mv …; echo …` chain reported rc 0 over a never-written manifest.
 sums:
 	@_sums_tmp="SHA256SUMS.$$$$.tmp"; \
 		if [ -e SHA256SUMS ] && [ ! -f SHA256SUMS ]; then \
