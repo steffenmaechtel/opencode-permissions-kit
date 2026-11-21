@@ -142,7 +142,8 @@ if [ ! -x "$DD_BIN" ]; then
             exit 1
         }
     rm -f "$DD_TMP"
-    chmod +x "$DD_BIN" 2>/dev/null || true
+    # Mode heal, same shape as e2e_fetch_opencode (#628 a M3, #601 class).
+    chmod 755 "$DD_BIN" 2>/dev/null || true
 fi
 [ -s "$DD_BIN" ] || {
     echo "  ${RED}FAIL${NC}  cached ddev binary is empty"

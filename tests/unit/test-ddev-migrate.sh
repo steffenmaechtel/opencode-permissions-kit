@@ -875,8 +875,8 @@ check_absent "D3/Y1: no write-through temp inside the dump dir (manifest.opk.\$\
     "$MIG" -q 'manifest\.opk\.'
 check_absent "D3/Y1: the drop never reads the dump-dir manifest directly" \
     "$MIG" -qF 'grep -v -F "OK|$dm_n|" "${dm_dir:?}/manifest.conf"'
-check_absent "D3/Y1: the drop never redirects into the dump dir" \
-    "$MIG" -q '>"\$[{]dm_dir'
+check_absent "D3/Y1: the drop never redirects into the dump dir (braced or unbraced, #663 V5)" \
+    "$MIG" -qE '>"\$\{?dm_dir'
 # c V2 (learnings L1 — fail-loud pins for fail-soft arms): every warn
 # arm of the drop helper gets a static presence pin, so deleting an
 # arm back to silent fail-soft reds; the functional legs below drive

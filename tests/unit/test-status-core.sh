@@ -534,8 +534,11 @@ fi
 # "the named function and the repair hint land on stderr with
 # fix: sudo opk update"; before the fix no abort path printed any
 # hint (the row lied). Comment-stripped count pin: exactly two
-# refusal lines, each with the hint.
-_pg_hint=$(live_src "$STATUS_ENTRY" | grep -c 'refusing to run (fix: sudo opk update)')
+# refusal lines, each with the hint. Guarded count (#663 T3): grep -c
+# exits 1 on zero matches and this suite runs set -e (unlike the
+# e2e-sources count family) — the bare shape aborted the suite before
+# any fail row, a non-counted red; the guard records 0 instead.
+_pg_hint=$(live_src "$STATUS_ENTRY" | grep -c 'refusing to run (fix: sudo opk update)' || true)
 if [ "$_pg_hint" -eq 2 ]; then
     pass "both wiring-abort guards print the repair hint (docs row is true) (#461 b B2)"
 else

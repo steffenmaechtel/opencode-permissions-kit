@@ -239,7 +239,14 @@ before the suite reads it — the parity test regenerates and compares
    union of the in-repo file(s) the `Source:` line resolves to (all
    slash tokens; a path wrapped over a line break heals) and the
    `rule:` back-ref file: metas quote both their source record and
-   the rule text itself. Tokens containing `..` never resolve. A
+   the rule text itself. The rule-file leg joins that union only
+   when at least one Source leg resolved — the parity block is
+   gated on a resolvable leg (#719, arm b): an external-only
+   `Source:` legitimately quotes its external text (maintainer issue
+   comments, PR timelines — not greppable in-tree; measured
+   2026-11-21: 33 active metas carry such quotes), so the meta's
+   unconditional rule-text anchor stays inv 5's `quote:` field.
+   Tokens containing `..` never resolve. A
    token that resolves to an existing directory is ignored — prose
    naming a tree, not a file: neither a parity leg nor unresolved —
    but listed in the audit's ignored sub-lane, so a broken file

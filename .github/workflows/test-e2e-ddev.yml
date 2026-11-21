@@ -151,6 +151,12 @@ jobs:
           # (opencode-e2e-2x-... from the e2e workflow's 2x-era jobs and
           # this file's former 2x job, opencode-e2e-latest<ver> from the
           # v1-era ddev job) to warm-start the binary on version bumps.
+          # One-directional by design (#663 B6, accepted): the e2e
+          # workflow's restore prefixes cannot match this job's primary
+          # (opencode-e2e-2x-npm<ver>), so warming flows e2e -> ddev
+          # only. The cold direction needs an npm bump between the two
+          # cron starts (e2e 17:05, ddev 27:05) and costs one redundant
+          # binary download, never a wrong binary (keys version-keyed).
           key: opencode-e2e-2x-npm${{ steps.version2x.outputs.OC2_VERSION }}
           restore-keys: |
             opencode-e2e-2x-

@@ -494,6 +494,19 @@ if live_src "$DOCKERFILE" | grep -q '^FROM ${BASE_IMAGE}' &&
 else
     fail "both Dockerfiles pull the configurable base (FROM \${BASE_IMAGE})"
 fi
+# Order pin (#663 T5, the #224 a W6 line-number idiom): ARG must sit
+# BEFORE FROM -- the two presence conjunctions above are order-blind
+# (a swap keeps both green and only the e2e image build fails later:
+# an ARG after FROM is unavailable to that FROM).
+for _df in "$DOCKERFILE" "$DOCKERFILE_ROOTLESS"; do
+    _arg_ln=$(live_src "$_df" | grep -n '^ARG BASE_IMAGE=ubuntu:24.04' | head -1 | cut -d: -f1)
+    _from_ln=$(live_src "$_df" | grep -n '^FROM ${BASE_IMAGE}' | head -1 | cut -d: -f1)
+    if [ -n "$_arg_ln" ] && [ -n "$_from_ln" ] && [ "$_arg_ln" -lt "$_from_ln" ]; then
+        pass "$(basename "$_df"): ARG BASE_IMAGE precedes FROM (order pinned, $_arg_ln < $_from_ln)"
+    else
+        fail "$(basename "$_df"): ARG/FROM order violated (arg: ${_arg_ln:-missing}, from: ${_from_ln:-missing})"
+    fi
+done
 if live_src "$WF_E2E" | grep -q 'E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04' &&
     live_src "$WF_DDEV" | grep -q 'E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04'; then
     pass "workflows export the mirror base image to the e2e steps"

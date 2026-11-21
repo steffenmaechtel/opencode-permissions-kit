@@ -276,7 +276,11 @@ e2e_fetch_opencode() {
             rm -f "$tmp"
             ;;
     esac
-    chmod +x "$dest"
+    # Mode heal (#628 a M3, the #601 rootless read class): tar preserves
+    # the archive's own modes; npm/GitHub ship 755 today, but a future
+    # owner-executable-but-unreadable archive mode would ride the cache
+    # forever (the probe checks -x only). 755 makes readability explicit.
+    chmod 755 "$dest"
 }
 
 # Resolve the latest release tag of a GitHub repo, rate-limit resilient

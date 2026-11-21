@@ -191,7 +191,10 @@ jobs:
           # the v1-era restore prefix below still warm-starts the OLD
           # binary + installer from pre-flip default runs. Shared with
           # the git-latest twin (the image build differs, the cached
-          # opencode binaries do not).
+          # opencode binaries do not). These prefixes cannot match the
+          # ddev workflow's primary (opencode-e2e-2x-npm<ver>) — warming
+          # is one-directional e2e -> ddev by design (#663 B6, accepted;
+          # rationale in test-e2e-ddev.yml's cache block).
           key: opencode-e2e-2x-old${{ steps.old.outputs.OLD_VERSION }}-npm${{ steps.version2x.outputs.OC2_VERSION }}
           restore-keys: |
             opencode-e2e-2x-old${{ steps.old.outputs.OLD_VERSION }}-
