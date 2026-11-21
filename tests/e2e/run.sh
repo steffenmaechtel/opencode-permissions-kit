@@ -1332,9 +1332,10 @@ echo "--- 12e.4 env_keep scoping: effective env on the RunAs side (issue #679) -
 # set makes the wrapper OVERWRITE the inherited sentinel before the
 # exec (opencode-as-opencode:142-145) and this arm false-reds loud
 # (B3); the pgrep poll rides TRANSITIVE procps (not Dockerfile-pinned
-# — B1 residual: if the dependency drops, the WARN + two red rows
-# below name the cause). Serve budget 45s vs the 30s poll: a serve
-# found late in the poll must still be alive at the environ read.
+# — B1 residual, b D1: if the dependency drops, the serve still runs
+# but the pid stays empty — the WARN below names the pgrep suspect
+# and the two environ rows red). Serve budget 45s vs the 30s poll: a
+# serve found late in the poll must still be alive at the environ read.
 check "env_keep scoping: deployed alias names exactly the wrapper exec target (#679)" \
     E 'sudo grep -q "^Cmnd_Alias OPK_ENV_CMNDS = /usr/local/lib/opencode-permissions-kit/bin/opencode \*$" /etc/sudoers.d/opencode-permissions-kit'
 check_fail "env_keep scoping: out-of-alias sudo drops DOCKER_HOST (#679)" \
@@ -1350,7 +1351,7 @@ for _ in $(seq 1 30); do
     sleep 1
 done
 if [ -z "$_envkeep_pid" ]; then
-    echo "  ${RED}WARN${NC}  wrapper serve (env_keep probe) never appeared within 30s — environ reads will fail"
+    echo "  ${RED}WARN${NC}  wrapper serve (env_keep probe) pid not found within 30s — environ reads will fail (serve down, or the poll's pgrep missing: rides transitive procps, #733 a B1 / b D1)"
 fi
 check "env_keep scoping: wrapper serve carries DOCKER_HOST across sudo (#679)" \
     E "sudo cat /proc/${_envkeep_pid:-none}/environ | tr '\\0' '\\n' | grep -Fx 'DOCKER_HOST=e2e-envkeep-pos-dh'"
