@@ -148,11 +148,13 @@ check_absent "env posture: no SETENV tag anywhere in the fragment (#726 a Q2)" \
 # The keep must ride a Cmnd_Alias whose ONLY member is the wrapper's exec
 # target (the real binary under bin/opencode) — the per-rule audit found
 # the other grants need none of the four vars. Exact-count pins lock the
-# rendered shape; the raw absence pin reddens any re-globalized keep (a
-# bare `Defaults env_keep` — commented-out sabotage shapes count too,
-# the harness absence contract). The alias-member absence pins encode
-# the audit result: widening the alias reddens them via the exact-line
-# count above AND visibly names the audit class here.
+# rendered shape; the absence pins reddens any re-globalized keep. The
+# absence and member pins run over a CONTINUATION-JOINED view of the
+# fragment: alias widening and merged Defaults ride backslash
+# continuations, and the physical-line grep stayed green over a two-line
+# widened alias (sabotage cycle B, 2026-11-22) — the pins must see the
+# LOGICAL line. Commented-out sabotage shapes count too (harness
+# absence contract).
 _scoped_keep=$(grep -c '^Defaults!OPK_ENV_CMNDS env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME"$' "$CONF/sudoers" || true)
 if [ "$_scoped_keep" = 1 ]; then
     pass "env_keep scoping: exactly one Defaults!OPK_ENV_CMNDS keep line (#679)"
@@ -165,16 +167,17 @@ if [ "$_alias_line" = 1 ]; then
 else
     fail "env_keep scoping: expected 1 exact wrapper-only alias line, found $_alias_line (#679)"
 fi
-check_absent "env_keep scoping: no global (unscoped) env_keep Defaults left (#679)" \
-    "$CONF/sudoers" -q '^Defaults env_keep'
+sed -e ':a' -e '/\\$/N' -e 's/\\\n[[:space:]]*//' -e 'ta' "$CONF/sudoers" >"$WORK/sudoers-joined"
+check_absent "env_keep scoping: no non-command-scoped env_keep Defaults left (#679)" \
+    "$WORK/sudoers-joined" -q '^Defaults[^!]*env_keep'
 check_absent "env_keep scoping: socket-check NOT in the alias (#679 audit: argv-only)" \
-    "$CONF/sudoers" -q 'OPK_ENV_CMNDS = .*socket-check'
+    "$WORK/sudoers-joined" -q 'OPK_ENV_CMNDS = .*socket-check'
 check_absent "env_keep scoping: cwd-check NOT in the alias (#679 audit: argv-only)" \
-    "$CONF/sudoers" -q 'OPK_ENV_CMNDS = .*cwd-check'
+    "$WORK/sudoers-joined" -q 'OPK_ENV_CMNDS = .*cwd-check'
 check_absent "env_keep scoping: ddev-as-opencode NOT in the alias (#679 audit: re-derives env)" \
-    "$CONF/sudoers" -q 'OPK_ENV_CMNDS = .*ddev-as-opencode'
+    "$WORK/sudoers-joined" -q 'OPK_ENV_CMNDS = .*ddev-as-opencode'
 check_absent "env_keep scoping: heal-index-head NOT in the alias (#679 audit: RunAs-root chown helper)" \
-    "$CONF/sudoers" -q 'OPK_ENV_CMNDS = .*heal-index-head'
+    "$WORK/sudoers-joined" -q 'OPK_ENV_CMNDS = .*heal-index-head'
 
 # --- 2. legacy name cleanup ------------------------------------------------
 
