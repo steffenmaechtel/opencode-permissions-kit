@@ -115,8 +115,14 @@ removes it only when it pins the kit wrapper.
 | `opencode-permissions-kit` | `(opencode)` RunAs rights for the kit binary, the probes, and the ddev helper |
 
 Grants `(opencode)` RunAs for the kit binary, the socket-check/cwd-check
-probes, and the ddev-as-opencode helper; keeps `DOCKER_HOST` and
-`XDG_RUNTIME_DIR` in env_keep. The fragment also pins the env posture
+probes, and the ddev-as-opencode helper; keeps `DOCKER_HOST`,
+`XDG_RUNTIME_DIR` and the `OPENCODE_SERVER_*` pair in env_keep —
+command-scoped to the kit binary's own grant (`Cmnd_Alias
+OPK_ENV_CMNDS` → `Defaults!OPK_ENV_CMNDS env_keep += …`, #679): the
+per-rule audit found the wrapper's sudo exec of the real binary the sole
+reader of the four vars, so every other sudo invocation on the host —
+any user, any command — gets the plain `env_reset` environment again.
+The fragment also pins the env posture
 explicitly — `Defaults env_reset` and `Defaults !setenv` (#677): stock
 sudo compiles both in as defaults, and pinning them keeps an admin edit
 of the main sudoers from reopening env smuggling into the root-run git

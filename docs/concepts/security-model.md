@@ -450,7 +450,9 @@ Operational notes:
   override replaces the fetch target entirely — treat the install
   environment as trusted.
 - **Developer-shell `DOCKER_HOST` rides env_keep:** the sudoers template
-  keeps `DOCKER_HOST`/`XDG_RUNTIME_DIR` into the agent session, but the
+  keeps `DOCKER_HOST`/`XDG_RUNTIME_DIR` into the agent session
+  (command-scoped to the wrapper's own exec target since #679 — no other
+  sudo invocation receives the keep, but this arm is unchanged), yet the
   wrapper pins its own values only in the socket-resolving arms —
   docker-rootless, and podman-rootless with `OPENCODE_PODMAN_SOCKET`
   configured — while the podman-CLI, unreachable-socket and no-backend
@@ -462,8 +464,10 @@ Operational notes:
   if your shell carries one.
 - **OpenChamber serve password in the agent env:** when the serve feature is
   configured, `OPENCODE_SERVER_PASSWORD` (and username) survive sudo's
-  `env_reset` into the agent's environment. Not a privilege escalation — but
-  pick a strong password.
+  `env_reset` into the agent's environment (the keep is command-scoped to
+  the wrapper's exec target, #679 — the credential no longer rides along
+  into unrelated sudo invocations on the host). Not a privilege
+  escalation — but pick a strong password.
 - **Agent-authored container opt-in:** the per-project container-tools
   opt-in is designed as project-owner consent, but the wrapper's probe
   cannot tell an owner-written `./opencode.jsonc` from one the agent

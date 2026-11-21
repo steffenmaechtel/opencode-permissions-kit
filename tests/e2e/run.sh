@@ -1290,8 +1290,8 @@ E 'cd /var/www/vhosts/test-project && timeout 20 /usr/local/bin/opencode serve -
     echo "  ${GREEN}OK${NC}  wrapper serve ran headless from a project dir"
 check "wrapper serve: listening line also from project dir" \
     E 'grep -q "server listening" /tmp/wrapper-serve2.out'
-check "wrapper serve: sudoers keep OPENCODE_SERVER_PASSWORD across sudo" \
-    E 'sudo grep -q "OPENCODE_SERVER_PASSWORD" /etc/sudoers.d/opencode-permissions-kit'
+check "wrapper serve: sudoers keep OPENCODE_SERVER_PASSWORD across sudo (command-scoped, #679)" \
+    E 'sudo grep -q "^Defaults!OPK_ENV_CMNDS env_keep += \"DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME\"$" /etc/sudoers.d/opencode-permissions-kit'
 
 echo "--- 12e.3 wrapper headless run (orchestrators: cezar, CI, eval harnesses — issue #42) ---"
 # Orchestrators spawn `opencode run` from git worktrees / temp checkouts
@@ -1304,6 +1304,46 @@ check_fail "wrapper run from non-project dir: no project-dir refusal" \
     E 'grep -q "cannot be started here" /tmp/wrapper-run.out /tmp/wrapper-run.err'
 check_fail "wrapper run: no SECURED banner on stdout" \
     E 'grep -q "SECURED BY" /tmp/wrapper-run.out'
+
+echo ""
+echo "--- 12e.4 env_keep scoping: effective env on the RunAs side (issue #679) ---"
+# The keep is command-scoped (Defaults!OPK_ENV_CMNDS). visudo proves
+# SYNTAX only — a subtly wrong alias (path drift) would break the
+# wrapper flow SILENTLY after the next opk update. Two functional arms,
+# both observing the environment production observes:
+#   positive: wrapper-invoked serve carries sentinel env across the
+#     sudo hop into the opencode-user process — /proc/<pid>/environ is
+#     the post-env_reset table sudo exec'd the target with;
+#   negative (the narrowing itself): an out-of-alias sudo invocation
+#     DROPS the same sentinel — under the pre-#679 global keep it
+#     survived, so this arm is the regression pin for the breadth.
+# Sentinel values carry no '/' or '%' (env_check strips those on its
+# own — the negative arm must discriminate the SCOPING, not env_check)
+# and nothing the serve boot parses: DOCKER_HOST is unused without
+# in-session container tools, the password is just the auth secret.
+check "env_keep scoping: deployed alias names exactly the wrapper exec target (#679)" \
+    E 'sudo grep -q "^Cmnd_Alias OPK_ENV_CMNDS = /usr/local/lib/opencode-permissions-kit/bin/opencode \*$" /etc/sudoers.d/opencode-permissions-kit'
+check_fail "env_keep scoping: out-of-alias sudo drops DOCKER_HOST (#679)" \
+    E 'DOCKER_HOST=e2e-envkeep-neg-dh sudo -u opencode /usr/bin/env | grep -Fx "DOCKER_HOST=e2e-envkeep-neg-dh"'
+docker exec -u dev -e OPK_UPDATE_CHECK=0 "$E2E_CONTAINER" \
+    sh -c 'cd /tmp && DOCKER_HOST=e2e-envkeep-pos-dh OPENCODE_SERVER_PASSWORD=e2e-envkeep-pw timeout 30 /usr/local/bin/opencode serve --hostname 127.0.0.1 --port 4197 >/tmp/envkeep-serve.out 2>&1' \
+    >/dev/null 2>&1 &
+E2E_ENVKEEP_JOB=$!
+_envkeep_pid=""
+for _ in $(seq 1 30); do
+    _envkeep_pid="$(E 'sudo pgrep -u opencode -f "serve --hostname 127.0.0.1 --port 4197" | head -1' || true)"
+    [ -n "$_envkeep_pid" ] && break
+    sleep 1
+done
+if [ -z "$_envkeep_pid" ]; then
+    echo "  ${RED}WARN${NC}  wrapper serve (env_keep probe) never appeared within 30s — environ reads will fail"
+fi
+check "env_keep scoping: wrapper serve carries DOCKER_HOST across sudo (#679)" \
+    E "sudo tr '\\0' '\\n' </proc/${_envkeep_pid:-none}/environ | grep -Fx 'DOCKER_HOST=e2e-envkeep-pos-dh'"
+check "env_keep scoping: wrapper serve carries OPENCODE_SERVER_PASSWORD across sudo (#679)" \
+    E "sudo tr '\\0' '\\n' </proc/${_envkeep_pid:-none}/environ | grep -Fx 'OPENCODE_SERVER_PASSWORD=e2e-envkeep-pw'"
+kill "$E2E_ENVKEEP_JOB" 2>/dev/null || true
+E 'sudo pkill -u opencode -f "port 419[7]" >/dev/null 2>&1 || true'
 
 echo ""
 echo "--- 12f. uninstall.sh --dry-run (no-op) ---"

@@ -89,7 +89,9 @@ echo ""
 
 echo "-- sudoers.template structure --"
 check_live "template keeps DOCKER_HOST + XDG_RUNTIME_DIR + OPENCODE_SERVER_PASSWORD + USERNAME env_keep" "$SUDOERS" \
-    -Fq 'env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME"'
+    -Fq 'Defaults!OPK_ENV_CMNDS env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME"'
+check_live "template scopes that env_keep to the wrapper exec target (#679)" "$SUDOERS" \
+    -Fq 'Cmnd_Alias OPK_ENV_CMNDS = /usr/local/lib/opencode-permissions-kit/bin/opencode *'
 check_absent "template has NO DDEV_DEBUG env_keep (describe URL transport needs none)" \
     "$SUDOERS" -Fq 'DDEV_DEBUG'
 check_absent "template has NO OPENCODE_LAUNCH_CWD env_keep" \

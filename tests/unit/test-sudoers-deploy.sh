@@ -144,6 +144,38 @@ fi
 check_absent "env posture: no SETENV tag anywhere in the fragment (#726 a Q2)" \
     "$CONF/sudoers" -q SETENV
 
+# --- 1d. env_keep is command-scoped (#679) ---------------------------------
+# The keep must ride a Cmnd_Alias whose ONLY member is the wrapper's exec
+# target (the real binary under bin/opencode) — the per-rule audit found
+# the other grants need none of the four vars. Exact-count pins lock the
+# rendered shape; the raw absence pin reddens any re-globalized keep (a
+# bare `Defaults env_keep` — commented-out sabotage shapes count too,
+# the harness absence contract). The alias-member absence pins encode
+# the audit result: widening the alias reddens them via the exact-line
+# count above AND visibly names the audit class here.
+_scoped_keep=$(grep -c '^Defaults!OPK_ENV_CMNDS env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME"$' "$CONF/sudoers" || true)
+if [ "$_scoped_keep" = 1 ]; then
+    pass "env_keep scoping: exactly one Defaults!OPK_ENV_CMNDS keep line (#679)"
+else
+    fail "env_keep scoping: expected 1 Defaults!OPK_ENV_CMNDS keep line, found $_scoped_keep (#679)"
+fi
+_alias_line=$(grep -c '^Cmnd_Alias OPK_ENV_CMNDS = /usr/local/lib/opencode-permissions-kit/bin/opencode \*$' "$CONF/sudoers" || true)
+if [ "$_alias_line" = 1 ]; then
+    pass "env_keep scoping: alias names exactly the wrapper exec target (#679)"
+else
+    fail "env_keep scoping: expected 1 exact wrapper-only alias line, found $_alias_line (#679)"
+fi
+check_absent "env_keep scoping: no global (unscoped) env_keep Defaults left (#679)" \
+    "$CONF/sudoers" -q '^Defaults env_keep'
+check_absent "env_keep scoping: socket-check NOT in the alias (#679 audit: argv-only)" \
+    "$CONF/sudoers" -q 'OPK_ENV_CMNDS = .*socket-check'
+check_absent "env_keep scoping: cwd-check NOT in the alias (#679 audit: argv-only)" \
+    "$CONF/sudoers" -q 'OPK_ENV_CMNDS = .*cwd-check'
+check_absent "env_keep scoping: ddev-as-opencode NOT in the alias (#679 audit: re-derives env)" \
+    "$CONF/sudoers" -q 'OPK_ENV_CMNDS = .*ddev-as-opencode'
+check_absent "env_keep scoping: heal-index-head NOT in the alias (#679 audit: RunAs-root chown helper)" \
+    "$CONF/sudoers" -q 'OPK_ENV_CMNDS = .*heal-index-head'
+
 # --- 2. legacy name cleanup ------------------------------------------------
 
 # A 440 file cannot be overwritten by its (non-root) owner — reset the
