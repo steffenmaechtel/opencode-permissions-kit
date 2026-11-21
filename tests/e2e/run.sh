@@ -1339,9 +1339,9 @@ if [ -z "$_envkeep_pid" ]; then
     echo "  ${RED}WARN${NC}  wrapper serve (env_keep probe) never appeared within 30s — environ reads will fail"
 fi
 check "env_keep scoping: wrapper serve carries DOCKER_HOST across sudo (#679)" \
-    E "sudo tr '\\0' '\\n' </proc/${_envkeep_pid:-none}/environ | grep -Fx 'DOCKER_HOST=e2e-envkeep-pos-dh'"
+    E "sudo cat /proc/${_envkeep_pid:-none}/environ | tr '\\0' '\\n' | grep -Fx 'DOCKER_HOST=e2e-envkeep-pos-dh'"
 check "env_keep scoping: wrapper serve carries OPENCODE_SERVER_PASSWORD across sudo (#679)" \
-    E "sudo tr '\\0' '\\n' </proc/${_envkeep_pid:-none}/environ | grep -Fx 'OPENCODE_SERVER_PASSWORD=e2e-envkeep-pw'"
+    E "sudo cat /proc/${_envkeep_pid:-none}/environ | tr '\\0' '\\n' | grep -Fx 'OPENCODE_SERVER_PASSWORD=e2e-envkeep-pw'"
 kill "$E2E_ENVKEEP_JOB" 2>/dev/null || true
 E 'sudo pkill -u opencode -f "port 419[7]" >/dev/null 2>&1 || true'
 
