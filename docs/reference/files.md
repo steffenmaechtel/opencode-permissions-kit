@@ -67,10 +67,11 @@ asks before removing the kit block; your own entries always stay.
 | `OPENCODE_GROUP` | Always the `opencode` usergroup (informational) |
 | `VERSION` | Deployed kit version |
 
-Removed keys: `HARD_DENY_REMOVED` — a legacy 0.0.36-era migration
-stamp, unused since; installs upgraded from ≤ 0.0.36 may still carry
-it in `install.conf` (harmless, ignored — the kit stopped writing it;
-history in `internal/records/ddev-working.md`).
+Removed keys: `HARD_DENY_REMOVED` — a 0.0.11–0.0.14-era migration
+stamp; installs that crossed the migration while on ≤ 0.0.14 may
+still carry it in `install.conf` (harmless, ignored — the kit stopped
+writing it at the 0.0.14 upgrade floor; history in
+`internal/records/ddev-working.md`).
 
 Key notes:
 
