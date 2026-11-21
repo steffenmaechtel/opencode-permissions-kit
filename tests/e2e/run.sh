@@ -1351,7 +1351,7 @@ for _ in $(seq 1 30); do
     sleep 1
 done
 if [ -z "$_envkeep_pid" ]; then
-    echo "  ${RED}WARN${NC}  wrapper serve (env_keep probe) pid not found within 30s — environ reads will fail (serve down, or the poll's pgrep missing: rides transitive procps, #733 a B1 / b D1)"
+    echo "  ${RED}WARN${NC}  wrapper serve (env_keep probe) pid not found within 30s — environ reads will fail (serve down or still booting under its 45s budget, or the poll's pgrep missing: rides transitive procps, #733 a B1 / b D1 / c E1)"
 fi
 check "env_keep scoping: wrapper serve carries DOCKER_HOST across sudo (#679)" \
     E "sudo cat /proc/${_envkeep_pid:-none}/environ | tr '\\0' '\\n' | grep -Fx 'DOCKER_HOST=e2e-envkeep-pos-dh'"
