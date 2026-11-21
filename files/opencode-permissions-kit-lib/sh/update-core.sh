@@ -469,11 +469,9 @@ update_redeploy_project_roots() {
         # per root in the loop below. Shared helper with live per-pass
         # progress (issue #14 — large trees used to run minutes in
         # silence during --refresh).
-        _fsbl=""
         for _fsbl_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/fs-baseline.sh" "$LIBDIR/sh/fs-baseline.sh"; do
             if [ -f "$_fsbl_cand" ]; then
                 . "$_fsbl_cand"
-                _fsbl="$_fsbl_cand"
                 break
             fi
         done
@@ -634,7 +632,7 @@ update_redeploy_project_roots() {
             log "group baseline refresh requested (--refresh)"
         elif [ "$_ho_ran" -gt 0 ]; then
             ui_detail "group baseline re-applied for $_ho_ran root(s) — the handover stamp was"
-            ui_detail "invalid (ownership/mode or baseline semantics changed since the last pass)"
+            ui_detail "invalid (no stamp yet, or ownership/mode or baseline semantics changed)"
             log "group baseline re-applied for $_ho_ran root(s) (stamp-triggered, issue #696)"
         else
             ui_detail "skipped group-baseline re-apply (stamps valid — --refresh forces it)"

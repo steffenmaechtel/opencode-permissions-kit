@@ -747,6 +747,44 @@ if printf '%s' "$_out" | grep -qF 'operand sweep only: the gitdir-level bits (st
 else
     fail "core: on must separate operand sweep and fs-baseline bits (#695)"
 fi
+# #710 a B1: the tee sits on the DATA path — a broken python3 (the
+# health probe fails) must degrade to the cat passthrough: the sweep
+# still heals and the warn names the degrade, never an empty list over
+# a dead tee (the #221 a W3 class). heal-index-head needs no python3,
+# so the broken stub can only hit the tee path.
+mkdir -p "$WORK/badbin"
+printf '#!/bin/sh\nexit 1\n' >"$WORK/badbin/python3"
+chmod 755 "$WORK/badbin/python3"
+printf '%s\n' "$WORK/zone/onroot" >"$WORK/on-projects.conf"
+: >"$LOG"
+_hr_rc=0
+_out=$( (
+    PATH="$WORK/badbin:$PATH"
+    export PATH
+    _core_run 'SD_SUDO="" SD_VISUDO="$WORK/visudo" SD_CONF_DIR="$WORK/etc" \
+        SD_SUDOERS_D="$WORK/sdd" GH_PROJECTS_CONF="$WORK/on-projects.conf" \
+        HOME="$WORK/devhome" _git_heal_on'
+) 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] &&
+    [ "$(grep -c 'gitdir=' "$LOG" 2>/dev/null || true)" -ge 1 ] &&
+    printf '%s' "$_out" | grep -qF 'operand set re-pinned for' &&
+    printf '%s' "$_out" | grep -qF 'live progress unavailable (python3 missing or broken)'; then
+    pass "core: broken python3 degrades to passthrough — sweep still heals, warn names it (#710 a B1)"
+else
+    fail "core: broken-python3 degrade leg (rc=$_hr_rc heals=$(grep -c 'gitdir=' "$LOG" 2>/dev/null) out=$_out) (#710 a B1)"
+fi
+# #710 a C8: the tee's DATA stream stays verbatim and a non-tty stderr
+# emits nothing (captured runs must be byte-identical — the sibling
+# verbatim-pin shape from test-status.sh). Runs the REAL tee (healthy
+# python3): the probe passes, the python path is the one exercised.
+printf 'a\nb\0c\n\nd\n' >"$WORK/tee-in.bin"
+(. "$CORE" && _ghc_progress_tee "pin-label" <"$WORK/tee-in.bin" >"$WORK/tee-out.bin") \
+    2>"$WORK/tee-err.txt"
+if cmp -s "$WORK/tee-in.bin" "$WORK/tee-out.bin" && [ ! -s "$WORK/tee-err.txt" ]; then
+    pass "core: tee passes data verbatim, non-tty stderr silent (#710 a C8)"
+else
+    fail "core: tee verbatim/silence leg (in/out differ or stderr nonempty) (#710 a C8)"
+fi
 
 # `on` sweep conf gate (#674 a A1): a hand-edited system-path line is
 # skipped loudly and steers no root find — with GH_CONF_RELAX unset the

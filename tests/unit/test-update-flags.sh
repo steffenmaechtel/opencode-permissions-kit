@@ -1737,5 +1737,20 @@ else
     fail "re-deploy confirm default flipped or undocumented (#428)"
 fi
 
+# --- #710 a C1/C8: the migration note is true in BOTH states ----------------------
+# The note prints on EVERY plain full update (no once-state): from the
+# second plain update on, stamps are valid and NO rescan runs — the
+# text must not claim "this run" strips anything. True shape: name the
+# mechanism (a stamp-invalidated update runs the baseline) + the force
+# command. Comment-stripped like the pin above.
+if live_src "$UPDATE" | grep -qF 'ui_info "Migration note: the project-root sticky bits of earlier heals are gone;"' &&
+    live_src "$UPDATE" | grep -qF 'the baseline pass strips them — a stamp-invalidated update runs it;' &&
+    live_src "$UPDATE" | grep -qF 'force it with: sudo opk update --refresh' &&
+    ! live_src "$UPDATE" | grep -qF "this run's rescan"; then
+    pass "migration note true in both states (no this-run claim, #710 a C1)"
+else
+    fail "migration note overclaims a run action (#710 a C1)"
+fi
+
 # --- Summary ----------------------------------------------------------------------
 suite_done "tests"

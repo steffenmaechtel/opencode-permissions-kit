@@ -51,8 +51,8 @@ asks before removing the kit block; your own entries always stay.
   release that changes what the group baseline applies invalidates every
   stamp, so the next plain `opk update` re-runs the baseline over each
   root automatically — that rescan is the kit's migration path onto
-  existing installs, not waste. Deleting the directory still only costs
-  one extra scan.
+  existing installs, not waste. Deleting the directory costs one extra
+  full pass per root (the recursive baseline included), not just a scan.
 
 ### `install.conf` keys
 

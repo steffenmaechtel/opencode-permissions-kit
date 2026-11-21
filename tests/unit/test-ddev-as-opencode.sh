@@ -75,7 +75,7 @@ _trap_cleanup() {
         "${RACESTUB:-}" "${RACESP:-}" "${RACESPS:-}" "${RACEC:-}" \
         "${RACECT:-}" "${RACEF:-}" "${RACEFT:-}" "${_112_dir:-}" \
         "${CB285:-}" "${SWAPF:-}" "${SWAPB:-}" "${SWAPR:-}" \
-        "${SWAPRB:-}" "${D2_dir:-}" "${D7STUB:-}"
+        "${SWAPRB:-}" "${D2_dir:-}" "${D7STUB:-}" "${_696_dir:-}"
 }
 trap _trap_cleanup EXIT INT TERM
 
@@ -2319,9 +2319,16 @@ fi
 # #696 rollout leg: a stamp in the PRE-#696 6-field format (no baseline
 # rev) must read invalid — the format change itself is what re-heals
 # every existing install on its first plain update after the release.
+# Loud setup (#710 a A4): a silently-failed write above (the || true
+# guards) would otherwise validate a MISSING stamp — rc 1 reads
+# "invalid" and the leg passes without ever exercising the 6-field
+# shape (the vacuous-pass class the wave's own #211 b W12 comment
+# warns about).
 _112_stampfile=$(ls "$_112_dir/stamps"/*.stamp 2>/dev/null || true)
 if [ -n "$_112_stampfile" ]; then
     printf '%s\n' '/srv/projects|ocuser|ocgroup|1|off|devuser' >"$_112_stampfile"
+else
+    fail "stamp: rollout leg setup lost the stamp file (write above failed)"
 fi
 if (. "$HANDOVER" && if ddev_handover_stamp_valid "/srv/projects" ocuser ocgroup devuser; then exit 1; fi); then
     pass "stamp: a legacy 6-field stamp reads invalid (#696 rollout)"
@@ -2494,7 +2501,61 @@ check_live "update.sh: routine skip hint names the valid-stamp case (#696)" "$UP
 check_live "update.sh: stamp-triggered re-apply arm present (#696)" "$UPDATE_CORE" \
     -qF 'group baseline re-applied for $_ho_ran root(s)'
 check_live "update.sh: stamp-triggered arm explains its trigger (#696)" "$UPDATE_CORE" \
-    -qF 'invalid (ownership/mode or baseline semantics changed since the last pass)'
+    -qF 'invalid (no stamp yet, or ownership/mode or baseline semantics changed)'
+# #710 a C8: FUNCTIONAL pin of the summary arms — drive the REAL
+# update_redeploy_project_roots over a scratch conf with the stamp gate
+# stubbed both ways: a stale stamp runs baseline + handover and prints
+# the re-apply arm; a valid stamp skips the whole pass (the #112 cost
+# win holds at runtime, not only in source greps). FILES_ROOT/LIBDIR
+# point nowhere, so the sourcing loops keep the stubs defined here.
+_696_dir=$(mktemp -d)
+mkdir -p "$_696_dir/rootA"
+printf '%s\n' "$_696_dir/rootA" >"$_696_dir/conf"
+_696_drive() { # $1 = the stubbed stamp_valid rc
+    (
+        OPK_READER_TMP_ROOTS=1
+        PROJECTS_CONF="$_696_dir/conf"
+        FILES_ROOT="$_696_dir/none"
+        LIBDIR="$_696_dir/none"
+        OPENCODE_USER=opencode
+        DEFAULT_USER=devuser
+        NEW_OPENCODE_GROUP=tgrp
+        REFRESH=""
+        export OPK_READER_TMP_ROOTS PROJECTS_CONF FILES_ROOT LIBDIR \
+            OPENCODE_USER DEFAULT_USER NEW_OPENCODE_GROUP REFRESH
+        ui_section() { :; }
+        ui_detail() { echo "detail: $*"; }
+        ui_info() { echo "info: $*"; }
+        ui_success() { echo "success: $*"; }
+        ui_warn() { echo "warn: $*"; }
+        ui_error() { echo "error: $*"; }
+        log() { echo "log: $*"; }
+        _696_stamp_rc="$1"
+        export _696_stamp_rc
+        ddev_handover_stamp_valid() { return "${_696_stamp_rc:-1}"; }
+        fs_baseline_root() { echo "BASELINE-RAN: $1"; }
+        ddev_handover_root() { echo "HANDOVER-RAN: $1"; }
+        . "$UPDATE_CORE"
+        update_redeploy_project_roots
+    )
+}
+_696_stale=$(_696_drive 1)
+_696_valid=$(_696_drive 0)
+if printf '%s\n' "$_696_stale" | grep -qF "BASELINE-RAN: $_696_dir/rootA" &&
+    printf '%s\n' "$_696_stale" | grep -qF "HANDOVER-RAN: $_696_dir/rootA" &&
+    printf '%s\n' "$_696_stale" | grep -qF 'detail: group baseline re-applied for 1 root(s)'; then
+    pass "update.sh: stale stamp drives baseline+handover and the re-apply arm (functional, #710 a C8)"
+else
+    fail "update.sh: stale-stamp functional leg (out=$_696_stale) (#710 a C8)"
+fi
+if ! printf '%s\n' "$_696_valid" | grep -qF 'BASELINE-RAN' &&
+    printf '%s\n' "$_696_valid" | grep -qF 'detail: skipped the ddev handover rescan for 1 root(s)' &&
+    printf '%s\n' "$_696_valid" | grep -qF 'detail: skipped group-baseline re-apply'; then
+    pass "update.sh: valid stamp skips the whole pass (functional, #112 at runtime)"
+else
+    fail "update.sh: valid-stamp skip leg (out=$_696_valid) (#112 at runtime)"
+fi
+rm -rf "$_696_dir"
 # a D2 wiring: the stamp call lives ONLY inside ddev_handover_root's
 # completed-pass gate — no shipped caller stamps on its own anymore
 # (if-found-then-fail absence shapes, comment-stripped).

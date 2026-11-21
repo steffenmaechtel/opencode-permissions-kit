@@ -298,7 +298,8 @@ Operational notes:
     the heal pins to the tree's owner — it buys nothing there.
   - **state created between heal runs:** the heal re-runs with the
     group baseline (install, `opk config projects add`/`refresh`,
-    `opk update --refresh`) — a worktree registration created after
+    `opk update --refresh`, and every stamp-invalidated plain
+    `opk update`) — a worktree registration created after
     the last run keeps agent-owned `gitdir`/`commondir` pointer files
     until the next. The git heal hooks do not close this either:
     they re-pin only the measured operand set inside a validated

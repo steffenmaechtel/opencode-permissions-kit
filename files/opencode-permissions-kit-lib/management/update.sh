@@ -1222,7 +1222,8 @@ else
     # (AGENTS.md, Rules).
     if [ "$REFRESH" != true ]; then
         ui_info "Migration note: the project-root sticky bits of earlier heals are gone;"
-        ui_detail "the baseline pass strips them — this run's rescan, or 'sudo opk update --refresh'"
+        ui_detail "the baseline pass strips them — a stamp-invalidated update runs it;"
+        ui_detail "force it with: sudo opk update --refresh"
     fi
 fi
 [ "$BINARY_UPDATE" = true ] || ui_kv "Binary" "untouched (use --binary to upgrade)"

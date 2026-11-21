@@ -1453,10 +1453,10 @@ doctor_detect() {
         DET_N=$((DET_N + 1))
         if [ "$DET_MIXED" = 1 ]; then
             _det_mixrow="mixed with human-owned files"
-            DET_NOTE="detect: container-written entries mixed with human-owned files -- one owner for both (#312)"
+            DET_NOTE="detect: container-written entries mixed with human-owned files -- one owner for both"
         else
             _det_mixrow="container-written only"
-            DET_NOTE="detect: $DET_CNT container-written entries ($DET_OWN) -- declare the whole build tree (#312)"
+            DET_NOTE="detect: $DET_CNT container-written entries ($DET_OWN) -- declare the whole build tree"
         fi
         ui_kv "candidate" "$DET_B -- $DET_CNT container-written entries ($DET_OWN), $_det_mixrow"
         [ -n "$DET_EX" ] && ui_detail "examples: $DET_EX"

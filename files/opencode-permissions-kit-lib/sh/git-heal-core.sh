@@ -163,15 +163,48 @@ _ghc_heal_once() {
     "$(_ghc_libdir)/git-heal/heal-index-head" "$1"
 }
 
+# _ghc_py_probe: once-per-run python3 health probe (the status-core
+# _st_py_ok / fs-baseline _fsb_py_ok shape, #710 a B1): the tee sits on
+# the sweeps' DATA path, so a findable-but-broken interpreter (pyenv
+# shim to a removed version) or a missing one must degrade LOUDLY to
+# the plain cat passthrough — never hand the consumer loops an empty
+# list over a dead tee (the silent false-green #221 a W3 exists for).
+# The probe runs the SAME invocation shape as the tee it gates; on
+# failure the interpreter's own stderr passes through once (#244 c S3)
+# and the warn names the degrade. No top-level state (definitions
+# only, like the file header demands) — the :- guards carry it.
+_ghc_py_probe() {
+    if [ "${_ghc_py_checked:-0}" != 1 ]; then
+        _ghc_py_checked=1
+        _ghc_py_ok=0
+        command -v python3 >/dev/null 2>&1 &&
+            python3 -I -c 'import sys, threading, time' >/dev/null 2>&1 &&
+            _ghc_py_ok=1
+        if [ "${_ghc_py_ok:-0}" != 1 ]; then
+            command -v python3 >/dev/null 2>&1 &&
+                python3 -I -c 'import sys, threading, time' >/dev/null 2>&1 || true
+            printf '  warn: git-heal live progress unavailable (python3 missing or broken) — sweeps run without it\n' >&2
+        fi
+    fi
+}
+
 # _ghc_progress_tee <label>: newline-separated stdin -> stdout verbatim,
-# plus — when stderr is a tty — a "<label> — N done, M:SS" line rewritten
-# once a second and erased at EOF. The status-core _st_progress_tee
-# shape, line-based here (issue #695: the sweeps read newline lists, not
-# NUL streams — the long walks used to run silent for minutes). python3
-# -I like every kit inline (a poisoned PYTHONHOME must not kill the
-# display); non-tty stderr (pipes, captured output) sees the plain
-# stream only, so nothing downstream parses progress frames.
+# plus — when stderr is a tty AND python3 is healthy — a "<label> — N
+# done, M:SS" line rewritten once a second and erased at EOF. The
+# status-core _st_progress_tee shape, line-based here (issue #695: the
+# sweeps read newline lists, not NUL streams — the long walks used to
+# run silent for minutes). python3 -I like every kit inline (a poisoned
+# PYTHONHOME must not kill the display); non-tty stderr (pipes,
+# captured output) sees the plain stream only, so nothing downstream
+# parses progress frames. A failed health probe degrades to the plain
+# passthrough (#710 a B1): the data path keeps its pre-#695 shape —
+# zero python3 dependency — and the warn above names the reason.
 _ghc_progress_tee() {
+    _ghc_py_probe
+    if [ "${_ghc_py_ok:-0}" != 1 ]; then
+        cat
+        return 0
+    fi
     python3 -I -c '
 import sys, threading, time
 # Pure-ASCII source, glyphs via \u escapes (the argv-decode rule every
@@ -210,7 +243,7 @@ try:
         count += 1
         sys.stdout.buffer.write(line)
         sys.stdout.buffer.flush()
-except BrokenPipeError:
+except (BrokenPipeError, KeyboardInterrupt):
     pass
 finally:
     done.set()
@@ -340,6 +373,10 @@ _git_heal_on() {
             fi
             _ghc_on_root="$_ghc_root_norm"
             [ -d "$_ghc_on_root" ] || continue
+            # rc contract (#710 a B2): the pipeline's rc is the tee's —
+            # the cat fallback passes find's stream through unchanged,
+            # and find's own rc (partial walk on an unreadable subtree)
+            # was already swallowed by the pre-#695 `|| true` shape.
             find "$_ghc_on_root" -type d -name .git 2>/dev/null |
                 _ghc_progress_tee "finding .git dirs" >>"$_ghc_on_list" || true
         done <"$_ghc_on_conf"

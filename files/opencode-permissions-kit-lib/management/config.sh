@@ -1101,9 +1101,17 @@ handover() {
             ui_warn "skip $p (symlink — register the target directory instead)"
             continue
         fi
-        ui_info "ddev handover on $p (.ddev + settings dirs + typo3 bootstrap root) ..."
+        ui_info "config handover on $p (group baseline + .ddev + settings dirs) ..."
+        # Baseline first (#710 a C3): the handover's completed pass
+        # re-stamps the record INCLUDING FS_BASELINE_STAMP_REV —
+        # without the baseline run the new rev would be recorded over
+        # an unhealed tree and consume the re-apply trigger the rev
+        # exists for. Every other stamping caller pairs baseline +
+        # handover (install, projects add/refresh, update) — mirror
+        # the pair here.
+        fs_baseline_root "$p" "$OPENCODE_GROUP" "$OPENCODE_USER"
         ddev_handover_root "$p" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
-        ui_success "handover applied to $p"
+        ui_success "handover applied to $p (group baseline + ddev ownership)"
         log "ddev handover: $p"
     done
     _handover_rootless_hint
