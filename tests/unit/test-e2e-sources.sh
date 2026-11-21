@@ -153,6 +153,15 @@ check_live "lib.sh moves the fetched installer into place atomically (#485 F30)"
     -qF 'mv -f "$_oc_ins_tmp" "$OC_INSTALLER"'
 check_live "lib.sh chmods the fetched installer temp world-readable before the mv (#601, #628 a M1)" "$LIB" \
     -qF 'chmod 644 "$_oc_ins_tmp"'
+# Mode-heal pins (#724 a B2, closing #628 a M3's claim): the extracted
+# binary's chmod is 755, not +x -- the cache probe asserts -x only, so
+# a revert to the additive form would ride green while an owner-
+# executable-but-unreadable archive mode re-opens the #601 read class.
+check_live "e2e_fetch_opencode heals the extracted binary to 755 (#628 a M3)" "$LIB" \
+    -qF 'chmod 755 "$dest"'
+_DDEV_SH="$(cd "$(dirname "$0")/../e2e" && pwd)/run-ddev.sh"
+check_live "run-ddev.sh twin heals the ddev binary to 755 (#628 a M3)" "$_DDEV_SH" \
+    -qF 'chmod 755 "$DD_BIN"'
 
 # Behavioral drive of the real e2e_resolve_cache against a fake curl:
 # the lib copy's OC_CACHE_DIR is rewritten into scratch (the ONE
@@ -494,6 +503,19 @@ if live_src "$DOCKERFILE" | grep -q '^FROM ${BASE_IMAGE}' &&
 else
     fail "both Dockerfiles pull the configurable base (FROM \${BASE_IMAGE})"
 fi
+# Order pin (#663 T5, the #224 a W6 line-number idiom): ARG must sit
+# BEFORE FROM -- the two presence conjunctions above are order-blind
+# (a swap keeps both green and only the e2e image build fails later:
+# an ARG after FROM is unavailable to that FROM).
+for _df in "$DOCKERFILE" "$DOCKERFILE_ROOTLESS"; do
+    _arg_ln=$(live_src "$_df" | grep -n '^ARG BASE_IMAGE=ubuntu:24.04' | head -1 | cut -d: -f1)
+    _from_ln=$(live_src "$_df" | grep -n '^FROM ${BASE_IMAGE}' | head -1 | cut -d: -f1)
+    if [ -n "$_arg_ln" ] && [ -n "$_from_ln" ] && [ "$_arg_ln" -lt "$_from_ln" ]; then
+        pass "$(basename "$_df"): ARG BASE_IMAGE precedes FROM (order pinned, $_arg_ln < $_from_ln)"
+    else
+        fail "$(basename "$_df"): ARG/FROM order violated (arg: ${_arg_ln:-missing}, from: ${_from_ln:-missing})"
+    fi
+done
 if live_src "$WF_E2E" | grep -q 'E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04' &&
     live_src "$WF_DDEV" | grep -q 'E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04'; then
     pass "workflows export the mirror base image to the e2e steps"

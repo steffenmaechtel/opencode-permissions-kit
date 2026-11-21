@@ -13,7 +13,7 @@
     test-fs-baseline \
     test-git-heal-core \
     test-staged-write \
-    test-parser \
+    test-jsonc-parser \
     test-template-bash-rules \
     test-git-config \
     test-container-backend \
@@ -180,7 +180,7 @@ help:
 	@echo "  make test-fs-baseline  Run group-baseline progress tests (issue #14)"
 	@echo "  make test-git-heal-core  Run git heal hooks tests (#671)"
 	@echo "  make test-staged-write  Run symlink-safe write / handover gate tests (0.0.39g)"
-	@echo "  make test-parser   Run JSONC parser edge-case tests"
+	@echo "  make test-jsonc-parser  Run JSONC parser edge-case tests"
 	@echo "  make test-template-bash-rules  Run template bash rule tests"
 	@echo "  make test-git-config  Run git-config toggle tests"
 	@echo "  make test-container-backend  Run container-backend tests"
@@ -258,7 +258,7 @@ test: lint \
       test-project-paths \
       check-py \
       test-rules-meta \
-      test-parser \
+      test-jsonc-parser \
       test-template-bash-rules \
       test-git-config \
       test-container-backend \
@@ -510,7 +510,7 @@ test-as-opencode-core:
 	@echo "=== Wrapper Core Lib Tests ==="
 	@./tests/unit/test-as-opencode-core.sh
 
-test-parser:
+test-jsonc-parser:
 	@echo "=== JSONC Parser Edge-Case Tests ==="
 	@./tests/unit/test-jsonc-parser.sh
 

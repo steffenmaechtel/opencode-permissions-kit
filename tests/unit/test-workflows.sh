@@ -155,7 +155,8 @@ fi
 # workflow but missing from the test: chain runs in CI yet never under a
 # developer's `make test`. Resolves through recipes, not names: the pin
 # maps each suite file to the Makefile target whose recipe executes it
-# (test-parser -> test-jsonc-parser.sh is the one alias) and checks that
+# (the 2026-11 rename closed the one alias: test-parser ->
+# test-jsonc-parser, #663 T7) and checks that
 # target's chain membership. The chain is wrapped one prerequisite per
 # line since issue #464 -- the awk span reads the whole continuation
 # block (head line + space-indented continuations, up to the first

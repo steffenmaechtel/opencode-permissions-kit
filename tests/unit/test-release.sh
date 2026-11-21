@@ -479,7 +479,9 @@ grep -q 'make -C "$REPO" test check-version' "$RELEASE" &&
 grep -q 'mktemp "${path}.release-sums.XXXXXX"' "$RELSUMS" &&
     pass "release-sums temp name is unguessable (mktemp)" ||
     fail "release-sums lost its mktemp temp handling"
-_traps=$(grep -c '^trap ' "$RELSUMS")
+# Guarded count (#724 b A1, the #663 T3 class): bare grep -c aborts
+# this set -e suite before the counted fail row below.
+_traps=$(grep -c '^trap ' "$RELSUMS" || true)
 [ "$_traps" -eq 3 ] &&
     pass "release-sums arms EXIT/INT/TERM temp traps" ||
     fail "release-sums trap count wrong ($_traps, want 3)"

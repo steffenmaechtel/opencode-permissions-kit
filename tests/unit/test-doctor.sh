@@ -841,7 +841,12 @@ if printf '%s' "$_rd_out" | grep -q toodeep; then
 else
     pass "a marker 4 levels deep is no project"
 fi
-_n_child="$(printf '%s' "$_rd_out" | grep -c 'Doctor -- container-tree ownership')"
+# Guarded counts (#724 a A1, the #663 T3 class): grep -c exits 1 on
+# zero matches and this suite runs set -e -- a bare count assignment
+# aborts before the counted fail row, the exact shape this file's own
+# comment ("the fail must be a ROW, not an abort") forbids. Every bare
+# count assignment below carries the guard.
+_n_child="$(printf '%s' "$_rd_out" | grep -c 'Doctor -- container-tree ownership' || true)"
 if [ "$_n_child" = 3 ]; then
     pass "one fresh doctor section per project (3 children)"
 else
@@ -1059,7 +1064,7 @@ if printf '%s' "$_rd_out" | grep -qF "tr: warning"; then
 else
     pass "d D1: no tr portability warning on the marker-gate warn path"
 fi
-_n_child="$(printf '%s' "$_rd_out" | grep -c 'Doctor -- container-tree ownership')"
+_n_child="$(printf '%s' "$_rd_out" | grep -c 'Doctor -- container-tree ownership' || true)"
 if [ "$_n_child" = 3 ]; then
     pass "the skipped marker runs no child"
 else
@@ -1111,13 +1116,13 @@ printf '%s\n' '{"containerTrees":["tree"]}' >"$ALLNL/$NLDIR/opk.json"
 printf '%s\n' '{"containerTrees":["tree"]}' >"$ALLNL/real/opk.json"
 echo f >"$ALLNL/real/tree/f"
 rc_doctor "a F1: newline-named marker dir -> real fleet stays rc 0" 0 all "$ALLNL"
-_n_child="$(printf '%s' "$_rd_out" | grep -c 'corrupted marker path')"
+_n_child="$(printf '%s' "$_rd_out" | grep -c 'corrupted marker path' || true)"
 if [ "$_n_child" = 2 ]; then
     pass "a F1: both split fragments warned as corrupt"
 else
     fail "a F1: both split fragments warned as corrupt (got $_n_child)"
 fi
-_n_proj="$(printf '%s' "$_rd_out" | grep -cF 'project        ')"
+_n_proj="$(printf '%s' "$_rd_out" | grep -cF 'project        ' || true)"
 if [ "$_n_proj" = 1 ]; then
     pass "a F1: no phantom project row -- only the real project ran"
 else
@@ -1139,7 +1144,7 @@ echo f >"$ALLDT/real/tree/f"
 rc_doctor "a F12: dir/dangling opk.json no markers -> rc 0" 0 all "$ALLDT"
 grep_last_out "a F12: non-regular marker warned" \
     grep -qF "is not a regular file through symlinks -- not a marker (the walk-up rule)"
-_n_proj="$(printf '%s' "$_rd_out" | grep -cF 'project        ')"
+_n_proj="$(printf '%s' "$_rd_out" | grep -cF 'project        ' || true)"
 if [ "$_n_proj" = 1 ]; then
     pass "a F12: only the real project ran (2 non-markers skipped)"
 else

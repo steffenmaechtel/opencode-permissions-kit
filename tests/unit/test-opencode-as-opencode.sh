@@ -349,8 +349,10 @@ if [ -n "$(extract_func "$CORE_LIB" wrapper_headless_classify)" ]; then
     # the function must be exactly 2 — the $1 case arm and the _hr_help
     # arm — so an arm reduced to `if …; then :; fi` fails loud (the
     # #370 a E1 regression).
+    # Guarded count (#724 b A1, the #663 T3 class): bare grep -c
+    # aborts this set -e suite before the counted fail row below.
     _vp_execs="$(printf '%s\n' "$_vp_fn" |
-        grep -c 'exec /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode "\$@"')"
+        grep -c 'exec /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode "\$@"' || true)"
     if printf '%s\n' "$_vp_fn" | grep -q 'if \[ "\$_hr_help" = true \]; then' &&
         [ "$_vp_execs" = 2 ]; then
         pass "the _hr_help exec arm exists in wrapper_version_passthrough (#370 a E1)"

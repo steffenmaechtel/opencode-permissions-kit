@@ -46,7 +46,11 @@
 #      not quotations) is findable -- case-folded, inv5-normalized --
 #      in the union of the in-repo file(s) the Source line resolves
 #      to (all slash tokens, wrapped paths healed) and the rule:
-#      back-ref file. The haystack is content-inclusive: fenced
+#      back-ref file. The rule-file leg joins inside the legs gate:
+#      with no resolvable Source leg the parity block skips whole
+#      (#719 arm b -- external-only Sources quote external text; the
+#      unconditional rule-text anchor is inv 5's quote field). The
+#      haystack is content-inclusive: fenced
 #      blocks of a leg or the rule file are searchable text (#572
 #      B4) -- the fence carve-out is quotation-side only, it decides
 #      which meta strings are checked, not what the named files may
@@ -476,6 +480,9 @@ while IFS= read -r m; do
                 fi ;;
             esac
         done
+        # legs gate (#719 arm b): the rule-file leg joins INSIDE -- a
+        # Source with no resolvable leg skips body parity entirely;
+        # the unconditional rule-text anchor is inv 5's quote field.
         if [ -n "$legs" ]; then
             hay=""
             for leg in $legs; do hay=$hay$(hay_join "$ROOT/$leg"); done
