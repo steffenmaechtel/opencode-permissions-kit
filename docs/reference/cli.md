@@ -558,7 +558,7 @@ Flags: `--yes` (alias `-y`) assumes yes where config.sh would ask.
 | `container-backend docker-rootless\|podman-rootless` | Switch the rootless backend |
 | `container-backend status` | Show the configured backend + socket state |
 | `refresh` | Re-apply the group baseline (chgrp/setgid/default ACLs) |
-| `handover <path...>` | Re-run the ddev handover for one project |
+| `handover <path...>` | Re-run the group baseline + ddev handover for one project |
 | `ddev-settings on\|off\|status` | Dev-owned projects: kit writes `disable_settings_management: true` |
 
 Command notes: `container-backend` — see

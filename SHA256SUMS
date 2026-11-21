@@ -15,7 +15,7 @@ e2625e95afcc4bc3b2f78e49be998c4304a302459b8a1c2cf0c03f5effbb567a  files/opencode
 444d99cc282d9ea05cfb7d897a3df81476eb81973af1bf5b54f2f6a9dcd752f0  files/opencode-permissions-kit-lib/git-heal/hooks/post-index-change
 444d99cc282d9ea05cfb7d897a3df81476eb81973af1bf5b54f2f6a9dcd752f0  files/opencode-permissions-kit-lib/git-heal/hooks/post-merge
 444d99cc282d9ea05cfb7d897a3df81476eb81973af1bf5b54f2f6a9dcd752f0  files/opencode-permissions-kit-lib/git-heal/hooks/post-rewrite
-29808b6f795a2bc02cdd8134a10b1334892dc64885f02737227674e676deca46  files/opencode-permissions-kit-lib/management/config.sh
+c9132ae6dd087017544e43017efdd3a722c6bc06259e720beeed6404d56cebda  files/opencode-permissions-kit-lib/management/config.sh
 f494db50a2fe6de42837d4eacb72b4cef79d0c934dc78df9d503be89d4a66213  files/opencode-permissions-kit-lib/management/doctor.sh
 a935e90ea3ddbc8403bb6b12d24630ffe33230ab0c3c791989eb5f485f460827  files/opencode-permissions-kit-lib/management/status.sh
 9a4f4da5f4560ac61807442042fcbb82f8d40180efbdc12f63fa7b3b6b503270  files/opencode-permissions-kit-lib/management/uninstall.sh
@@ -32,7 +32,7 @@ b46ff01a242272adc09abb83b12f7c7982d836212cbbac5d3cce05965302ba78  files/opencode
 db10fdee1914af11a158b46fa5dc39bd54c3b9e75969ebd2373bc5945680026c  files/opencode-permissions-kit-lib/sh/doctor-core.sh
 7ab5b5de4ef3de6e6050f76ccd252f9e5842624ae9120307554ac660957482eb  files/opencode-permissions-kit-lib/sh/fs-baseline.sh
 80579d6005c882c689086a3af913ccdf686059905451f43b496aa74005fd0b41  files/opencode-permissions-kit-lib/sh/git-check.sh
-fa35b2fa18e5b90c5eaf1ec485c41b27d3d5d944e4277bbb9975c47449de2c23  files/opencode-permissions-kit-lib/sh/git-heal-core.sh
+1ba94f8b7a2567d421bfebd785e9023aa331d8ff64e8062bc8487339da5328cf  files/opencode-permissions-kit-lib/sh/git-heal-core.sh
 0896e326aa81ab1ee99c217ff74a7d463759320d7154ea0e69a318933b050754  files/opencode-permissions-kit-lib/sh/handover-core.sh
 d329359b63949652297aa34651b949e2279aa397b20d12c3ad6fb0cdffd5ca7c  files/opencode-permissions-kit-lib/sh/install-core.sh
 575266d6e05f87e5b5444464538ab3c222931bf5d5753d44695308aac067c3bf  files/opencode-permissions-kit-lib/sh/log.sh

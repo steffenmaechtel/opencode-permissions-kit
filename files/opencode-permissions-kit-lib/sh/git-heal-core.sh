@@ -169,20 +169,23 @@ _ghc_heal_once() {
 # shim to a removed version) or a missing one must degrade LOUDLY to
 # the plain cat passthrough — never hand the consumer loops an empty
 # list over a dead tee (the silent false-green #221 a W3 exists for).
-# The probe runs the SAME invocation shape as the tee it gates; on
-# failure the interpreter's own stderr passes through once (#244 c S3)
-# and the warn names the degrade. No top-level state (definitions
-# only, like the file header demands) — the :- guards carry it.
+# The probe runs the SAME invocation shape as the tee it gates, with
+# the interpreter's stderr VISIBLE (#244 c S3, the status-core shape;
+# #710 b D1: the first probe is the diagnostic surface — a broken
+# python3 names its real problem above the warn, an absent one is
+# guarded off). No top-level state (definitions only, like the file
+# header demands) — the :- guards carry it. Call ONCE from the MAIN
+# shell before the sweep loops (#710 b D2): the tee call sites are
+# pipeline forks, and a cache written inside a fork dies with it —
+# forks inherit the main shell's cache vars.
 _ghc_py_probe() {
     if [ "${_ghc_py_checked:-0}" != 1 ]; then
         _ghc_py_checked=1
         _ghc_py_ok=0
         command -v python3 >/dev/null 2>&1 &&
-            python3 -I -c 'import sys, threading, time' >/dev/null 2>&1 &&
+            python3 -I -c 'import sys, threading, time' >/dev/null &&
             _ghc_py_ok=1
         if [ "${_ghc_py_ok:-0}" != 1 ]; then
-            command -v python3 >/dev/null 2>&1 &&
-                python3 -I -c 'import sys, threading, time' >/dev/null 2>&1 || true
             printf '  warn: git-heal live progress unavailable (python3 missing or broken) — sweeps run without it\n' >&2
         fi
     fi
@@ -202,8 +205,11 @@ _ghc_py_probe() {
 _ghc_progress_tee() {
     _ghc_py_probe
     if [ "${_ghc_py_ok:-0}" != 1 ]; then
+        # Bare cat: rc-preserving passthrough (the #265 class; #710 b
+        # INFO adoption) — no call site observes the tee's rc today,
+        # the honesty is free.
         cat
-        return 0
+        return
     fi
     python3 -I -c '
 import sys, threading, time
@@ -354,6 +360,11 @@ _git_heal_on() {
     # refresh, bin/opk handover all ship inline mirrors).
     _ghc_on_conf="${GH_PROJECTS_CONF:-/etc/opencode-permissions-kit/projects.conf}"
     if [ -f "$_ghc_on_conf" ]; then
+        # Main-shell pre-probe (#710 b D2): the tee call sites below
+        # are pipeline forks — without this the probe re-runs and the
+        # warn re-prints once per root (N+1 on a broken-python3 host).
+        # Forks inherit the cache the main shell just wrote.
+        _ghc_py_probe
         _ghc_on_list=$(mktemp) || {
             ui_error "git-heal: mktemp failed — cannot enumerate heal targets"
             exit 1
@@ -490,6 +501,9 @@ _git_heal_status() {
         return 0
     }
     ui_detail "git-heal: scanning conf roots for .git dirs (large trees: this can take a while) ..."
+    # Main-shell pre-probe (#710 b D2): the lockout row loop's tee is a
+    # pipeline fork — probe here so the cache survives into the forks.
+    _ghc_py_probe
     while IFS= read -r _ghc_stt_root; do
         case "$_ghc_stt_root" in '' | '#'*) continue ;; esac
         [ -d "$_ghc_stt_root" ] || continue

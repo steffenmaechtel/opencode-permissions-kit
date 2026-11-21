@@ -773,6 +773,28 @@ if [ "$_hr_rc" -eq 0 ] &&
 else
     fail "core: broken-python3 degrade leg (rc=$_hr_rc heals=$(grep -c 'gitdir=' "$LOG" 2>/dev/null) out=$_out) (#710 a B1)"
 fi
+# #710 b D2: the pre-probe runs ONCE in the main shell — the per-root
+# tee forks inherit the cache, so an N-root sweep on broken python3
+# warns EXACTLY once (a per-fork probe would print N+1).
+git -C "$WORK/zone/onroot2" init -q -b main 2>/dev/null ||
+    { mkdir -p "$WORK/zone/onroot2" && git -C "$WORK/zone/onroot2" init -q -b main; }
+printf '%s\n%s\n' "$WORK/zone/onroot" "$WORK/zone/onroot2" >"$WORK/on-projects.conf"
+: >"$LOG"
+_hr_rc=0
+_out=$( (
+    PATH="$WORK/badbin:$PATH"
+    export PATH
+    _core_run 'SD_SUDO="" SD_VISUDO="$WORK/visudo" SD_CONF_DIR="$WORK/etc" \
+        SD_SUDOERS_D="$WORK/sdd" GH_PROJECTS_CONF="$WORK/on-projects.conf" \
+        HOME="$WORK/devhome" _git_heal_on'
+) 2>&1) || _hr_rc=$?
+_hr_warns=$(printf '%s' "$_out" | grep -cF 'live progress unavailable (python3 missing or broken)' || true)
+_hr_heals=$(grep -c 'gitdir=' "$LOG" 2>/dev/null || true)
+if [ "$_hr_rc" -eq 0 ] && [ "$_hr_warns" -eq 1 ] && [ "$_hr_heals" -ge 2 ]; then
+    pass "core: broken-python3 warn fires exactly once across N roots (#710 b D2)"
+else
+    fail "core: warn-count leg (warns=$_hr_warns heals=$_hr_heals rc=$_hr_rc) (#710 b D2)"
+fi
 # #710 a C8: the tee's DATA stream stays verbatim and a non-tty stderr
 # emits nothing (captured runs must be byte-identical — the sibling
 # verbatim-pin shape from test-status.sh). Runs the REAL tee (healthy
