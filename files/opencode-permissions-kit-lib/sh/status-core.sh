@@ -1326,9 +1326,11 @@ _st_ddev_version() {
     #   1. the binary resolved the SAME way bin/ddev-as-opencode does (PATH,
     #      then the two standard locations), run as the current user —
     #      covers plain `opk status` and checkout runs. Probed from / (pr-309
-    #      a M1+S1+Q1): version output never depends on the cwd, but ddev's
-    #      command walk chmods .ddev/commands/** on every in-project
-    #      non-root invocation (issue #279) — with the caller's cwd, a plain
+    #      a M1+S1+Q1): version output never depends on the cwd, but
+    #      through ddev 1.25.5 ddev's command walk chmodded
+    #      .ddev/commands/** on every in-project non-root invocation
+    #      (issue #279; ddev 1.25.6 keeps group-write — the neutral cwd
+    #      stays cheap defense) — with the caller's cwd, a plain
     #      `opk status` run from a project directory re-broke the tree it
     #      had just scanned.
     #   2. ddev >= 1.25.4 refuses root outright ("DDEV is not designed to be

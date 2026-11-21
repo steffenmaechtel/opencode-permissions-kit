@@ -616,7 +616,9 @@ check "4c-2: the teammate-file git pull delivers lands for the developer" \
 # issue #279: the heal must follow EVERY command — re-cap the tree and run
 # a NON-tree command (describe) through the hook: the tail heal must
 # restore group-write (the pre-#279 hook healed config/get/start/restart
-# only, and real ddev's describe re-caps the command files).
+# only; real ddev's describe re-capped the command files through 1.25.5 —
+# ddev 1.25.6 keeps group-write, so the fake's planted re-cap mirrors what
+# run-ddev.sh DD13 now plants on fixed ddev too).
 E 'sudo -u opencode chmod 755 /var/www/vhosts/git94/.ddev/commands/web'
 check "4c-2: fixture re-capped — tree is NOT dev-writable again (the re-break shape)" \
     E '! sudo -u dev test -w /var/www/vhosts/git94/.ddev/commands/web'

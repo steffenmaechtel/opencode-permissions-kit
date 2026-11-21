@@ -988,8 +988,27 @@ if OC_DD13 'ddev start >/tmp/dd13-start2.log 2>&1'; then
         E 'test "$(stat -c %U /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd)" = opencode && test "$(stat -c %a /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd)" = 775'
     OC_DD13 'ddev describe >/tmp/dd13-describe1.log 2>&1; echo "describe-rc=$?" >>/tmp/dd13-describe1.log'
     E 'stat -c "diag after agent describe: %a %U %n" /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd 2>&1; tail -2 /tmp/dd13-describe1.log 2>&1'
-    check "DD13: agent-side describe re-caps the command file (real ddev, issue #279)" \
-        E 'test -z "$(find /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd -maxdepth 0 -perm -g+w)"'
+    # ddev 1.25.6 (released 2026-11-20, ddev issue #9031 / PR #9032) fixed
+    # the #279 re-cap upstream: custom command files KEEP their group-write
+    # bit and ACLs across every invocation. Probe the OBSERVED mode rather
+    # than parsing versions — CI can pin DDEV_VERSION below 1.25.6, where
+    # real ddev still re-caps:
+    #   g+w intact (>= 1.25.6): pin the fixed upstream behavior, then plant
+    #   the pre-1.25.6 gap ourselves (owner chmod g-w — the exact operation
+    #   ddev's command walk used to perform as the file owner), so the
+    #   kit's own machinery (status detection + hook heal) stays under
+    #   test on every ddev version.
+    #   g+w gone (< 1.25.6): the original #279 circle — real ddev planted
+    #   the gap, nothing to simulate.
+    if E 'test -n "$(find /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd -maxdepth 0 -perm -g+w)"'; then
+        check "DD13: agent-side describe keeps g+w (ddev >= 1.25.6 fixed the re-cap upstream, issue #279)" \
+            E 'test -n "$(find /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd -maxdepth 0 -perm -g+w)" && grep -q "describe-rc=0" /tmp/dd13-describe1.log'
+        OC_DD13 'chmod g-w /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd'
+        E 'stat -c "diag planted gap: %a %U %n" /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd'
+    else
+        check "DD13: agent-side describe re-caps the command file (real ddev < 1.25.6, issue #279)" \
+            E 'test -z "$(find /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd -maxdepth 0 -perm -g+w)"'
+    fi
     check "DD13: opk status flags the re-capped tree again (issue #279)" \
         E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/status.sh >/tmp/dd13-status3.log 2>&1; grep -q "dd13-proj/.ddev: group-write missing" /tmp/dd13-status3.log'
     DEVSH 'cd /var/www/vhosts/dd13-proj && type ddev >/tmp/dd13-type.log 2>&1; ddev describe >/tmp/dd13-describe2.log 2>&1; echo "describe-rc=$?" >>/tmp/dd13-describe2.log; stat -c "diag after dev describe: %a %U %n" .ddev/commands/web/dd13cmd >>/tmp/dd13-describe2.log 2>&1'

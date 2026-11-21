@@ -271,12 +271,15 @@ ddev() {
     _opk_rc=$?
     # ${1:-}: the exported function may land in child scripts running
     # `set -u` that call ddev without arguments (issue #18).
-    # issues #94 + #279: EVERY ddev invocation re-caps group-write on the
-    # project's command files (ddev walks .ddev/commands in its process
-    # init and chmods each file to 0755, capping the inherited ACL mask
-    # below g+w — describe/--version/IDE describe-polls included, not
-    # just the tree-creating four), so the heal follows every command
-    # now. Still cheap, still never changes ddev's own exit code.
+    # issues #94 + #279: through ddev 1.25.5, EVERY ddev invocation
+    # re-capped group-write on the project's command files (ddev walked
+    # .ddev/commands in its process init and chmodded each file to 0755,
+    # capping the inherited ACL mask below g+w — describe/--version/IDE
+    # describe-polls included, not just the tree-creating four), so the
+    # heal follows every command. ddev 1.25.6 (ddev#9031/#9032) keeps
+    # group-write on command files — the heal stays for older installs
+    # and the tree-creating writes. Still cheap, still never changes
+    # ddev's own exit code.
     _opk_ddev_reshare
     # issue #149 finding 1: dev-owned mode flags the project the moment
     # `ddev config` creates it (silent when off or already flagged).
@@ -294,11 +297,13 @@ ddev() {
 # .ddev through the sudoers helper (bin/ddev-as-opencode --opk-ensure-shared
 # — runs as opencode, owner-only chmod on its own files, zero new
 # privilege). #94 covered the tree-creating commands (ddev's explicit
-# 0755/0644 cap the inherited ACL mask); #279 showed ddev ALSO chmods
+# 0755/0644 cap the inherited ACL mask); #279 showed ddev ALSO chmodded
 # .ddev/commands/** to 0755 during its process init on every invocation
-# (command-list walk), so describe/--version/IDE polls re-cap the tree
-# seconds after any heal — without the per-command heal, `git pull` on
-# teammate-delivered .ddev/ files fails with "permission denied". Cheap,
+# (command-list walk), so describe/--version/IDE polls re-capped the
+# tree seconds after any heal — without the per-command heal, `git pull`
+# on teammate-delivered .ddev/ files failed with "permission denied".
+# ddev 1.25.6 (ddev#9031/#9032) keeps group-write on command files; the
+# heal stays for older installs and the #94 tree-creating writes. Cheap,
 # silent, never changes the ddev command's own exit code.
 _opk_ddev_reshare() {
     [ -d "$PWD/.ddev" ] || return 0

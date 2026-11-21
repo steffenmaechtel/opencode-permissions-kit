@@ -209,11 +209,13 @@ if ! [ -x . ]; then
     cd "$HOME" 2>/dev/null || true
 fi
 
-# Version probes run from the agent home (issue #279): ddev's command-list
-# walk in init() chmods .ddev/commands/** to 0755 on EVERY in-project
-# invocation (--version included), capping the inherited ACL mask below
-# g+w. status.sh and update.sh probe the ddev version with the CALLER's
-# cwd — run from a project directory, the probe used to re-break the very
+# Version probes run from the agent home (issue #279): through ddev 1.25.5,
+# ddev's command-list walk in init() chmodded .ddev/commands/** to 0755 on
+# EVERY in-project invocation (--version included), capping the inherited
+# ACL mask below g+w. ddev 1.25.6 (ddev#9031/#9032) keeps group-write on
+# command files; the neutral home stays as cheap defense for older
+# installs. status.sh and update.sh probe the ddev version with the
+# CALLER's cwd — run from a project directory, the probe used to re-break the very
 # tree a heal had just fixed (the "green right after the heal, warning
 # half a minute later" report). --version output never depends on the
 # cwd, so the neutral home makes the probe side-effect-free. Best-effort
