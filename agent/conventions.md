@@ -209,13 +209,13 @@ are the distilled incidents:
 ## Python3 pipeline tees (health probe, fork cache, degrade)
 
 Shipped progress tees (`find … | tee-with-counter | …`) run python3
-inline on DATA paths. The pattern exists three times — status-core's
+inline on DATA paths. The pattern's sites as of #710 — status-core's
 `_st_progress_tee`, fs-baseline's `_fsb_count_tee`, git-heal-core's
-`_ghc_progress_tee` — and PR #710 spent three review rounds
-re-deriving knowledge that lived in code comments 200 lines apart
-(#714); this section is the one findable home. The two mechanism
-claims below were re-probed in scratch 2026-11-21 before codifying
-(fork cache; broken-shim health probe).
+`_ghc_progress_tee` — predate this section, and PR #710 spent three
+review rounds re-deriving knowledge that lived in code comments 200
+lines apart (#714); this section is the one findable home. The two
+mechanism claims below were re-probed in scratch 2026-11-21 before
+codifying (fork cache; broken-shim health probe).
 
 - The python3 check is a HEALTH probe, not `command -v` presence: a
   findable-but-broken interpreter (pyenv shim to a removed version,
@@ -234,18 +234,19 @@ claims below were re-probed in scratch 2026-11-21 before codifying
   the same no-op once the cache is set (fs-baseline and git-heal-core
   spell it that way, status-core probes in its consumer).
   (RM-0195)
-- On probe failure the path DEGRADES to a plain `cat` passthrough —
-  the stream loses its live counter, never its data — one warn line
-  names the degradation, and the interpreter's own stderr stays
-  visible on the first probe. A diagnostic rerun that swallows
-  stderr (`2>&1` into the void) discards exactly the cause it exists
-  to show (PR #710 b D1); the unswallowed-first-probe shape
-  (status-core, git-heal-core) and the rerun-with-stderr shape
-  (fs-baseline) are the reference spellings. (RM-0196)
+- On probe failure the path DEGRADES — the stream loses its live
+  counter, never its data — in two sanctioned spellings: the
+  tee-side plain `cat` passthrough with one warn line naming the
+  degradation (fs-baseline, git-heal-core), or the consumer-side
+  skip that never starts the tee (status-core — silent by design:
+  the probe's own unswallowed stderr is the signal, #244 c S3). A
+  diagnostic rerun that swallows stderr (`2>&1` into the void)
+  discards exactly the cause it exists to show (PR #710 b D1).
+  (RM-0196)
 
 Reference implementations with their pin suites: `sh/status-core.sh`
-(#221 a W3; `tests/unit/test-status.sh` and
-`tests/unit/test-status-core.sh` — the #244 c S3 health-probe pins),
+(#221 a W3; `tests/unit/test-status.sh` — the #244 c S3
+health-probe pins — and `tests/unit/test-status-core.sh`),
 `sh/fs-baseline.sh` (`tests/unit/test-fs-baseline.sh`),
 `sh/git-heal-core.sh` (`tests/unit/test-git-heal-core.sh`; born PR
 #710 rounds a–c — the pattern's cost record).

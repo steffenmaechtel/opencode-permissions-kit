@@ -81,11 +81,13 @@ A correction's sweep key is the claim's MEANING, not its literal
 token: a claim's substance — a notice's lifetime, a state machine's
 bounds — lives in many wordings, so a claim-correction fix lists the
 old claim's substance first and checks every NEW sentence of the fix
-against the code's actual behavior; the token grep alone is the
-known false-clean (PR #706: the "one-time migration" correction
-swept `one-time` tree-wide to zero hits while the fix's own comment
+against the code's actual behavior. The distinctive-text tree-wide
+grep above stays the necessary first leg — alone it is the known
+false-clean: PR #706's "one-time migration" correction swept the
+claim's wording tree-wide (the old wording fully gone, the remaining
+bare `one-time` hits unrelated contexts) while the fix's own comment
 re-asserted the same false lifetime as "until a refresh ran" — round
-b B1, fix-induced, #708). Output-string sweeps carry a key
+b B1, fix-induced, #708. Output-string sweeps carry a key
 discipline of their own: a message held in a VARIABLE that later
 flows into a `ui_*` call or a note field is a sweep site of the same
 rank as the call site — the rider's `ui_*` call-site grep read clean
@@ -440,18 +442,19 @@ empty-match greps (`grep … || true` where empty output is rc 1), `IFS= read
   cheapest recovery.
 - **Indent-anchored extractions re-check after re-nesting**
   (2026-11-21, PR #710 F2, #714) — a test pin that extracts a
-  construct by indent-anchored sed/awk ranges fails SILENTLY when
-  the construct moves one nesting level out, in two shapes: both
-  anchors over-specific and the extraction comes back EMPTY — the
-  pin drives nothing and the suite reds loud at rc 127, one gate
-  cycle paid (test-kit-cli.sh's fs-baseline stub after #696's 12→8
-  re-nest; the fixed 8-space form sits at the sed call today) — or
-  an anchored END pattern keeps matching past the construct and
-  captures the file TAIL, all pins green (the pr-00381 comment
-  block in test-ddev-as-opencode.sh documents that sibling; its awk
-  end pattern is deliberately unanchored since). After re-nesting
-  shipped code, sweep the test tree for indent-anchored sed/awk
-  extractions over the touched files before the gate run.
+  construct by indent-anchored sed/awk ranges breaks when the
+  construct moves one nesting level out, in two shapes — one loud,
+  one silent: both anchors over-specific and the extraction comes
+  back EMPTY — the pin drives nothing and the suite reds loud at
+  rc 127, one gate cycle paid (test-kit-cli.sh's fs-baseline stub
+  after #696's 12→8 re-nest; the fixed 8-space form sits at the sed
+  call today) — or an anchored END pattern keeps matching past the
+  construct and captures the file TAIL silently, all pins green (the
+  pr-00381 comment block in test-ddev-as-opencode.sh documents that
+  sibling; its awk end pattern is deliberately unanchored since).
+  After re-nesting shipped code, sweep the test tree for
+  indent-anchored sed/awk extractions over the touched files before
+  the gate run.
 - **Consumer sweeps key on the data the consumers assert, not the
   producer's message names** (2026-11-19, PR #680 round a B1 HIGH) —
   a wave that changes a producer's output shape sweeps the consumers

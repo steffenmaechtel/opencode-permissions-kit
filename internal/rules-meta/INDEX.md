@@ -8,12 +8,12 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**198 metas · 195 active · 3 retired · 10 review-pending · next due 2026-11-17**
+**198 metas · 195 active · 3 retired · 11 review-pending · next due 2026-11-17**
 
 ## Actionable
 
 - **Review pending:** RM-0190, RM-0191, RM-0192, RM-0193, RM-0194, RM-0195, RM-0196, RM-0197, RM-0198
-- **Amended — pending:** RM-0182 (2026-11-20)
+- **Amended — pending:** RM-0182 (2026-11-20), RM-0133 (2026-11-21)
 
 ## AGENTS.md
 
@@ -243,7 +243,7 @@
 |---|---|---|---|---|---|
 | [RM-0131](0/1/3/RM-0131.md) | Non-shipped staffing: standard | active | approved | 1m | 2026-11-30 |
 | [RM-0132](0/1/3/RM-0132.md) | Fresh-session entry (the batch | active | approved | 1m | 2026-11-30 |
-| [RM-0133](0/1/3/RM-0133.md) | Disposition policy on the non-shipped | active | approved | 1m | 2026-11-30 |
+| [RM-0133](0/1/3/RM-0133.md) | Disposition policy on the non-shipped | active | **amended — pending** | 1m | 2026-11-30 |
 | [RM-0176](0/1/7/RM-0176.md) | The in-round exceptions above | active | approved | 1m | 2026-12-17 |
 | [RM-0198](0/1/9/RM-0198.md) | The docs-only close is a | active | **pending** | 1m | 2026-12-21 |
 
