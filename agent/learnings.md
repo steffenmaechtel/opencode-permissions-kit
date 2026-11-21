@@ -77,6 +77,21 @@ measure in one probe, measure instead of copying (`#521 a S1` — a
 PYTHONUTF8 mechanism claim copied from a harness comment, disproven on
 the very host it names).
 
+A correction's sweep key is the claim's MEANING, not its literal
+token: a claim's substance — a notice's lifetime, a state machine's
+bounds — lives in many wordings, so a claim-correction fix lists the
+old claim's substance first and checks every NEW sentence of the fix
+against the code's actual behavior; the token grep alone is the
+known false-clean (PR #706: the "one-time migration" correction
+swept `one-time` tree-wide to zero hits while the fix's own comment
+re-asserted the same false lifetime as "until a refresh ran" — round
+b B1, fix-induced, #708). Output-string sweeps carry a key
+discipline of their own: a message held in a VARIABLE that later
+flows into a `ui_*` call or a note field is a sweep site of the same
+rank as the call site — the rider's `ui_*` call-site grep read clean
+while the DET_NOTE twins (doctor-core.sh) held the `#NNN` strings in
+variables two `ui_*` lines away (PR #710 a A2, #714).
+
 ### L3 — Claim audit per wave
 *Class: `claim-drift` — rank 1 by count in BOTH runs (77 and 89 findings;
 7 MED/HIGH in the current corpus).*
@@ -130,6 +145,26 @@ where one exists) before it enters shipped comments, docs or
 records; the wave's shipped comment went in only after re-measuring
 every claim at the local clone, and the pre-verification draft's
 hedge was exactly the unaudited remainder.
+
+Prose the wave NEWLY WRITES is an audit surface of the same rank as
+the sites it corrects: verification of the named claim never extends
+to the adjacent sentences around it — every factual assertion in
+ADDED or REWRITTEN text (provenance, "who writes this file", version
+eras, SHAs, counts) carries its own primary-source lookup, and the
+lookup performed for the corrected claim never covers it (PR #711
+round a Q1 MED: the corrected opt-in sentence's "agent-authored file
+by definition" half was the session's own inference, refuted by the
+installer's own shapes — it writes the default global config itself,
+preserves user-authored ones (#372 I6), and names the file
+"agent-replaceable after any completed install"; #712).
+Review-finding prose is the same arm's carrier beside issue bodies
+and research summaries: a CONFIRMED verdict covers the finding's
+MECHANISM, never the incidental factual tokens of its prose — fix
+text that re-quotes a finding's numbers, eras or names re-measures
+each at the primary source before it lands (PR #711 round b B1 LOW:
+the re-quoted "0.0.36-era" stamp was 0.0.11–0.0.14 by `git log -S`,
+one lookup ahead of the fix commit would have pre-empted the round;
+#712).
 
 ### L4 — Pins must discriminate, and sit before the summary gate
 *Class: `test-vacuous` — run 1: 37 findings; run 2: 45 findings, 4 MED/HIGH,
@@ -403,6 +438,20 @@ empty-match greps (`grep … || true` where empty output is rc 1), `IFS= read
   not the trigger. When the anchor line does carry typographic
   characters, the shortest special-char-free anchor remains the
   cheapest recovery.
+- **Indent-anchored extractions re-check after re-nesting**
+  (2026-11-21, PR #710 F2, #714) — a test pin that extracts a
+  construct by indent-anchored sed/awk ranges fails SILENTLY when
+  the construct moves one nesting level out, in two shapes: both
+  anchors over-specific and the extraction comes back EMPTY — the
+  pin drives nothing and the suite reds loud at rc 127, one gate
+  cycle paid (test-kit-cli.sh's fs-baseline stub after #696's 12→8
+  re-nest; the fixed 8-space form sits at the sed call today) — or
+  an anchored END pattern keeps matching past the construct and
+  captures the file TAIL, all pins green (the pr-00381 comment
+  block in test-ddev-as-opencode.sh documents that sibling; its awk
+  end pattern is deliberately unanchored since). After re-nesting
+  shipped code, sweep the test tree for indent-anchored sed/awk
+  extractions over the touched files before the gate run.
 - **Consumer sweeps key on the data the consumers assert, not the
   producer's message names** (2026-11-19, PR #680 round a B1 HIGH) —
   a wave that changes a producer's output shape sweeps the consumers
