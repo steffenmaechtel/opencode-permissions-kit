@@ -1015,8 +1015,10 @@ rm -rf "$BH"
 # --- 7d. reshare wiring (issue #94, widened to every command in #279) --------------
 # The ddev() function must re-assert group-write after EVERY ddev command
 # (ddev's explicit 0755/0644 modes cap the inherited ACL mask, AND its
-# command-list walk re-chmods .ddev/commands/** on every invocation —
-# describe/--version included), through the sudoers helper's heal mode.
+# command-list walk re-chmodded .ddev/commands/** on every invocation
+# through ddev 1.25.5 — describe/--version included; 1.25.6 keeps
+# group-write, the heal stays as cheap defense), through the sudoers
+# helper's heal mode.
 if live_src "$FUNC" | awk '/^_opk_ddev_reshare\(\)/,/^}/' | grep -q -- '--opk-ensure-shared'; then
     pass "reshare: _opk_ddev_reshare calls the helper's heal mode"
 else
@@ -1178,8 +1180,9 @@ check "reshare detect: warn line names the general cause, not only agent runs (i
 rm -rf "$RN"
 
 # --- 7d-4. version-probe neutrality (issue #279) ----------------------------------
-# ddev chmods .ddev/commands/** to 0755 on every IN-PROJECT invocation
-# (--version included — the command-list walk runs in init()). The kit's
+# through ddev 1.25.5, ddev chmodded .ddev/commands/** to 0755 on every
+# IN-PROJECT invocation (--version included — the command-list walk runs
+# in init(); ddev 1.25.6 keeps group-write). The kit's
 # version probes (status.sh, update.sh) call bin/ddev-as-opencode
 # --version with the CALLER's cwd; from a project directory that re-broke
 # the tree a heal had just fixed. The helper therefore execs --version
@@ -1197,7 +1200,8 @@ printf 'OPENCODE_USER=%s\n' "$(id -un)" >"$VN/install.conf"
 cat >"$VN/bin/ddev" <<'STUB'
 #!/bin/sh
 # 279 stub: record the process cwd the real ddev would run with — that
-# cwd decides whether ddev's command walk chmods the project's files.
+# cwd decides whether ddev's command walk chmods the project's files
+# (through ddev 1.25.5; 1.25.6 keeps group-write on command files).
 printf 'cwd=%s args=%s\n' "$PWD" "$*" >>"$VN_MARKER"
 echo "ddev version v9.9.9"
 STUB

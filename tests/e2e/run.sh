@@ -592,10 +592,12 @@ echo "--- 4c-2. ddev() reshare: .ddev stays dev-writable (issue #94, widened in 
 # to r-x: content ddev creates as opencode keeps the developer (sharing
 # group) out — `git pull` delivering teammate .ddev/ files fails with
 # "permission denied" (reproduced live on a kit machine). Issue #279
-# widened the shape: ddev re-chmods .ddev/commands/** on EVERY in-project
-# invocation, so the ddev() function must heal after every command, not
-# just the tree-creating four — a describe right after a start otherwise
-# re-breaks the tree the start's heal had just fixed.
+# widened the shape: through ddev 1.25.5, ddev re-chmodded
+# .ddev/commands/** on EVERY in-project invocation, so the ddev()
+# function must heal after every command, not just the tree-creating
+# four — a describe right after a start otherwise re-broke the tree the
+# start's heal had just fixed (ddev 1.25.6 keeps group-write on command
+# files; the heal stays as cheap defense).
 # Fixture: a project whose .ddev was created by "ddev" (= opencode) with
 # restrictive modes; a planted fake ddev answers the config call.
 E 'sudo mkdir -p /var/www/vhosts/git94/.ddev/commands/web /var/www/vhosts/git94/.ddev/db_snapshots && sudo chown dev:dev /var/www/vhosts/git94 && sudo chown -R opencode:opencode /var/www/vhosts/git94/.ddev'
@@ -617,8 +619,9 @@ check "4c-2: the teammate-file git pull delivers lands for the developer" \
 # a NON-tree command (describe) through the hook: the tail heal must
 # restore group-write (the pre-#279 hook healed config/get/start/restart
 # only; real ddev's describe re-capped the command files through 1.25.5 —
-# ddev 1.25.6 keeps group-write, so the fake's planted re-cap mirrors what
-# run-ddev.sh DD13 now plants on fixed ddev too).
+# ddev 1.25.6 keeps group-write, so the suite plants the re-cap itself,
+# the same hand-planted-gap shape run-ddev.sh DD13 uses on fixed ddev:
+# here chmod 755 on the commands/web DIR, there chmod g-w on a FILE).
 E 'sudo -u opencode chmod 755 /var/www/vhosts/git94/.ddev/commands/web'
 check "4c-2: fixture re-capped — tree is NOT dev-writable again (the re-break shape)" \
     E '! sudo -u dev test -w /var/www/vhosts/git94/.ddev/commands/web'

@@ -974,15 +974,17 @@ if OC_DD13 'ddev start >/tmp/dd13-start2.log 2>&1'; then
     check "DD13: dev-side ddev command heals the gap (hook reshare)" \
         E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/status.sh >/tmp/dd13-status2.log 2>&1; test -s /tmp/dd13-status2.log && ! grep -q "dd13-proj/.ddev: group-write missing" /tmp/dd13-status2.log'
     # issue #279: the re-cap is not limited to tree-creating commands —
-    # real ddev chmods .ddev/commands/** during EVERY in-project
-    # invocation (describe included). The #279 circle with real ddev:
-    # an agent-side describe re-caps a freshly healed command file,
-    # status flags it again, and a dev-side describe (NON-tree command,
-    # pre-#279 hooks did not heal those) must heal it via the per-command
-    # tail heal. The planted DIR gets g+w too, so a status flag can only
-    # come from the FILE (the first run had the dir 0755 — a false flag
-    # source). Fixture-landed check + mode probes diagnose a plant or
-    # invocation failure loudly; E2E_KEEP=1 keeps the container.
+    # through ddev 1.25.5, real ddev chmodded .ddev/commands/** during
+    # EVERY in-project invocation (describe included). The #279 circle
+    # with real ddev: an agent-side describe re-capped a freshly healed
+    # command file, status flagged it again, and a dev-side describe
+    # (NON-tree command, pre-#279 hooks did not heal those) must heal it
+    # via the per-command tail heal. On ddev >= 1.25.6 the gap is
+    # planted by the suite instead (probe below). The planted DIR gets
+    # g+w too, so a status flag can only come from the FILE (the first
+    # run had the dir 0755 — a false flag source). Fixture-landed check
+    # + mode probes diagnose a plant or invocation failure loudly;
+    # E2E_KEEP=1 keeps the container.
     E 'sudo mkdir -p /var/www/vhosts/dd13-proj/.ddev/commands/web && sudo chown opencode:opencode /var/www/vhosts/dd13-proj/.ddev/commands/web && sudo chmod 775 /var/www/vhosts/dd13-proj/.ddev/commands/web && printf "#!/bin/sh\necho dd13cmd\n" | sudo tee /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd >/dev/null && sudo chown opencode:opencode /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd && sudo chmod 775 /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd'
     check "DD13: fixture landed — command file is opencode-owned 775 (issue #279)" \
         E 'test "$(stat -c %U /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd)" = opencode && test "$(stat -c %a /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd)" = 775'
