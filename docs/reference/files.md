@@ -65,8 +65,13 @@ asks before removing the kit block; your own entries always stay.
 | `OPENCHAMBER_POLICY` | `yes` = the OpenChamber policy pin is active |
 | `KIT_CHANNEL` | Ref installs/updates track (`stable`, `master`, a feature branch, or a pinned tag) |
 | `OPENCODE_GROUP` | Always the `opencode` usergroup (informational) |
-| `HARD_DENY_REMOVED` | Unused legacy migration stamp |
 | `VERSION` | Deployed kit version |
+
+Removed keys: `HARD_DENY_REMOVED` — a 0.0.11–0.0.14-era migration
+stamp; installs that crossed the migration while on ≤ 0.0.14 may
+still carry it in `install.conf` (harmless, ignored — the kit stopped
+writing it at the 0.0.14 upgrade floor; history in
+`internal/records/ddev-working.md`).
 
 Key notes:
 

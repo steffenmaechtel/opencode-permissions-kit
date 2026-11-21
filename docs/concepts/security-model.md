@@ -469,6 +469,11 @@ Operational notes:
   wrote itself (the template's edit rules allow `*`): a
   `"docker *": "allow"` entry the agent writes flips the probe to
   "enabled by this project" without any prompt — only a note prints.
+  The probe reads the merged final config, so the opencode user's
+  global `~/.config/opencode/opencode.json[c]` arms the same opt-in —
+  that file is agent-replaceable (kit-installed, user-authored or
+  agent-written — the probe cannot tell), so owner consent cannot be
+  verified at probe time.
   Bounded by the rootless, agent-UID backend: the opt-in changes which
   tools run, not whose privileges they run with.
 - **Checkout-first `opk` runs checkout code as root:** `opk` resolves its

@@ -17,6 +17,7 @@ RELEASE="$SCRIPT_DIR/../../scripts/release.sh"
 GENSUMS="$SCRIPT_DIR/../../scripts/gen-sums.sh"
 RELSUMS="$SCRIPT_DIR/../../scripts/release-sums.sh"
 FILES_DIR="$SCRIPT_DIR/../../files"
+MAKEFILE="$SCRIPT_DIR/../../Makefile"
 # Shared harness (issue #394): pass/fail, colors, counters
 # (and check/assert_eq where present) live in lib/harness.sh now.
 . "$SCRIPT_DIR/lib/harness.sh"
@@ -402,6 +403,69 @@ _ek_out="$(sh "$WORK/r/scripts/release-sums.sh" 2>&1)" && _ek_rc=0 || _ek_rc=$?
 printf '%s' "$_ek_out" | grep -q 'rewrite verification failed' &&
     pass "dup refusal tells the maintainer to fix the block by hand (a A4)" ||
     fail "dup refusal message missing (out=$_ek_out)"
+
+# --- 6h. make sums fails loud over a broken manifest write (#701) ------------------
+# The old recipe closed with `mv …; echo …`: any failed mv left the
+# manifest unwritten while the target exited rc 0 (fail-open, #701).
+# These arms drive the REAL Makefile's sums target in the sandbox:
+# broken target, failing mv (PATH stub), and both happy legs.
+mkrepo
+cp "$MAKEFILE" "$WORK/r/Makefile"
+rm -f "${WORK:?}/r/SHA256SUMS"
+mkdir "${WORK:?}/r/SHA256SUMS"
+_701_rc=0
+_701_out="$(make -C "$WORK/r" sums 2>&1)" || _701_rc=$?
+if [ "$_701_rc" -ne 0 ] &&
+    printf '%s' "$_701_out" | grep -q 'not a regular file'; then
+    pass "sums: non-file manifest target refused loud (#701)"
+else
+    fail "sums: non-file manifest target refused loud (rc=$_701_rc out=$_701_out) (#701)"
+fi
+if printf '%s' "$_701_out" | grep -q 'SHA256SUMS regenerated'; then
+    fail "sums: broken-target refusal still prints the success line (#701)"
+else
+    pass "sums: broken-target refusal prints no success line (#701)"
+fi
+# Failing mv (PATH stub, the 6f badbin idiom): abort rc != 0, named
+# cause, temp cleaned, committed manifest untouched.
+mkdir -p "${WORK:?}/mvfail"
+printf '#!/bin/sh\necho "stub: mv down" >&2\nexit 1\n' >"${WORK:?}/mvfail/mv"
+chmod 755 "${WORK:?}/mvfail/mv"
+mkrepo
+cp "$MAKEFILE" "$WORK/r/Makefile"
+printf 'drift\n' >>"${WORK:?}/r/files/install.sh"
+_701_rc=0
+_701_out="$(PATH="${WORK:?}/mvfail:$PATH" make -C "$WORK/r" sums 2>&1)" || _701_rc=$?
+if [ "$_701_rc" -ne 0 ] &&
+    printf '%s' "$_701_out" | grep -q 'replacing SHA256SUMS failed'; then
+    pass "sums: failing mv aborts loud with the named cause (#701)"
+else
+    fail "sums: failing mv aborts loud (rc=$_701_rc out=$_701_out) (#701)"
+fi
+if [ -z "$(ls "${WORK:?}"/r/SHA256SUMS.*.tmp 2>/dev/null)" ] &&
+    [ -z "$(git -C "$WORK/r" status --porcelain -- SHA256SUMS)" ]; then
+    pass "sums: failed mv leaves no temp, committed manifest intact (#701)"
+else
+    fail "sums: failed mv leaves no temp, committed manifest intact (#701)"
+fi
+# Happy legs: a stale manifest regenerates for real; a fresh one no-ops.
+_701_rc=0
+_701_out="$(make -C "$WORK/r" sums 2>&1)" || _701_rc=$?
+if [ "$_701_rc" -eq 0 ] &&
+    printf '%s' "$_701_out" | grep -q 'SHA256SUMS regenerated' &&
+    [ -n "$(git -C "$WORK/r" status --porcelain -- SHA256SUMS)" ]; then
+    pass "sums: stale manifest regenerates and really writes (#701)"
+else
+    fail "sums: stale manifest regenerates and really writes (rc=$_701_rc out=$_701_out) (#701)"
+fi
+_701_rc=0
+_701_out="$(make -C "$WORK/r" sums 2>&1)" || _701_rc=$?
+if [ "$_701_rc" -eq 0 ] &&
+    printf '%s' "$_701_out" | grep -q 'already fresh'; then
+    pass "sums: fresh manifest takes the no-op branch (#701)"
+else
+    fail "sums: fresh manifest takes the no-op branch (rc=$_701_rc out=$_701_out) (#701)"
+fi
 
 # --- 7. static: test gate + suite wiring -------------------------------------------
 grep -q 'make -C "$REPO" test check-version' "$RELEASE" &&
