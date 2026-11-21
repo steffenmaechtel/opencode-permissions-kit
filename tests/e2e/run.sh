@@ -535,6 +535,35 @@ check "4b: stdout carries exactly the clean URL line (running project, no start 
 E 'sudo rm -f /usr/local/bin/ddev /tmp/fake-ddev-running /tmp/fake-ddev-calls'
 
 echo ""
+echo "--- 4b-2. fresh login shells resolve the rc-installed hooks (issue #693) ---"
+# The test-fidelity rule's demanded artifact (agent/test-fidelity.md
+# checklist, issue #693): until now the rc wiring was asserted only
+# by static greps and by sourcing the hook file directly — Ubuntu's
+# .bashrc returns early for non-interactive shells, so those checks
+# admitted a broken assembly no real shell executes. These checks spawn
+# REAL login/interactive shells as the developer: the profile.d order
+# (umask profile), the .profile -> .bashrc hand-off past the
+# interactivity guard, the ddev() hook export, and BASH_ENV propagation
+# into non-interactive children — the issue #18 transport class end to
+# end. Deliberately AFTER the fake-ddev teardown above: with no ddev
+# binary anywhere in PATH, `type -t ddev` can only resolve to the
+# FUNCTION the rc hook defines. shell-warn stays scoped to 6c: its
+# observable is the banner, already driven there by a real interactive
+# start — a login shell adds no second observable for it.
+check "4b-2: sudo -i login shell resolves ddev as the function (no binary)" \
+    E 'sudo -iu dev bash -lic "type -t ddev" 2>/dev/null | grep -qx function'
+# The su variant needs sudo's root seat first (E exec's as dev; su from
+# dev asks for a password) — sudo su - dev then buys a REAL PAM login
+# session, the vendor-chain shape: profile assembly without sudo -i's
+# environment simulation.
+check "4b-2: su login shell (non-bash parent, vendor chain shape) resolves the function" \
+    E 'sudo su - dev -c "bash -lic \"type -t ddev\"" 2>/dev/null | grep -qx function'
+check "4b-2: BASH_ENV carries the hook into non-interactive children under login (#18)" \
+    E 'sudo -iu dev bash -lic "bash -c \"type -t ddev\"" 2>/dev/null | grep -qx function'
+check "4b-2: login shell applies the kit umask profile (0002)" \
+    E 'sudo -iu dev bash -lic "umask" 2>/dev/null | grep -qx 0002'
+
+echo ""
 echo "--- 4c. .ddev handover to the opencode user (ddev-working) ---"
 # A pre-existing dev-owned .ddev breaks `ddev start` as opencode with
 # "chmod .ddev/.webimageBuild: operation not permitted". config.sh refresh
