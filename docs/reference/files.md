@@ -65,7 +65,6 @@ asks before removing the kit block; your own entries always stay.
 | `OPENCHAMBER_POLICY` | `yes` = the OpenChamber policy pin is active |
 | `KIT_CHANNEL` | Ref installs/updates track (`stable`, `master`, a feature branch, or a pinned tag) |
 | `OPENCODE_GROUP` | Always the `opencode` usergroup (informational) |
-| `HARD_DENY_REMOVED` | Unused legacy migration stamp |
 | `VERSION` | Deployed kit version |
 
 Key notes:

@@ -381,17 +381,29 @@ fmt:
 # deterministic (LC_ALL=C path sort), so an unchanged tree reproduces
 # the committed file byte-for-byte. Temp+mv on purpose (#493 a C6): a
 # red run must never delete or truncate the committed manifest in the
-# working tree.
+# working tree. Fail-loud (#701): a manifest target that exists but is
+# no regular file, and a failing mv, both abort rc != 0 with the temp
+# cleaned up — the old `mv …; echo …` chain reported rc 0 over a
+# never-written manifest.
 sums:
 	@_sums_tmp="SHA256SUMS.$$$$.tmp"; \
+		if [ -e SHA256SUMS ] && [ ! -f SHA256SUMS ]; then \
+			echo "error:  SHA256SUMS exists but is not a regular file — refusing to regenerate over it"; \
+			exit 1; \
+		fi; \
 		if ! sh ./scripts/gen-sums.sh >"SHA256SUMS.$$$$.tmp"; then \
 			echo "error:  SHA256SUMS generation failed (a listed file missing?)"; \
 			rm -f "$$_sums_tmp"; \
 			exit 1; \
 		fi; \
 		if ! cmp -s SHA256SUMS "$$_sums_tmp"; then \
-			mv "$$_sums_tmp" SHA256SUMS; \
-			echo "SHA256SUMS regenerated ($$(wc -l < SHA256SUMS | tr -d ' ') entries) — commit it with your PR"; \
+			if mv "$$_sums_tmp" SHA256SUMS; then \
+				echo "SHA256SUMS regenerated ($$(wc -l < SHA256SUMS | tr -d ' ') entries) — commit it with your PR"; \
+			else \
+				echo "error:  replacing SHA256SUMS failed — the manifest was NOT regenerated"; \
+				rm -f "$$_sums_tmp"; \
+				exit 1; \
+			fi; \
 		else \
 			rm -f "$$_sums_tmp"; \
 			echo "SHA256SUMS already fresh ($$(wc -l < SHA256SUMS | tr -d ' ') entries)"; \
