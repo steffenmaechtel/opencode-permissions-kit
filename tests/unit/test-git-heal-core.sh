@@ -183,9 +183,11 @@ fi
 # Dot and whitespace form arms execute UNDER relax — the "form arms
 # never relax" claim, pinned (#674 b D4); both lines are skipped, so
 # the gitdir matches nothing. #665 adds the glob line: its skip line
-# names the glob class, and WITHOUT the arm the root would fall
-# through to the silent nonexistent-skip (discriminating through the
-# loud skip, not through absence).
+# names the glob class, and WITHOUT the arm the root would pass the
+# form gates (_gh_root_ok never checks existence), leave the allowlist
+# unmatched, and the run would exit at "refused: … outside
+# kit-managed roots" (discriminating through the loud skip, not
+# through absence).
 printf '%s\n' "$WORK/r1/../r1" "$WORK /gap" "$WORK/r1*glob" >"$CONF"
 _hr_rc=0
 _hr_out=$(env GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 GH_PROJECTS_CONF="$CONF" \

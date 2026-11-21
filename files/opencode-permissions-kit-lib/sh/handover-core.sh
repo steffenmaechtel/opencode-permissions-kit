@@ -279,8 +279,9 @@ PYEOF
                     [ -n "$_ho_decl" ] || continue
                     # belt: only comparable relative path forms can
                     # be matched -- a STRICTER structural+shell set
-                    # than doctor's path_error (which also rejects
-                    # globs but TOLERATES non-ASCII; this belt
+                    # than doctor's path_error (which rejects globs
+                    # too but TOLERATES non-ASCII; this belt refuses
+                    # the glob class as well, #729 a A1, and
                     # additionally drops |&<> so fragments of a
                     # mangled policy cannot even reach the warning
                     # TEXT, #356 a A8/B3). A skip is never silent:
@@ -289,6 +290,12 @@ PYEOF
                     _ho_badform=0
                     case "$_ho_decl" in
                         /* | */ | . | ./* | .. | ../* | */. | */./* | */.. | */../* | *//* | *\\*) _ho_badform=1 ;;
+                    esac
+                    # glob metacharacters too (#729 a A1, the class
+                    # doctor's path_error refuses) — a separate case
+                    # keeps the structural list inside the ratchet.
+                    case "$_ho_decl" in
+                        *[\*\?\[]*) _ho_badform=1 ;;
                     esac
                     case "$_ho_decl" in
                         *"'"* | *'"'* | *'`'* | *'$'* | *';'* | *"|"* | *"&"* | *"<"* | *">"*) _ho_badform=1 ;;

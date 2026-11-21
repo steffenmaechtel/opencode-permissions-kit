@@ -264,9 +264,9 @@ finally:
 # the roots re-validates each line; the uninstall-core reader mirror,
 # #674 a A1). rc 0: usable root, trailing-slash-stripped form in
 # _ghc_root_norm. rc 1: refused, form (non-absolute, dot/empty
-# segment, whitespace, glob character #665); rc 2: refused, agent
-# home; rc 3: refused,
-# system path (incl. the bare "/" that strips to empty, #674 b D1) —
+# segment, whitespace, glob character #665); rc 2: refused,
+# agent home; rc 3: refused, system path (incl. the bare "/"
+# that strips to empty, #674 b D1) —
 # the caller maps each rc to its skip line.
 # The system-path and agent-home arms sit behind GH_CONF_RELAX (unit
 # scratch zones live under /tmp); the form arms never relax.
