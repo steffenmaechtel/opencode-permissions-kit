@@ -244,9 +244,11 @@ _ddev_migrate_run_as() {
     fi
     # pr-309 b M3: the hop runs ddev from / — sudo preserves the caller's
     # cwd, the migrate loops address projects BY NAME while ddev's command
-    # walk derives from os.Getwd() (issue #279): from a project directory
-    # the walk re-caps THAT (possibly unrelated) project — as the dev user
-    # even on dev-owned trees, where the 0755 chmod succeeds. Every command
+    # walk derives from os.Getwd() (issue #279): through ddev 1.25.5, from
+    # a project directory the walk re-capped THAT (possibly unrelated)
+    # project — as the dev user even on dev-owned trees, where the 0755
+    # chmod succeeded. ddev 1.25.6 (ddev#9031/#9032) keeps group-write on
+    # command files; the neutral cwd stays as cheap defense. Every command
     # through this runner is name-addressed or global; the neutral cwd
     # closes the vector.
     sudo -u "$dm_u" sh -c 'cd / && exec "$@"' migrate-run "$@"

@@ -444,10 +444,13 @@ settings directories (a different writer); both failure modes live in
 
 ## ensure-shared
 
-Re-assert group-write on a `.ddev` tree a ddev run left without it (every
-ddev invocation re-caps the modes, and agent sessions run without the
-healing hook) — the short form of the fix `opk status` prints for its
-`ddev share … group-write missing` line:
+Re-assert group-write on a `.ddev` tree a ddev run left without it — the
+short form of the fix `opk status` prints for its
+`ddev share … group-write missing` line. Needed for agent-side ddev
+sessions (they run without the healing hook), for ddev installs older
+than 1.25.6 (every invocation re-capped the modes), and for the
+tree-creating commands' explicit `0755`/`0644` writes, which ddev 1.25.6
+still applies:
 
 ```bash
 opk ensure-shared                     # heals ./.ddev

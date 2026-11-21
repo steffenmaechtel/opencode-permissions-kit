@@ -490,9 +490,12 @@ _ddev_handover_run_as() {
     _dhr_h=$(getent passwd "$_dhr_u" 2>/dev/null | cut -d: -f6 || true)
     [ -n "$_dhr_h" ] || return 1
     # pr-309 b M2: the hop runs ddev from / — sudo preserves the caller's
-    # cwd, and ddev's command walk chmods .ddev/commands/** on every
-    # in-project non-root invocation (issue #279), re-capping whatever
-    # project the operator stands in. Every call through this runner is
+    # cwd, and through ddev 1.25.5 ddev's command walk chmodded
+    # .ddev/commands/** on every in-project non-root invocation
+    # (issue #279), re-capping whatever project the operator stands
+    # in. ddev 1.25.6 (ddev#9031/#9032) keeps group-write on command
+    # files; the neutral cwd stays as cheap defense for older installs.
+    # Every call through this runner is
     # cwd-independent (global config, name-addressed commands), so the
     # neutral cwd costs nothing and closes the vector for every caller.
     sudo -u "$_dhr_u" env HOME="$_dhr_h" sh -c 'cd / && exec "$@"' handover-run "$@"

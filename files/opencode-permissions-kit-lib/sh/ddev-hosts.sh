@@ -166,10 +166,12 @@ ddev_hosts_missing() {
 # commands the status/hints print, so the user sees and adds exactly what
 # was reported.
 # _dha_hostname <name> (pr-309 c M1): run `ddev hostname <name> 127.0.0.1`
-# from / — ddev's command walk chmods .ddev/commands/** on every in-project
-# non-root invocation (issue #279), and the opk dispatcher preserves the
-# operator's cwd through its sudo hop; as the dev user the 0755 chmod even
-# succeeds on dev-owned trees. The hostname subcommand is name-addressed
+# from / — through ddev 1.25.5 ddev's command walk chmodded
+# .ddev/commands/** on every in-project non-root invocation (issue #279),
+# and the opk dispatcher preserves the operator's cwd through its sudo
+# hop; as the dev user the 0755 chmod even succeeded on dev-owned trees
+# (ddev 1.25.6 keeps group-write — the neutral cwd stays cheap defense).
+# The hostname subcommand is name-addressed
 # and cwd-independent, so the neutral cwd costs nothing (the same
 # choke-point pattern as the handover/migrate runners, pr-309 b).
 _dha_hostname() {

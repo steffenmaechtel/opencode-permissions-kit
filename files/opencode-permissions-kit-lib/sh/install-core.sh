@@ -400,8 +400,10 @@ do_plan_phase() {
         if [ -n "$DDEV_BIN_DEV" ] && [ -x "$DDEV_BIN_DEV" ]; then
             # issue #279 (pr-309 a Q3): probed from / via sh -c — sudo
             # preserves the caller's cwd, and the installer runs wherever
-            # the user invoked it (project directories included); ddev's
-            # command walk would chmod the cwd project's .ddev/commands.
+            # the user invoked it (project directories included); through
+            # ddev 1.25.5 ddev's command walk would chmod the cwd
+            # project's .ddev/commands (ddev 1.25.6 keeps group-write —
+            # the neutral cwd stays cheap defense).
             DDEV_VERSION="$(sudo -u "$DEFAULT_USER" \
                 env HOME="$DEV_HOME" sh -c 'cd / && exec "$0" version' "$DDEV_BIN_DEV" 2>/dev/null |
                 grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//' || true)"

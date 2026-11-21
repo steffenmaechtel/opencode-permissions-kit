@@ -889,8 +889,10 @@ container_backend_apply() {
         done
         if [ -n "$_cand_bin" ]; then
             # issue #279 (pr-309 a M3): neutral cwd — same walk, same
-            # re-cap as the status/install probes; config.sh's direct
-            # (non-root) mode runs from wherever the user stands.
+            # re-cap as the status/install probes (through ddev 1.25.5;
+            # ddev 1.25.6 keeps group-write — the neutral cwd stays cheap
+            # defense); config.sh's direct (non-root) mode runs from
+            # wherever the user stands.
             _cand_ver=$( (cd / && "$_cand_bin" version) 2>/dev/null |
                 grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//' || true)
             # if/else, not `case $?` after a bare call — config.sh runs

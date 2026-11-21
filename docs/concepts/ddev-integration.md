@@ -155,15 +155,22 @@ generated subtrees (`db_snapshots`, import dumps) are pruned. Trees that
 arrived via git never need the heal.
 
 That the heal runs after *every* command (not just the tree-creating
-`config`/`get`/`start`/`restart`) is deliberate: ddev re-caps group-write
-on **every invocation** — during its startup it walks the project's
-`.ddev/commands/` and chmods every command file to `0755`, from any
-subcommand (`ddev describe`, `ddev --version` and the describe-polls IDE
-integrations run in the background all qualify). A tree healed once does
-not stay healed: the next describe re-breaks it seconds later (issue #279).
-The kit's own ddev invocations — version probes and the handover/migrate
-runners — run ddev outside the project context, so no kit command re-breaks
-the project you stand in.
+`config`/`get`/`start`/`restart`) is deliberate: through ddev 1.25.5, ddev
+re-capped group-write on **every invocation** — during its startup it
+walked the project's `.ddev/commands/` and chmodded every command file to
+`0755`, from any subcommand (`ddev describe`, `ddev --version` and the
+describe-polls IDE integrations run in the background all qualified). A
+tree healed once did not stay healed: the next describe re-broke it
+seconds later (issue #279). **ddev 1.25.6** (upstream issue
+[#9031](https://github.com/ddev/ddev/issues/9031), fixed in
+[PR #9032](https://github.com/ddev/ddev/pull/9032)) keeps the group-write
+bit and ACLs on custom command files — on current ddev the re-cap is
+gone. The per-command heal stays anyway: it costs nothing on fixed ddev,
+it still covers the explicit `0755`/`0644` writes of the tree-creating
+commands, and it keeps installs on older ddev healed. The kit's own ddev
+invocations — version probes and the handover/migrate runners — run ddev
+outside the project context, so no kit command re-breaks the project you
+stand in.
 
 After `ddev config` the same hook also writes the dev-owned flag into the
 fresh `.ddev/config.yaml` when dev-owned mode is on — new projects are
