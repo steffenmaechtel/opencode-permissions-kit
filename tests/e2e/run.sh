@@ -373,7 +373,9 @@ if [ "$(printf '%s\n2.2.6\n' "$OC_VERSION" | sort -V | tail -n 1)" = "$OC_VERSIO
         E 'curl -sf -u opencode:e2e-probe-pw -X POST -H "content-type: application/json" -d "{\"action\":\"shell\",\"resources\":[\"ls -la\"]}" "http://127.0.0.1:4789/api/session/$(cat /tmp/e2e-probe-sid)/permission" | grep -q "\"effect\":\"allow\""'
     # Teardown: killing the docker-exec client ends the exec session (the
     # container removal at suite end would reap any survivor anyway —
-    # the image ships no procps, so no in-container pkill exists).
+    # pgrep/pkill are in the image via transitive procps, but the kill
+    # stays the primary reaper; corrected 2026-11-22, #733 a B1: the old
+    # "image ships no procps" claim was stale and misled a review).
     kill "$E2E_SERVE_JOB" 2>/dev/null || true
 else
     # Counted through skip() (issue #480 F35): visible in the tally and
@@ -1321,12 +1323,24 @@ echo "--- 12e.4 env_keep scoping: effective env on the RunAs side (issue #679) -
 # own — the negative arm must discriminate the SCOPING, not env_check)
 # and nothing the serve boot parses: DOCKER_HOST is unused without
 # in-session container tools, the password is just the auth secret.
+# Suite-internal dependencies, named so a fixture change reads as a
+# fixture break, not a kit break (#733 round a): the negative arm's
+# /usr/bin/env runs only under dev's ALL grant (Dockerfile fixture —
+# without it sudo refuses and the check_fail passes vacuously, A3);
+# the DOCKER_HOST sentinel survives only because this suite installs
+# podman-rootless daemonless — a backend with CONTAINER_DOCKER_HOST
+# set makes the wrapper OVERWRITE the inherited sentinel before the
+# exec (opencode-as-opencode:142-145) and this arm false-reds loud
+# (B3); the pgrep poll rides TRANSITIVE procps (not Dockerfile-pinned
+# — B1 residual: if the dependency drops, the WARN + two red rows
+# below name the cause). Serve budget 45s vs the 30s poll: a serve
+# found late in the poll must still be alive at the environ read.
 check "env_keep scoping: deployed alias names exactly the wrapper exec target (#679)" \
     E 'sudo grep -q "^Cmnd_Alias OPK_ENV_CMNDS = /usr/local/lib/opencode-permissions-kit/bin/opencode \*$" /etc/sudoers.d/opencode-permissions-kit'
 check_fail "env_keep scoping: out-of-alias sudo drops DOCKER_HOST (#679)" \
     E 'DOCKER_HOST=e2e-envkeep-neg-dh sudo -u opencode /usr/bin/env | grep -Fx "DOCKER_HOST=e2e-envkeep-neg-dh"'
 docker exec -u dev -e OPK_UPDATE_CHECK=0 "$E2E_CONTAINER" \
-    sh -c 'cd /tmp && DOCKER_HOST=e2e-envkeep-pos-dh OPENCODE_SERVER_PASSWORD=e2e-envkeep-pw timeout 30 /usr/local/bin/opencode serve --hostname 127.0.0.1 --port 4197 >/tmp/envkeep-serve.out 2>&1' \
+    sh -c 'cd /tmp && DOCKER_HOST=e2e-envkeep-pos-dh OPENCODE_SERVER_PASSWORD=e2e-envkeep-pw timeout 45 /usr/local/bin/opencode serve --hostname 127.0.0.1 --port 4197 >/tmp/envkeep-serve.out 2>&1' \
     >/dev/null 2>&1 &
 E2E_ENVKEEP_JOB=$!
 _envkeep_pid=""

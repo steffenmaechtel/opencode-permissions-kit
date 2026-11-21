@@ -168,8 +168,25 @@ else
     fail "env_keep scoping: expected 1 exact wrapper-only alias line, found $_alias_line (#679)"
 fi
 sed -e ':a' -e '/\\$/N' -e 's/\\\n[[:space:]]*//' -e 'ta' "$CONF/sudoers" >"$WORK/sudoers-joined"
-check_absent "env_keep scoping: no non-command-scoped env_keep Defaults left (#679)" \
-    "$WORK/sudoers-joined" -q '^Defaults[^!]*env_keep'
+# Class pin (#733 round a B2+C1): every live Defaults line mentioning
+# env_keep except the ONE sanctioned scoped line must be absent. The
+# view is comment-stripped BEFORE joining (a backslash-ending comment
+# would textually swallow a following live line in a plain join —
+# comments are not live sudoers, but the join is textual) and joined
+# (merged and widened shapes ride continuations). Counts must be equal
+# and non-zero: catches global, user-, host-, runas-scoped,
+# merged-negation (Defaults !setenv,env_keep — the shape the old
+# ^Defaults[^!]* pin could not cross) and second-alias/second-keep
+# additions, none of which the exact-text count pins alone see.
+grep -v '^[[:space:]]*#' "$CONF/sudoers" |
+    sed -e ':a' -e '/\\$/N' -e 's/\\\n[[:space:]]*//' -e 'ta' >"$WORK/sudoers-class"
+_env_class=$(grep -c 'env_keep' "$WORK/sudoers-class" || true)
+_env_sanctioned=$(grep -cF 'Defaults!OPK_ENV_CMNDS env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME"' "$WORK/sudoers-class" || true)
+if [ "$_env_class" = "$_env_sanctioned" ] && [ "$_env_sanctioned" -ge 1 ]; then
+    pass "env_keep scoping: no Defaults env_keep line outside the sanctioned scoped one (#679, #733 a B2+C1)"
+else
+    fail "env_keep scoping: expected sanctioned-only env_keep lines, class=$_env_class sanctioned=$_env_sanctioned (#679, #733 a B2+C1)"
+fi
 check_absent "env_keep scoping: socket-check NOT in the alias (#679 audit: argv-only)" \
     "$WORK/sudoers-joined" -q 'OPK_ENV_CMNDS = .*socket-check'
 check_absent "env_keep scoping: cwd-check NOT in the alias (#679 audit: argv-only)" \

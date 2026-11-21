@@ -52,7 +52,7 @@ b84c5ae854e30e7286c258f7108e1bced15d9cba829e872e35e3197a9c869f2f  files/opencode
 49cf2952831b66edadf452762cad54d762477348cb0725ee1e11f9a199c8f8c5  files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh
 2fc5c12cfc89bfdb42bbf0b52f30a9432e9642a6383fe626ed4b87895d66218b  files/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc
 10ff06c6570c70a6dc251eab0cdcdf52f522d3de997b220070110d92c29c6d01  files/opencode-permissions-kit-lib/templates/opencode.jsonc
-151d91b2874d446e9fb7d4b9dab62ddc22d77e7a1ca3d1387c04fce36773d2c6  files/opencode-permissions-kit-lib/templates/sudoers.template
+cc922e4cb0c2652df614717a0f68039b5589492787705ccfa761bb72b82fa8bc  files/opencode-permissions-kit-lib/templates/sudoers.template
 237621b618617ba62d97643a20e471098a5343cc82595d972bb58b51949d9a7f  files/opencode-permissions-kit-lib/tui/kit-mode-2x.tsx
 086f1578f65c044004af017b0fa400241f14b3619ca77ad998a8cbeda37f07a4  files/opencode-permissions-kit-lib/tui/kit-mode.tsx
 617499587b5d63f2ddf54e4bfa2bb56a02cdb5f4a54a7668681a701535e58fa8  files/opencode-permissions-kit-lib/tui/opencode-danger.theme.json

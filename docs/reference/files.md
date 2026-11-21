@@ -117,8 +117,9 @@ removes it only when it pins the kit wrapper.
 Grants `(opencode)` RunAs for the kit binary, the socket-check/cwd-check
 probes, and the ddev-as-opencode helper; keeps `DOCKER_HOST`,
 `XDG_RUNTIME_DIR` and the `OPENCODE_SERVER_*` pair in env_keep —
-command-scoped to the kit binary's own grant (`Cmnd_Alias
-OPK_ENV_CMNDS` → `Defaults!OPK_ENV_CMNDS env_keep += …`, #679): the
+command-scoped to the wrapper's sudo exec of the kit binary (`Cmnd_Alias
+OPK_ENV_CMNDS` → `Defaults!OPK_ENV_CMNDS env_keep += …`, #679; sudo
+matches per-command, not per-grant): the
 per-rule audit found the wrapper's sudo exec of the real binary the sole
 reader of the four vars, so every other sudo invocation on the host —
 any user, any command — gets the plain `env_reset` environment again.
@@ -126,7 +127,9 @@ The fragment also pins the env posture
 explicitly — `Defaults env_reset` and `Defaults !setenv` (#677): stock
 sudo compiles both in as defaults, and pinning them keeps an admin edit
 of the main sudoers from reopening env smuggling into the root-run git
-heal. Two disclosed limits: the pins are unscoped (host-global — a
+heal. Two disclosed limits: the pins (and the keep's narrowing — a
+`--only-binary` host keeps the pre-#679 global env_keep) are subject to
+the re-deploy skip (a
 deliberate host-wide `setenv`/`!env_reset` posture is flipped back on
 the next kit install or full update; `opk update --only-binary` skips
 the sudoers re-deploy), and a lexicographically later sudoers.d
