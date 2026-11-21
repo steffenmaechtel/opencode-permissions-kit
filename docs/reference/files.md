@@ -122,7 +122,8 @@ sudo compiles both in as defaults, and pinning them keeps an admin edit
 of the main sudoers from reopening env smuggling into the root-run git
 heal. Two disclosed limits: the pins are unscoped (host-global — a
 deliberate host-wide `setenv`/`!env_reset` posture is flipped back on
-the next kit install/update), and a lexicographically later sudoers.d
+the next kit install or full update; `opk update --only-binary` skips
+the sudoers re-deploy), and a lexicographically later sudoers.d
 fragment still overrides both lines.
 
 ## /etc/profile.d/
