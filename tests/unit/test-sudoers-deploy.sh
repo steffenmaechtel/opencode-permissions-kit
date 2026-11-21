@@ -114,6 +114,36 @@ else
     fail "git-heal grant: expected exactly 1 heal grant line, found $_gh_grants (#671)"
 fi
 
+# --- 1c. env posture pinned: env_reset + !setenv (#677 WO-1) ----------------
+# The kit's fragment must not lean on sudo's compiled-in defaults for
+# the env posture: an admin edit or another sudoers.d fragment flipping
+# env_reset (or enabling setenv) would reopen GH_* env smuggling into
+# the root heal. Exact-count pins (not bare presence): a duplicated or
+# missing Defaults block reddens either way. Note the visudo above is a
+# STUB — real syntax validation of the rendered lines happens inside
+# the e2e container install legs (the deploy pipeline's visudo,
+# sh/sudoers-deploy.sh); these pins only hold the rendered shape.
+_envreset=$(grep -c '^Defaults env_reset$' "$CONF/sudoers" || true)
+if [ "$_envreset" = 1 ]; then
+    pass "env posture: exactly one 'Defaults env_reset' (#677 WO-1)"
+else
+    fail "env posture: expected 1 'Defaults env_reset', found $_envreset (#677 WO-1)"
+fi
+_nosetenv=$(grep -c '^Defaults !setenv$' "$CONF/sudoers" || true)
+if [ "$_nosetenv" = 1 ]; then
+    pass "env posture: exactly one 'Defaults !setenv' (#677 WO-1)"
+else
+    fail "env posture: expected 1 'Defaults !setenv', found $_nosetenv (#677 WO-1)"
+fi
+# Raw per the harness absence contract (harness.sh: "RAW, never
+# ridden -- a commented-out forbidden line still counts",
+# conventions.md "Source-counting pins"): no uppercase SETENV anywhere
+# in the fragment -- grant tags AND commented-out sabotage shapes
+# count. The template's prose says lowercase "setenv" by contract of
+# this pin (#726 a Q2).
+check_absent "env posture: no SETENV tag anywhere in the fragment (#726 a Q2)" \
+    "$CONF/sudoers" -q SETENV
+
 # --- 2. legacy name cleanup ------------------------------------------------
 
 # A 440 file cannot be overwritten by its (non-root) owner — reset the

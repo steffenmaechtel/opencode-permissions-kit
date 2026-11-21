@@ -781,6 +781,11 @@ wrapper_serve_cwd_fallback() {
                 [ -z "$root" ] && continue
                 [ ! -d "$root" ] && continue
                 root_clean="${root%/}"
+                # A bare "/" strips to empty (#677 WO-2, the E1 twin's
+                # shape): the membership match below would hit every
+                # absolute cwd, and an empty probe target must never be
+                # promoted to SERVE_FALLBACK. Skip it — fail closed.
+                [ -n "$root_clean" ] || continue
                 if [ "$CWD" = "$root_clean" ] || [ "${CWD#"$root_clean"/}" != "$CWD" ]; then
                     if [ "$(cwd_probe "$root_clean")" = "readable" ]; then
                         SERVE_FALLBACK="$root_clean"
@@ -795,6 +800,10 @@ wrapper_serve_cwd_fallback() {
                     [ -z "$root" ] && continue
                     [ ! -d "$root" ] && continue
                     root_clean="${root%/}"
+                    # Same empty-strip skip as pass 1 (#677 WO-2): the
+                    # probe below would ask cwd-check about "" — the E1
+                    # twin guards this reader shape too.
+                    [ -n "$root_clean" ] || continue
                     if [ "$(cwd_probe "$root_clean")" = "readable" ]; then
                         SERVE_FALLBACK="$root_clean"
                         break

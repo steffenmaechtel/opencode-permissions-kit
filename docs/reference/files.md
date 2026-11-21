@@ -116,7 +116,15 @@ removes it only when it pins the kit wrapper.
 
 Grants `(opencode)` RunAs for the kit binary, the socket-check/cwd-check
 probes, and the ddev-as-opencode helper; keeps `DOCKER_HOST` and
-`XDG_RUNTIME_DIR` in env_keep.
+`XDG_RUNTIME_DIR` in env_keep. The fragment also pins the env posture
+explicitly — `Defaults env_reset` and `Defaults !setenv` (#677): stock
+sudo compiles both in as defaults, and pinning them keeps an admin edit
+of the main sudoers from reopening env smuggling into the root-run git
+heal. Two disclosed limits: the pins are unscoped (host-global — a
+deliberate host-wide `setenv`/`!env_reset` posture is flipped back on
+the next kit install or full update; `opk update --only-binary` skips
+the sudoers re-deploy), and a lexicographically later sudoers.d
+fragment still overrides both lines.
 
 ## /etc/profile.d/
 

@@ -244,4 +244,70 @@ else
     fail "wrapper: positive validation arm (VALID=$_vc)"
 fi
 
+# --- 6. wrapper_serve_cwd_fallback: a "/" conf line never reaches the probe -----
+# (#677 WO-2 — the E1 guard shape for the two serve readers). Function-level
+# with a RECORDING cwd_probe override, defined AFTER sourcing (calls
+# resolve at runtime, the later definition wins): every probe argument
+# lands in the log, so the pins see what the empty strip result would
+# have fed the real helper. The real cwd-check answers "unreadable" for
+# "" (its [ -n "$target" ] gate) -- both passes stay benign today; the
+# probe-log pins hold the belt if that ever changes. Result-level
+# assertions alone CANNOT see pass 2's guard (an unguarded pass 2 would
+# probe "", get "unreadable", move on to the real root and still return
+# the right fallback) -- the log is the discriminating witness.
+mkdir -p "$WORK/serve/root/proj"
+PROBELOG="$WORK/serve/probes"
+# stub semantics: "" answers unreadable (the real helper's empty gate),
+# the scratch root answers readable, everything else unreadable
+serve_arm() {
+    _sa_desc="$1" _sa_conf="$2" _sa_cwd="$3" _sa_want="$4"
+    : >"$PROBELOG"
+    _sf=$( (
+        . "$LIB"
+        RED='' YELLOW='' NC='' HEADLESS=true
+        cwd_probe() {
+            printf '%s\n' "$1" >>"$PROBELOG"
+            case "$1" in
+                "") printf 'unreadable' ;;
+                "$WORK/serve/root") printf 'readable' ;;
+                *) printf 'unreadable' ;;
+            esac
+        }
+        PROJECTS_CONF="$_sa_conf"
+        CWD="$_sa_cwd"
+        SERVE_FALLBACK=""
+        wrapper_serve_cwd_fallback serve
+        printf '%s' "$SERVE_FALLBACK"
+    ) 2>/dev/null)
+    if [ "$_sf" = "$_sa_want" ]; then
+        pass "$_sa_desc (fallback [$_sf])"
+    else
+        fail "$_sa_desc (got [$_sf], want [$_sa_want])"
+    fi
+    _sa_empty=$(grep -c '^$' "$PROBELOG" || true)
+    if [ "$_sa_empty" = 0 ]; then
+        pass "$_sa_desc: the empty strip result is never probed"
+    else
+        fail "$_sa_desc: probed an empty candidate $_sa_empty times (#677 WO-2)"
+    fi
+}
+
+# 6a. negative arm: a bare "/" line, cwd inside nothing configured --
+# with the guard both passes skip it; without, pass 1's membership
+# matches every absolute cwd and pass 2 probes it as a candidate.
+printf '%s\n' "/" >"$WORK/serve/conf-only-slash"
+serve_arm "serve fallback: bare / conf line promotes no fallback" \
+    "$WORK/serve/conf-only-slash" "/srv/not-configured" ""
+# 6b. positive pass-1 arm: trailing-slash root containing the cwd --
+# the guard must not over-skip legitimate spellings.
+printf '%s\n' "$WORK/serve/root/" >"$WORK/serve/conf-trailing"
+serve_arm "serve fallback: trailing-slash root still wins pass 1" \
+    "$WORK/serve/conf-trailing" "$WORK/serve/root/proj" "$WORK/serve/root"
+# 6c. positive pass-2 arm: "/" first, then a readable root, cwd outside
+# both -- pass 2 must skip the "/" line and pick the root; the log is
+# the witness that "" was never a candidate.
+printf '%s\n' "/" "$WORK/serve/root/" >"$WORK/serve/conf-slash-then-root"
+serve_arm "serve fallback: pass 2 skips the / line and picks the root" \
+    "$WORK/serve/conf-slash-then-root" "/srv/not-configured" "$WORK/serve/root"
+
 suite_done "as-opencode-core lib tests"
