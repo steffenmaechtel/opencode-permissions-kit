@@ -901,7 +901,8 @@ ddev_handover_root() {
     # strip. No valid stored root carries these forms (the writer
     # refuses them, the reader loops skip them); the belt for direct
     # and future callers refuses them outright — the writer's form set
-    # (absolute, no dot/empty segments, no whitespace; blocklist #247).
+    # (absolute, no dot/empty segments, no whitespace, no glob
+    # metacharacters #665; blocklist #247).
     case "$dhr_root" in
         /*) ;;
         *)
@@ -910,8 +911,9 @@ ddev_handover_root() {
             ;;
     esac
     case "$dhr_root" in
-        *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]*)
-            printf '%s\n' "  warn: $dhr_root is a malformed root (dot/empty segment or whitespace) — refusing the ddev handover" >&2
+        *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]* | *[\*\?\[]*)
+            printf '  warn: %s is a malformed root (dot/empty segment, whitespace, or glob) — refusing the ddev handover\n' \
+                "$dhr_root" >&2
             return 1
             ;;
     esac

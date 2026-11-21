@@ -952,8 +952,8 @@ refresh() {
                     ;;
             esac
             case "$p" in
-                *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]*)
-                    ui_warn "skip $p (malformed project path — dot, empty segment, or whitespace)"
+                *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]* | *[\*\?\[]*)
+                    ui_warn "skip $p (malformed project path — dot, empty segment, whitespace, or glob)"
                     continue
                     ;;
             esac

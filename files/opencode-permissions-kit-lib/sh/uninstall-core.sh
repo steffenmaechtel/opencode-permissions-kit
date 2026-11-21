@@ -902,8 +902,8 @@ un_projects_revert() {
                 ;;
         esac
         case "$root" in
-            *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]*)
-                echo "  Skipping malformed project path (dot, empty segment, or whitespace): $root"
+            *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]* | *[\*\?\[]*)
+                echo "  Skipping malformed project path (dot, empty segment, whitespace, or glob): $root"
                 continue
                 ;;
         esac

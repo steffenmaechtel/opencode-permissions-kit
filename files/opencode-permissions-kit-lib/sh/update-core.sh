@@ -510,8 +510,8 @@ update_redeploy_project_roots() {
                     ;;
             esac
             case "$root" in
-                *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]*)
-                    ui_warn "skip $root (malformed project path — dot, empty segment, or whitespace)"
+                *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]* | *[\*\?\[]*)
+                    ui_warn "skip $root (malformed project path — dot, empty segment, whitespace, or glob)"
                     continue
                     ;;
             esac

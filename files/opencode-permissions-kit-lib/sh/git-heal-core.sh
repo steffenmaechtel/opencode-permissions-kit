@@ -264,7 +264,8 @@ finally:
 # the roots re-validates each line; the uninstall-core reader mirror,
 # #674 a A1). rc 0: usable root, trailing-slash-stripped form in
 # _ghc_root_norm. rc 1: refused, form (non-absolute, dot/empty
-# segment, whitespace); rc 2: refused, agent home; rc 3: refused,
+# segment, whitespace, glob character #665); rc 2: refused, agent
+# home; rc 3: refused,
 # system path (incl. the bare "/" that strips to empty, #674 b D1) —
 # the caller maps each rc to its skip line.
 # The system-path and agent-home arms sit behind GH_CONF_RELAX (unit
@@ -276,7 +277,7 @@ _ghc_root_ok() {
         *) return 1 ;;
     esac
     case "$_ghc_ro" in
-        *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]*) return 1 ;;
+        *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]* | *[\*\?\[]*) return 1 ;;
     esac
     while :; do
         case "$_ghc_ro" in
@@ -377,7 +378,7 @@ _git_heal_on() {
                 case "$_ghc_rk_rc" in
                     2) _ghc_on_why="agent home is never a project root" ;;
                     3) _ghc_on_why="system path is never a project root" ;;
-                    *) _ghc_on_why="not an absolute root, or malformed (dot, empty segment, or whitespace)" ;;
+                    *) _ghc_on_why="not an absolute root, or malformed (dot, empty segment, whitespace, or glob)" ;;
                 esac
                 ui_detail "skip (conf): $_ghc_on_why: $_ghc_on_root"
                 continue

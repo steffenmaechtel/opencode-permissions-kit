@@ -519,6 +519,28 @@ for p in "/var/./" "//x/" "/./"; do
     fi
 done
 
+# Glob metacharacters (#665): install.sh's parse gate has refused them
+# on RAW --projects values since 0.0.42f S2, but the OTHER writer
+# route stored them — measured on the pre-fix tree, config.sh
+# projects add → project_path_sane returned rc 0 with the glob
+# verbatim in _PP_NORM. The arm closes the class at the writer; the
+# belts and every reader mirror refuse/skip it too (#665 sweep).
+for p in "/var/www/vhosts/x*y" "/var/www/vhosts/proj?" "/var/www/vhosts/[set]"; do
+    if project_path_sane "$p"; then
+        fail "rejects glob metacharacter: $p (#665)"
+    else
+        pass "rejects glob metacharacter: $p (#665)"
+    fi
+done
+# control arm: a clean name still passes — the arm refuses the
+# characters, not the shape.
+if project_path_sane "/var/www/vhosts/plain665" &&
+    [ "$_PP_NORM" = "/var/www/vhosts/plain665" ]; then
+    pass "clean root still passes the glob arm's case (#665)"
+else
+    fail "glob arm must not refuse clean roots (#665)"
+fi
+
 # install.sh must store the NORMALIZED path, not the raw tilde input, in
 # all entry points — a literal ~/dev in projects.conf is silently skipped
 # by every consumer (review 0.0.39b C1). The standard prompt always did;

@@ -115,6 +115,14 @@ project_path_sane() {
         *..* | /./ | */./* | ./* | */. | *//*) return 1 ;; # traversal / dot / empty segments
         *[[:space:]]*) return 1 ;;                         # storage format is line-based and
             # space-free (0.0.39b C3)
+        *[\*\?\[]*) return 1 ;; # glob metacharacters (#665):
+            # install.sh has refused them on RAW --projects values
+            # since 0.0.42f S2, but the OTHER writer route stored
+            # them — measured on the pre-fix tree, config.sh
+            # projects add → project_path_sane returned rc 0 with
+            # the glob verbatim in _PP_NORM. One form set at the
+            # writer; the belts and reader mirrors refuse/skip the
+            # class too (#665 sweep).
     esac
     # Control characters or a backslash (#670 a L2, the doctor operand
     # class): such a root clobbers every reader's verdict rows (raw

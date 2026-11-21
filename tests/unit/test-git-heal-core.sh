@@ -98,7 +98,8 @@ fi
 # --- 1b. heal: conf-line reader gate (#674 a A1) — a hand-edited line
 # never authorizes a heal. Arms run WITHOUT GH_CONF_RELAX (system-path
 # and agent-home arms live) except where a relax arm is named — the
-# form arms (absolute, dot/empty segment, whitespace) never relax.
+# form arms (absolute, dot/empty segment, whitespace, glob character
+# #665) never relax.
 
 printf '%s\n' "/etc" >"$CONF"
 _hr_rc=0
@@ -181,17 +182,21 @@ fi
 
 # Dot and whitespace form arms execute UNDER relax — the "form arms
 # never relax" claim, pinned (#674 b D4); both lines are skipped, so
-# the gitdir matches nothing.
-printf '%s\n' "$WORK/r1/../r1" "$WORK /gap" >"$CONF"
+# the gitdir matches nothing. #665 adds the glob line: its skip line
+# names the glob class, and WITHOUT the arm the root would fall
+# through to the silent nonexistent-skip (discriminating through the
+# loud skip, not through absence).
+printf '%s\n' "$WORK/r1/../r1" "$WORK /gap" "$WORK/r1*glob" >"$CONF"
 _hr_rc=0
 _hr_out=$(env GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 GH_PROJECTS_CONF="$CONF" \
     "$HEAL" "$WORK/r1" 2>&1) || _hr_rc=$?
 if [ "$_hr_rc" -eq 1 ] &&
     printf '%s' "$_hr_out" | grep -qF 'skip (conf): malformed root' &&
+    printf '%s' "$_hr_out" | grep -qF "malformed root (dot, empty segment, whitespace, or glob): $WORK/r1*glob" &&
     ! printf '%s' "$_hr_out" | grep -qF 'not a (common) gitdir shape'; then
-    pass "heal: dot and whitespace conf lines refused even under relax"
+    pass "heal: dot, whitespace and glob conf lines refused even under relax (#674 b D4; #665)"
 else
-    fail "heal: conf form-arms-under-relax (rc=$_hr_rc out=$_hr_out)"
+    fail "heal: conf form-arms-under-relax (rc=$_hr_rc out=$_hr_out) (#674/#665)"
 fi
 
 printf '%s\n' "$WORK" >"$CONF"
@@ -868,6 +873,27 @@ if [ "$_hr_rc" -eq 0 ] &&
     pass "core: on maps the bare / line to the system-path reason (rc 3)"
 else
     fail "core: on slash mapping (rc=$_hr_rc out=$(printf '%s' "$_out" | grep 'skip (conf)' | head -2))"
+fi
+# #665: a glob-bearing conf line maps to the FORM why (rc 1) in the
+# on-scan's conf loop — the form gate catches it before the
+# relax-gated blocklist (GH_CONF_RELAX stays off here: without the
+# glob arm the /tmp-scratch root would fall through to the
+# system-path skip line, a DIFFERENT reason — the leg discriminates
+# through the why-text, not through the skip volume).
+printf '%s\n' "$WORK/r1*glob" >"$WORK/on-projects.conf"
+: >"$LOG"
+_hr_rc=0
+_out=$(
+    _core_run 'SD_SUDO="" SD_VISUDO="$WORK/visudo" SD_CONF_DIR="$WORK/etc" \
+        SD_SUDOERS_D="$WORK/sdd" GH_PROJECTS_CONF="$WORK/on-projects.conf" \
+        GH_CONF_RELAX= HOME="$WORK/devhome" _git_heal_on'
+) || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] &&
+    printf '%s' "$_out" | grep -qF 'or malformed (dot, empty segment, whitespace, or glob): '"$WORK/r1*glob" &&
+    ! printf '%s' "$_out" | grep -qF 'system path is never a project root'; then
+    pass "core: on maps a glob conf line to the form-arm why (#665)"
+else
+    fail "core: on glob conf line (rc=$_hr_rc out=$(printf '%s' "$_out" | grep 'skip (conf)' | head -2)) (#665)"
 fi
 printf '%s\n' "$WORK/zone/onroot" "# comment tolerated" >"$WORK/on-projects.conf"
 

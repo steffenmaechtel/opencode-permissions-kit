@@ -30,7 +30,10 @@ asks before removing the kit block; your own entries always stay.
 - `projects.conf` paths must not contain spaces — the writer splits on
   them and every consumer reads the file line-by-line. Control
   characters and backslashes are refused by the writer (they clobber
-  the report rows that render conf lines). Lines starting
+  the report rows that render conf lines), and so are glob characters
+  (`*`, `?`, `[`, issue #665): install.sh has rejected them in
+  `--projects` values since 0.0.42f, and every reader skips them like
+  the other malformed forms. Lines starting
   with `#` are comments and are ignored by every reader (status counts,
   the doctor `all` scan roots, the config/update refresh passes — an
   annotated conf renders no verdict rows). Entries are
