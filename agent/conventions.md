@@ -206,6 +206,51 @@ are the distilled incidents:
   ddev-handover.sh twice on `abort's` before that rule existed).
   (RM-0164)
 
+## Python3 pipeline tees (health probe, fork cache, degrade)
+
+Shipped progress tees (`find … | tee-with-counter | …`) run python3
+inline on DATA paths. The pattern's sites as of #710 — status-core's
+`_st_progress_tee`, fs-baseline's `_fsb_count_tee`, git-heal-core's
+`_ghc_progress_tee` — predate this section, and PR #710 spent three
+review rounds re-deriving knowledge that lived in code comments 200
+lines apart (#714); this section is the one findable home. The two
+mechanism claims below were re-probed in scratch 2026-11-21 before
+codifying (fork cache; broken-shim health probe).
+
+- The python3 check is a HEALTH probe, not `command -v` presence: a
+  findable-but-broken interpreter (pyenv shim to a removed version,
+  poisoned PYTHONHOME/PYTHONPATH) passes presence and dies at
+  pipeline startup — on a data path it hands the consumer loop an
+  EMPTY scan list, a silent false-green (#221 a W3). The probe runs
+  the SAME invocation shape as the tee it gates (`python3 -I -c
+  '<exactly the tee's imports>'`): presence checks a different fact
+  than the execution about to stream. (RM-0194)
+- Probe once per run, from the MAIN shell: the verdict caches in a
+  `<pfx>_py_checked`/`<pfx>_py_ok` pair, and a pipeline member is a
+  FORK — a cache first written inside a pipeline dies with the fork
+  (every call site re-probes and re-warns, PR #710 b D2), while a
+  main-shell cache is inherited by every pipeline member. Call the
+  probe from the main shell before the pipeline; a tee-side call is
+  the same no-op once the cache is set (fs-baseline and git-heal-core
+  spell it that way, status-core probes in its consumer).
+  (RM-0195)
+- On probe failure the path DEGRADES — the stream loses its live
+  counter, never its data — in two sanctioned spellings: the
+  tee-side plain `cat` passthrough with one warn line naming the
+  degradation (fs-baseline, git-heal-core), or the consumer-side
+  skip that never starts the tee (status-core — silent by design:
+  the probe's own unswallowed stderr is the signal, #244 c S3). A
+  diagnostic rerun that swallows stderr (`2>&1` into the void)
+  discards exactly the cause it exists to show (PR #710 b D1).
+  (RM-0196)
+
+Reference implementations with their pin suites: `sh/status-core.sh`
+(#221 a W3; `tests/unit/test-status.sh` — the #244 c S3
+health-probe pins — and `tests/unit/test-status-core.sh`),
+`sh/fs-baseline.sh` (`tests/unit/test-fs-baseline.sh`),
+`sh/git-heal-core.sh` (`tests/unit/test-git-heal-core.sh`; born PR
+#710 rounds a–c — the pattern's cost record).
+
 ## Lib pairing and cross-lib guards (entries that source libs)
 
 An entry script and the libs it sources are pinned surfaces — version

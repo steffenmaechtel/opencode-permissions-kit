@@ -435,8 +435,9 @@ works.
   the marker (a permanent `"session":"implementer"|"fresh"` field — batch
   loops carry the fresh value); a main-direct review pass (a `reviewers:0`
   marker) stays a disclosed deviation, never a template. (RM-0132)
-- Disposition policy on the non-shipped track: MED/HIGH code
-  findings are fixed with their class sweep, like every track.
+- Disposition policy on the non-shipped track: MED/HIGH findings —
+  code or docs content alike — are fixed with their class sweep,
+  like every track.
   LOW/INFO code findings are deliberately not done, RECORDED in the
   round comment — no fix, no follow-on round, and no new LOW issue
   from a non-shipped diff (deferred issues remain a MED/HIGH
@@ -457,6 +458,28 @@ works.
   is the pr-00605 round-b deviation, disclosed and recovered per the
   loop rules; the seam's mechanical form (posted.log before the
   first fix commit) holds for docs-only fixes too. (RM-0176)
+- The docs-only close is a default, not a ban on re-review: a
+  session MAY run one more low-tier (one-axis) re-review over a
+  docs-only fix wave at its own judgment, on either track — the
+  docs-only close it modifies is track-independent ("The loop and
+  the stop rule": a round whose fixes stay in comments, docs or
+  bookkeeping closes the loop, no track qualifier) — the round
+  budgets referenced are the non-shipped ones; named in the loop
+  status as a chosen re-review, never as an owed round; the stop
+  rule and the round budgets stay unchanged. The option pays where the record concentrates: a fix wave that
+  re-quotes or newly writes factual tokens (PR #711 round b B1 LOW —
+  a wrong version era headed for shipped docs), a round a whose top
+  finding was MED, above the in-round exceptions' LOW/INFO bound (PR
+  #711 again), a fix wave amending a meta Check enumeration (PR #654
+  round b B1 LOW). Base rate as history, 2026-11-17 → 2026-11-21:
+  nine docs-class fix-wave re-reviews (PRs #589 #592 #605 #617 #622
+  #654 #689 #705 #711) surfaced LOW findings in three — two
+  substantive (#654 B1, #711 B1), one style-level (#705 A1) — six
+  INFO-only or clean, zero MED/HIGH; one further LOW (#589's
+  needle asymmetry) entered as a closing-summary work order and was
+  filed as #591, its round b itself posting zero findings. A
+  blanket obligation would buy six polish rounds per nine.
+  (RM-0198)
 
 ## Curation and verification
 
@@ -700,6 +723,14 @@ Four places carry review knowledge, each with exactly one job:
   ENOENT and EACCES alike), and the correction had to ride a later
   round comment. A CONFIRMED verdict over an unprobed mechanism is
   `unverified`, not confirmed. (RM-0162)
+- A CONFIRMED verdict covers the finding's MECHANISM, never the
+  incidental factual tokens of its prose — numbers, version eras,
+  SHAs, names carried in the finding's own wording. Fix text that
+  re-quotes a finding's figures into shipped docs, rule text or
+  records re-measures each token at the primary source before it
+  lands (PR #711 round b B1 LOW: the re-quoted "0.0.36-era" stamp
+  was 0.0.11–0.0.14 by `git log -S`; the mechanism verdict it rode
+  on was correct). (RM-0197)
 - A claim about what a make target touches enumerates its transitive
   scans, not just its prerequisites — the re-derivation includes what
   the named commands recursively traverse: pr-00586 round a's A1 read

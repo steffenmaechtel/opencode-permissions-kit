@@ -8,12 +8,12 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**193 metas · 190 active · 3 retired · 5 review-pending · next due 2026-11-17**
+**198 metas · 195 active · 3 retired · 11 review-pending · next due 2026-11-17**
 
 ## Actionable
 
-- **Review pending:** RM-0190, RM-0191, RM-0192, RM-0193
-- **Amended — pending:** RM-0182 (2026-11-20)
+- **Review pending:** RM-0190, RM-0191, RM-0192, RM-0193, RM-0194, RM-0195, RM-0196, RM-0197, RM-0198
+- **Amended — pending:** RM-0182 (2026-11-20), RM-0133 (2026-11-21)
 
 ## AGENTS.md
 
@@ -71,6 +71,14 @@
 |---|---|---|---|---|---|
 | [RM-0163](0/1/6/RM-0163.md) | A special builtin's failed redirection is FATAL | active | approved | 1m | 2026-12-17 |
 | [RM-0164](0/1/6/RM-0164.md) | Comment text inside a single-quoted sh -c worker | active | approved | 1m | 2026-12-17 |
+
+### Python3 pipeline tees (health probe, fork cache, degrade)
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0194](0/1/9/RM-0194.md) | The python3 check is a HEALTH | active | **pending** | 1m | 2026-12-21 |
+| [RM-0195](0/1/9/RM-0195.md) | Probe once per run, from the | active | **pending** | 1m | 2026-12-21 |
+| [RM-0196](0/1/9/RM-0196.md) | On probe failure the path | active | **pending** | 1m | 2026-12-21 |
 
 ### Fail-loud detector sweeps
 
@@ -235,8 +243,9 @@
 |---|---|---|---|---|---|
 | [RM-0131](0/1/3/RM-0131.md) | Non-shipped staffing: standard | active | approved | 1m | 2026-11-30 |
 | [RM-0132](0/1/3/RM-0132.md) | Fresh-session entry (the batch | active | approved | 1m | 2026-11-30 |
-| [RM-0133](0/1/3/RM-0133.md) | Disposition policy on the non-shipped | active | approved | 1m | 2026-11-30 |
+| [RM-0133](0/1/3/RM-0133.md) | Disposition policy on the non-shipped | active | **amended — pending** | 1m | 2026-11-30 |
 | [RM-0176](0/1/7/RM-0176.md) | The in-round exceptions above | active | approved | 1m | 2026-12-17 |
+| [RM-0198](0/1/9/RM-0198.md) | The docs-only close is a | active | **pending** | 1m | 2026-12-21 |
 
 ### Curation and verification
 
@@ -298,6 +307,7 @@
 | [RM-0139](0/1/3/RM-0139.md) | Sabotage spot-checks run only against | active | approved | 1m | 2026-12-10 |
 | [RM-0162](0/1/6/RM-0162.md) | A finding whose mechanism rests on shell… | active | approved | 1m | 2026-12-17 |
 | [RM-0168](0/1/6/RM-0168.md) | A claim about what a | active | approved | 1m | 2026-12-17 |
+| [RM-0197](0/1/9/RM-0197.md) | A CONFIRMED verdict covers the | active | **pending** | 1m | 2026-12-21 |
 
 ### Suites are the standing review
 
