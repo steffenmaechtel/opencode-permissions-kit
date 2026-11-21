@@ -26,6 +26,17 @@
 # belongs to the opencode user's own environment — env_reset is the
 # protection here, keeping any of them would let the calling shell
 # override agent config/permissions per invocation.
+# Pin the env posture explicitly (issue #677 WO-1): stock sudo compiles
+# both of these in as defaults, but the closure was implicit — an admin
+# edit or another sudoers.d fragment flipping env_reset (or enabling
+# setenv) would have reopened env smuggling into the root heal
+# (GH_PROJECTS_CONF, GH_AGENT_USER, GH_ALLOW_NONROOT — see the heal
+# grant below). env_reset keeps the minimal environment; !setenv refuses
+# `sudo VAR=x cmd` assignments (an env_keep'd variable stays settable,
+# which uninstall's XDG_RUNTIME_DIR line relies on). Belt only — a
+# lexicographically later sudoers.d fragment could still override both.
+Defaults env_reset
+Defaults !setenv
 Defaults env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME"
 
 # Base RunAs: the wrapper always execs opencode as the opencode user.

@@ -23,7 +23,7 @@ a935e90ea3ddbc8403bb6b12d24630ffe33230ab0c3c791989eb5f485f460827  files/opencode
 f547a32d7ad24391f5c9ebd143506d46140d8981af2ce5b6574c7c9cce6f8d4b  files/opencode-permissions-kit-lib/py/jsonc-parser.py
 d9f9fb0aae130f10c300153b745f4768b9a763e07f82298f6f156a671a07e37a  files/opencode-permissions-kit-lib/py/tui-register.py
 dcb8b17188cab386608f95f5e4b2fe3ae0a0cf87e624c4661be08074f32fa1e8  files/opencode-permissions-kit-lib/sh/advisories.sh
-b39cd4d494f078317e94a32c7f8e96731d037c15c6b3012576741f5d63cd6189  files/opencode-permissions-kit-lib/sh/as-opencode-core.sh
+d9b85097bf72668e8122b2623cb8fe62c27ff0feb741ccaf36738d508b1b73c3  files/opencode-permissions-kit-lib/sh/as-opencode-core.sh
 2ff6611509438124fd7d703965cfe1bd4899f23b571973d1084322dfeddfeb51  files/opencode-permissions-kit-lib/sh/ddev-handover.sh
 785c7d7d8a262956a5334acf387637c1d601d6e9d83ddfaa9037473624dc4bae  files/opencode-permissions-kit-lib/sh/ddev-hosts.sh
 a6f317ab7f4589bdc244db55296119a882c27f855bc14442cedf301dd06ca7e4  files/opencode-permissions-kit-lib/sh/ddev-migrate.sh
@@ -52,7 +52,7 @@ b84c5ae854e30e7286c258f7108e1bced15d9cba829e872e35e3197a9c869f2f  files/opencode
 49cf2952831b66edadf452762cad54d762477348cb0725ee1e11f9a199c8f8c5  files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh
 2fc5c12cfc89bfdb42bbf0b52f30a9432e9642a6383fe626ed4b87895d66218b  files/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc
 10ff06c6570c70a6dc251eab0cdcdf52f522d3de997b220070110d92c29c6d01  files/opencode-permissions-kit-lib/templates/opencode.jsonc
-6b81b3ea0d2b4e46bc5a2547fab2d010dc10a3cd631c519eebf035f4ceee446e  files/opencode-permissions-kit-lib/templates/sudoers.template
+4dd626667ab1b5816c1457cb43b0273a52c307e8e9e3f6b8d53b902d37b4df77  files/opencode-permissions-kit-lib/templates/sudoers.template
 237621b618617ba62d97643a20e471098a5343cc82595d972bb58b51949d9a7f  files/opencode-permissions-kit-lib/tui/kit-mode-2x.tsx
 086f1578f65c044004af017b0fa400241f14b3619ca77ad998a8cbeda37f07a4  files/opencode-permissions-kit-lib/tui/kit-mode.tsx
 617499587b5d63f2ddf54e4bfa2bb56a02cdb5f4a54a7668681a701535e58fa8  files/opencode-permissions-kit-lib/tui/opencode-danger.theme.json
