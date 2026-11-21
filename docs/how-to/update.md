@@ -79,8 +79,10 @@ deny-list customizations survive.
 The ddev handover rescan over your project roots is skipped when nothing
 changed since the last pass (a stamp under
 `/etc/opencode-permissions-kit/handover/` records it). New or re-registered
-roots, a group re-base, or a dev-owned toggle re-scan automatically. To
-re-apply the group baseline **and** force the full rescan:
+roots, a group re-base, a dev-owned toggle — or a kit release that changed
+the baseline's semantics (the stamp carries a baseline revision) — re-scan
+automatically, and such a run re-applies the group baseline too. To force
+the baseline **and** the full rescan regardless:
 
 ```bash
 opk update --refresh
@@ -88,10 +90,12 @@ opk update --refresh
 
 Plain `opk update` runs print a migration note (on every such run —
 there is no once-only state): the project-root sticky bits of earlier
-heals are removed in the #703 era, and `opk update --refresh` (or
-`sudo opk config refresh`) applies the strip — a plain `opk update`
-never re-runs the group baseline, so the legacy bits stay until one of
-those commands runs. `.git` itself and its pinned internals keep the
+heals are removed in the #703 era, and the strip rides the group
+baseline — a plain update re-runs that baseline whenever the handover
+stamp invalidates (every pre-existing stamp did on the release that
+introduced the baseline revision), and `opk update --refresh` (or
+`sudo opk config refresh`) forces it for anything that lingers.
+`.git` itself and its pinned internals keep the
 heal unchanged. The strip covers registered roots and the ancestors of
 every `.git` found under them; one corner lingers — an ancestor
 stickied for a `.git` that has since been deleted is outside every

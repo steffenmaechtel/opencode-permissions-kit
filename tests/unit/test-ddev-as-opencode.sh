@@ -75,7 +75,7 @@ _trap_cleanup() {
         "${RACESTUB:-}" "${RACESP:-}" "${RACESPS:-}" "${RACEC:-}" \
         "${RACECT:-}" "${RACEF:-}" "${RACEFT:-}" "${_112_dir:-}" \
         "${CB285:-}" "${SWAPF:-}" "${SWAPB:-}" "${SWAPR:-}" \
-        "${SWAPRB:-}" "${D2_dir:-}" "${D7STUB:-}"
+        "${SWAPRB:-}" "${D2_dir:-}" "${D7STUB:-}" "${_696_dir:-}"
 }
 trap _trap_cleanup EXIT INT TERM
 
@@ -2298,6 +2298,45 @@ if (. "$HANDOVER" && if ddev_handover_stamp_valid "/srv/projects" ocuser ocgroup
 else
     fail "stamp: a scan-rev mismatch invalidates"
 fi
+# #696: FS_BASELINE_STAMP_REV rides the same record — a baseline-semantics
+# bump must invalidate exactly like an ownership change, or a plain
+# `opk update` would skip the re-apply the bump exists for. Assignment
+# AFTER the dot (inverse of the #342 DDEV_DEV_OWNED shape): the lib
+# DEFINES this rev, so a pre-dot override is simply overwritten by the
+# sourcing itself.
+sh -c ". \"\$1\" && ddev_handover_stamp_write \"\$2\" \"\$3\" \"\$4\" \"\$5\"" _ "$HANDOVER" "/srv/projects" ocuser ocgroup devuser || true
+if (
+    . "$HANDOVER" &&
+        FS_BASELINE_STAMP_REV=99 &&
+        if ddev_handover_stamp_valid "/srv/projects" ocuser ocgroup devuser; then
+            exit 1
+        fi
+); then
+    pass "stamp: an FS_BASELINE_STAMP_REV mismatch invalidates (#696)"
+else
+    fail "stamp: an FS_BASELINE_STAMP_REV mismatch invalidates (#696)"
+fi
+# #696 rollout leg: a stamp in the PRE-#696 6-field format (no baseline
+# rev) must read invalid — the format change itself is what re-heals
+# every existing install on its first plain update after the release.
+# Loud setup (#710 a A4): a silently-failed write above (the || true
+# guards) would otherwise validate a MISSING stamp — rc 1 reads
+# "invalid" and the leg passes without ever exercising the 6-field
+# shape (the vacuous-pass class the wave's own #211 b W12 comment
+# warns about).
+_112_stampfile=$(ls "$_112_dir/stamps"/*.stamp 2>/dev/null || true)
+if [ -n "$_112_stampfile" ]; then
+    printf '%s\n' '/srv/projects|ocuser|ocgroup|1|off|devuser' >"$_112_stampfile"
+else
+    fail "stamp: rollout leg setup lost the stamp file (write above failed)"
+fi
+if (. "$HANDOVER" && if ddev_handover_stamp_valid "/srv/projects" ocuser ocgroup devuser; then exit 1; fi); then
+    pass "stamp: a legacy 6-field stamp reads invalid (#696 rollout)"
+else
+    fail "stamp: a legacy 6-field stamp reads invalid (#696 rollout)"
+fi
+check_live "ddev-handover: the stamp record carries FS_BASELINE_STAMP_REV (#696)" "$HANDOVER" \
+    -qF '|$FS_BASELINE_STAMP_REV'
 rm -rf "$_112_dir"
 unset OPK_HANDOVER_STAMP_DIR
 
@@ -2421,26 +2460,28 @@ if live_src "$UPDATE_CORE" | grep -q 'opk update --refresh' &&
 else
     fail "update.sh: skip message names both force paths"
 fi
-# pr-00381 a1/a2/a7 + b1/b2 (reworked for #568 a D2): the file-global
-# presence/order pins were comment-blind and position-free — hoisting
-# the arm out of the loop, dropping its REFRESH wrapper or commenting
-# it out all stayed green. The loop-body range pin below is
-# comment-stripped (#261) and asserts the arm's REFRESH gate, the arm
-# itself and the handover call INSIDE the single loop, each EXACTLY
-# ONCE, in order arm < handover, plus ZERO stamp writes (the stamp
-# moved inside ddev_handover_root; a caller-side stamp write is
-# exactly the regression this pin exists for). The awk end pattern is
-# deliberately UNANCHORED (b1: an indent-anchored one silently
-# captured the file tail after a re-nest, all pins green). A stray
-# done-text occurrence is loud in EVERY placement (c1): anywhere it
-# reds the loops==1 pin, and inside the range it additionally shortens
-# this capture, which reds the in-body counts.
+# pr-00381 a1/a2/a7 + b1/b2 (reworked for #568 a D2, re-contracted for
+# #696): the file-global presence/order pins were comment-blind and
+# position-free — hoisting the arm out of the loop or commenting it out
+# all stayed green. The loop-body range pin below is comment-stripped
+# (#261) and asserts ZERO REFRESH gates (the #696 contract: the arm
+# rides EVERY executed pass — a REFRESH wrapper around it is exactly
+# the bug that left plain-update hosts unhealed), the arm itself and
+# the handover call INSIDE the single loop, each EXACTLY ONCE, in
+# order arm < handover, plus ZERO stamp writes (the stamp moved inside
+# ddev_handover_root; a caller-side stamp write is exactly the
+# regression this pin exists for). The awk end pattern is deliberately
+# UNANCHORED (b1: an indent-anchored one silently captured the file
+# tail after a re-nest, all pins green). A stray done-text occurrence
+# is loud in EVERY placement (c1): anywhere it reds the loops==1 pin,
+# and inside the range it additionally shortens this capture, which
+# reds the in-body counts.
 _upd_loop="$(live_src "$UPDATE_CORE" | awk '/while IFS= read -r root; do/,/done <"\$PROJECTS_CONF"/')"
 _upd_gate_n="$(printf '%s\n' "$_upd_loop" | grep -c 'if \[ "\$REFRESH" = true \]; then' || true)"
 _upd_arm_n="$(printf '%s\n' "$_upd_loop" | grep -c 'fs_baseline_root "\$root"' || true)"
 _upd_stmp_n="$(printf '%s\n' "$_upd_loop" | grep -c 'ddev_handover_stamp_write' || true)"
-check "update.sh: loop body = 1× REFRESH gate + arm + handover, 0 stamp writes (${_upd_gate_n}/${_upd_arm_n}/${_upd_stmp_n} — pr-00381, a D2)" \
-    sh -c '[ "$1" -eq 1 ] && [ "$2" -eq 1 ] && [ "$3" -eq 0 ]' _ "$_upd_gate_n" "$_upd_arm_n" "$_upd_stmp_n"
+check "update.sh: loop body = 0× REFRESH gate (#696) + 1× arm + handover, 0 stamp writes (${_upd_gate_n}/${_upd_arm_n}/${_upd_stmp_n} — pr-00381, a D2)" \
+    sh -c '[ "$1" -eq 0 ] && [ "$2" -eq 1 ] && [ "$3" -eq 0 ]' _ "$_upd_gate_n" "$_upd_arm_n" "$_upd_stmp_n"
 _upd_arm_ln="$(printf '%s\n' "$_upd_loop" | grep -n 'fs_baseline_root "\$root"' | head -1 | cut -d: -f1)"
 _upd_ho_ln="$(printf '%s\n' "$_upd_loop" | grep -n 'ddev_handover_root "\$root"' | head -1 | cut -d: -f1)"
 check "update.sh: in-loop order arm < handover (${_upd_arm_ln}<${_upd_ho_ln} — pr-00381 a7)" \
@@ -2455,8 +2496,66 @@ check_live "update.sh: refresh success line kept verbatim (issue #219 move)" "$U
     -qF 'ui_success "group baseline refreshed (chgrp + setgid + g+rw + default ACLs)"'
 check_live "update.sh: refresh section header kept (issue #219 move)" "$UPDATE_CORE" \
     -qF 'ui_section "Refreshing group baseline"'
-check_live "update.sh: routine skip hint kept verbatim (issue #219 move)" "$UPDATE_CORE" \
-    -qF 'skipped group-baseline refresh (use --refresh to re-apply chgrp/setgid/default ACLs)'
+check_live "update.sh: routine skip hint names the valid-stamp case (#696)" "$UPDATE_CORE" \
+    -qF 'skipped group-baseline re-apply (stamps valid — --refresh forces it)'
+check_live "update.sh: stamp-triggered re-apply arm present (#696)" "$UPDATE_CORE" \
+    -qF 'group baseline re-applied for $_ho_ran root(s)'
+check_live "update.sh: stamp-triggered arm explains its trigger (#696)" "$UPDATE_CORE" \
+    -qF 'invalid (no stamp yet, or ownership/mode or baseline semantics changed)'
+# #710 a C8: FUNCTIONAL pin of the summary arms — drive the REAL
+# update_redeploy_project_roots over a scratch conf with the stamp gate
+# stubbed both ways: a stale stamp runs baseline + handover and prints
+# the re-apply arm; a valid stamp skips the whole pass (the #112 cost
+# win holds at runtime, not only in source greps). FILES_ROOT/LIBDIR
+# point nowhere, so the sourcing loops keep the stubs defined here.
+_696_dir=$(mktemp -d)
+mkdir -p "$_696_dir/rootA"
+printf '%s\n' "$_696_dir/rootA" >"$_696_dir/conf"
+_696_drive() { # $1 = the stubbed stamp_valid rc
+    (
+        OPK_READER_TMP_ROOTS=1
+        PROJECTS_CONF="$_696_dir/conf"
+        FILES_ROOT="$_696_dir/none"
+        LIBDIR="$_696_dir/none"
+        OPENCODE_USER=opencode
+        DEFAULT_USER=devuser
+        NEW_OPENCODE_GROUP=tgrp
+        REFRESH=""
+        export OPK_READER_TMP_ROOTS PROJECTS_CONF FILES_ROOT LIBDIR \
+            OPENCODE_USER DEFAULT_USER NEW_OPENCODE_GROUP REFRESH
+        ui_section() { :; }
+        ui_detail() { echo "detail: $*"; }
+        ui_info() { echo "info: $*"; }
+        ui_success() { echo "success: $*"; }
+        ui_warn() { echo "warn: $*"; }
+        ui_error() { echo "error: $*"; }
+        log() { echo "log: $*"; }
+        _696_stamp_rc="$1"
+        export _696_stamp_rc
+        ddev_handover_stamp_valid() { return "${_696_stamp_rc:-1}"; }
+        fs_baseline_root() { echo "BASELINE-RAN: $1"; }
+        ddev_handover_root() { echo "HANDOVER-RAN: $1"; }
+        . "$UPDATE_CORE"
+        update_redeploy_project_roots
+    )
+}
+_696_stale=$(_696_drive 1)
+_696_valid=$(_696_drive 0)
+if printf '%s\n' "$_696_stale" | grep -qF "BASELINE-RAN: $_696_dir/rootA" &&
+    printf '%s\n' "$_696_stale" | grep -qF "HANDOVER-RAN: $_696_dir/rootA" &&
+    printf '%s\n' "$_696_stale" | grep -qF 'detail: group baseline re-applied for 1 root(s)'; then
+    pass "update.sh: stale stamp drives baseline+handover and the re-apply arm (functional, #710 a C8)"
+else
+    fail "update.sh: stale-stamp functional leg (out=$_696_stale) (#710 a C8)"
+fi
+if ! printf '%s\n' "$_696_valid" | grep -qF 'BASELINE-RAN' &&
+    printf '%s\n' "$_696_valid" | grep -qF 'detail: skipped the ddev handover rescan for 1 root(s)' &&
+    printf '%s\n' "$_696_valid" | grep -qF 'detail: skipped group-baseline re-apply'; then
+    pass "update.sh: valid stamp skips the whole pass (functional, #112 at runtime)"
+else
+    fail "update.sh: valid-stamp skip leg (out=$_696_valid) (#112 at runtime)"
+fi
+rm -rf "$_696_dir"
 # a D2 wiring: the stamp call lives ONLY inside ddev_handover_root's
 # completed-pass gate — no shipped caller stamps on its own anymore
 # (if-found-then-fail absence shapes, comment-stripped).

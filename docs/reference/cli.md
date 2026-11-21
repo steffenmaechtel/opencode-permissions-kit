@@ -558,7 +558,7 @@ Flags: `--yes` (alias `-y`) assumes yes where config.sh would ask.
 | `container-backend docker-rootless\|podman-rootless` | Switch the rootless backend |
 | `container-backend status` | Show the configured backend + socket state |
 | `refresh` | Re-apply the group baseline (chgrp/setgid/default ACLs) |
-| `handover <path...>` | Re-run the ddev handover for one project |
+| `handover <path...>` | Re-run the group baseline + ddev handover for one project |
 | `ddev-settings on\|off\|status` | Dev-owned projects: kit writes `disable_settings_management: true` |
 
 Command notes: `container-backend` — see
@@ -590,7 +590,7 @@ error; `KIT_SHA_VERIFY=0` is the break-glass) — details in the
 | Flag | Meaning |
 |---|---|
 | `--yes`, `-y` | Skip the confirmation prompt |
-| `--refresh` | Also re-apply the group baseline |
+| `--refresh` | Force the full rescan; re-apply the group baseline (plain updates re-apply when stamps invalidate) |
 | `--binary` | Also upgrade the opencode binary to the latest release **of the current major** |
 | `--only-binary` | Skip every kit step, only upgrade the opencode binary |
 | `--binary-path <file>` | Install a specific binary file instead |

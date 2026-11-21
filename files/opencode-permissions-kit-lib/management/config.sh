@@ -1045,9 +1045,12 @@ refresh() {
 
 # --- handover (ddev ownership, one project) --------------------------------------
 
-# Light variant of `refresh`: re-runs ONLY the ddev handover (.ddev dirs
-# at any depth, settings dirs, typo3 bootstrap root) on the given paths —
-# no group baseline. The ready-made fix for `ddev start` failing with
+# Paired variant of `refresh` (#710 a C3): re-runs the group baseline
+# AND the ddev handover (.ddev dirs at any depth, settings dirs, typo3
+# bootstrap root) on the given paths — the handover's completed pass
+# stamps FS_BASELINE_STAMP_REV, and that rev must never be recorded
+# over an unhealed tree (every stamping caller pairs the two). The
+# ready-made fix for `ddev start` failing with
 # "operation not permitted" on a freshly cloned project; the ddev()
 # shell hook (ddev-terminal.sh) prints this exact command when it
 # detects the bootstrap case.
@@ -1101,9 +1104,17 @@ handover() {
             ui_warn "skip $p (symlink — register the target directory instead)"
             continue
         fi
-        ui_info "ddev handover on $p (.ddev + settings dirs + typo3 bootstrap root) ..."
+        ui_info "config handover on $p (group baseline + .ddev + settings dirs + typo3 bootstrap root) ..."
+        # Baseline first (#710 a C3): the handover's completed pass
+        # re-stamps the record INCLUDING FS_BASELINE_STAMP_REV —
+        # without the baseline run the new rev would be recorded over
+        # an unhealed tree and consume the re-apply trigger the rev
+        # exists for. Every other stamping caller pairs baseline +
+        # handover (install, projects add/refresh, update) — mirror
+        # the pair here.
+        fs_baseline_root "$p" "$OPENCODE_GROUP" "$OPENCODE_USER"
         ddev_handover_root "$p" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
-        ui_success "handover applied to $p"
+        ui_success "handover applied to $p (group baseline + ddev ownership)"
         log "ddev handover: $p"
     done
     _handover_rootless_hint

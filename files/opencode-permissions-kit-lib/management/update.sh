@@ -1212,16 +1212,18 @@ else
     # Migration notice (#703 — prints on EVERY plain full update;
     # the refresh run itself skips it, and there is deliberately no
     # once-state (#706 a S1, re-corrected b B1)): this version removes
-    # the
-    # #655-era top-folder sticky bits — the .git heal itself is
-    # unchanged. The strip rides the group-baseline heal, which a
-    # plain update does not run (#696) — name the command instead of
-    # silently leaving legacy bits in place (they carry the measured
-    # #699/#682/#701 friction). SHOW, never run — the kit never edits
-    # user-owned system config on its own (AGENTS.md, Rules).
+    # the #655-era top-folder sticky bits — the .git heal itself is
+    # unchanged. The strip rides the group-baseline heal; since #696 a
+    # plain update runs that heal whenever the handover stamp
+    # invalidates (this release's stamp-format change invalidates
+    # every pre-existing stamp, so the first plain update strips),
+    # and --refresh forces it for anything that lingers. SHOW, never
+    # run — the kit never edits user-owned system config on its own
+    # (AGENTS.md, Rules).
     if [ "$REFRESH" != true ]; then
-        ui_info "Migration note (issue #703): the project-root sticky bits of earlier heals are gone;"
-        ui_detail "strip them once with: sudo opk update --refresh"
+        ui_info "Migration note: the project-root sticky bits of earlier heals are gone;"
+        ui_detail "the baseline pass strips them — a stamp-invalidated update runs it;"
+        ui_detail "force it with: sudo opk update --refresh"
     fi
 fi
 [ "$BINARY_UPDATE" = true ] || ui_kv "Binary" "untouched (use --binary to upgrade)"

@@ -19,6 +19,7 @@ STATUS="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/status.s
 # status.sh end to end (the movement is output-pure, so their
 # expectations are unchanged).
 STATUS_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core.sh"
+GIT_HEAL_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/git-heal-core.sh"
 # Shared harness (issue #394): pass/fail, colors, counters
 # (and check/assert_eq where present) live in lib/harness.sh now.
 . "$SCRIPT_DIR/lib/harness.sh"
@@ -3238,7 +3239,7 @@ fi
 #     feed, scan parser) while every EXPECTED failure stays silent —
 #     the empty/warn output contracts are untouched. Line-shape pins
 #     first (re-adding a stderr discard goes red), behavior after.
-if grep -qF "import sys, threading, time' >/dev/null 2>&1" "$STATUS" "$STATUS_CORE"; then
+if grep -qF "import sys, threading, time' >/dev/null 2>&1" "$STATUS" "$STATUS_CORE" "$GIT_HEAL_CORE"; then
     fail "#244 c S3: probe must not discard interpreter stderr (2>&1 found)"
 else
     pass "#244 c S3: probe no longer discards interpreter stderr"

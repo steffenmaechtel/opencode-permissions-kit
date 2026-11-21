@@ -24,7 +24,9 @@ the command output and the filesystem state.
 - project roots added/removed (`project added: ...`, `project removed: ...`)
 - the git-config toggle (`git-config hardening set to ...`)
 - ddev handovers (`ddev handover: ...`, `ddev handover ran under ...`,
-  `ddev handover pass ran under ...`, `ddev handover rescan skipped for ... root(s)`)
+  `group baseline + ddev handover pass ran under ...`,
+  `ddev handover rescan skipped for ... root(s)`)
+- the stamp-triggered baseline re-apply (`group baseline re-applied for ... root(s) ...`)
 - ddev-settings changes (`ddev-settings set to ...`)
 - the agents migration (`agents migration: moved|copied|skipped ...`)
 - ddev database exports (skipped/result lines)

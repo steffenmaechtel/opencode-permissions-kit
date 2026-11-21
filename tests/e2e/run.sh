@@ -1687,7 +1687,7 @@ echo "--- 12n. opk doctor detect + handover-me warning (issue #352 / #313 phase 
 E 'mkdir -p /var/www/vhosts/doctor-det/public/scss /var/www/vhosts/doctor-det/src && cd /var/www/vhosts/doctor-det && git init -q . && printf "public/deps.js\n" >.gitignore && echo body >public/scss/main.scss && echo app >public/deps.js && echo idx >src/index.php'
 E 'sudo chown opencode /var/www/vhosts/doctor-det/public/deps.js'
 check "12n: detect proposes the mixed boundary (ignored artifact + human sources)" \
-    E 'cd /var/www/vhosts/doctor-det && opk doctor detect </dev/null >/tmp/ddet-eof.log 2>&1; test $? -eq 1 && grep -q "candidate      public --" /tmp/ddet-eof.log && grep -q "mixed with human-owned files" /tmp/ddet-eof.log && grep -q "one owner for both (#312)" /tmp/ddet-eof.log'
+    E 'cd /var/www/vhosts/doctor-det && opk doctor detect </dev/null >/tmp/ddet-eof.log 2>&1; test $? -eq 1 && grep -q "candidate      public --" /tmp/ddet-eof.log && grep -q "mixed with human-owned files" /tmp/ddet-eof.log && grep -q "one owner for both" /tmp/ddet-eof.log'
 check "12n: declined detect prints the paste snippet, writes nothing" \
     E 'test ! -e /var/www/vhosts/doctor-det/opk.json && grep -qF "{\"path\": \"public\"," /tmp/ddet-eof.log'
 check "12n: tracked dev-only dirs are no candidates" \

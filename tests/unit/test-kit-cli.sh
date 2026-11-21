@@ -1313,14 +1313,16 @@ else
 fi
 # The update.sh twins of the same stub (#211 a F2 sweep — its loop logs
 # "ddev handover pass completed" unconditionally; #211 b W3 — the
-# fs_baseline_root stub, in the refresh arm of the project-root loop
-# since issue #219, was missed by the same sweep): loud rc 1 as well.
+# fs_baseline_root stub, riding every executed pass since #696 — before
+# that in the refresh arm of the project-root loop since issue #219 —
+# was missed by the same sweep): loud rc 1 as well.
 # EXECUTED, not just grepped (#211 b W12): a presence-only pin passes a
 # `return 0` regression with the echo kept. Both stubs live in
-# sh/update-core.sh since #346 wave 2 (indents unchanged).
+# sh/update-core.sh since #346 wave 2; the fs-baseline stub moved one
+# level out with #696 (8-space indent now).
 sed -n '/^        command -v ddev_handover_root/,/^        }$/p' \
     "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/update-core.sh" >"$_stubs/uho.sh"
-sed -n '/^            command -v fs_baseline_root/,/^            }$/p' \
+sed -n '/^        command -v fs_baseline_root/,/^        }$/p' \
     "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/update-core.sh" >"$_stubs/ufsbl.sh"
 for _stubpair in uho:ddev_handover_root:handover ufsbl:fs_baseline_root:baseline; do
     _short="${_stubpair%%:*}"
