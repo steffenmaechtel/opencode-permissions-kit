@@ -119,8 +119,11 @@ probes, and the ddev-as-opencode helper; keeps `DOCKER_HOST` and
 `XDG_RUNTIME_DIR` in env_keep. The fragment also pins the env posture
 explicitly — `Defaults env_reset` and `Defaults !setenv` (#677): stock
 sudo compiles both in as defaults, and pinning them keeps an admin edit
-or another sudoers fragment from reopening env smuggling into the
-root-run git heal.
+of the main sudoers from reopening env smuggling into the root-run git
+heal. Two disclosed limits: the pins are unscoped (host-global — a
+deliberate host-wide `setenv`/`!env_reset` posture is flipped back on
+the next kit install/update), and a lexicographically later sudoers.d
+fragment still overrides both lines.
 
 ## /etc/profile.d/
 

@@ -120,8 +120,9 @@ fi
 # env_reset (or enabling setenv) would reopen GH_* env smuggling into
 # the root heal. Exact-count pins (not bare presence): a duplicated or
 # missing Defaults block reddens either way. Note the visudo above is a
-# STUB — real syntax validation of these lines happens in the e2e
-# suites' visudo leg; these pins only hold the rendered shape.
+# STUB — real syntax validation of the rendered lines happens inside
+# the e2e container install legs (the deploy pipeline's visudo,
+# sh/sudoers-deploy.sh); these pins only hold the rendered shape.
 _envreset=$(grep -c '^Defaults env_reset$' "$CONF/sudoers" || true)
 if [ "$_envreset" = 1 ]; then
     pass "env posture: exactly one 'Defaults env_reset' (#677 WO-1)"
@@ -134,11 +135,14 @@ if [ "$_nosetenv" = 1 ]; then
 else
     fail "env posture: expected 1 'Defaults !setenv', found $_nosetenv (#677 WO-1)"
 fi
-# Non-comment lines only: the pin targets grant tags, not prose -- a
-# comment mentioning SETENV must not redden it (the commented-out
-# sabotage class, #577).
-check_absent "env posture: no SETENV tag on any active line (#677 WO-1)" \
-    "$CONF/sudoers" -qE '^[^#]*SETENV'
+# Raw per the harness absence contract (harness.sh: "RAW, never
+# ridden -- a commented-out forbidden line still counts",
+# conventions.md "Source-counting pins"): no uppercase SETENV anywhere
+# in the fragment -- grant tags AND commented-out sabotage shapes
+# count. The template's prose says lowercase "setenv" by contract of
+# this pin (#726 a Q2).
+check_absent "env posture: no SETENV tag anywhere in the fragment (#726 a Q2)" \
+    "$CONF/sudoers" -q SETENV
 
 # --- 2. legacy name cleanup ------------------------------------------------
 

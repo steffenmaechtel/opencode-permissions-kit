@@ -32,9 +32,13 @@
 # setenv) would have reopened env smuggling into the root heal
 # (GH_PROJECTS_CONF, GH_AGENT_USER, GH_ALLOW_NONROOT — see the heal
 # grant below). env_reset keeps the minimal environment; !setenv refuses
-# `sudo VAR=x cmd` assignments (an env_keep'd variable stays settable,
-# which uninstall's XDG_RUNTIME_DIR line relies on). Belt only — a
-# lexicographically later sudoers.d fragment could still override both.
+# `sudo VAR=x cmd` assignments for grant-matched callers (an env_keep'd
+# variable stays settable for them; the uninstall/install XDG lines run
+# as ROOT, whose ALL grant implies the setenv privilege either way —
+# probes in PR #726 round a). The pins are unscoped host-global: a
+# deliberate host-wide setenv/!env_reset posture flips back on the next
+# kit install/update. Belt only — a lexicographically later sudoers.d
+# fragment could still override both.
 Defaults env_reset
 Defaults !setenv
 Defaults env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME"
