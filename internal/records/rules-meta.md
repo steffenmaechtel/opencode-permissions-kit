@@ -244,7 +244,7 @@ before the suite reads it — the parity test regenerates and compares
    gated on a resolvable leg (#719, arm b): an external-only
    `Source:` legitimately quotes its external text (maintainer issue
    comments, PR timelines — not greppable in-tree; measured
-   2026-11-21: 33 active metas carry such quotes), so the meta's
+   2026-11-21: 27 active metas carry 32 such quotes), so the meta's
    unconditional rule-text anchor stays inv 5's `quote:` field.
    Tokens containing `..` never resolve. A
    token that resolves to an existing directory is ignored — prose

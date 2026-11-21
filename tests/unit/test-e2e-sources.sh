@@ -153,6 +153,15 @@ check_live "lib.sh moves the fetched installer into place atomically (#485 F30)"
     -qF 'mv -f "$_oc_ins_tmp" "$OC_INSTALLER"'
 check_live "lib.sh chmods the fetched installer temp world-readable before the mv (#601, #628 a M1)" "$LIB" \
     -qF 'chmod 644 "$_oc_ins_tmp"'
+# Mode-heal pins (#724 a B2, closing #628 a M3's claim): the extracted
+# binary's chmod is 755, not +x -- the cache probe asserts -x only, so
+# a revert to the additive form would ride green while an owner-
+# executable-but-unreadable archive mode re-opens the #601 read class.
+check_live "e2e_fetch_opencode heals the extracted binary to 755 (#628 a M3)" "$LIB" \
+    -qF 'chmod 755 "$dest"'
+_DDEV_SH="$(cd "$(dirname "$0")/../e2e" && pwd)/run-ddev.sh"
+check_live "run-ddev.sh twin heals the ddev binary to 755 (#628 a M3)" "$_DDEV_SH" \
+    -qF 'chmod 755 "$DD_BIN"'
 
 # Behavioral drive of the real e2e_resolve_cache against a fake curl:
 # the lib copy's OC_CACHE_DIR is rewritten into scratch (the ONE
