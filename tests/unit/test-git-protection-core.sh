@@ -465,6 +465,23 @@ else
     fail "classify: refused conf line (out=$_out)"
 fi
 
+# an unreadable subtree under a good root: the scan note fires on
+# stderr, the data channel keeps the readable projects (the
+# git-heal-status twin shape — find rc 1 must not be silence).
+printf '%s\n' "$WORK/roots/r1" >"$CONF"
+mkdir -p "$WORK/roots/r1/locked/sub"
+_mkrepo "$WORK/roots/r1/locked/sub/inner"
+chmod 000 "$WORK/roots/r1/locked/sub"
+_rc=0
+_out=$(_core_run '_gp_projects') || _rc=$?
+chmod 755 "$WORK/roots/r1/locked/sub"
+if printf '%s' "$_out" | grep -qF 'scan may be incomplete under' &&
+    printf '%s' "$_out" | grep -qF "classic $WORK/roots/r1/classic"; then
+    pass "classify: unreadable subtree renders the incompleteness note, data flows"
+else
+    fail "classify: unreadable-subtree arm (out=$_out)"
+fi
+
 # --- 6. the atomic migrate -----------------------------------------------------------
 
 printf '%s\n' "$WORK/roots/r1" >"$CONF"

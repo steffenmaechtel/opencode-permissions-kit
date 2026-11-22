@@ -1118,4 +1118,37 @@ else
     fail "consent: the pairing guard must name update_git_protection_consent"
 fi
 
+# present-but-skewed core: the phase's used-set guard refuses loud
+# (rc 1) BEFORE anything runs — a mid-update rc-127 abort is the
+# alternative (the cross-lib pairing rule).
+printf '#!/bin/sh\n# skewed: defines nothing\n' >"$WORK/skewed-core.sh"
+_rc=0
+_out=$(
+    GIT_PROTECTION_CORE="$WORK/skewed-core.sh" INSTALL_CONF="$UC_IC" sh -c '
+        . "$1"
+        ui_error() { echo "error: $*" >&2; }
+        update_git_protection_consent
+    ' _ "$LIB" 2>&1
+) || _rc=$?
+if [ "$_rc" = 1 ] && printf '%s' "$_out" | grep -qF 'missing from the core lib'; then
+    pass "consent: a present-but-skewed core aborts loud (#704)"
+else
+    fail "consent: skewed-core arm (rc=$_rc out=$_out)"
+fi
+
+# absent core: a visible skip row, never a silent phase drop.
+_rc=0
+_out=$(
+    INSTALL_CONF="$UC_IC" sh -c '
+        . "$1"
+        ui_detail() { echo "detail: $*"; }
+        update_git_protection_consent
+    ' _ "$LIB" 2>&1
+) || _rc=$?
+if [ "$_rc" = 0 ] && printf '%s' "$_out" | grep -qF 'core lib absent'; then
+    pass "consent: an absent core skips with a visible row (#704)"
+else
+    fail "consent: absent-core arm (rc=$_rc out=$_out)"
+fi
+
 suite_done
