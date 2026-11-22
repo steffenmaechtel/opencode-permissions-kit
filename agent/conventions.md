@@ -216,6 +216,17 @@ are the distilled incidents:
   handover declared-tree belt's three-case shape, whose own comment
   names the reason ("a separate case keeps the structural list
   inside the ratchet", sh/handover-core.sh). (RM-0203)
+- A presence check on a shell function proves the function exists,
+  never WHERE its definition came from — `command -v func` is
+  satisfied by a stub from an earlier invocation of the same shell,
+  an `export -f` import (bash) and a sourced vintage alike. A
+  stub-or-real distinction built on presence needs an
+  invocation-scoped `unset -f func` reset at entry (every invocation
+  re-derives the probe from its own sourcing) or a definition-site
+  marker the sourced file sets itself — the never-shadow fail-safe's
+  marker precondition was satisfied by the very rc-0 stub it existed
+  to prevent (PR #746 round b D1 over round a's B1 marker, fix
+  53364ca9; probed in dash). (RM-0209)
 
 ## Python3 pipeline tees (health probe, fork cache, degrade)
 
@@ -683,6 +694,15 @@ review host):
   one broken rewrite away from live (the migrate fixtures carried them
   for months behind a `sed` that a wave then dropped; maintainer
   directive 2026-10-04). (RM-0016)
+- Every path a fixture REFERENCES — not just executes — is
+  scratch-owned: a symlink's target, a grep needle's input file, a
+  comparison baseline. An existence assert through the reference
+  resolves the HOST path (`test -e`/`-x` through a link follows to
+  the target), so the pin greens wherever the host happens to carry
+  the path and reds where it does not — a foreign-symlink fixture
+  linked `/etc/sudoers.d/README`, green locally and CI-red on the
+  runner (PR #746 round b D5, unit lane red on ef5be2da; issue #749
+  incident 2). (RM-0208)
 - An `rm` — any flag form (`rm`, `rm -f`, `rm -r`, `rm -rf`, `rm -fr`,
   …), any operand position — on a variable **with a literal suffix**
   (`rm -rf "$WORK/sub"`, `rm -f "$WORK/mark"`, `rm -rf "${WORK}/sub"`,

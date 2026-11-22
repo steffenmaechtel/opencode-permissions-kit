@@ -8,12 +8,12 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**205 metas · 202 active · 3 retired · 19 review-pending · next due 2026-11-20**
+**210 metas · 207 active · 3 retired · 26 review-pending · next due 2026-11-20**
 
 ## Actionable
 
-- **Review pending:** RM-0190, RM-0191, RM-0192, RM-0193, RM-0194, RM-0195, RM-0196, RM-0197, RM-0198, RM-0199, RM-0200, RM-0201, RM-0202, RM-0203, RM-0204, RM-0205
-- **Amended — pending:** RM-0133 (2026-11-21), RM-0136 (2026-11-22), RM-0182 (2026-11-22)
+- **Review pending:** RM-0190, RM-0191, RM-0192, RM-0193, RM-0194, RM-0195, RM-0196, RM-0197, RM-0198, RM-0199, RM-0200, RM-0201, RM-0202, RM-0203, RM-0204, RM-0205, RM-0206, RM-0207, RM-0208, RM-0209, RM-0210
+- **Amended — pending:** RM-0133 (2026-11-21), RM-0078 (2026-11-22), RM-0135 (2026-11-22), RM-0136 (2026-11-22), RM-0182 (2026-11-22)
 
 ## AGENTS.md
 
@@ -72,6 +72,7 @@
 | [RM-0163](0/1/6/RM-0163.md) | A special builtin's failed redirection is FATAL | active | approved | 1m | 2026-12-17 |
 | [RM-0164](0/1/6/RM-0164.md) | Comment text inside a single-quoted sh -c worker | active | approved | 1m | 2026-12-17 |
 | [RM-0203](0/2/0/RM-0203.md) | A case pattern list split | active | **pending** | 1m | 2026-12-22 |
+| [RM-0209](0/2/0/RM-0209.md) | A presence check on a | active | **pending** | 1m | 2026-12-22 |
 
 ### Python3 pipeline tees (health probe, fork cache, degrade)
 
@@ -115,6 +116,7 @@
 | [RM-0151](0/1/5/RM-0151.md) | The decision rule for writing NEW | active | approved | 1m | 2026-12-15 |
 | [RM-0173](0/1/7/RM-0173.md) | A harness env override consumed | active | approved | 1m | 2026-12-17 |
 | [RM-0179](0/1/7/RM-0179.md) | The controlled PATH of an | active | approved | 1m | 2026-12-20 |
+| [RM-0208](0/2/0/RM-0208.md) | Every path a fixture | active | **pending** | 1m | 2026-12-22 |
 
 ### Never-write pins (unit suites)
 
@@ -254,6 +256,7 @@
 |---|---|---|---|---|---|
 | [RM-0126](0/1/2/RM-0126.md) | Curation: the MAIN | active | approved | 1m | 2026-11-28 |
 | [RM-0127](0/1/2/RM-0127.md) | Verification: every curated | active | approved | 1m | 2026-12-17 |
+| [RM-0210](0/2/1/RM-0210.md) | Severity anchors for process/bookkeeping | active | **pending** | 1m | 2026-12-22 |
 
 ### Reviewer freshness
 
@@ -276,6 +279,8 @@
 | [RM-0158](0/1/5/RM-0158.md) | names its observation scope | active | approved | 1m | 2026-12-16 |
 | [RM-0166](0/1/6/RM-0166.md) | The closing summary's marker carries | active | approved | 1m | 2026-12-17 |
 | [RM-0170](0/1/7/RM-0170.md) | Mechanical fields derive from the | active | approved | 1m | 2026-12-17 |
+| [RM-0206](0/2/0/RM-0206.md) | A polling CI watch | active | **pending** | 1m | 2026-12-22 |
+| [RM-0207](0/2/0/RM-0207.md) | An EMPTY run list | active | **pending** | 1m | 2026-12-22 |
 
 ### Fixes close classes, not sites
 
@@ -319,7 +324,7 @@
 |---|---|---|---|---|---|
 | [RM-0076](0/0/7/RM-0076.md) | Every finding class that can | active | approved | 6m | 2027-05-20 |
 | [RM-0077](0/0/7/RM-0077.md) | Root-script behavior changes owe | active | approved | 6m | 2027-05-20 |
-| [RM-0078](0/0/7/RM-0078.md) | Record the environment in | active | approved | 1m | 2026-12-17 |
+| [RM-0078](0/0/7/RM-0078.md) | Record the environment in | active | **amended — pending** | 1m | 2026-12-17 |
 | [RM-0079](0/0/7/RM-0079.md) | A disposition claim | active | approved | 6m | 2027-05-20 |
 | [RM-0113](0/1/1/RM-0113.md) | The debt's due date splits | active | approved | 1m | 2026-12-20 |
 
@@ -424,7 +429,7 @@
 | [RM-0035](0/0/3/RM-0035.md) | Examples use the abstract token | active | approved | 6m | 2027-05-17 |
 | [RM-0093](0/0/9/RM-0093.md) | In meta bodies, cross-references | active | approved | 6m | 2027-05-20 |
 | [RM-0094](0/0/9/RM-0094.md) | The review log names the | active | approved | 6m | 2027-05-20 |
-| [RM-0135](0/1/3/RM-0135.md) | Post-approval changes set | active | approved | 1m | 2026-12-20 |
+| [RM-0135](0/1/3/RM-0135.md) | Post-approval changes set | active | **amended — pending** | 1m | 2026-12-20 |
 | [RM-0156](0/1/5/RM-0156.md) | The quote: needle is the | active | approved | 1m | 2026-12-17 |
 | [RM-0159](0/1/5/RM-0159.md) | Quoted strings in meta bodies | active | approved | 1m | 2026-12-16 |
 

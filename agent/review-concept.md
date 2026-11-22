@@ -524,6 +524,18 @@ works.
   the REVIEW pass, never main-solo at any size; the verifier batch's
   value is context economy and parallel re-derivation at volume,
   not a second independent judgment. (RM-0127)
+- Severity anchors for process/bookkeeping findings (missing Track
+  line, closing keyword, marker fields): MED — a required contract
+  element is missing and the codifying rule's history shows live
+  divergence; LOW — form drift on optional or bookkeeping prose with
+  no divergence path, behavior already correct by other means. The
+  disposition policy splits at this line (LOW/INFO code findings are
+  deliberately not done; MED is fixed with its class sweep), so the
+  recorded case shape (the marker's med counts) follows the anchor
+  instead of per-round re-deliberation (PR #747 round a A1: `Issue:`
+  in place of the closing keyword on an intermediate wave — MED kept,
+  both readings defensible with no citable anchor; issue #751).
+  (RM-0210)
 
 ## Reviewer freshness
 
@@ -660,6 +672,29 @@ Review-relevant code touched this round: yes/no → …
   (`gh pr checks` showed them in the same second) while the full sha
   resolved them instantly — a short-sha match is not a reliable
   identity probe (PR #654's fix push, #656). (RM-0154)
+- A polling CI watch that feeds those lines gates on the per-run
+  conjunction — `status: completed` AND `conclusion: success`, keyed on
+  the same run identity (the full 40-char sha) — never on a count of
+  completed entries: a completed count is blind to failure by
+  construction, and the `gh run list --json status,conclusion` output
+  carries both fields per run (pr-00732's closing-phase watch counted
+  completed entries and would have reported ALL-COMPLETED over two
+  completed-but-failed runs — the maintainer's cross-check caught it;
+  cancelled lanes show the same shape: completed with a non-success
+  conclusion). (RM-0206)
+- An EMPTY run list over the full sha is diagnosed by the PR's
+  `mergeable` state FIRST: a CONFLICTING PR runs no workflows at all —
+  the website shows the conflict banner while the API's run list just
+  looks empty (`mergeable: CONFLICTING` / `mergeStateStatus: DIRTY` is
+  the only API-visible tell) — so the round comment's CI line names
+  the conflict, the diagnosis stops there, and the CI checkpoint
+  moves to the post-rebase push. Two waves regenerating the same
+  artifact (INDEX.md, SHA256SUMS) serialize: the second PR opens
+  conflicting after the first merges and owes its rebase before any
+  CI claim (PR #742, born conflicting from PR #740's minutes-earlier
+  merge, its round a mis-diagnosed lost push events over the empty
+  list — the fix push showed the same emptiness, and CI started only
+  after the rebase). (RM-0207)
 - Size guard: GitHub caps one comment at ~64k characters; a comment
   that would exceed ~60k is SPLIT into part 1/2 (each part with its
   own marker and a `"part":1|2` field) — content is NEVER trimmed to
@@ -758,7 +793,14 @@ Four places carry review knowledge, each with exactly one job:
   output IS the primary source, and an eyeballed count is a draft, not
   a measurement (PR #724 round a C1 — a first-hand figure read off
   probe output landed wrong in record, PR body and commit message; a
-  deterministic recount refuted it only after the commit). (RM-0200)
+  deterministic recount refuted it only after the commit). The
+  timestamp twin: a date claim checked against git output derives
+  from `git show -s --format=%aI` (authored) or `%cI` (committed)
+  with the zone offset CONVERTED to the record's zone, never the
+  locale-rendered date — a host rendering `git show` in +01:00 shifts
+  day boundaries against UTC-dated records, and the reviewer finding
+  built on that rendering retracted only by showing the conversion
+  (PR #742 round a A3). (RM-0200)
 - A completeness claim in a commit message or PR body states only what
   the session derived itself, cited by its own grep or sweep pattern.
   Restating a reviewer axis's coverage self-report as the record's
@@ -826,7 +868,16 @@ Between reviews, the unit/e2e suites are the review (see also the
   SHA + counts into the ledger; that record doubles as the fresh
   comparator the next count claim needs). (RM-0113)
 - Record the environment in the round comment (opencode binary version,
-  host layout). (RM-0078)
+  host layout). On kit-managed hosts the wrapper intercepts
+  `opencode --version` for the agent user (stdout empty first, the
+  sudoers refusal then on stderr) — the sanctioned source is the
+  kit-managed binary itself:
+  `/usr/local/lib/opencode-permissions-kit/bin/opencode --version`
+  (maintainer-confirmed, issue #750; the version-probe discipline
+  unchanged — strict `grep -oE` extract, empty means unknown, never a
+  guess). A probe that stays empty after both legs records the honest
+  degradation: wrapper-managed, version not asserted (PR #747's
+  Environment line). (RM-0078)
 - A disposition claim ("closed", "never dereferences", "any … aborts")
   owes a behavioral test, not prose: every such claim in a round
   comment or code comment names its pinning test in the same wave —

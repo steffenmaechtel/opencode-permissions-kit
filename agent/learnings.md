@@ -224,6 +224,18 @@ intuitive embedded-newline operand silently builds the wrong fixture
 embedded newlines via a variable (`NL=$(printf '\nX'); NL=${NL%X}`)
 and verify the fixture itself with `od -c`/`cat -A` before reading
 its output (PR #657 round a S3, #659).
+An environment-dependent RED that appears while a non-default
+environment (TMPDIR, PATH, GIT_CONFIG_*) is active on the chain is
+re-derived once under the DEFAULT environment before any external
+attribution — the differential probe must hold the mitigation
+CONSTANT, and a scratch-worktree re-run inherits the exported
+TMPDIR, so the clean-HEAD leg re-applies the same confound and
+confirms nothing (pr-00746, 2026-11-22: a long private TMPDIR
+crossed the pty draw width and truncation ate the very substring
+the pin grepped — mechanism and pin in #745 — and the wrong
+environmental attribution survived both a clean-HEAD worktree run
+and a manual repro that sat on the truncation boundary; issue #749
+incident 1).
 
 ### L5 — Root-operand inventory check
 *Classes: `perm-model` + `race-toctou` — run 1: 53 findings, 23 MED/HIGH,
