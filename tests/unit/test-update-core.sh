@@ -987,6 +987,10 @@ _uc_out=$(
         . "$1"
         ui_info() { echo "info: $*"; }
         ui_detail() { echo "detail: $*"; }
+        ui_section() { echo "section: $*"; }
+        ui_kv() { echo "kv: $1 $2"; }
+        ui_success() { echo "success: $*"; }
+        ui_warn() { echo "warn: $*"; }
         update_git_protection_consent
     ' _ "$LIB" 2>&1 || true
 )
@@ -997,7 +1001,8 @@ else
 fi
 
 # state 2: the conf's declined marker skips silently — same proof.
-printf 'DEFAULT_USER=%s\nGITDIR_STORAGE=none\n' "$(id -un)" >"$UC_IC"
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\nGITDIR_STORAGE=none\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" >"$UC_IC"
 _uc_out=$(
     GIT_PROTECTION_CORE="$GPCORE" INSTALL_CONF="$UC_IC" \
         GP_CONF="$UC_CONF" GP_INSTALL_CONF="$UC_IC" GP_STORAGE="$WORK/ucstorage" \
@@ -1005,6 +1010,10 @@ _uc_out=$(
         . "$1"
         ui_info() { echo "info: $*"; }
         ui_detail() { echo "detail: $*"; }
+        ui_section() { echo "section: $*"; }
+        ui_kv() { echo "kv: $1 $2"; }
+        ui_success() { echo "success: $*"; }
+        ui_warn() { echo "warn: $*"; }
         update_git_protection_consent
     ' _ "$LIB" 2>&1 || true
 )
@@ -1016,7 +1025,8 @@ else
 fi
 
 # state 3: --yes (non-interactive) leaves a hint, never a marker.
-printf 'DEFAULT_USER=%s\n' "$(id -un)" >"$UC_IC"
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" >"$UC_IC"
 _uc_out=$(
     GIT_PROTECTION_CORE="$GPCORE" INSTALL_CONF="$UC_IC" \
         GP_CONF="$UC_CONF" GP_INSTALL_CONF="$UC_IC" GP_STORAGE="$WORK/ucstorage" \
@@ -1024,6 +1034,10 @@ _uc_out=$(
         . "$1"
         ui_info() { echo "info: $*"; }
         ui_detail() { echo "detail: $*"; }
+        ui_section() { echo "section: $*"; }
+        ui_kv() { echo "kv: $1 $2"; }
+        ui_success() { echo "success: $*"; }
+        ui_warn() { echo "warn: $*"; }
         YES=true
         update_git_protection_consent
     ' _ "$LIB" 2>&1 || true
@@ -1047,7 +1061,8 @@ else
 fi
 
 # state 5: interactive accept configures + migrates (pty + stubbed yes).
-printf 'DEFAULT_USER=%s\n' "$(id -un)" >"$UC_IC"
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" >"$UC_IC"
 _uc_driver y
 _uc_out=$(script -qec "sh '$WORK/ucdriver.sh'" /dev/null 2>/dev/null || true)
 if [ "$(sed -n 's/^GITDIR_STORAGE=//p' "$UC_IC")" = "$WORK/ucstorage" ] &&
@@ -1068,6 +1083,10 @@ _uc_out=$(
         . "$1"
         ui_info() { echo "info: $*"; }
         ui_detail() { echo "detail: $*"; }
+        ui_section() { echo "section: $*"; }
+        ui_kv() { echo "kv: $1 $2"; }
+        ui_success() { echo "success: $*"; }
+        ui_warn() { echo "warn: $*"; }
         ui_error() { echo "error: $*" >&2; }
         update_git_protection_consent
     ' _ "$LIB" 2>&1 || true
@@ -1081,7 +1100,8 @@ else
 fi
 
 # state 7: KIT_GITDIR_STORAGE=<path> configures non-interactively.
-printf 'DEFAULT_USER=%s\n' "$(id -un)" >"$UC_IC"
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" >"$UC_IC"
 _uc_mkrepo "$WORK/ucroots/r1/proj3"
 _uc_out=$(
     KIT_GITDIR_STORAGE="$WORK/ucstorage" GIT_PROTECTION_CORE="$GPCORE" \
@@ -1091,6 +1111,10 @@ _uc_out=$(
         . "$1"
         ui_info() { echo "info: $*"; }
         ui_detail() { echo "detail: $*"; }
+        ui_section() { echo "section: $*"; }
+        ui_kv() { echo "kv: $1 $2"; }
+        ui_success() { echo "success: $*"; }
+        ui_warn() { echo "warn: $*"; }
         ui_error() { echo "error: $*" >&2; }
         update_git_protection_consent
     ' _ "$LIB" 2>&1 || true
