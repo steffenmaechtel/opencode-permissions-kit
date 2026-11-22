@@ -1128,9 +1128,16 @@ fi
 # loudly; the primary root is still processed normally. Op negatives
 # cover every op verb (#243 d Q3): find, both setfacl spellings and
 # chmod g-s.
-FOUT=$(_un_loop_out "" false 60000 60002 60001 "//etc /var/. .") || true
-if printf '%s' "$FOUT" | grep -qF 'Skipping malformed project path (dot, empty segment, or whitespace): //etc' &&
-    printf '%s' "$FOUT" | grep -qF 'Skipping malformed project path (dot, empty segment, or whitespace): /var/.' &&
+# #665: a glob-bearing EXISTING root (the [ ! -d ] gate sits before
+# the form gates — a nonexistent one would be eaten silently). The
+# for-list in _un_loop_out word-splits the extra string; the quoted
+# mkdir creates the literal name, and the unique stem keeps the
+# for-list pathname expansion self-matching only.
+mkdir -p "$WORK/opk665-gl*b"
+FOUT=$(_un_loop_out "" false 60000 60002 60001 "//etc /var/. . $WORK/opk665-gl*b") || true
+if printf '%s' "$FOUT" | grep -qF 'Skipping malformed project path (dot, empty segment, whitespace, or glob): //etc' &&
+    printf '%s' "$FOUT" | grep -qF 'Skipping malformed project path (dot, empty segment, whitespace, or glob): /var/.' &&
+    printf '%s' "$FOUT" | grep -qF "Skipping malformed project path (dot, empty segment, whitespace, or glob): $WORK/opk665-gl*b" &&
     printf '%s' "$FOUT" | grep -qF 'Skipping non-absolute project path: .' &&
     ! printf '%s' "$FOUT" | grep -qF 'sudo find //etc' &&
     ! printf '%s' "$FOUT" | grep -qF 'sudo setfacl -R -x g:60002 //etc' &&
@@ -1140,10 +1147,11 @@ if printf '%s' "$FOUT" | grep -qF 'Skipping malformed project path (dot, empty s
     ! printf '%s' "$FOUT" | grep -qF 'sudo chmod g-s /var/.' &&
     ! printf '%s' "$FOUT" | grep -qF 'sudo find . !' &&
     ! printf '%s' "$FOUT" | grep -qF 'sudo chmod g-s .' &&
+    ! printf '%s' "$FOUT" | grep -qF "sudo find $WORK/opk665-gl*b" &&
     printf '%s' "$FOUT" | grep -qF "log: project ownership reverted + kit ACL entries removed: $WORK/fakeproj"; then
-    pass "malformed roots (//etc, /var/., .) skipped loudly, no root ops on them (#243 a X2)"
+    pass "malformed roots (//etc, /var/., ., glob) skipped loudly, no root ops on them (#243 a X2; #665)"
 else
-    fail "malformed-root screening arms (out=$(_unarm_show "$FOUT")) (#243 a X2)"
+    fail "malformed-root screening arms (out=$(_unarm_show "$FOUT")) (#243 a X2/#665)"
 fi
 # Whitespace arm (#418 a A2 — the #247 mirror-or-scope resolution): a
 # spaced line naming an EXISTING directory used to pass every gate in
@@ -1176,7 +1184,7 @@ printf '%s\n/etc\n%s\n' "$WORK/fakeproj" "$WORK/has space" >"$WORK/unloop-ws.con
     un_projects_revert
 ) >"$WORK/unloop-ws.log" 2>&1 || true
 FOUT=$(cat "$WORK/unloop-ws.log")
-if printf '%s' "$FOUT" | grep -qF "Skipping malformed project path (dot, empty segment, or whitespace): $WORK/has space" &&
+if printf '%s' "$FOUT" | grep -qF "Skipping malformed project path (dot, empty segment, whitespace, or glob): $WORK/has space" &&
     ! grep -qF "sudo find $WORK/has space" "$WORK/unloop-ws-sudo.log" &&
     ! grep -qF "sudo setfacl -R -x g:60002 $WORK/has space" "$WORK/unloop-ws-sudo.log" &&
     ! grep -qF "sudo chmod g-s $WORK/has space" "$WORK/unloop-ws-sudo.log" &&
@@ -1264,7 +1272,7 @@ done
 printf '%s' "$FOUT" | grep -q 'Skipping system path: /$' || _un_ts_ok=0
 printf '%s' "$FOUT" | grep -qE 'Reverting kit ownership in: *$' && _un_ts_ok=0
 printf '%s' "$FOUT" | grep -qF 'sudo find / !' && _un_ts_ok=0
-printf '%s' "$FOUT" | grep -qF 'Skipping malformed project path (dot, empty segment, or whitespace): /var//' || _un_ts_ok=0
+printf '%s' "$FOUT" | grep -qF 'Skipping malformed project path (dot, empty segment, whitespace, or glob): /var//' || _un_ts_ok=0
 printf '%s' "$FOUT" | grep -qF 'sudo find /var// !' && _un_ts_ok=0
 printf '%s' "$FOUT" | grep -q 'sudo setfacl -R -x g:60002 /var//$' && _un_ts_ok=0
 printf '%s' "$FOUT" | grep -q 'sudo chmod g-s /var//$' && _un_ts_ok=0

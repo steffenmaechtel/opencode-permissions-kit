@@ -828,6 +828,23 @@ case "$out" in
         ;;
 esac
 
+# glob metacharacters in a declared path (#729 a A1): doctor's
+# path_error refuses the class and the skip row claims parity with
+# it -- now the belt does too. The belt sees the RAW declaration
+# (case subject, no pathname expansion; the later realpath -m is
+# literal too); delete the arm and this pin reds through the
+# vanishing skip row.
+printf '{"containerTrees":["tr*es"]}\n' >"$HO_PROJ/tree/opk.json"
+out="$(_ho_warn_run "$HO_PROJ/tree" me sub --dry-run)" || true
+case "$out" in
+    *"declared path 'tr*es' skipped -- unusable form"*)
+        pass "belt refuses glob metacharacters in a declared path (#729 a A1)"
+        ;;
+    *)
+        fail "belt glob refusal for declared paths (got: $out)"
+        ;;
+esac
+
 # a top-level non-dict opk.json (the natural "paste a list" mistake)
 # takes the same warn row as broken JSON (#356 a A3) -- never a silent
 # skip

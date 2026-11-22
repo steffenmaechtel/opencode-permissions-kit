@@ -117,8 +117,8 @@ _gh_agent="${_gh_agent:-opencode}"
 # Refused lines say why (the hook-safe loud form — a skip line, never
 # an exit) and rc 1. The system-path and agent-home arms sit behind
 # GH_CONF_RELAX (unit scratch zones live under /tmp); the form arms
-# (absolute, dot/empty segment, whitespace) never relax — a malformed
-# line is refused in every mode.
+# (absolute, dot/empty segment, whitespace, glob character #665) never
+# relax — a malformed line is refused in every mode.
 _gh_root_ok() {
     _gh_ro="$1"
     case "$_gh_ro" in
@@ -129,8 +129,8 @@ _gh_root_ok() {
             ;;
     esac
     case "$_gh_ro" in
-        *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]*)
-            say "skip (conf): malformed root (dot, empty segment, or whitespace): $_gh_ro"
+        *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]* | *[\*\?\[]*)
+            say "skip (conf): malformed root (dot, empty segment, whitespace, or glob): $_gh_ro"
             return 1
             ;;
     esac

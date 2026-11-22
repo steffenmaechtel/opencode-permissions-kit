@@ -1440,6 +1440,13 @@ S245F_ERR=$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$S
     S245F_RC=0 || S245F_RC=$?
 S245G_ERR=$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "." "$(id -gn)" 2>&1) &&
     S245G_RC=0 || S245G_RC=$?
+# #665 arm: a glob-bearing root. No reachable misfire today — every
+# root use in the belt's callers is quoted — the arm is the belt's
+# own contract for direct/future callers (issue #665, PR #655 round e
+# S3). A spelling with no dots or whitespace isolates the glob arm
+# from the sibling form arms.
+S245H_ERR=$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$S245/glb*root" "$(id -gn)" 2>&1) &&
+    S245H_RC=0 || S245H_RC=$?
 if [ "$S245A_RC" -ne 0 ] &&
     printf '%s' "$S245A_ERR" | grep -qF 'is a symlink — refusing the group baseline' &&
     [ "$(_s245_mode)" = "$_s245_before" ] &&
@@ -1451,11 +1458,13 @@ if [ "$S245A_RC" -ne 0 ] &&
     [ "$S245E_RC" -ne 0 ] && [ "$S245F_RC" -ne 0 ] &&
     printf '%s' "$S245E_ERR" | grep -qF 'is a malformed root' &&
     printf '%s' "$S245F_ERR" | grep -qF 'is a malformed root' &&
+    [ "$S245H_RC" -ne 0 ] &&
+    printf '%s' "$S245H_ERR" | grep -qF 'is a malformed root' &&
     [ "$S245G_RC" -ne 0 ] &&
     printf '%s' "$S245G_ERR" | grep -qF 'is not an absolute path'; then
-    pass "fs_baseline_root: live/dangling/slash/dot/relative link roots all refused loudly, tree untouched (#245, b X4, c X1)"
+    pass "fs_baseline_root: live/dangling/slash/dot/relative/glob link roots all refused loudly, tree untouched (#245, b X4, c X1; #665)"
 else
-    fail "fs_baseline_root must refuse every dodge spelling (A=$S245A_RC B=$S245B_RC D=$S245D_RC E=$S245E_RC F=$S245F_RC G=$S245G_RC) (#245)"
+    fail "fs_baseline_root must refuse every dodge spelling (A=$S245A_RC B=$S245B_RC D=$S245D_RC E=$S245E_RC F=$S245F_RC G=$S245G_RC H=$S245H_RC) (#245/#665)"
 fi
 
 # 12b. config.sh refresh(): the REAL extracted function over a fixture
@@ -1507,6 +1516,12 @@ fi
 printf '#660 ops note\n%s\n/\n%s\n%s/\n%s/.\n%s//\n%s\n%s\n.\nfoo\n/var/www/foo bar\n/etc\n/usr\n/var\n/home\n/var/backups\n/home/toc\n/relocated/opencode\n' \
     "$S245/real" "$S245/link" "$S245/link" "$S245/link" "$S245/link" \
     "$S245/dangling" "$S245/real2" >"$S245/conf"
+# #665: a glob-bearing entry rides at the conf tail (the long printf
+# above stays untouched for the line-length ratchet): BOTH readers of
+# this conf (config.sh refresh below, the update.sh root loop in 12c)
+# must skip it loudly at the form gate, and the FSB/HO counts stay 2 —
+# no baseline or handover runs over a glob-bearing root.
+printf '%s\n' "$S245/glb*root" >>"$S245/conf"
 # getent stub (L1 rider for the agent-home arm): toc's RELOCATED home —
 # pins the getent-hit direction (pr-00263 a F10 shape: the literal
 # /home/<user> compare alone would miss a moved agent home). Absent
@@ -1540,10 +1555,11 @@ if [ "$(printf '%s\n' "$S245R_OUT" | grep -c '^FSB: ')" -eq 2 ] &&
     [ "$(printf '%s\n' "$S245R_OUT" | grep -cF '(agent home — never a project root)')" -eq 2 ] &&
     [ "$(printf '%s\n' "$S245R_OUT" | grep -cF 'ui_warn: skip /home/toc (agent home')" -eq 1 ] &&
     [ "$(printf '%s\n' "$S245R_OUT" | grep -cF 'ui_warn: skip /relocated/opencode (agent home')" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245R_OUT" | grep -cF "ui_warn: skip $S245/glb*root (malformed")" -eq 1 ] &&
     ! printf '%s\n' "$S245R_OUT" | grep -qF 'skip #660 ops note' &&
     ! printf '%s\n' "$S245R_OUT" | grep -q '^FSB: /etc' &&
     ! printf '%s\n' "$S245R_OUT" | grep -q '^FSB: /home$'; then
-    pass "config.sh refresh: real roots only, link/dangling/malformed/relative/spaced skipped loudly, system paths + agent home refused, no abort (#245, a S1/S2/S3, b X1; #247)"
+    pass "config.sh refresh: real roots only, link/dangling/malformed/relative/spaced/glob skipped loudly, system paths + agent home refused, no abort (#245, a S1/S2/S3, b X1; #247; #665)"
 else
     fail "config.sh refresh must skip link/dangling/malformed/relative roots without abort (out=$(printf '%s\n' "$S245R_OUT" | head -10)) (#245/#247)"
 fi
@@ -1588,10 +1604,11 @@ if [ "$(printf '%s\n' "$S245U_OUT" | grep -c '^FSB: ')" -eq 2 ] &&
     [ "$(printf '%s\n' "$S245U_OUT" | grep -cF '(agent home — never a project root)')" -eq 2 ] &&
     [ "$(printf '%s\n' "$S245U_OUT" | grep -cF 'ui_warn: skip /home/toc (agent home')" -eq 1 ] &&
     [ "$(printf '%s\n' "$S245U_OUT" | grep -cF 'ui_warn: skip /relocated/opencode (agent home')" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245U_OUT" | grep -cF "ui_warn: skip $S245/glb*root (malformed")" -eq 1 ] &&
     ! printf '%s\n' "$S245U_OUT" | grep -qF 'skip #660 ops note' &&
     ! printf '%s\n' "$S245U_OUT" | grep -q '^FSB: /etc' &&
     ! printf '%s\n' "$S245U_OUT" | grep -q '^HO: /home$'; then
-    pass "update.sh root loop: real roots only, link/dangling/malformed/relative/spaced skipped loudly, system paths + agent home refused, no abort (#245, a S1/S2/S3, b X1; #247)"
+    pass "update.sh root loop: real roots only, link/dangling/malformed/relative/spaced/glob skipped loudly, system paths + agent home refused, no abort (#245, a S1/S2/S3, b X1; #247; #665)"
 else
     fail "update.sh root loop must skip link/dangling/malformed/relative roots without abort (out=$(printf '%s\n' "$S245U_OUT" | head -10)) (#245/#247)"
 fi
@@ -1667,16 +1684,21 @@ S245X2_ERR=$(_s245_dhr "$S245/link") && S245X2_RC=0 || S245X2_RC=$?
 S245X3_ERR=$(_s245_dhr "$S245/link/.") && S245X3_RC=0 || S245X3_RC=$?
 S245X4_ERR=$(_s245_dhr "$S245/link//") && S245X4_RC=0 || S245X4_RC=$?
 S245X5_ERR=$(_s245_dhr ".") && S245X5_RC=0 || S245X5_RC=$?
+# #665: the sibling belt's glob arm — same spelling class as the
+# fs_baseline_root H arm above.
+S245X6_ERR=$(_s245_dhr "$S245/glb*root") && S245X6_RC=0 || S245X6_RC=$?
 if [ "$S245X2_RC" -ne 0 ] &&
     printf '%s' "$S245X2_ERR" | grep -qF 'is a symlink — refusing the ddev handover' &&
     [ "$S245X3_RC" -ne 0 ] && [ "$S245X4_RC" -ne 0 ] &&
     printf '%s' "$S245X3_ERR" | grep -qF 'is a malformed root' &&
     printf '%s' "$S245X4_ERR" | grep -qF 'is a malformed root' &&
+    [ "$S245X6_RC" -ne 0 ] &&
+    printf '%s' "$S245X6_ERR" | grep -qF 'is a malformed root' &&
     [ "$S245X5_RC" -ne 0 ] &&
     printf '%s' "$S245X5_ERR" | grep -qF 'is not an absolute path'; then
-    pass "ddev_handover_root belt refuses link, dodge spellings and non-absolute roots, all rc 1 (#245, b X2, c X1)"
+    pass "ddev_handover_root belt refuses link, dodge spellings, glob roots and non-absolute roots, all rc 1 (#245, b X2, c X1; #665)"
 else
-    fail "ddev_handover_root belt must refuse every dodge spelling (X2=$S245X2_RC X3=$S245X3_RC X4=$S245X4_RC X5=$S245X5_RC) (#245)"
+    fail "ddev_handover_root belt must refuse every dodge spelling (X2=$S245X2_RC X3=$S245X3_RC X4=$S245X4_RC X5=$S245X5_RC X6=$S245X6_RC) (#245/#665)"
 fi
 if live_src "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core.sh" |
     grep -qF 'ui_atten "$root" "symlinked root — register the target directory instead"'; then

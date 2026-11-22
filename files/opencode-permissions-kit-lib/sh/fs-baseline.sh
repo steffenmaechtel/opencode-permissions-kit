@@ -948,7 +948,9 @@ fs_baseline_root() {
     # carries these forms — the writer refuses them, the reader loops
     # skip them — so the belt for direct and future callers refuses
     # them outright: the writer's form set (absolute, no dot/empty
-    # segments, no whitespace; the system-path blocklist rides #247).
+    # segments, no whitespace, no glob metacharacters — #665 adds the
+    # glob class at belt AND writer after the config.sh projects add
+    # route measured storing it; the system-path blocklist rides #247).
     case "$fsb_root" in
         /*) ;;
         *)
@@ -966,8 +968,8 @@ fs_baseline_root() {
         return 1
     fi
     case "$fsb_root" in
-        *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]*)
-            printf '  error: %s is a malformed root (dot/empty segment or whitespace) — refusing the group baseline\n' \
+        *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]* | *[\*\?\[]*)
+            printf '  error: %s is a malformed root (dot/empty segment, whitespace, or glob) — refusing the group baseline\n' \
                 "$fsb_root" >&2
             return 1
             ;;

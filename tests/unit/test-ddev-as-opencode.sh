@@ -2514,7 +2514,11 @@ check_live "update.sh: stamp-triggered arm explains its trigger (#696)" "$UPDATE
 # point nowhere, so the sourcing loops keep the stubs defined here.
 _696_dir=$(mktemp -d)
 mkdir -p "$_696_dir/rootA"
-printf '%s\n' "$_696_dir/rootA" >"$_696_dir/conf"
+# #665: a glob-bearing EXISTING root (without the update loop's glob
+# arm it would ride the stale-stamp stub into the baseline — the
+# count leg below reddens on exactly that).
+mkdir -p "$_696_dir/opk665-gl*b"
+printf '%s\n' "$_696_dir/rootA" "$_696_dir/opk665-gl*b" >"$_696_dir/conf"
 _696_drive() { # $1 = the stubbed stamp_valid rc
     (
         OPK_READER_TMP_ROOTS=1
@@ -2547,10 +2551,12 @@ _696_stale=$(_696_drive 1)
 _696_valid=$(_696_drive 0)
 if printf '%s\n' "$_696_stale" | grep -qF "BASELINE-RAN: $_696_dir/rootA" &&
     printf '%s\n' "$_696_stale" | grep -qF "HANDOVER-RAN: $_696_dir/rootA" &&
+    printf '%s\n' "$_696_stale" | grep -qF "warn: skip $_696_dir/opk665-gl*b (malformed" &&
+    ! printf '%s\n' "$_696_stale" | grep -qF "BASELINE-RAN: $_696_dir/opk665-gl*b" &&
     printf '%s\n' "$_696_stale" | grep -qF 'detail: group baseline re-applied for 1 root(s)'; then
-    pass "update.sh: stale stamp drives baseline+handover and the re-apply arm (functional, #710 a C8)"
+    pass "update.sh: stale stamp drives baseline+handover and the re-apply arm; glob root skipped (#710 a C8; #665)"
 else
-    fail "update.sh: stale-stamp functional leg (out=$_696_stale) (#710 a C8)"
+    fail "update.sh: stale-stamp functional leg (out=$_696_stale) (#710 a C8/#665)"
 fi
 if ! printf '%s\n' "$_696_valid" | grep -qF 'BASELINE-RAN' &&
     printf '%s\n' "$_696_valid" | grep -qF 'detail: skipped the ddev handover rescan for 1 root(s)' &&

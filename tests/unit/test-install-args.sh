@@ -323,6 +323,9 @@ expect_rc 1 "--migrate-agents with an invalid value aborts" --yes --migrate-agen
 # for-list pathname expansion and never saw a matching glob.
 expect_rc 1 "--projects value with glob characters aborts" --yes --projects '/var/www/vhosts/*'
 expect_rc 1 "--projects value with question mark aborts" --yes --projects '/opt/?vhosts'
+# the bracket class was in the parse arm (*[\\*\\?\\[]*) all along but
+# never pinned — the #665 sweep rides the missing char in.
+expect_rc 1 "--projects value with bracket aborts" --yes --projects '/var/www/vhosts/[x]'
 expect_rc 0 "plain --projects value passes parse_args" --yes --projects /var/www/vhosts
 
 # Whitespace in a --projects value is LEGAL at parse time (issue #372

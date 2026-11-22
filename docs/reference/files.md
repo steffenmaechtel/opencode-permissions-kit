@@ -30,7 +30,15 @@ asks before removing the kit block; your own entries always stay.
 - `projects.conf` paths must not contain spaces — the writer splits on
   them and every consumer reads the file line-by-line. Control
   characters and backslashes are refused by the writer (they clobber
-  the report rows that render conf lines). Lines starting
+  the report rows that render conf lines), and so are glob characters
+  (`*`, `?`, `[`, issue #665): install.sh has rejected them in
+  `--projects` values since 0.0.42f, and every reader that runs root
+  operations over the roots skips them like the other malformed
+  forms. The display-only readers (status rows, the doctor `all`
+  scan roots, `config projects list`) render such lines as written,
+  and the opencode wrapper reads them with no form gate (#729 b D1):
+  its refusal listing renders the line, its cwd validation and serve
+  fallback accept an existing directory line as a root. Lines starting
   with `#` are comments and are ignored by every reader (status counts,
   the doctor `all` scan roots, the config/update refresh passes — an
   annotated conf renders no verdict rows). Entries are

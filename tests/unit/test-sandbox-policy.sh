@@ -75,6 +75,12 @@ tests/unit/test-project-paths.sh|/var/www/vhosts/client1
 # policy-INPUT like the rows above
 tests/unit/test-project-paths.sh|/var/www/vhosts/evil
 tests/unit/test-project-paths.sh|/var/www/vhosts/back
+# #665 glob-metacharacter refusal arms + clean-root control: same
+# policy-INPUT class (refused before any filesystem act); the screener
+# derives the stems from the metachar spellings (x*y → x, proj? → proj)
+tests/unit/test-project-paths.sh|/var/www/vhosts/x
+tests/unit/test-project-paths.sh|/var/www/vhosts/proj
+tests/unit/test-project-paths.sh|/var/www/vhosts/plain665
 # screening-pattern loop values fed to greps against the uninstall
 # section lib (#346 wave 4 moved the cluster from test-uninstall.sh to
 # test-uninstall-core.sh with un_projects_revert)
