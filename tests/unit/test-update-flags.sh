@@ -1389,10 +1389,81 @@ if [ -n "$_xds_arm" ]; then
 else
     fail "xdg removal arm extractable from update-core.sh (#681 site 2)"
 fi
-# The marker's SET site: only a real sourced wsl-browser-bridge.sh may
-# raise it (the stub line above it must not).
-check_live "real-lib marker set inside the sourcing loop (#681 site 2)" \
-    "$UPDATE_CORE" -qF '_upd_bb_sourced=1'
+# --- marker set-site pins (#746 round a C3/B1/B2) ----------------------------------
+# C3 hardened: presence alone cannot catch the assignment being hoisted
+# outside its guard. Pins: exactly TWO assignment sites (the wipe at
+# function entry + the guarded set), and the set line sits BEFORE the
+# stub arms (line order over comment-stripped source) — hoisting or
+# duplicating it elsewhere reds one of the two.
+_sd_set_ln="$(live_src "$UPDATE_CORE" | grep -n '_upd_bb_sourced=1' | cut -d: -f1)"
+_sd_stub_ln="$(live_src "$UPDATE_CORE" | grep -nF 'xdg_open_real_exists() { return 0; }' | cut -d: -f1)"
+_sd_wipe_ln="$(live_src "$UPDATE_CORE" | grep -n '_upd_bb_sourced=0' | cut -d: -f1)"
+if [ "$(live_src "$UPDATE_CORE" | grep -c '_upd_bb_sourced=[01]')" -eq 2 ] &&
+    [ -n "$_sd_set_ln" ] && [ -n "$_sd_stub_ln" ] && [ -n "$_sd_wipe_ln" ] &&
+    [ "$_sd_wipe_ln" -lt "$_sd_set_ln" ] &&
+    [ "$_sd_set_ln" -lt "$_sd_stub_ln" ]; then
+    pass "marker: wipe + guarded set before the stub, exactly 2 sites (#746 a C3/B1)"
+else
+    fail "marker set-site shape (wipe=$_sd_wipe_ln set=$_sd_set_ln stub=$_sd_stub_ln) (#746 a C3/B1)"
+fi
+# Behavioral B1/B2: the real function, driven through the states that
+# matter — a sourced probe-defining bridge sets the marker, a sourced
+# PRE-PROBE bridge does NOT (B1), an inherited exported value is wiped
+# (B2), no candidates leaves it 0.
+_brb_fn="$(sed -n '/^update_redeploy_wsl_bridge() {/,/^}/p' "$UPDATE_CORE")"
+if [ -n "$_brb_fn" ]; then
+    pass "bridge function extractable from update-core.sh (#746 a B1/B2)"
+    BRB="$(mktemp -d)"
+    mkdir -p "$BRB/root/opencode-permissions-kit-lib/sh" "$BRB/lib/sh"
+    printf '#!/bin/sh\nbridge_helper() { :; }\n' \
+        >"$BRB/root/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh"
+    _brb_run() { # $1 = FILES_ROOT, $2 = LIBDIR; env may carry _upd_bb_sourced
+        (
+            FILES_ROOT="$1"
+            LIBDIR="$2"
+            sudo() { return 0; }
+            ui_success() { :; }
+            ui_detail() { :; }
+            ui_warn() { :; }
+            log() { :; }
+            grep() { command grep "$@"; }
+            eval "$_brb_fn"
+            update_redeploy_wsl_bridge
+            printf '%s' "${_upd_bb_sourced:-unset}"
+        )
+    }
+    # Probe-defining vintage: the sourced lib defines the probe.
+    printf '#!/bin/sh\nxdg_open_real_exists() { return 1; }\n' \
+        >"$BRB/root/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh"
+    _brb_out=$(_brb_run "$BRB/root" "$BRB/lib") || true
+    if [ "$_brb_out" = 1 ]; then
+        pass "bridge: probe-defining sourced lib sets the marker (#746 a B1)"
+    else
+        fail "bridge: probe-defining lib did not set marker (got $_brb_out) (#746 a B1)"
+    fi
+    # B2: inherited exported 1 must be wiped when nothing is sourced.
+    rm -rf "${BRB:?}/root"
+    _brb_out=$(_upd_bb_sourced=1 _brb_run "$BRB/missing-root" "$BRB/lib") || true
+    if [ "$_brb_out" = 0 ]; then
+        pass "bridge: inherited exported marker wiped to 0 (#746 a B2)"
+    else
+        fail "bridge: inherited marker survived (got $_brb_out) (#746 a B2)"
+    fi
+    # B1: a sourced pre-probe-vintage bridge (helper only, no probe
+    # definition) must NOT set the marker.
+    mkdir -p "$BRB/root/opencode-permissions-kit-lib/sh"
+    printf '#!/bin/sh\nbridge_helper() { :; }\n' \
+        >"$BRB/root/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh"
+    _brb_out=$(_brb_run "$BRB/root" "$BRB/lib") || true
+    if [ "$_brb_out" = 0 ]; then
+        pass "bridge: pre-probe-vintage sourced lib leaves marker 0 (#746 a B1)"
+    else
+        fail "bridge: pre-probe lib set marker anyway (got $_brb_out) (#746 a B1)"
+    fi
+    rm -rf "${BRB:?}"
+else
+    fail "bridge function extractable from update-core.sh (#746 a B1/B2)"
+fi
 
 # --- openchamber policy pin: atomic stage+mv (#211 a F17) --------------------------
 # Both write sites (update.sh re-apply + opk openchamber-secure) used

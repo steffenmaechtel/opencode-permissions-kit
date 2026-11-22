@@ -17,8 +17,8 @@
 #      refuse to run, and recovering would require non-sudo access
 #      (0.0.38 S1),
 #   4. install it mode 440 into the kit's CONFDIR, symlink it into
-#      /etc/sudoers.d, and remove the pre-0.0.10 legacy name so only
-#      the new name is active.
+#      /etc/sudoers.d, and remove the pre-0.0.10 legacy SYMLINK
+#      (link-target-gated, #748) so only the new name is active.
 #
 # POSIX sh, SOURCED by install.sh, config.sh and update.sh (checkout
 # copy first, deployed LIBDIR fallback — same rules as
@@ -109,8 +109,27 @@ sudoers_deploy() {
         echo "error: cannot link sudoers into $_sd_d (user '$_sd_user')." >&2
         return 1
     fi
-    # Remove the pre-0.0.10 sudoers symlink so only the new name is
-    # active (unifies the cleanup config.sh and update.sh already did).
-    _sd_sudo rm -f "${_sd_d:?}/opencode" 2>/dev/null || true
+    # Remove the pre-0.0.10 sudoers SYMLINK so only the new name is
+    # active — link-target-gated like the uninstall twin (uninstall-core's
+    # un_sudoers_remove; #746 round a A1 / #748): the bare name is
+    # generic, so only a symlink pointing into the legacy conf dir is
+    # kit-owned; a foreign file at the name survives every
+    # install/update. The probe runs at the rm's authority (#198 a W1:
+    # /etc/sudoers.d can be 0750 on hardened hosts); a failed legacy rm
+    # notes loudly but never aborts the (already completed) deploy.
+    if _sd_sudo test -L "${_sd_d:?}/opencode" 2>/dev/null; then
+        case "$(_sd_sudo readlink "${_sd_d:?}/opencode" 2>/dev/null || true)" in
+            /etc/opencode/*)
+                if ! _sd_sudo rm -f "${_sd_d:?}/opencode"; then
+                    echo "note: could not remove the legacy sudoers symlink ${_sd_d}/opencode — remove it manually." >&2
+                fi
+                ;;
+            *)
+                echo "note: ${_sd_d}/opencode is not kit-owned — left untouched." >&2
+                ;;
+        esac
+    elif _sd_sudo test -e "${_sd_d:?}/opencode" 2>/dev/null; then
+        echo "note: ${_sd_d}/opencode is not kit-owned — left untouched." >&2
+    fi
     return 0
 }

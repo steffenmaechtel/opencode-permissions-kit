@@ -22,7 +22,7 @@ Run it as your default user (it asks for `sudo` where needed). Options:
   detected and left untouched
 - sudoers rules, profile scripts, project ACLs/setgid
 - legacy kit artifacts, if present (the old `/etc/opencode/` conf dir, the
-  `/usr/local/lib/opencode/` library, legacy sudoers/profile symlinks) —
+  `/usr/local/lib/opencode/` library, legacy sudoers and helper symlinks) —
   foreign content living under those names is detected and left untouched
 - kit ownership inside the registered project roots: everything the kit
   handed to the `opencode` user (`.ddev/` trees, ddev settings directories,

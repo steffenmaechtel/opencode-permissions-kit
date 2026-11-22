@@ -201,10 +201,12 @@ check_absent "env_keep scoping: ddev-as-opencode NOT in the alias (#679 audit: r
 check_absent "env_keep scoping: heal-index-head NOT in the alias (#679 audit: RunAs-root chown helper)" \
     "$WORK/sudoers-joined" -q 'OPK_ENV_CMNDS = .*heal-index-head'
 
-# --- 2. legacy name cleanup ------------------------------------------------
+# --- 2. legacy name cleanup (#746 round a A1 / #748: link-target-gated) --------
 
-# A 440 file cannot be overwritten by its (non-root) owner — reset the
-# CONFDIR between runs like the privileged callers never have to.
+# The legacy cleanup is GATED since #748: only a symlink pointing into
+# the legacy conf dir (/etc/opencode/*) is kit-owned. A regular file at
+# the generic name (the #748 finding's admin drop-in) must SURVIVE —
+# the former pin asserted its deletion, which was the finding.
 rm -rf "$CONF"
 touch "$SDD/opencode"
 _sd_out=$(
@@ -214,8 +216,39 @@ _sd_out=$(
     . "$LIB"
     sudoers_deploy "$TPL" alice
     echo "rc=$?"
+) 2>"$WORK/legacy-foreign.err"
+check "legacy: foreign regular file at sudoers.d/opencode kept (#748)" test -e "$SDD/opencode"
+check "legacy: foreign file announced as not kit-owned (#748)" \
+    grep -qF "$SDD/opencode is not kit-owned — left untouched." "$WORK/legacy-foreign.err"
+
+# The kit-owned shape: a legacy symlink INTO the legacy conf dir goes.
+rm -f "${SDD:?}/opencode"
+ln -s /etc/opencode/sudoers "$SDD/opencode"
+_sd_out=$(
+    sd_env
+    export SD_SUDO SD_VISUDO SD_CONF_DIR SD_SUDOERS_D
+    # shellcheck disable=SC2030
+    . "$LIB"
+    sudoers_deploy "$TPL" alice
+    echo "rc=$?"
 )
-check "legacy: pre-0.0.10 sudoers.d/opencode removed" test ! -e "$SDD/opencode"
+check "legacy: kit symlink to /etc/opencode removed (#748)" test ! -e "$SDD/opencode"
+
+# A foreign symlink target is left untouched with the note.
+rm -f "${SDD:?}/opencode"
+ln -s /etc/sudoers.d/README "$SDD/opencode"
+_sd_out=$(
+    sd_env
+    export SD_SUDO SD_VISUDO SD_CONF_DIR SD_SUDOERS_D
+    # shellcheck disable=SC2030
+    . "$LIB"
+    sudoers_deploy "$TPL" alice
+    echo "rc=$?"
+) 2>"$WORK/legacy-foreignlink.err"
+check "legacy: foreign symlink target kept (#748)" test -e "$SDD/opencode"
+check "legacy: foreign symlink announced (#748)" \
+    grep -qF "$SDD/opencode is not kit-owned — left untouched." "$WORK/legacy-foreignlink.err"
+rm -f "${SDD:?}/opencode"
 
 # --- 3. invalid user charset ----------------------------------------------
 

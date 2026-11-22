@@ -1465,48 +1465,60 @@ else
 fi
 # #681 site 3: the sysctl rm is content-gated now. Kit mode (the
 # default above) proves the gate still lets the kit's own file go; the
-# kit leg is the sudo-log row — the closing log line is static and
-# would stay green over a gate that never removed anything.
+# kit leg is the sudo-log row — plus the A2 closing leg: the success
+# enumeration names the file only when it went (#746 a A2).
 COUT=$(_un_cfg_out "" false kit) || true
 if printf '%s' "$COUT" | sed -n '/^--- sudo log ---$/,$p' |
-    grep -qF 'sudo rm -f /etc/sysctl.d/99-ddev-rootless.conf'; then
-    pass "sysctl gate: byte-equal kit file is removed (#681 site 3)"
+    grep -qF 'sudo rm -f /etc/sysctl.d/99-ddev-rootless.conf' &&
+    printf '%s' "$COUT" |
+    grep -qF 'log: config dirs + runtime artifacts removed (/etc/opencode-permissions-kit, /run/opencode-permissions-kit, 99-ddev-rootless.conf)'; then
+    pass "sysctl gate: byte-equal kit file is removed + enumerated (#681 site 3, #746 a A2)"
 else
-    fail "sysctl gate: kit-file rm never executed (out=$(_unarm_show "$COUT")) (#681 site 3)"
+    fail "sysctl gate: kit-file rm never executed or mis-enumerated (out=$(_unarm_show "$COUT")) (#681 site 3, #746 a A2)"
 fi
 # Foreign content at the ddev-flavored name: named, left untouched, no
-# rm — and the section closing stays green (the skip adds no partial).
+# rm — the section closing stays green (the skip adds no partial), and
+# the enumeration does NOT claim the kept file (#746 a A2) while the
+# keep itself lands in the log.
 COUT=$(_un_cfg_out "" false foreign) || true
-if printf '%s' "$COUT" | grep -qF '/etc/sysctl.d/99-ddev-rootless.conf is not kit-owned (content differs) — left untouched.' &&
+if printf '%s' "$COUT" | grep -qF '/etc/sysctl.d/99-ddev-rootless.conf is not kit-owned — left untouched.' &&
     ! printf '%s' "$COUT" | grep -qF 'sudo rm -f /etc/sysctl.d/99-ddev-rootless.conf' &&
+    printf '%s' "$COUT" | grep -qF 'log: sysctl drop-in kept: not kit-owned at /etc/sysctl.d/99-ddev-rootless.conf' &&
+    printf '%s' "$COUT" |
+    grep -qF 'log: config dirs + runtime artifacts removed (/etc/opencode-permissions-kit, /run/opencode-permissions-kit)' &&
+    ! printf '%s' "$COUT" | grep -qF 'artifacts removed (/etc/opencode-permissions-kit, /run/opencode-permissions-kit, 99-ddev-rootless.conf)' &&
     printf '%s' "$COUT" | grep -qF 'Removed.' &&
     ! printf '%s' "$COUT" | grep -qF 'PARTIALLY' &&
     ! printf '%s' "$COUT" | grep -qF 'WARN:'; then
-    pass "sysctl gate: foreign content left untouched, section stays green (#681 site 3)"
+    pass "sysctl gate: foreign content left untouched, honest enumeration, section stays green (#681 site 3, #746 a A2/A4)"
 else
-    fail "sysctl gate foreign arms (out=$(_unarm_show "$COUT")) (#681 site 3)"
+    fail "sysctl gate foreign arms (out=$(_unarm_show "$COUT")) (#681 site 3, #746 a A2/A4)"
 fi
-# Absent file: quiet — no rm, no not-kit-owned line, no partial noise.
+# Absent file: quiet — no rm, no not-kit-owned line, no partial noise;
+# the enumeration also omits the name (nothing was there to remove).
 COUT=$(_un_cfg_out "" false absent) || true
 if ! printf '%s' "$COUT" | grep -qF 'sudo rm -f /etc/sysctl.d/99-ddev-rootless.conf' &&
     ! printf '%s' "$COUT" | grep -qF 'not kit-owned' &&
     ! printf '%s' "$COUT" | grep -qF 'PARTIALLY' &&
+    printf '%s' "$COUT" |
+    grep -qF 'log: config dirs + runtime artifacts removed (/etc/opencode-permissions-kit, /run/opencode-permissions-kit)' &&
     printf '%s' "$COUT" | grep -qF 'Removed.'; then
-    pass "sysctl gate: absent file is quiet (#681 site 3)"
+    pass "sysctl gate: absent file is quiet, enumeration omits the name (#681 site 3, #746 a A2)"
 else
-    fail "sysctl gate absent arms (out=$(_unarm_show "$COUT")) (#681 site 3)"
+    fail "sysctl gate absent arms (out=$(_unarm_show "$COUT")) (#681 site 3, #746 a A2)"
 fi
 # Unreadable file (L1: the shipped 2>/dev/null failure path executes):
 # the cat dies, the capture is empty, the gate must treat it as not
-# kit-owned — skip message, no rm, section closing stays green.
+# kit-owned — skip message, no rm, honest enumeration, closing green.
 COUT=$(_un_cfg_out "" false unreadable) || true
-if printf '%s' "$COUT" | grep -qF '/etc/sysctl.d/99-ddev-rootless.conf is not kit-owned (content differs) — left untouched.' &&
+if printf '%s' "$COUT" | grep -qF '/etc/sysctl.d/99-ddev-rootless.conf is not kit-owned — left untouched.' &&
     ! printf '%s' "$COUT" | grep -qF 'sudo rm -f /etc/sysctl.d/99-ddev-rootless.conf' &&
+    ! printf '%s' "$COUT" | grep -qF '99-ddev-rootless.conf)' &&
     ! printf '%s' "$COUT" | grep -qF 'PARTIALLY' &&
     printf '%s' "$COUT" | grep -qF 'Removed.'; then
-    pass "sysctl gate: unreadable file fails safe — no rm, no crash (#681 site 3)"
+    pass "sysctl gate: unreadable file fails safe — no rm, no crash (#681 site 3, #746 a A2/A4)"
 else
-    fail "sysctl gate unreadable arms (out=$(_unarm_show "$COUT")) (#681 site 3)"
+    fail "sysctl gate unreadable arms (out=$(_unarm_show "$COUT")) (#681 site 3, #746 a A2/A4)"
 fi
 
 # --- prompt_yn: answer semantics + shape (issue #187 A/B) -----------------------

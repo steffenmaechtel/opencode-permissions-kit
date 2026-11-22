@@ -132,17 +132,14 @@ update_redeploy_wsl_bridge() {
     # back-to-back sourcing let the deployed LIBDIR copy override the
     # checkout copy — the documented "prefer the checkout vintage" was
     # inverted in code. Sibling shape: config.sh's helper lookups.
+    # Inherited-state wipe (#746 a B2): the marker below must reflect
+    # THIS run's sourcing only — an exported _upd_bb_sourced from the
+    # invoking environment must never open the xdg removal arm
+    # (update_redeploy_xdg_shim reads it later in the same run).
+    _upd_bb_sourced=0
     for cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh" "$LIBDIR/sh/wsl-browser-bridge.sh"; do
         if [ -f "$cand" ]; then
             . "$cand"
-            # Real-lib marker (#681 site 2): set ONLY when a real
-            # wsl-browser-bridge.sh was sourced — the stub below stays
-            # silent about it. update_redeploy_xdg_shim (later in the
-            # same run) requires this marker before its probe may
-            # REMOVE a kit shim: with the stub standing, "a real one
-            # might exist" must withhold deploys but never churn an
-            # already-deployed one.
-            _upd_bb_sourced=1
             break
         fi
     done
@@ -151,15 +148,25 @@ update_redeploy_wsl_bridge() {
     # is_wsl stub above keeps the re-apply block below closed when the lib
     # is missing from both lookup sites.
     command -v browser_bridge_install >/dev/null 2>&1 || browser_bridge_install() { :; }
+    # Real-lib marker (#681 site 2, hardened #746 a B1): set ONLY when
+    # the sourced lib actually DEFINED the never-shadow probe. The
+    # command -v here runs BEFORE the fail-safe stub below arms, so it
+    # can only see a definition the sourcing loop brought in — a
+    # pre-probe-vintage bridge file leaves the marker at 0 and the xdg
+    # removal arm closed (the stub's rc 0 must never pair with marker=1).
+    if command -v xdg_open_real_exists >/dev/null 2>&1; then
+        _upd_bb_sourced=1
+    fi
     # Fail-safe stub (#211 a F7): if the never-shadow probe itself is
-    # unavailable (wsl-browser-bridge.sh missing from both lookup sites),
-    # the call sites below must err on the never-shadow side — rc 0
-    # ("a real one might exist") withholds a new shim instead of
-    # shadowing one. Since #681 site 2 the stub governs ONLY that
-    # withhold arm: the removal arm in update_redeploy_xdg_shim
-    # additionally requires the _upd_bb_sourced marker, so a missing
-    # probe keeps a deployed shim instead of churning it (the status.sh
-    # command -v wrap is the report-side sibling, 0.0.46a F4).
+    # unavailable (wsl-browser-bridge.sh missing from both lookup
+    # sites, or a sourced vintage predating the probe), the call sites
+    # below must err on the never-shadow side — rc 0 ("a real one might
+    # exist") withholds a new shim instead of shadowing one. Since
+    # #681 site 2 the stub governs ONLY that withhold arm: the removal
+    # arm in update_redeploy_xdg_shim additionally requires the
+    # _upd_bb_sourced marker (set above only for a real definition), so
+    # a missing probe keeps a deployed shim instead of churning it (the
+    # status.sh command -v wrap is the report-side sibling, 0.0.46a F4).
     command -v xdg_open_real_exists >/dev/null 2>&1 || xdg_open_real_exists() { return 0; }
     if browser_bridge_is_wsl; then
         # Failure-honest since 0.0.45c C4: browser_bridge_install propagates a
@@ -230,12 +237,14 @@ update_redeploy_xdg_shim() {
     fi
     if [ -L /usr/local/bin/xdg-open ] &&
         [ "$(readlink /usr/local/bin/xdg-open 2>/dev/null || true)" = "$LIBDIR/bin/xdg-open" ]; then
-        # Removal needs the CONFIRMED probe (#681 site 2): rc 0 alone is
-        # not proof — the never-shadow stub answers rc 0 whenever the
-        # real probe is unavailable, and removing a kit shim the deployed
-        # binary still needs (the 1.x line) on a maybe is churn. The
-        # _upd_bb_sourced marker (set in update_redeploy_wsl_bridge,
-        # which runs before this phase) proves the real walker answered;
+        # Removal needs the CONFIRMED probe (#681 site 2, hardened
+        # #746 a B1): rc 0 alone is not proof — the never-shadow stub
+        # answers rc 0 whenever the real probe is unavailable, and
+        # removing a kit shim the deployed binary still needs (the 1.x
+        # line) on a maybe is churn. The _upd_bb_sourced marker is set
+        # in update_redeploy_wsl_bridge (which runs before this phase)
+        # ONLY when the sourced lib defined the probe — checked before
+        # the stub arms, so marker=1 means the real walker can answer;
         # without it the shim stays.
         if [ "${_upd_bb_sourced:-0}" = 1 ] && xdg_open_real_exists; then
             sudo rm -f /usr/local/bin/xdg-open
