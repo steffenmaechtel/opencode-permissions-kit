@@ -87,9 +87,13 @@ Body rules:
 - **Post-approval changes set `amended:`** — any change to an approved
   meta appends an amendment log line and sets `amended:` to its date;
   the meta re-joins the approval queue (rendered *amended — pending*)
-  until a fresh maintainer approval drops the field. Whitespace-only
-  layout normalization under a maintainer directive is exempt — no
-  amendment, no re-queue. (RM-0135)
+  until a fresh maintainer approval drops the field. The field always
+  equals the date of the NEWEST amendment log line — every new
+  amendment line bumps it, a later approval drops it (invariant 9's
+  stale class; PR #742's birth commit left the previous amendment's
+  date over a newer log line and paid one red gate cycle).
+  Whitespace-only layout normalization under a maintainer directive
+  is exempt — no amendment, no re-queue. (RM-0135)
 - **The `quote:` needle is the bullet's first five words,
   character-normalized** — write the rule bullet first, then take its
   joined first five words: parentheticals and backtick content are
