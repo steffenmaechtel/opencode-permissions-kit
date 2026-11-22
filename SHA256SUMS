@@ -46,9 +46,9 @@ ea3f57e045beefcae420043811c1bbdc3c4698360ad2e92c1c346310abe3b10a  files/opencode
 4755d12b6c54960db2d2441d57fbd01525f7def049f17dea9b9f5c3928136b92  files/opencode-permissions-kit-lib/sh/sudoers-deploy.sh
 5e5bdac5e5dc8b14a15d5f61a8980f3f850fe0baf869f70c3c76b4a7235e2e10  files/opencode-permissions-kit-lib/sh/tui-plugin.sh
 fc51c07b906b60867ec0eadddefc296111ec208a87d4e8e020b8cc8757415e5e  files/opencode-permissions-kit-lib/sh/ui.sh
-ae6e7cf310883178c0ebed9f706aa73f9983790a2cef0c28c3e9bd1bcd705dd8  files/opencode-permissions-kit-lib/sh/uninstall-core.sh
+7ccfb8f1e3118eaa89d4afd0ef40732cd9713229931afaf2b85f2b2a5ca53292  files/opencode-permissions-kit-lib/sh/uninstall-core.sh
 b84c5ae854e30e7286c258f7108e1bced15d9cba829e872e35e3197a9c869f2f  files/opencode-permissions-kit-lib/sh/update-check.sh
-e6a81ce7215dfb58297accc530bc4a2622e93c186725f6ac25c1c9846b530505  files/opencode-permissions-kit-lib/sh/update-core.sh
+c6eda8ecf5130c5a6670a2c52e8ddc0e0069b48102dab44397cbf1c61f5bdd26  files/opencode-permissions-kit-lib/sh/update-core.sh
 49cf2952831b66edadf452762cad54d762477348cb0725ee1e11f9a199c8f8c5  files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh
 2fc5c12cfc89bfdb42bbf0b52f30a9432e9642a6383fe626ed4b87895d66218b  files/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc
 10ff06c6570c70a6dc251eab0cdcdf52f522d3de997b220070110d92c29c6d01  files/opencode-permissions-kit-lib/templates/opencode.jsonc

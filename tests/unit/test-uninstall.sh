@@ -94,9 +94,10 @@ else
     # sudo grep -q — read-only, and deliberately unwrapped so they
     # see the file at the rm's authority), and the #198 a W1 legacy
     # sudoers probes (sudo test -L + sudo readlink — same read-only
-    # gate-at-the-write's-authority class); any OTHER sudo command in
-    # dry-run mode is a bug.
-    _destructive="$(grep -vE '^sudo -n true( |$)|^sudo ls -A /home/[^ ]*/\.(agents|claude)$|^sudo test -d /home/[^ ]*/\.(agents|claude)$|^sudo test -f /etc/openchamber/policy\.json$|^sudo grep -q .* /etc/openchamber/policy\.json$|^sudo test -L /etc/sudoers\.d/opencode$|^sudo readlink /etc/sudoers\.d/opencode$' "$WORK/log" 2>/dev/null || true)"
+    # gate-at-the-write's-authority class), and the #681 sysctl content
+    # probes (sudo test -f / sudo cat / sudo test -e — read-only, same
+    # class); any OTHER sudo command in dry-run mode is a bug.
+    _destructive="$(grep -vE '^sudo -n true( |$)|^sudo ls -A /home/[^ ]*/\.(agents|claude)$|^sudo test -d /home/[^ ]*/\.(agents|claude)$|^sudo test -f /etc/openchamber/policy\.json$|^sudo grep -q .* /etc/openchamber/policy\.json$|^sudo test -L /etc/sudoers\.d/opencode$|^sudo readlink /etc/sudoers\.d/opencode$|^sudo (test -f|cat|test -e) /etc/sysctl\.d/99-ddev-rootless\.conf$' "$WORK/log" 2>/dev/null || true)"
     if [ -z "$_destructive" ]; then
         pass "--dry-run executes no destructive sudo command (only read-only probes)"
     else
@@ -125,6 +126,19 @@ if grep -q '^sudo test -L /etc/sudoers\.d/opencode$' "$WORK/log" 2>/dev/null &&
     pass "legacy sudoers gate probes via sudo in the real call sequence (#198 a W1)"
 else
     fail "legacy sudoers gate must probe via sudo, not at developer authority (#198 a W1)"
+fi
+
+# #681 site 3 behavioral: the sysctl content gate must probe at the
+# rm's authority too — an admin-hardened /etc/sysctl.d must not hide a
+# kit file from removal, and the developer must not cat a root-owned
+# file on his own authority either. The fake sudo exits 0 without
+# running cat, so the gate's else arm fires — the PROBE SEQUENCE is
+# the assertion here, exactly the #164 shape above.
+if grep -q '^sudo test -f /etc/sysctl\.d/99-ddev-rootless\.conf$' "$WORK/log" 2>/dev/null &&
+    grep -q '^sudo cat /etc/sysctl\.d/99-ddev-rootless\.conf$' "$WORK/log" 2>/dev/null; then
+    pass "sysctl content gate probes via sudo in the real call sequence (#681)"
+else
+    fail "sysctl content gate must probe via sudo, not at developer authority (#681)"
 fi
 
 # --- 3. dry-run plans the removals --------------------------------------------
@@ -185,16 +199,25 @@ else
 fi
 
 # --- 3b. legacy pre-0.0.10 artifacts (0.0.43a F5) --------------------------------
-# Kits before v0.0.10 wrote /etc/sudoers.d/opencode -> /etc/opencode/sudoers,
-# /etc/profile.d/opencode-umask.sh and /usr/local/lib/opencode (with the
-# root-runnable protect-projects.sh + its /usr/local/sbin symlink). `opk
-# update` refuses pre-0.0.14, so this cohort never migrated names — the
-# uninstall must take the legacy names down with the current ones.
+# The umask-name cleanup is GONE (#681 site 1): /etc/profile.d/
+# opencode-umask.sh is NOT kit-namespaced — its unconditional rm was the
+# last ungated deletion of a foreign-nameable path — and its cohort
+# (pre-0.0.10, never updatable past 0.0.14) is empty, so a file at the
+# old name is foreign by default and the uninstall must plan NOTHING
+# for it. The gated legacy removals below stay: they take down ACTIVE
+# root grants (sudoers symlink, root-runnable library) the same empty
+# cohort could still hold, and their link-target/marker gates carry no
+# foreign-file risk — removing them is a different wave's call.
 if printf '%s' "$PLAN" | grep -qF -- "/etc/profile.d/opencode-umask.sh"; then
-    pass "dry-run plans removal of the legacy umask profile"
+    fail "dry-run must not plan removal of the foreign-nameable legacy umask path (#681 site 1)"
 else
-    fail "dry-run plans removal of the legacy umask profile"
+    pass "dry-run plans nothing for the legacy umask name (#681 site 1)"
 fi
+# Static sweep leg (#681 site 1, class sweep): the uninstall lib no
+# longer names the legacy path anywhere (the update twin lives in
+# test-update-flags.sh).
+check_absent "uninstall-core no longer names the legacy umask path (#681 site 1)" \
+    "$UNINSTALL_CORE" -qF 'opencode-umask.sh'
 # The gated legacy removals (sudoers symlink, /etc/opencode conf files,
 # legacy lib dir, sbin helper symlink) branch on the REAL /etc state and
 # cannot be staged hermetically — their names and marker gates are pinned

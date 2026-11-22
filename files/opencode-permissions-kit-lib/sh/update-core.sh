@@ -135,6 +135,14 @@ update_redeploy_wsl_bridge() {
     for cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh" "$LIBDIR/sh/wsl-browser-bridge.sh"; do
         if [ -f "$cand" ]; then
             . "$cand"
+            # Real-lib marker (#681 site 2): set ONLY when a real
+            # wsl-browser-bridge.sh was sourced — the stub below stays
+            # silent about it. update_redeploy_xdg_shim (later in the
+            # same run) requires this marker before its probe may
+            # REMOVE a kit shim: with the stub standing, "a real one
+            # might exist" must withhold deploys but never churn an
+            # already-deployed one.
+            _upd_bb_sourced=1
             break
         fi
     done
@@ -145,10 +153,13 @@ update_redeploy_wsl_bridge() {
     command -v browser_bridge_install >/dev/null 2>&1 || browser_bridge_install() { :; }
     # Fail-safe stub (#211 a F7): if the never-shadow probe itself is
     # unavailable (wsl-browser-bridge.sh missing from both lookup sites),
-    # both call sites below must err on the never-shadow side — rc 0
-    # ("a real one might exist") removes/withholds the shim instead of
-    # shadowing one. Sibling guard: status.sh wraps its call in
-    # command -v (0.0.46a F4); update.sh was the unswept twin.
+    # the call sites below must err on the never-shadow side — rc 0
+    # ("a real one might exist") withholds a new shim instead of
+    # shadowing one. Since #681 site 2 the stub governs ONLY that
+    # withhold arm: the removal arm in update_redeploy_xdg_shim
+    # additionally requires the _upd_bb_sourced marker, so a missing
+    # probe keeps a deployed shim instead of churning it (the status.sh
+    # command -v wrap is the report-side sibling, 0.0.46a F4).
     command -v xdg_open_real_exists >/dev/null 2>&1 || xdg_open_real_exists() { return 0; }
     if browser_bridge_is_wsl; then
         # Failure-honest since 0.0.45c C4: browser_bridge_install propagates a
@@ -219,7 +230,14 @@ update_redeploy_xdg_shim() {
     fi
     if [ -L /usr/local/bin/xdg-open ] &&
         [ "$(readlink /usr/local/bin/xdg-open 2>/dev/null || true)" = "$LIBDIR/bin/xdg-open" ]; then
-        if xdg_open_real_exists; then
+        # Removal needs the CONFIRMED probe (#681 site 2): rc 0 alone is
+        # not proof — the never-shadow stub answers rc 0 whenever the
+        # real probe is unavailable, and removing a kit shim the deployed
+        # binary still needs (the 1.x line) on a maybe is churn. The
+        # _upd_bb_sourced marker (set in update_redeploy_wsl_bridge,
+        # which runs before this phase) proves the real walker answered;
+        # without it the shim stays.
+        if [ "${_upd_bb_sourced:-0}" = 1 ] && xdg_open_real_exists; then
             sudo rm -f /usr/local/bin/xdg-open
             ui_detail "xdg-open fallback removed: a real xdg-open on PATH took over"
             log "xdg-open shim removed: real xdg-open present on PATH"
@@ -269,8 +287,9 @@ update_redeploy_umask() {
         copy_file_atomic "$FILES_ROOT/etc/umask.sh" \
             /etc/profile.d/opencode-permissions-kit-umask.sh 644 ||
             die "umask profile re-deploy failed (atomic deploy)"
-        # Remove the pre-0.0.10 umask profile so only the new name is loaded.
-        sudo rm -f /etc/profile.d/opencode-umask.sh 2>/dev/null || true
+        # No legacy pre-0.0.10 name cleanup anymore (#681 site 1): the old
+        # name is not kit-namespaced and its cohort can never reach a
+        # modern update (refuses pre-0.0.14) — see un_umask_remove.
         ui_success "umask profile re-deployed"
         log "umask profile re-deployed: /etc/profile.d/opencode-permissions-kit-umask.sh"
     else

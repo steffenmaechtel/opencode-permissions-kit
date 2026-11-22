@@ -1296,10 +1296,22 @@ if [ -n "$_f6_block" ]; then
     else
         fail "present umask.sh: deploy path unchanged (out=$_out)"
     fi
+    # #681 site 1 (absence over an extracted span stays raw by design —
+    # a commented-out forbidden line SHOULD keep counting): the update
+    # path no longer rms the legacy pre-0.0.10 umask name.
+    if printf '%s' "$_f6_block" | grep -qF 'opencode-umask.sh'; then
+        fail "umask re-deploy still names the legacy umask path (#681 site 1)"
+    else
+        pass "umask re-deploy no longer touches the legacy name (#681 site 1)"
+    fi
     rm -rf "$F6"
 else
     fail "umask block extractable from update-core.sh (#211 a F6)"
 fi
+# Static sweep leg (#681 site 1): the update lib names the legacy path
+# nowhere at all.
+check_absent "update-core no longer names the legacy umask path (#681 site 1)" \
+    "$UPDATE_CORE" -qF 'opencode-umask.sh'
 
 # --- xdg_open_real_exists fail-safe stub (#211 a F7) --------------------------------
 # Without the stub, a missing wsl-browser-bridge.sh made both call
@@ -1328,6 +1340,59 @@ if [ -n "$_f7_stub" ]; then
 else
     fail "xdg_open_real_exists stub extractable from update-core.sh (#211 a F7)"
 fi
+
+# --- xdg shim removal arm requires the sourced-lib marker (#681 site 2) ------------
+# The never-shadow stub answers rc 0 whenever the real probe is
+# unavailable — identical to a CONFIRMED real xdg-open. A bare
+# `if xdg_open_real_exists` removal arm therefore deleted a deployed
+# kit shim on the stub's maybe (shim churn for a 1.x binary that still
+# needs it, #681 site 2). The arm must additionally require the
+# _upd_bb_sourced marker, set ONLY when update_redeploy_wsl_bridge
+# sourced a real wsl-browser-bridge.sh. Pin: the real arm bytes are
+# extracted and driven through both rc-0 states — marker set (removes),
+# stub standing (keeps); rc alone cannot discriminate them.
+_xds_arm="$(sed -n '/^        if \[ "\${_upd_bb_sourced:-0}" = 1 \] && xdg_open_real_exists; then$/,/^        fi$/p' "$UPDATE_CORE")"
+if [ -n "$_xds_arm" ]; then
+    pass "xdg removal arm extractable from update-core.sh (#681 site 2)"
+    _xds_run() { # $1 = _upd_bb_sourced ("1"|"")
+        (
+            _upd_bb_sourced="$1"
+            # Both states answer rc 0 — the marker is the only
+            # discriminator (the stub verbatim, #211 a F7).
+            xdg_open_real_exists() { return 0; }
+            sudo() {
+                printf 'sudo %s\n' "$*" >>"${XDS_LOG:?}"
+                return 0
+            }
+            ui_detail() { echo "detail: $*"; }
+            log() { echo "log: $*"; }
+            eval "$_xds_arm"
+        ) 2>&1
+    }
+    XDS_LOG="$(mktemp)"
+    _xds_out=$(_xds_run 1) || true
+    if printf '%s' "$_xds_out" | grep -q 'detail: xdg-open fallback removed' &&
+        grep -qF 'sudo rm -f /usr/local/bin/xdg-open' "$XDS_LOG"; then
+        pass "confirmed probe (marker+rc0) removes the kit shim (#681 site 2)"
+    else
+        fail "confirmed-probe arm (out=$_xds_out) (#681 site 2)"
+    fi
+    : >"$XDS_LOG"
+    _xds_out=$(_xds_run "") || true
+    if printf '%s' "$_xds_out" | grep -q 'detail: xdg-open fallback active' &&
+        ! grep -qF 'sudo rm -f /usr/local/bin/xdg-open' "$XDS_LOG"; then
+        pass "stub-only rc0 (no marker) KEEPS the kit shim — no churn (#681 site 2)"
+    else
+        fail "stub-only arm kept nothing (out=$_xds_out) (#681 site 2)"
+    fi
+    rm -f "${XDS_LOG:?}"
+else
+    fail "xdg removal arm extractable from update-core.sh (#681 site 2)"
+fi
+# The marker's SET site: only a real sourced wsl-browser-bridge.sh may
+# raise it (the stub line above it must not).
+check_live "real-lib marker set inside the sourcing loop (#681 site 2)" \
+    "$UPDATE_CORE" -qF '_upd_bb_sourced=1'
 
 # --- openchamber policy pin: atomic stage+mv (#211 a F17) --------------------------
 # Both write sites (update.sh re-apply + opk openchamber-secure) used
