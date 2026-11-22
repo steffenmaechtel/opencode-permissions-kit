@@ -8,12 +8,12 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**198 metas · 195 active · 3 retired · 11 review-pending · next due 2026-11-17**
+**202 metas · 199 active · 3 retired · 16 review-pending · next due 2026-11-17**
 
 ## Actionable
 
-- **Review pending:** RM-0190, RM-0191, RM-0192, RM-0193, RM-0194, RM-0195, RM-0196, RM-0197, RM-0198
-- **Amended — pending:** RM-0182 (2026-11-20), RM-0133 (2026-11-21)
+- **Review pending:** RM-0190, RM-0191, RM-0192, RM-0193, RM-0194, RM-0195, RM-0196, RM-0197, RM-0198, RM-0199, RM-0200, RM-0201, RM-0202
+- **Amended — pending:** RM-0182 (2026-11-20), RM-0133 (2026-11-21), RM-0136 (2026-11-22)
 
 ## AGENTS.md
 
@@ -223,7 +223,7 @@
 | [RM-0115](0/1/1/RM-0115.md) | A round never declares the | active | approved | 1m | 2026-11-28 |
 | [RM-0118](0/1/1/RM-0118.md) | Closure is a recorded step | active | approved | 1m | 2026-11-28 |
 | [RM-0134](0/1/3/RM-0134.md) | On the non-shipped track, a | active | approved | 1m | 2026-11-30 |
-| [RM-0136](0/1/3/RM-0136.md) | Deferred work orders collected during | active | approved | 1m | 2026-12-17 |
+| [RM-0136](0/1/3/RM-0136.md) | Deferred work orders collected during | active | **amended — pending** | 1m | 2026-12-17 |
 | [RM-0140](0/1/4/RM-0140.md) | After the work-order gate settles | active | approved | 1m | 2026-12-15 |
 | [RM-0161](0/1/6/RM-0161.md) | A FILED work order is self-contained at creation | active | approved | 1m | 2026-12-17 |
 | [RM-0185](0/1/8/RM-0185.md) | A deferred-findings COLLECTION issue states | active | approved | 1m | 2026-12-20 |
@@ -308,6 +308,9 @@
 | [RM-0162](0/1/6/RM-0162.md) | A finding whose mechanism rests on shell… | active | approved | 1m | 2026-12-17 |
 | [RM-0168](0/1/6/RM-0168.md) | A claim about what a | active | approved | 1m | 2026-12-17 |
 | [RM-0197](0/1/9/RM-0197.md) | A CONFIRMED verdict covers the | active | **pending** | 1m | 2026-12-21 |
+| [RM-0199](0/1/9/RM-0199.md) | The empirical probe owed before | active | **pending** | 1m | 2026-12-22 |
+| [RM-0200](0/2/0/RM-0200.md) | A figure the session itself generates | active | **pending** | 1m | 2026-12-22 |
+| [RM-0201](0/2/0/RM-0201.md) | A completeness claim in a commit | active | **pending** | 1m | 2026-12-22 |
 
 ### Suites are the standing review
 
@@ -346,6 +349,7 @@
 | [RM-0114](0/1/1/RM-0114.md) | Agents stamp with their own | active | approved | 1m | 2026-11-22 |
 | [RM-0172](0/1/7/RM-0172.md) | A shipped code block is | active | approved | 1m | 2026-12-17 |
 | [RM-0186](0/1/8/RM-0186.md) | A session close (window, terminal, host) | active | approved | 1m | 2026-12-20 |
+| [RM-0202](0/2/0/RM-0202.md) | Every phase boundary the run | active | **pending** | 1m | 2026-12-22 |
 
 ### Release gate
 
