@@ -738,7 +738,7 @@ Four places carry review knowledge, each with exactly one job:
   bracket-expression mechanism, one checkpoint claiming an empirical
   on-host match; the verifier's own scratch probes under dash and bash
   refuted it, keeping the wrong MED out of the findings table — it
-  retracted into the round comment's "Retracted / ghost findings"
+  retracted into the round comment's "Retracted/ghost findings"
   section, visible as every retraction owes: "the verification probe
   is the record"). Probe artifacts that decide a verdict live in the
   round scratch and are named in the round comment or retraction.
