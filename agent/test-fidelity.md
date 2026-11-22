@@ -145,6 +145,22 @@ production code path touched (draining stdin). Rule for this repo:
    no-tty CONTRACT test asserts the loud fast abort — rc 1 plus the
    guard message, with a timeout as the no-hang discriminator
    (pr-00568 wave a, the reworked 12d in tests/e2e/run.sh). (RM-0165)
+5. **Privileged-channel probes: who opens the operand, and in which
+   capability set** (issue #739, the pr-00733 mini-container
+   incident). A probe that reads through a privileged channel
+   verifies two facts beyond the command text. (a) WHO opens the
+   operand: a redirection is opened by the CALLING shell under its
+   OWN uid — `sudo tr … </proc/<pid>/environ` dies at the redirect
+   before sudo runs, while `sudo cat /proc/<pid>/environ` passes the
+   path as argv into the privileged context (probed: the redirect
+   failure names the SHELL as its emitter, the argv failure names
+   the tool). (b) The environment's capability set: a default-cap
+   container's root cannot read another uid's /proc/<pid>/environ
+   (EACCES — probed in ubuntu:24.04; CAP_SYS_PTRACE is what it
+   needs), and the e2e containers differ from a plain mini container
+   exactly there (`--privileged`, tests/e2e/lib.sh) — a
+   discrimination proof run in a default-cap mini container
+   false-negatives on that arm alone. (RM-0204)
 
 PTY harnesses, by weight: `script -qec '<command>' /dev/null`
 (util-linux) gives the command a real PTY in any CI script — cheap
@@ -198,6 +214,14 @@ Adopting either is a maintainer decision; nothing here blocks on it.
 - Interactive-only surfaces (browser launch, Windows hosts file) →
   assert the container-side half only, as `e2e-ddev` does (non-goal
   there: the Windows side). (RM-0055)
+- A comment asserting an environment fact (image contents, tool
+  availability) → carries a pin that reddens when the fact flips, or
+  names how to re-verify (a "transitive dependency" hedge IS the
+  re-verify hint). Environment facts drift silently when the
+  environment changes transitively, and reviewers treat in-repo
+  prose as evidence — a stale "the image ships no procps" comment
+  fed a round-a HIGH that took three evidence legs to refute (issue
+  #739, PR #733 round a B1, REFUTED). (RM-0205)
 
 ## References
 

@@ -381,7 +381,14 @@ empty-match greps (`grep … || true` where empty output is rc 1), `IFS= read
   subject AT creation time, read from each call's own output;
   reconstructing the mapping afterward from assumed launch sequence
   crossed the work-order mapping — all three of #541/#542/#543 vs the
-  PR-body table (PR #544 round a A3 MED).
+  PR-body table (PR #544 round a A3 MED). The timeline arm
+  (2026-11-21, PR #716 round a C3): per-round statistics — counts,
+  severities, findings-by-round — derive from each round comment's
+  OWN findings table or headline count line, never from greps over
+  the merged comment stream; the unit is the comment, not the
+  stream, and a merged-stream extraction smeared one PR's
+  closing-summary work-order lines into another round's census
+  (corrected only in the fix wave, across four surfaces).
 - **No history-dependent test pins — CI checkouts are depth-1**
   (2026-11-17, pr-00599): test code that resolves historical git
   objects at runtime (`git show <historical-sha>:<path>`) passes every

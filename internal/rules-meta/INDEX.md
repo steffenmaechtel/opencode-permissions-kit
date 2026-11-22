@@ -8,12 +8,12 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**202 metas · 199 active · 3 retired · 16 review-pending · next due 2026-11-20**
+**205 metas · 202 active · 3 retired · 19 review-pending · next due 2026-11-20**
 
 ## Actionable
 
-- **Review pending:** RM-0190, RM-0191, RM-0192, RM-0193, RM-0194, RM-0195, RM-0196, RM-0197, RM-0198, RM-0199, RM-0200, RM-0201, RM-0202
-- **Amended — pending:** RM-0182 (2026-11-20), RM-0133 (2026-11-21), RM-0136 (2026-11-22)
+- **Review pending:** RM-0190, RM-0191, RM-0192, RM-0193, RM-0194, RM-0195, RM-0196, RM-0197, RM-0198, RM-0199, RM-0200, RM-0201, RM-0202, RM-0203, RM-0204, RM-0205
+- **Amended — pending:** RM-0133 (2026-11-21), RM-0136 (2026-11-22), RM-0182 (2026-11-22)
 
 ## AGENTS.md
 
@@ -71,6 +71,7 @@
 |---|---|---|---|---|---|
 | [RM-0163](0/1/6/RM-0163.md) | A special builtin's failed redirection is FATAL | active | approved | 1m | 2026-12-17 |
 | [RM-0164](0/1/6/RM-0164.md) | Comment text inside a single-quoted sh -c worker | active | approved | 1m | 2026-12-17 |
+| [RM-0203](0/2/0/RM-0203.md) | A case pattern list split | active | **pending** | 1m | 2026-12-22 |
 
 ### Python3 pipeline tees (health probe, fork cache, degrade)
 
@@ -379,6 +380,7 @@
 | [RM-0049](0/0/4/RM-0049.md) | Real-binary tiers | active | approved | 6m | 2027-05-20 |
 | [RM-0050](0/0/5/RM-0050.md) | Environment matrix as a test | active | approved | 6m | 2027-05-20 |
 | [RM-0165](0/1/6/RM-0165.md) | No controlling tty in containers — split display | active | approved | 1m | 2026-12-17 |
+| [RM-0204](0/2/0/RM-0204.md) | Privileged-channel probes: who opens the | active | **pending** | 1m | 2026-12-22 |
 
 ### 6. Checklist for new kit code
 
@@ -389,6 +391,7 @@
 | [RM-0053](0/0/5/RM-0053.md) | New fake/shim → replicate the | active | approved | 6m | 2027-05-20 |
 | [RM-0054](0/0/5/RM-0054.md) | rc-installed behavior (functions, hooks, PATH) | active | approved | 6m | 2027-05-21 |
 | [RM-0055](0/0/5/RM-0055.md) | Interactive-only surfaces (browser launch,… | active | approved | 6m | 2027-05-20 |
+| [RM-0205](0/2/0/RM-0205.md) | A comment asserting an environment | active | **pending** | 1m | 2026-12-22 |
 
 ## internal/records/rules-meta.md
 

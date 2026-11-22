@@ -205,6 +205,17 @@ are the distilled incidents:
   comments carry no apostrophe at all (the pr-00568 wave broke
   ddev-handover.sh twice on `abort's` before that rule existed).
   (RM-0164)
+- A `case` pattern list split across lines is not parseable shell:
+  POSIX case grammar takes one arm's alternatives on one physical
+  line — a list ending in `|` with the further alternatives on the
+  next line dies at `sh -n` with "word unexpected" and reddens
+  ShellCheck (SC1073/SC1009; probed in scratch, one red lint cycle
+  paid — issue #738, PR #729 fix wave a). When a new form-arm class
+  would push a shared pattern line past the 120-column ratchet, give
+  the class its OWN `case` statement after the shared one — the
+  handover declared-tree belt's three-case shape, whose own comment
+  names the reason ("a separate case keeps the structural list
+  inside the ratchet", sh/handover-core.sh). (RM-0203)
 
 ## Python3 pipeline tees (health probe, fork cache, degrade)
 
@@ -441,6 +452,26 @@ pinned literals sit on single lines today), the drop keeps commented
 examples from counting; for a NEW pin whose literal spans a wrap, join
 continuations before stripping — otherwise do not copy the idiom, and
 do not refactor the site into the canonical shape.
+
+Line counting versus occurrence counting is a per-pin DECISION, made
+explicitly and checked against the constructs that can share a
+physical line: `grep -c` counts LINES, so a rogue token glued onto
+the sanctioned line, a comma-joined sudoers Defaults list, or a CLI
+printing its whole JSON payload on one line (gh's run list: two
+completed runs, `grep -c '"status":"completed"'` answers 1 forever)
+all defeat it — probed shapes, not hypotheses. Class or absence pins
+over joined/normalized views count OCCURRENCES on at least one leg
+(`grep -o … | wc -l`) against the sanctioned-line count — a rogue
+keep glued onto the sanctioned line then reds 2-vs-1 (PR #733's
+env_keep class pin, sabotage-verified) — and counts over single-line
+tool output go through `grep -o | wc -l` or a structured query
+(`jq 'length'`), never `grep -c` (the pr-00729 CI watcher polled a
+threshold `grep -c` could never reach). Absence patterns over such
+views are probed against every separator character that can appear
+between the anchor and the construct: `^Defaults[^!]*` cannot cross
+a `!`, so the merged-negation shape `Defaults !setenv,env_keep += …`
+escaped the pin (PR #733 round a B2+C1). Issues #738 and #739 land
+this paragraph together — one principle, two incident arms.
 
 ## Quoting-aware test machinery (detectors and byte-exact fixtures)
 
