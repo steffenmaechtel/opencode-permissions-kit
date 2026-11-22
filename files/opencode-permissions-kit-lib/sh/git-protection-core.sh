@@ -450,9 +450,13 @@ _gp_verify() {
 # DIRECTORY occupies the `.git` name (the D8 post-rename shape, or a
 # verify-failure race), `rm -f` no-ops and a plain mv would move the
 # gitdir INSIDE the plant with rc 0 — silently defeating the
-# ROLLBACK INCOMPLETE arm. Agent-planted content under the project
-# root is expendable by the kit's model: the plant is removed, then
-# the gitdir lands at its name.
+# ROLLBACK INCOMPLETE arm. The deletion is sound on a verifiable
+# invariant: every rollback caller runs AFTER the project's gitdir
+# was moved OUT, so a non-symlink directory at the `.git` name is
+# never legit project data at this point (the one theoretical
+# exception — a developer `git init` racing the sub-second error-path
+# window — nested silently under the pre-wave behavior, which was
+# strictly worse).
 _gp_rollback() {
     _gpb_p=$1 _gpb_gd=$2
     if [ -d "$_gpb_p/.git" ] && [ ! -L "$_gpb_p/.git" ]; then

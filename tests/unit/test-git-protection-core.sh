@@ -1011,8 +1011,8 @@ else
     fail "fix-wave A1: observables (residue=$(ls "$WORK/roots/r1/noimm/".git.opk* 2>/dev/null || true))"
 fi
 
-# D6/A7+D10: _gp_unnest restores ours from the nested shape — both
-# the plain and the deep plant (deepest .git wins).
+# D6/A7/E1: _gp_unnest restores ours from the nested shape (the only
+# reachable nest is depth 1 — probed; junk inside rides along).
 _mkrepo "$WORK/roots/r1/nn1"
 mkdir -p "$WORK/storage/nn1.git"
 mv "$WORK/roots/r1/nn1/.git" "$WORK/storage/nn1.git/.git"
