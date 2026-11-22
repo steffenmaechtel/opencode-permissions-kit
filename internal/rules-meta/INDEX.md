@@ -8,7 +8,7 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**202 metas · 199 active · 3 retired · 16 review-pending · next due 2026-11-17**
+**202 metas · 199 active · 3 retired · 16 review-pending · next due 2026-11-20**
 
 ## Actionable
 
@@ -387,7 +387,7 @@
 | [RM-0051](0/0/5/RM-0051.md) | Child process inside a while | active | approved | 6m | 2027-05-20 |
 | [RM-0052](0/0/5/RM-0052.md) | Prompt → read </dev/tty via | active | approved | 6m | 2027-05-20 |
 | [RM-0053](0/0/5/RM-0053.md) | New fake/shim → replicate the | active | approved | 6m | 2027-05-20 |
-| [RM-0054](0/0/5/RM-0054.md) | rc-installed behavior (functions, hooks, PATH) | active | approved | 1m | 2026-11-17 |
+| [RM-0054](0/0/5/RM-0054.md) | rc-installed behavior (functions, hooks, PATH) | active | approved | 6m | 2027-05-21 |
 | [RM-0055](0/0/5/RM-0055.md) | Interactive-only surfaces (browser launch,… | active | approved | 6m | 2027-05-20 |
 
 ## internal/records/rules-meta.md

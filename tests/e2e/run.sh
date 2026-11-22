@@ -535,6 +535,49 @@ check "4b: stdout carries exactly the clean URL line (running project, no start 
 E 'sudo rm -f /usr/local/bin/ddev /tmp/fake-ddev-running /tmp/fake-ddev-calls'
 
 echo ""
+echo "--- 4b-2. fresh login shells resolve the rc-installed hooks (issue #693) ---"
+# The test-fidelity rule's demanded artifact (agent/test-fidelity.md
+# checklist, issue #693): the LOGIN chain was never exercised —
+# run-ddev.sh DD5 already drives the rc-loaded function through a real
+# interactive (non-login) shell; the wiring here was otherwise asserted
+# by static greps and by sourcing the hook file directly — Ubuntu's
+# .bashrc returns early for non-interactive shells, so those checks
+# admitted a broken assembly no real shell executes. These checks spawn
+# REAL login/interactive shells as the developer and assert the rc
+# assembly as a whole (install-core writes the hook into
+# .bashrc/.zshrc/.profile alike, so the .profile -> .bashrc hand-off is
+# not individually observable here): the ddev() hook resolves in the
+# login shell, BASH_ENV carries it into non-interactive children past a
+# dash wrapper — the issue #18 transport class end to end — and the
+# umask profile applies under login. Deliberately AFTER the fake-ddev
+# teardown above: with no ddev
+# binary anywhere in PATH, `type -t ddev` can only resolve to the
+# FUNCTION the rc hook defines. shell-warn stays scoped to 6c: its
+# observable is the banner, already driven there by a real interactive
+# start — a login shell adds no second observable for it.
+check "4b-2: sudo -i login shell resolves ddev as the function (no binary)" \
+    E 'sudo -iu dev bash -lic "type -t ddev" 2>/dev/null | grep -qx function'
+# The su variant needs sudo's root seat first (E exec's as dev; su from
+# dev asks for a password) — sudo su - dev then buys a REAL PAM login
+# session, the vendor-chain shape: profile assembly without sudo -i's
+# environment simulation.
+check "4b-2: su login shell (non-bash parent, vendor chain shape) resolves the function" \
+    E 'sudo su - dev -c "bash -lic \"type -t ddev\"" 2>/dev/null | grep -qx function'
+# A plain non-interactive child would inherit the exported function
+# itself (BASH_FUNC_* travels the bash environment), so a bare
+# `bash -c "type -t ddev"` cannot observe WHICH transport delivered
+# the hook. The #!/bin/sh wrapper strips the BASH_FUNC_* entries (dash
+# drops the %-named variables from its export table; same shape as
+# 4b's rt-wrap above) — only BASH_ENV can carry the hook into the bash
+# target, so this check reddens if the hook's BASH_ENV arm breaks
+# while export -f survives (#732 a A1, probe-verified).
+E 'printf "#!/usr/bin/env sh\nexec bash -c \"type -t ddev\"\n" > /tmp/rt4b2.sh && chmod 755 /tmp/rt4b2.sh'
+check "4b-2: BASH_ENV carries the hook into non-interactive children under login (#18)" \
+    E 'sudo -iu dev bash -lic "/tmp/rt4b2.sh" 2>/dev/null | grep -qx function'
+check "4b-2: login shell applies the kit umask profile (0002)" \
+    E 'sudo -iu dev bash -lic "umask" 2>/dev/null | grep -qx 0002'
+
+echo ""
 echo "--- 4c. .ddev handover to the opencode user (ddev-working) ---"
 # A pre-existing dev-owned .ddev breaks `ddev start` as opencode with
 # "chmod .ddev/.webimageBuild: operation not permitted". config.sh refresh
