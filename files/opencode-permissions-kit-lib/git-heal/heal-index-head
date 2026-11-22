@@ -75,6 +75,9 @@
 #                     (unit scratch zones live under /tmp, which the
 #                     arms refuse; like every GH_* override this never
 #                     survives sudo's env_reset in production)
+#   GH_STORAGE        the git-protection storage root (#704 O4) —
+#                     default GITDIR_STORAGE from install.conf; the
+#                     relocated gitdirs live under it
 set -u
 
 _gh_lib="${GH_LIBDIR:-/usr/local/lib/opencode-permissions-kit}"
@@ -179,7 +182,14 @@ _gh_root_ok() {
 # listed in the projects config (one absolute root per line; # and
 # empty lines ignored — projects.conf format; every line runs the
 # _gh_root_ok reader gate first, so a hand-edited system/scratch/
-# agent-home line never authorizes a heal).
+# agent-home line never authorizes a heal), OR equals/sits under the
+# git-protection storage root (#704 O4): after adoption the common
+# gitdir lives OUTSIDE every projects.conf root, in the external
+# storage — it is honored like a conf root, through the SAME reader
+# gate, so a bogus install.conf line never authorizes a heal either
+# (the value "none" is the declined marker, not a path: the absolute
+# form arm refuses it). GH_STORAGE is the test seam (never survives
+# sudo's env_reset).
 _gh_allowlisted() {
     _gh_p="$1"
     [ -f "$_gh_conf" ] || return 1
@@ -190,6 +200,16 @@ _gh_allowlisted() {
             "$_gh_root_norm" | "$_gh_root_norm"/*) return 0 ;;
         esac
     done <"$_gh_conf"
+    _gh_storage="${GH_STORAGE:-$(sed -n 's/^GITDIR_STORAGE=//p' \
+        /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -n 1)}"
+    case "$_gh_storage" in
+        /*) ;;
+        *) return 1 ;;
+    esac
+    _gh_root_ok "$_gh_storage" || return 1
+    case "$_gh_p" in
+        "$_gh_root_norm" | "$_gh_root_norm"/*) return 0 ;;
+    esac
     return 1
 }
 

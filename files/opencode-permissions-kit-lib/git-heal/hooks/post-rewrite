@@ -34,6 +34,12 @@
 #                     /usr/local/lib/opencode-permissions-kit)
 #   GH_PROJECTS_CONF  allowlist source (default
 #                     /etc/opencode-permissions-kit/projects.conf)
+#   GP_STORAGE        git-protection storage root for the fast path
+#                     and the decline-marker check (#704; default
+#                     GITDIR_STORAGE from
+#                     /etc/opencode-permissions-kit/install.conf)
+#   GP_NO_HINT=1      silence the git-protection adopt hint (fixtures
+#                     that assert on clean stderr)
 set -u
 
 GH_LIBDIR="${GH_LIBDIR:-/usr/local/lib/opencode-permissions-kit}"
@@ -68,7 +74,44 @@ if [ -f "$CONF" ]; then
         esac
     done <"$CONF"
 fi
+
+# git-protection storage (#704 O4): after adoption the common gitdir
+# lives in the external storage -- OUTSIDE every projects.conf root.
+# Accept it like a managed root (fast path only; heal-index-head's
+# own reader gate stays the authority). GP_STORAGE is the test seam;
+# the value "none" (declined marker) is not absolute and never
+# matches. An unreadable install.conf degrades to empty -- silence,
+# never a broken checkout (fail soft, the same discipline as $CONF).
+_gp_storage="${GP_STORAGE:-$(sed -n 's/^GITDIR_STORAGE=//p' \
+    /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -n 1)}"
+if [ "$_gh_hit" != 1 ]; then
+    case "$_gp_storage" in
+        /*)
+            case "$cdg" in
+                "$_gp_storage" | "$_gp_storage"/*) _gh_hit=1 ;;
+            esac
+            ;;
+    esac
+fi
 [ "$_gh_hit" = 1 ] || exit 0
+
+# git-protection hint (#704 O4): a kit-managed tree whose .git is
+# still a classic DIRECTORY carries the reopened wholesale arm
+# (mv .git, #702). After adoption .git is a pointer FILE and this
+# silences itself. Echo only -- never blocks the git op, needs no
+# root (the adopt command elevates itself). Respects the decline
+# marker (GITDIR_STORAGE=none): a host that said no is not nagged on
+# every checkout. GP_NO_HINT=1 silences it for fixtures that assert
+# on clean stderr.
+if [ "$_gp_storage" != "none" ] && [ "${GP_NO_HINT:-}" != "1" ]; then
+    _gp_top=$(git rev-parse --show-toplevel 2>/dev/null)
+    if [ -n "$_gp_top" ] && [ ! -L "$_gp_top/.git" ] && [ -d "$_gp_top/.git" ]; then
+        printf '[opk git-protection %s] kit-managed tree with classic .git layout (unprotected)\n' \
+            "${0##*/}" >&2
+        printf '[opk git-protection %s] run: sudo opk git-protection adopt %s\n' \
+            "${0##*/}" "$_gp_top" >&2
+    fi
+fi
 
 if command -v sudo >/dev/null 2>&1 && sudo -n "$HEAL" "$cdg" 2>/dev/null; then
     exit 0

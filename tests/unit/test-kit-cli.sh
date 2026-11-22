@@ -90,7 +90,7 @@ echo "=== CLI dispatcher tests ==="
 _rk_rc=0
 out="$(run_kit --help)" || _rk_rc=$?
 assert_eq "--help exits 0" "0" "$_rk_rc"
-for c in status doctor config update uninstall handover help openchamber-secure ensure-shared; do
+for c in status doctor config update uninstall handover help openchamber-secure ensure-shared git-protection; do
     case "$out" in
         *"$c"*)
             pass "--help mentions '$c'"
@@ -946,6 +946,8 @@ done
 cp "$OCCORE" "$F24/lib/sh/openchamber-core.sh"
 cp "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/git-heal-core.sh" \
     "$F24/lib/sh/git-heal-core.sh"
+cp "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/git-protection-core.sh" \
+    "$F24/lib/sh/git-protection-core.sh"
 : >"$F24/lib/sh/wsl-browser-bridge.sh"
 printf '#!/bin/sh\necho "SUDO-CALLED $*" >> "%s/sudo.log"\nexit 0\n' "$F24" >"$F24/sbin/sudo"
 chmod +x "$F24/sbin/sudo"
@@ -987,6 +989,7 @@ _f24_check OPK_UPGRADE_ROOT upgrade-opencode
 _f24_check OPK_WSLFIX_ROOT wsl-add-opencode-1-fix
 _f24_check OPK_OPENCHAMBER_ROOT openchamber-secure
 _f24_check OPK_GITHEAL_ROOT git-heal on
+_f24_check OPK_GITPROTECT_ROOT git-protection on
 
 # --- ensure-shared: short heal wrapper (issue #159) ----------------------------
 # The real helper (bin/ddev-as-opencode) is stubbed with an argument

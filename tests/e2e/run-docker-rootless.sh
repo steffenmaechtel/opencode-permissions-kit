@@ -299,6 +299,33 @@ check "RL2b: opk git-heal status reports ON" \
     E 'sudo opk git-heal status | grep -q "git-heal: ON"'
 
 echo ""
+echo "--- RL2c/#704: git-protection pointer layout (migrate, status, revert) ---"
+# The run.sh 12q twin on the rootless lane: real git, real dispatch.
+# Overlayfs containers cannot chattr — the nail row is branched on the
+# filesystem's actual answer (nailed -> rc 0; degraded -> rc 1 + row);
+# the nail's kernel mechanics are Phase A's domain (issue #704).
+E 'opk git-protection status >/tmp/gp-status-before.log 2>&1; test $? -eq 1'
+check "RL2c: status (unconfigured) shows the classic row + rc 1" \
+    E 'grep -qF "classic .git (unprotected -- the mv .git arm)" /tmp/gp-status-before.log'
+E 'sudo opk git-protection on >/tmp/gp-on.log 2>&1' &&
+    echo "  ${GREEN}OK${NC}  opk git-protection on completed"
+check "RL2c: storage created + persisted" \
+    E 'test "$(stat -c %U /var/www/gitdirs)" = "dev" && grep -qx "GITDIR_STORAGE=/var/www/gitdirs" /etc/opencode-permissions-kit/install.conf'
+check "RL2c: rl-gh migrated — pointer file + agent git green" \
+    E 'test -f /var/www/vhosts/rl-gh/.git && grep -qF "gitdir: /var/www/gitdirs/rl-gh.git" /var/www/vhosts/rl-gh/.git && sudo -u opencode -H git -C /var/www/vhosts/rl-gh status --porcelain >/dev/null'
+check "RL2c: status rows are nail-state honest (branched)" \
+    E 'if lsattr /var/www/vhosts/rl-gh/.git 2>/dev/null | awk "{print \$1}" | grep -q i; then opk git-protection status >/tmp/gp-status.log 2>&1; test $? -eq 0 && grep -qF "pointer + nailed" /tmp/gp-status.log; else opk git-protection status >/tmp/gp-status.log 2>&1; test $? -eq 1 && grep -qF "pointer, NOT nailed" /tmp/gp-status.log; fi'
+check "RL2c: the adopt hint fires on a fresh classic tree (hooks on)" \
+    E 'git -C /var/www/vhosts init -q rl-gp2 && cd /var/www/vhosts/rl-gp2 && git -c user.email=t@e -c user.name=t commit -q --allow-empty -m x && git checkout -q -b hint 2>/tmp/gp-hint.log && grep -q "opk git-protection" /tmp/gp-hint.log'
+check "RL2c: no adopt hint on the adopted tree (self-silencing)" \
+    E 'cd /var/www/vhosts/rl-gh && git checkout -q -b gp-post 2>/tmp/gp-hint2.log && ! grep -q "opk git-protection" /tmp/gp-hint2.log'
+E 'sudo opk git-protection revert --all >/tmp/gp-revert.log 2>&1' &&
+    echo "  ${GREEN}OK${NC}  opk git-protection revert --all completed"
+check "RL2c: revert walks rl-gh back to the classic layout" \
+    E 'test -d /var/www/vhosts/rl-gh/.git && git -C /var/www/vhosts/rl-gh status --porcelain >/dev/null'
+E 'rm -rf /var/www/vhosts/rl-gp2 /tmp/gp-*.log'
+
+echo ""
 echo "--- RL3. Wrapper dispatch + socket-check sudoers fallback (ab19025) ---"
 # This is the exact scenario from the bug: the wrapper runs as the DEVELOPER,
 # but the rootless socket lives in the opencode user's 0700 /run/user/<uid>.
@@ -435,5 +462,10 @@ check_fail "Sudoers removed" E 'test -e /etc/sudoers.d/opencode-permissions-kit'
 check_fail "/etc/opencode-permissions-kit removed" E 'test -e /etc/opencode-permissions-kit'
 check_fail "opencode user removed" E 'id opencode'
 check_fail "Audit log removed" E 'test -e /var/log/opencode-permissions-kit'
+# #704: the uninstall's default-yes offer dropped the storage config
+# (nothing left adopted after RL2c's revert) and the storage directory
+# stays as the documented manual-cleanup leftover.
+check "RL6: the git-protection storage dir stays (documented leftover)" \
+    E 'test -d /var/www/gitdirs'
 
 e2e_finish

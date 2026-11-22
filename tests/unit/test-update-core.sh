@@ -52,6 +52,7 @@ _defs="update_redeploy_library update_redeploy_wsl_bridge
 update_redeploy_cli_links update_redeploy_xdg_shim update_redeploy_sudoers
 update_redeploy_umask update_redeploy_openchamber update_redeploy_shell_hooks
 update_redeploy_project_roots update_redeploy_git_safe update_redeploy_wsl_mntc
+update_git_protection_consent
 update_binary_resecure update_binary_upgrade
 update_ensure_backup_dir
 detect_target opencode_version_line install_binary version_major
@@ -65,8 +66,11 @@ for _fn in $_defs; do
     sh -c '. "$1" && command -v "$2" >/dev/null' _ "$LIB" "$_fn" 2>/dev/null ||
         _missing="$_missing $_fn"
 done
+# Count derived from the list, never hardcoded (#595): the next list
+# edit cannot desync the message.
+_ndefs="$(printf '%s\n' $_defs | wc -w | tr -d ' ')"
 if [ -z "$_missing" ]; then
-    pass "all 27 phase/helper functions defined by sourcing"
+    pass "all $_ndefs phase/helper functions defined by sourcing"
 else
     fail "functions missing after sourcing:$_missing"
 fi
@@ -899,6 +903,276 @@ if live_src "$LIB" | grep -qF '_xds_ver=$(opencode_version_line)'; then
     pass "xdg shim section probes the deployed binary for its version basis (#257)"
 else
     fail "the shim gate must probe the deployed binary, not a stamp (#257)"
+fi
+
+# --- update_git_protection_consent (#704): the one-time question + the pass --------
+# Behavioral arms over the phase's documented states, with the REAL
+# git-protection-core (GIT_PROTECTION_CORE) driven on a scratch
+# projects.conf/install.conf and stubbed chattr/lsattr (the
+# test-git-protection-core idiom). The two INTERACTIVE legs run under
+# a pty (script -qec) with ui_confirm stubbed in the driver — the
+# phase's own /dev/tty probe decides interactivity, so a plain
+# non-tty run would take the hint leg instead.
+GPCORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/git-protection-core.sh"
+mkdir -p "$WORK/ucbin" "$WORK/ucroots/r1" "$WORK/ucstorage"
+cat >"$WORK/ucbin/chattr" <<'EOF'
+#!/bin/sh
+case "$1" in
+    +i) touch "$2.nailed" ;;
+    -i) rm -f "$2.nailed" ;;
+esac
+exit 0
+EOF
+cat >"$WORK/ucbin/lsattr" <<'EOF'
+#!/bin/sh
+if [ -e "$1.nailed" ]; then
+    printf '%s\n' "-----i---------e------- $1"
+else
+    printf '%s\n' "--------------e------- $1"
+fi
+EOF
+chmod 755 "$WORK/ucbin/chattr" "$WORK/ucbin/lsattr"
+UC_CONF="$WORK/ucprojects.conf"
+UC_IC="$WORK/ucinstall.conf"
+printf '%s\n' "$WORK/ucroots/r1" >"$UC_CONF"
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" >"$UC_IC"
+
+_uc_driver() { # <answer:y|n> — writes the pty driver script
+    cat >"$WORK/ucdriver.sh" <<EOF
+PATH="$WORK/ucbin:/usr/bin:/bin"
+export PATH
+ui_info() { echo "info: \$*"; }
+ui_success() { echo "success: \$*"; }
+ui_detail() { echo "detail: \$*"; }
+ui_warn() { echo "warn: \$*"; }
+ui_error() { echo "error: \$*" >&2; }
+ui_section() { echo "section: \$*"; }
+ui_kv() { echo "kv: \$1 \$2"; }
+EOF
+    case $1 in
+        y) printf 'ui_confirm() { echo "confirm: $*"; return 0; }\n' >>"$WORK/ucdriver.sh" ;;
+        n) printf 'ui_confirm() { echo "confirm: $*"; return 1; }\n' >>"$WORK/ucdriver.sh" ;;
+    esac
+    cat >>"$WORK/ucdriver.sh" <<EOF
+. "$LIB"
+. "$GPCORE"
+GIT_PROTECTION_CORE="$GPCORE"
+INSTALL_CONF="$UC_IC"
+GP_CONF="$UC_CONF"
+GP_INSTALL_CONF="$UC_IC"
+GP_STORAGE="$WORK/ucstorage"
+GP_ALLOW_NONROOT=1
+GP_CONF_RELAX=1
+export GP_CONF GP_INSTALL_CONF GP_STORAGE GP_ALLOW_NONROOT GP_CONF_RELAX
+YES=false
+update_git_protection_consent
+EOF
+}
+
+_uc_mkrepo() {
+    mkdir -p "$1"
+    git -C "$1" init -q
+    printf 'x\n' >"$1/f.txt"
+    git -C "$1" add f.txt
+    git -C "$1" -c user.email=t@e.st -c user.name=t commit -qm c1
+}
+
+# state 1: KIT_GITDIR_STORAGE=none skips silently — no marker, no pass.
+_uc_mkrepo "$WORK/ucroots/r1/proj"
+_uc_out=$(
+    KIT_GITDIR_STORAGE=none GIT_PROTECTION_CORE="$GPCORE" INSTALL_CONF="$UC_IC" \
+        GP_CONF="$UC_CONF" GP_INSTALL_CONF="$UC_IC" GP_STORAGE="$WORK/ucstorage" \
+        GP_ALLOW_NONROOT=1 GP_CONF_RELAX=1 sh -c '
+        . "$1"
+        ui_info() { echo "info: $*"; }
+        ui_detail() { echo "detail: $*"; }
+        ui_section() { echo "section: $*"; }
+        ui_kv() { echo "kv: $1 $2"; }
+        ui_success() { echo "success: $*"; }
+        ui_warn() { echo "warn: $*"; }
+        update_git_protection_consent
+    ' _ "$LIB" 2>&1 || true
+)
+if ! grep -q '^GITDIR_STORAGE=' "$UC_IC" && [ ! -e "$WORK/ucroots/r1/proj/.git.nailed" ]; then
+    pass "consent: KIT_GITDIR_STORAGE=none skips without marker or pass (#704)"
+else
+    fail "consent: env-none arm (out=$_uc_out ic=$(grep GITDIR "$UC_IC" || true))"
+fi
+
+# state 2: the conf's declined marker skips silently — same proof.
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\nGITDIR_STORAGE=none\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" >"$UC_IC"
+_uc_out=$(
+    GIT_PROTECTION_CORE="$GPCORE" INSTALL_CONF="$UC_IC" \
+        GP_CONF="$UC_CONF" GP_INSTALL_CONF="$UC_IC" GP_STORAGE="$WORK/ucstorage" \
+        GP_ALLOW_NONROOT=1 GP_CONF_RELAX=1 sh -c '
+        . "$1"
+        ui_info() { echo "info: $*"; }
+        ui_detail() { echo "detail: $*"; }
+        ui_section() { echo "section: $*"; }
+        ui_kv() { echo "kv: $1 $2"; }
+        ui_success() { echo "success: $*"; }
+        ui_warn() { echo "warn: $*"; }
+        update_git_protection_consent
+    ' _ "$LIB" 2>&1 || true
+)
+if [ "$(sed -n 's/^GITDIR_STORAGE=//p' "$UC_IC")" = none ] &&
+    [ ! -e "$WORK/ucroots/r1/proj/.git.nailed" ]; then
+    pass "consent: GITDIR_STORAGE=none (conf) skips silently (#704)"
+else
+    fail "consent: conf-none arm (out=$_uc_out)"
+fi
+
+# state 3: --yes (non-interactive) leaves a hint, never a marker.
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" >"$UC_IC"
+_uc_out=$(
+    GIT_PROTECTION_CORE="$GPCORE" INSTALL_CONF="$UC_IC" \
+        GP_CONF="$UC_CONF" GP_INSTALL_CONF="$UC_IC" GP_STORAGE="$WORK/ucstorage" \
+        GP_ALLOW_NONROOT=1 GP_CONF_RELAX=1 sh -c '
+        . "$1"
+        ui_info() { echo "info: $*"; }
+        ui_detail() { echo "detail: $*"; }
+        ui_section() { echo "section: $*"; }
+        ui_kv() { echo "kv: $1 $2"; }
+        ui_success() { echo "success: $*"; }
+        ui_warn() { echo "warn: $*"; }
+        YES=true
+        update_git_protection_consent
+    ' _ "$LIB" 2>&1 || true
+)
+if printf '%s' "$_uc_out" | grep -qF 'enable with: sudo opk git-protection on' &&
+    ! grep -q '^GITDIR_STORAGE=' "$UC_IC" &&
+    [ ! -e "$WORK/ucroots/r1/proj/.git.nailed" ]; then
+    pass "consent: non-interactive (--yes) hints, persists nothing (#704)"
+else
+    fail "consent: --yes arm (out=$_uc_out)"
+fi
+
+# state 4: interactive decline persists the marker (pty + stubbed no).
+_uc_driver n
+_uc_out=$(script -qec "sh '$WORK/ucdriver.sh'" /dev/null 2>/dev/null || true)
+if [ "$(sed -n 's/^GITDIR_STORAGE=//p' "$UC_IC")" = none ] &&
+    printf '%s' "$_uc_out" | grep -qF 'declined — enable later'; then
+    pass "consent: interactive decline persists the none marker (#704)"
+else
+    fail "consent: decline arm (out=$_uc_out ic=$(cat "$UC_IC"))"
+fi
+
+# state 5: interactive accept configures + migrates (pty + stubbed yes).
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" >"$UC_IC"
+_uc_driver y
+_uc_out=$(script -qec "sh '$WORK/ucdriver.sh'" /dev/null 2>/dev/null || true)
+if [ "$(sed -n 's/^GITDIR_STORAGE=//p' "$UC_IC")" = "$WORK/ucstorage" ] &&
+    [ -f "$WORK/ucroots/r1/proj/.git" ] &&
+    [ -d "$WORK/ucstorage/proj.git" ] &&
+    [ -e "$WORK/ucroots/r1/proj/.git.nailed" ]; then
+    pass "consent: interactive accept persists storage + migrates + nails (#704)"
+else
+    fail "consent: accept arm (out=$_uc_out ic=$(cat "$UC_IC"))"
+fi
+
+# state 6: already enabled (conf path) — the recurring pass, no question.
+_uc_mkrepo "$WORK/ucroots/r1/proj2"
+_uc_out=$(
+    GIT_PROTECTION_CORE="$GPCORE" INSTALL_CONF="$UC_IC" \
+        GP_CONF="$UC_CONF" GP_INSTALL_CONF="$UC_IC" GP_STORAGE="$WORK/ucstorage" \
+        GP_ALLOW_NONROOT=1 GP_CONF_RELAX=1 sh -c '
+        . "$1"
+        ui_info() { echo "info: $*"; }
+        ui_detail() { echo "detail: $*"; }
+        ui_section() { echo "section: $*"; }
+        ui_kv() { echo "kv: $1 $2"; }
+        ui_success() { echo "success: $*"; }
+        ui_warn() { echo "warn: $*"; }
+        ui_error() { echo "error: $*" >&2; }
+        update_git_protection_consent
+    ' _ "$LIB" 2>&1 || true
+)
+if [ -f "$WORK/ucroots/r1/proj2/.git" ] &&
+    [ -d "$WORK/ucstorage/proj2.git" ] &&
+    ! printf '%s' "$_uc_out" | grep -qF 'confirm:'; then
+    pass "consent: enabled conf runs the adopt pass without asking (#704)"
+else
+    fail "consent: enabled arm (out=$_uc_out)"
+fi
+
+# state 7: KIT_GITDIR_STORAGE=<path> configures non-interactively.
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" >"$UC_IC"
+_uc_mkrepo "$WORK/ucroots/r1/proj3"
+_uc_out=$(
+    KIT_GITDIR_STORAGE="$WORK/ucstorage" GIT_PROTECTION_CORE="$GPCORE" \
+        INSTALL_CONF="$UC_IC" \
+        GP_CONF="$UC_CONF" GP_INSTALL_CONF="$UC_IC" GP_ALLOW_NONROOT=1 \
+        GP_CONF_RELAX=1 sh -c '
+        . "$1"
+        ui_info() { echo "info: $*"; }
+        ui_detail() { echo "detail: $*"; }
+        ui_section() { echo "section: $*"; }
+        ui_kv() { echo "kv: $1 $2"; }
+        ui_success() { echo "success: $*"; }
+        ui_warn() { echo "warn: $*"; }
+        ui_error() { echo "error: $*" >&2; }
+        update_git_protection_consent
+    ' _ "$LIB" 2>&1 || true
+)
+if [ "$(sed -n 's/^GITDIR_STORAGE=//p' "$UC_IC")" = "$WORK/ucstorage" ] &&
+    [ -d "$WORK/ucstorage/proj3.git" ]; then
+    pass "consent: KIT_GITDIR_STORAGE=<path> configures without asking (#704)"
+else
+    fail "consent: env-path arm (out=$_uc_out ic=$(cat "$UC_IC"))"
+fi
+
+# wiring: the phase is sequenced AFTER the library redeploy (the core
+# it sources is deployed by update_redeploy_library) and named in the
+# entry's pairing guard.
+if live_src "$UPDATE" |
+    grep -qF 'update_redeploy_wsl_mntc
+    update_git_protection_consent'; then
+    pass "consent: sequenced after the redeploy phases in the entry (#704)"
+else
+    fail "consent: the entry must run the phase after the library redeploy"
+fi
+if live_src "$UPDATE" | grep -qF 'update_redeploy_wsl_mntc update_git_protection_consent'; then
+    pass "consent: named in update_pairing_guard (#704)"
+else
+    fail "consent: the pairing guard must name update_git_protection_consent"
+fi
+
+# present-but-skewed core: the phase's used-set guard refuses loud
+# (rc 1) BEFORE anything runs — a mid-update rc-127 abort is the
+# alternative (the cross-lib pairing rule).
+printf '#!/bin/sh\n# skewed: defines nothing\n' >"$WORK/skewed-core.sh"
+_rc=0
+_out=$(
+    GIT_PROTECTION_CORE="$WORK/skewed-core.sh" INSTALL_CONF="$UC_IC" sh -c '
+        . "$1"
+        ui_error() { echo "error: $*" >&2; }
+        update_git_protection_consent
+    ' _ "$LIB" 2>&1
+) || _rc=$?
+if [ "$_rc" = 1 ] && printf '%s' "$_out" | grep -qF 'missing from the core lib'; then
+    pass "consent: a present-but-skewed core aborts loud (#704)"
+else
+    fail "consent: skewed-core arm (rc=$_rc out=$_out)"
+fi
+
+# absent core: a visible skip row, never a silent phase drop.
+_rc=0
+_out=$(
+    INSTALL_CONF="$UC_IC" sh -c '
+        . "$1"
+        ui_detail() { echo "detail: $*"; }
+        update_git_protection_consent
+    ' _ "$LIB" 2>&1
+) || _rc=$?
+if [ "$_rc" = 0 ] && printf '%s' "$_out" | grep -qF 'core lib absent'; then
+    pass "consent: an absent core skips with a visible row (#704)"
+else
+    fail "consent: absent-core arm (rc=$_rc out=$_out)"
 fi
 
 suite_done

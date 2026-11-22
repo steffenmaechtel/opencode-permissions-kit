@@ -101,6 +101,24 @@ every `.git` found under them; one corner lingers — an ancestor
 stickied for a `.git` that has since been deleted is outside every
 current walk (strip those manually: `sudo chmod -t <dir>`).
 
+### The git-protection question (once)
+
+Since #704 an interactive `opk update` asks once, early in the phase
+run (right after the re-deploy phases, before the finalize phases —
+the re-deploys replace kit-owned files only; your configs stay
+untouched throughout), whether to configure the
+[git-protection pointer layout](git-protection.md): answering yes
+initializes the storage, persists `GITDIR_STORAGE` and migrates every
+kit-managed project to the nailed pointer layout in the same run;
+answering no persists `GITDIR_STORAGE=none` — the question never
+returns, and `sudo opk git-protection on` stays one command away.
+Unattended runs (`--yes`, no terminal) skip the question with a hint
+and persist nothing; `KIT_GITDIR_STORAGE=none` in the environment
+silences the hint, an absolute path configures without asking. Once
+enabled, every subsequent update runs the adopt + nail pass as part
+of its phases — new clones under your roots are migrated by the
+update itself.
+
 ### Update integrity (SHA256SUMS)
 
 Every `opk update` verifies each fetched kit file against the

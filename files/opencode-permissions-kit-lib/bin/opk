@@ -202,6 +202,14 @@ Commands:
                                       kit-managed main checkouts once; off
                                       removes only the kit-owned value;
                                       status reports state and lockout risks
+   git-protection <on|off|status|adopt|nail|revert>
+                                      O4 pointer layout (#704): each
+                                      project's .git directory becomes a
+                                      chattr+i-nailed pointer file into an
+                                      external dev-owned sticky storage
+                                      (closes the mv-.git arm of #702);
+                                      status is read-only, the rest
+                                      auto-elevates
   uninstall [--yes] [--dry-run] [--debug]   Remove the kit (runs as your user)
   --version                       Print the deployed kit version and exit
   help                            Show this help
@@ -453,6 +461,36 @@ $LIBDIR/sh/openchamber-core.sh) — is the kit installed?"
             exit 1
         }
         git_heal_cli "$@"
+        ;;
+    git-protection)
+        # The O4 pointer layout toggle (issue #704, the design agreed
+        # 2026-11-21): each project's .git DIRECTORY becomes a POINTER
+        # FILE into a dev-owned sticky gitdir storage OUTSIDE every
+        # projects.conf root, and the pointer is nailed with chattr +i
+        # -- the per-entry nail POSIX does not otherwise offer. Closes
+        # the reopened wholesale arm (mv .git, #702's W1/W2) without
+        # any top-level sticky. Explicit consent (the issue #100
+        # family): only `opk git-protection on` / `adopt` migrate --
+        # update asks first (update_git_protection_consent) and never
+        # silently. The arm's logic lives in sh/git-protection-core.sh
+        # (the #346 wave shape, like git-heal above). Checkout-first by
+        # construction: LIBDIR is SELF-resolved, so a checkout opk runs
+        # the checkout's core. Pairing guard: a version-skewed lib
+        # (the function missing) refuses loud instead of printing
+        # not-found and continuing -- bin/opk sets no set -e.
+        GIT_PROTECTION_CORE="$LIBDIR/sh/git-protection-core.sh"
+        if [ -f "$GIT_PROTECTION_CORE" ]; then
+            # shellcheck disable=SC1090
+            . "$GIT_PROTECTION_CORE"
+        else
+            ui_error "git-protection: core not found ($LIBDIR/sh/git-protection-core.sh) — is the kit installed?"
+            exit 1
+        fi
+        command -v git_protection_cli >/dev/null 2>&1 || {
+            ui_error "git-protection: core is version-skewed (git_protection_cli missing) — refusing to run"
+            exit 1
+        }
+        git_protection_cli "$@"
         ;;
     handover)
         # Generic ownership switch between the two kit users (mixed-

@@ -155,6 +155,8 @@ jobs:
         run: ./tests/unit/test-fs-baseline.sh
       - name: Run git heal hooks tests
         run: ./tests/unit/test-git-heal-core.sh
+      - name: Run git-protection (O4 pointer layout) tests
+        run: ./tests/unit/test-git-protection-core.sh
       - name: Run staged-write / handover gate tests
         run: ./tests/unit/test-staged-write.sh
       - name: Run sudoers pipeline tests

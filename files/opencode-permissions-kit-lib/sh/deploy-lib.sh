@@ -170,6 +170,10 @@ opencode-permissions-kit-lib/sh/fs-baseline.sh 644
 # git-heal-core.sh: the opk git-heal subcommand (#671), sourced by
 # bin/opk through its SELF-resolved $LIBDIR (the openchamber-core shape)
 opencode-permissions-kit-lib/sh/git-heal-core.sh 644
+# git-protection-core.sh: the opk git-protection subcommand (#704 O4
+# pointer layout), sourced by bin/opk the same way — same section-lib
+# class; update.sh sources it too (the consent phase)
+opencode-permissions-kit-lib/sh/git-protection-core.sh 644
 opencode-permissions-kit-lib/sh/git-check.sh 644
 opencode-permissions-kit-lib/sh/log.sh 644
 # path-sane.sh: the project-root policy gate (issue #216) — bounds the

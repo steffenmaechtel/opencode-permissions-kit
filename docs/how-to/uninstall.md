@@ -47,6 +47,17 @@ comment block, plus the legacy `[opencode-permissions-kit]` section if
 present; default: no). Decline and it prints the exact line range to
 delete by hand.
 
+Since #704 the uninstaller also asks whether to **revert the
+[git-protection pointer layout](git-protection.md)** (default: yes —
+the uninstall's contract is "all changes gone"): the revert moves
+every stored gitdir back into its project (`chattr -i`, pointer out,
+verify) and drops the storage config, before the library that performs
+it is removed. Decline and the layout simply stays — pointer files
+are plain git and keep working without the kit; the closing list then
+names the per-project manual dance (`sudo chattr -i <project>/.git &&
+sudo rm <project>/.git && sudo mv <storage>/<name>.git
+<project>/.git`).
+
 ## What stays behind (harmless)
 
 - A file at the kit's pre-0.0.10 umask name
@@ -54,6 +65,10 @@ delete by hand.
   so the uninstall treats any file there as foreign and leaves it for
   its owner to remove (kit-written profiles use the
   `opencode-permissions-kit-umask.sh` name, which IS removed).
+- The **git-protection storage directory** (the `GITDIR_STORAGE` path,
+  e.g. `/var/www/gitdirs`) stays even after a successful revert —
+  empty once every project was reverted; remove it manually if you no
+  longer want it.
 - Shell RC hook lines (`~/.bashrc` / `~/.zshrc` / `~/.profile`, tagged
   `# opencode permissions kit`) — remove the tagged lines manually.
 - Entries `opk ddev-hosts-add` wrote into the **Windows hosts file**
