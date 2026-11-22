@@ -1110,7 +1110,8 @@ un_config_dirs_remove() {
     _un_partial=""
     _un_revert_failed=0
     # #746 a A2: set by the sysctl rm arm below; the closing enumeration
-    # names the file only when it actually went.
+    # names the file only when that arm ran (DRY keeps the intended
+    # outcome, #211 b W1).
     _un_sysctl_gone=0
     un_rc_q "rm /run/opencode-permissions-kit" sudo rm -rf /run/opencode-permissions-kit
     # Router-port sysctl drop-in (#681 site 3): the name is ddev-flavored,
@@ -1123,9 +1124,11 @@ un_config_dirs_remove() {
         [ "$(sudo cat /etc/sysctl.d/99-ddev-rootless.conf 2>/dev/null)" = 'net.ipv4.ip_unprivileged_port_start=80' ]; then
         un_rc_q "rm 99-ddev-rootless.conf" sudo rm -f /etc/sysctl.d/99-ddev-rootless.conf
         # Feeds the closing enumeration (#746 a A2): the success log
-        # names this file only when it actually went — a foreign file
-        # at the name takes the skip arm below and the log must not
-        # claim a removal that did not happen (audit-log honesty).
+        # names this file only when the rm arm ran — a foreign file at
+        # the name takes the skip arm below and the log must not claim
+        # a removal that did not happen (audit-log honesty; under
+        # DRY_RUN the flag still sets — the [DRY] echo + success lines
+        # report the intended outcome, the run_q convention #211 b W1).
         _un_sysctl_gone=1
     elif sudo test -e /etc/sysctl.d/99-ddev-rootless.conf; then
         # #746 a A4: no parenthetical reason — this arm also fires for
@@ -1170,7 +1173,8 @@ un_config_dirs_remove() {
         echo "Removed."
         # The sysctl name rides the enumeration only when the rm arm
         # ran (#746 a A2) — a foreign file at the name survives and the
-        # log must not claim it among the removed artifacts.
+        # log must not claim it among the removed artifacts (DRY runs
+        # keep the intended-outcome convention, D2-qualified #746 b).
         _un_artifacts="/etc/opencode-permissions-kit, /run/opencode-permissions-kit"
         if [ "${_un_sysctl_gone:-0}" = 1 ]; then
             _un_artifacts="$_un_artifacts, 99-ddev-rootless.conf"

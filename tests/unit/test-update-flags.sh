@@ -1460,6 +1460,30 @@ if [ -n "$_brb_fn" ]; then
     else
         fail "bridge: pre-probe lib set marker anyway (got $_brb_out) (#746 a B1)"
     fi
+    # D1: a persisted stub from an EARLIER invocation must not flip the
+    # marker in a later one — second call with no candidates must stay
+    # at 0 even though the first armed the rc-0 stub (probed red
+    # pre-fix: the stub survived `command -v` and set marker=1).
+    rm -rf "${BRB:?}/root"
+    _brb_out=$(
+        FILES_ROOT="$BRB/missing-root" LIBDIR="$BRB/lib" sh -c '
+            sudo() { return 0; }
+            ui_success() { :; }
+            ui_detail() { :; }
+            ui_warn() { :; }
+            log() { :; }
+            grep() { command grep "$@"; }
+            eval "$1"
+            update_redeploy_wsl_bridge
+            update_redeploy_wsl_bridge
+            printf "%s" "${_upd_bb_sourced:-unset}"
+        ' _ "$_brb_fn"
+    ) || true
+    if [ "$_brb_out" = 0 ]; then
+        pass "bridge: double invocation with persisted stub keeps marker 0 (#746 b D1)"
+    else
+        fail "bridge: double invocation flipped marker (got $_brb_out) (#746 b D1)"
+    fi
     rm -rf "${BRB:?}"
 else
     fail "bridge function extractable from update-core.sh (#746 a B1/B2)"

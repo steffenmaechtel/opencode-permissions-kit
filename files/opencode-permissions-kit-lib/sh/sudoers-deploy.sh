@@ -20,9 +20,10 @@
 #      /etc/sudoers.d, and remove the pre-0.0.10 legacy SYMLINK
 #      (link-target-gated, #748) so only the new name is active.
 #
-# POSIX sh, SOURCED by install.sh, config.sh and update.sh (checkout
-# copy first, deployed LIBDIR fallback — same rules as
-# staged-write.sh). Never executed directly. SD_SUDO overrides the
+# POSIX sh, SOURCED by install.sh, config.sh, update.sh and
+# git-heal-core.sh (checkout copy first, deployed LIBDIR fallback — same
+# rules as staged-write.sh). Never executed directly. SD_SUDO overrides
+# the
 # sudo prefix ("" in tests), SD_VISUDO the visudo binary, SD_CONF_DIR
 # the kit config dir, SD_SUDOERS_D the sudoers.d directory. Note the
 # plain "-": SD_SUDO="" must stay empty, a ":-" would re-substitute

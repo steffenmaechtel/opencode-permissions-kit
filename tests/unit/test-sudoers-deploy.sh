@@ -234,9 +234,13 @@ _sd_out=$(
 )
 check "legacy: kit symlink to /etc/opencode removed (#748)" test ! -e "$SDD/opencode"
 
-# A foreign symlink target is left untouched with the note.
+# A foreign symlink target is left untouched with the note. The target
+# is the suite's OWN scratch file (#746 b D5): a host path (the first
+# draft used /etc/sudoers.d/README) dangles on hosts without it and
+# `test -e` false-reds the keep — the CI runner caught exactly that.
+touch "$WORK/foreign-sudoers-target"
 rm -f "${SDD:?}/opencode"
-ln -s /etc/sudoers.d/README "$SDD/opencode"
+ln -s "$WORK/foreign-sudoers-target" "$SDD/opencode"
 _sd_out=$(
     sd_env
     export SD_SUDO SD_VISUDO SD_CONF_DIR SD_SUDOERS_D

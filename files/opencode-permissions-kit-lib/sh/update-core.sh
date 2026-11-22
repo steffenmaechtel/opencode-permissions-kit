@@ -137,6 +137,13 @@ update_redeploy_wsl_bridge() {
     # invoking environment must never open the xdg removal arm
     # (update_redeploy_xdg_shim reads it later in the same run).
     _upd_bb_sourced=0
+    # Invocation isolation (#746 b D1): shell functions persist — a
+    # fail-safe stub armed by an earlier call of this function would
+    # survive into this one and satisfy the probe check below with the
+    # stub itself. Unset it so every invocation re-derives the probe
+    # from THIS run's sourcing (probed: second call with no candidates
+    # left the stub standing and flipped the marker to 1 pre-fix).
+    unset -f xdg_open_real_exists 2>/dev/null || true
     for cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh" "$LIBDIR/sh/wsl-browser-bridge.sh"; do
         if [ -f "$cand" ]; then
             . "$cand"
