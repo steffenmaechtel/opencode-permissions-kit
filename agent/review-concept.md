@@ -529,13 +529,13 @@ works.
   element is missing and the codifying rule's history shows live
   divergence; LOW — form drift on optional or bookkeeping prose with
   no divergence path, behavior already correct by other means. The
-  disposition policy splits at this line (LOW/INFO code findings are
-  deliberately not done; MED is fixed with its class sweep), so the
-  recorded case shape (the marker's med counts) follows the anchor
-  instead of per-round re-deliberation (PR #747 round a A1: `Issue:`
-  in place of the closing keyword on an intermediate wave — MED kept,
-  both readings defensible with no citable anchor; issue #751).
-  (RM-0210)
+  non-shipped disposition policy splits at this line (MED is fixed
+  with its class sweep, scaling the rounds; a LOW one may close
+  in-round under the comments-only rule), so the recorded case shape
+  (the marker's med counts) follows the anchor instead of per-round
+  re-deliberation (PR #747 round a A1: `Issue:` in place of the
+  closing keyword on an intermediate wave — MED kept, both readings
+  defensible with no citable anchor; issue #751). (RM-0210)
 
 ## Reviewer freshness
 
@@ -671,17 +671,20 @@ Review-relevant code touched this round: yes/no → …
   empty list three times over runs that were already registered
   (`gh pr checks` showed them in the same second) while the full sha
   resolved them instantly — a short-sha match is not a reliable
-  identity probe (PR #654's fix push, #656). (RM-0154)
+  identity probe (PR #654's fix push, #656). The completed-and-identity
+  assertion this bullet governs is necessary, not sufficient — a watch
+  that WAITS on these runs adds the conclusion leg (the polling-watch
+  rule directly below). (RM-0154)
 - A polling CI watch that feeds those lines gates on the per-run
   conjunction — `status: completed` AND `conclusion: success`, keyed on
-  the same run identity (the full 40-char sha) — never on a count of
-  completed entries: a completed count is blind to failure by
-  construction, and the `gh run list --json status,conclusion` output
-  carries both fields per run (pr-00732's closing-phase watch counted
-  completed entries and would have reported ALL-COMPLETED over two
-  completed-but-failed runs — the maintainer's cross-check caught it;
-  cancelled lanes show the same shape: completed with a non-success
-  conclusion). (RM-0206)
+  the same current-commit run identity (probed by the full 40-char
+  sha) — never on a count of completed entries: a completed count is
+  blind to failure by construction, and the `gh run list --json
+  status,conclusion` output carries both fields per run (pr-00732's
+  closing-phase watch counted completed entries and would have
+  reported ALL-COMPLETED over two completed-but-failed runs — the
+  maintainer's cross-check caught it; cancelled lanes show the same
+  shape: completed with a non-success conclusion). (RM-0206)
 - An EMPTY run list over the full sha is diagnosed by the PR's
   `mergeable` state FIRST: a CONFLICTING PR runs no workflows at all —
   the website shows the conflict banner while the API's run list just
