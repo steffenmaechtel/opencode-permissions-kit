@@ -564,11 +564,12 @@ else
 fi
 
 # Guard pin (#741): re-impose the tie directly — touch the index back to
-# f's cached second, the exact end state a backward clock step leaves
-# behind (probe-proven in #741) — and require the guard to converge back
-# to a quiet settled status. Discriminates the guard: without _settle_tie
-# the assert below reds, because the tie still holds when the settled
-# status runs and git legitimately re-smudges.
+# f's cached second, the tie member a ≤ 1 s backward step leaves behind
+# (larger steps stamp the index strictly earlier; the guard's -le covers
+# the whole family — probe-proven in #741) — and require the guard to
+# converge back to a quiet settled status. Discriminates the guard:
+# without _settle_tie the assert below reds, because the tie still holds
+# when the settled status runs and git legitimately re-smudges.
 touch -d "@$(stat -c %Y "$WORK/zone/repo/f")" "$WORK/zone/repo/.git/index"
 _settle_tie
 _before=$(_mlog)
