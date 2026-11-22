@@ -138,7 +138,8 @@ is still a classic directory gets a two-line hint (`run: sudo opk
 git-protection adopt <toplevel>`) on checkout — echo only, never
 blocking, self-silencing once adopted or declined. And when a project
 HAS been adopted, its common gitdir lives in the external storage,
-outside every `projects.conf` root — the hooks' fast path and the
-root heal's allowlist both accept gitdirs under the configured
-storage (validated through the same reader gate as conf roots), so
-the heal keeps working unchanged after adoption.
+outside every `projects.conf` root — the hooks' fast path accepts
+gitdirs under the configured storage by plain prefix match (the root
+heal's allowlist then re-validates that value through the same reader
+gate as conf roots before authorizing anything), so the heal keeps
+working unchanged after adoption.

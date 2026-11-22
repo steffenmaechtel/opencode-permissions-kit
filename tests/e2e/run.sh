@@ -1885,7 +1885,7 @@ check "12q: the on-run named the nail degradation loud when it happened" \
 # The adopt hint (hooks are on since 2c): silent on the ADOPTED tree,
 # still advertising on a classic one.
 check "12q: no adopt hint on the adopted tree (self-silencing)" \
-    E 'cd /var/www/vhosts/perm-check && git checkout -q -b gp-post 2>/tmp/gp-hint.log; ! grep -q "opk git-protection" /tmp/gp-hint.log'
+    E 'cd /var/www/vhosts/perm-check && git checkout -q -b gp-post 2>/tmp/gp-hint.log && ! grep -q "opk git-protection" /tmp/gp-hint.log'
 E 'git -C /var/www/vhosts/perm-check checkout -q main 2>/dev/null || git -C /var/www/vhosts/perm-check checkout -q master 2>/dev/null || true'
 # The update consent: with the feature enabled, a full update runs the
 # recurring adopt+nail pass inside its phases (checkout-shaped copy of

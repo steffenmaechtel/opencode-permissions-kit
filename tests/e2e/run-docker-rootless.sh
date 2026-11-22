@@ -316,9 +316,9 @@ check "RL2c: rl-gh migrated — pointer file + agent git green" \
 check "RL2c: status rows are nail-state honest (branched)" \
     E 'if lsattr /var/www/vhosts/rl-gh/.git 2>/dev/null | awk "{print \$1}" | grep -q i; then opk git-protection status >/tmp/gp-status.log 2>&1; test $? -eq 0 && grep -qF "pointer + nailed" /tmp/gp-status.log; else opk git-protection status >/tmp/gp-status.log 2>&1; test $? -eq 1 && grep -qF "pointer, NOT nailed" /tmp/gp-status.log; fi'
 check "RL2c: the adopt hint fires on a fresh classic tree (hooks on)" \
-    E 'git -C /var/www/vhosts init -q rl-gp2 && cd /var/www/vhosts/rl-gp2 && git -c user.email=t@e -c user.name=t commit -q --allow-empty -m x && git checkout -q -b hint 2>/tmp/gp-hint.log; grep -q "opk git-protection" /tmp/gp-hint.log'
+    E 'git -C /var/www/vhosts init -q rl-gp2 && cd /var/www/vhosts/rl-gp2 && git -c user.email=t@e -c user.name=t commit -q --allow-empty -m x && git checkout -q -b hint 2>/tmp/gp-hint.log && grep -q "opk git-protection" /tmp/gp-hint.log'
 check "RL2c: no adopt hint on the adopted tree (self-silencing)" \
-    E 'cd /var/www/vhosts/rl-gh && git checkout -q -b gp-post 2>/tmp/gp-hint2.log; ! grep -q "opk git-protection" /tmp/gp-hint2.log'
+    E 'cd /var/www/vhosts/rl-gh && git checkout -q -b gp-post 2>/tmp/gp-hint2.log && ! grep -q "opk git-protection" /tmp/gp-hint2.log'
 E 'sudo opk git-protection revert --all >/tmp/gp-revert.log 2>&1' &&
     echo "  ${GREEN}OK${NC}  opk git-protection revert --all completed"
 check "RL2c: revert walks rl-gh back to the classic layout" \

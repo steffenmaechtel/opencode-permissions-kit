@@ -32,7 +32,8 @@ on the maintainer host lives this way).
 
 ```bash
 sudo opk git-protection on      # storage init + persist + migrate ALL + nail
-opk git-protection status       # per project: classic | nailed | unnailed (no sudo)
+opk git-protection status       # per project: classic | nailed | unnailed |
+                                #   foreign-pointer | worktree-reg (no sudo)
 sudo opk git-protection adopt /var/www/vhosts/myproj   # migrate + nail ONE
 sudo opk git-protection nail    # nail pending pointers (the root pass)
 sudo opk git-protection revert --all   # walk back to the classic layout
@@ -40,7 +41,11 @@ sudo opk git-protection off     # revert --all + drop the storage config
 ```
 
 `status` exits non-zero when an actionable row exists (a classic
-`.git`, or an unnailed pointer) — cron-friendly without parsing.
+`.git`, or an unnailed pointer) — cron-friendly without parsing. The
+two remaining row kinds are informational: `foreign-pointer` (a
+pointer to somewhere else — every linked worktree of a not-yet-migrated
+project shows this shape) and `worktree-reg` (a `.git` directory
+without the gitdir payload — a worktree registration or similar).
 
 ### Consent: update asks once
 
@@ -81,11 +86,12 @@ and the result is verified (`git status`) before the next project
 starts. A failed project rolls back to the classic layout and the
 run continues; nothing is ever half-migrated.
 
-New clones: git has no post-clone hook, so the kit's
-[git-heal hooks](git-heal-hooks.md) print a two-line adopt hint when
-you clone or check out inside a managed root with a classic `.git`
-(echo only, never blocks; needs `opk git-heal on`; silenced once
-adopted or declined). `opk git-protection status` detects the same
+New clones: git runs no hook at clone time, so the kit's
+[git-heal hooks](git-heal-hooks.md) print a two-line adopt hint on
+your first checkout or switch inside a managed root with a classic
+`.git` (echo only, never blocks; needs `opk git-heal on`; silenced
+once adopted or declined — a clone you never check out in stays
+unhinted until you do). `opk git-protection status` detects the same
 state without any hooks.
 
 ## Friction you should know about (measured)
@@ -120,11 +126,16 @@ sudo opk git-protection off      # revert every project + drop the config
 ```
 
 `off` reverts first and drops `GITDIR_STORAGE` only when every
-revert succeeded (orphaned pointers could never be recognized
-again). The storage directory itself stays — remove it manually once
-empty. `opk uninstall` offers the same revert before the library
-goes; a declined revert lands in its manual-cleanup list (the
-pointer layout keeps working without the kit — it is plain git).
+revert succeeded AND nothing was skipped as not kit-owned (orphaned
+pointers could never be recognized again); when pointer projects
+exist without a resolvable storage, or rows were skipped, it refuses
+loudly and keeps the config as the locator. Linked worktrees of a
+migrated project are repaired by their MAIN project's revert — a
+worktree registration is never moved itself. The storage directory
+itself stays — remove it manually once empty. `opk uninstall` offers
+the same revert before the library goes; a declined revert lands in
+its manual-cleanup list (the pointer layout keeps working without
+the kit — it is plain git).
 
 ## Limits
 

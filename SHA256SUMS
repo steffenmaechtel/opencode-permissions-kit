@@ -33,7 +33,7 @@ db10fdee1914af11a158b46fa5dc39bd54c3b9e75969ebd2373bc5945680026c  files/opencode
 af84017e6f97099f825b839ab5e1e3d15841d1e275ec4d46da3a6580b00fce77  files/opencode-permissions-kit-lib/sh/fs-baseline.sh
 80579d6005c882c689086a3af913ccdf686059905451f43b496aa74005fd0b41  files/opencode-permissions-kit-lib/sh/git-check.sh
 d78f6d51f910142ab1b17c13b2c7a46160709a1b98f34bbc6e789eabc9ec5b2f  files/opencode-permissions-kit-lib/sh/git-heal-core.sh
-ace28e488a8c95c372c4e4b5718035a18f1f2e93e3e7fcb03e6b2fcde5115fe0  files/opencode-permissions-kit-lib/sh/git-protection-core.sh
+634f72538979c2f6e04123337ae9f83e53b09332252a954c9dddf69f58037df3  files/opencode-permissions-kit-lib/sh/git-protection-core.sh
 90dbe15f368fe65c1c022169b2700f9fd7820a47f98440bc3cb53a8fce92edaa  files/opencode-permissions-kit-lib/sh/handover-core.sh
 2dae08bdf66e64c4362baa190490937519ba7e2e9e1de551401d673ea9e28c43  files/opencode-permissions-kit-lib/sh/install-core.sh
 575266d6e05f87e5b5444464538ab3c222931bf5d5753d44695308aac067c3bf  files/opencode-permissions-kit-lib/sh/log.sh
@@ -47,7 +47,7 @@ ea3f57e045beefcae420043811c1bbdc3c4698360ad2e92c1c346310abe3b10a  files/opencode
 b6e8c715cb2881c4c4193b8d8772b9076f0a5f304952eb6a0a9a78cb7f720c81  files/opencode-permissions-kit-lib/sh/sudoers-deploy.sh
 5e5bdac5e5dc8b14a15d5f61a8980f3f850fe0baf869f70c3c76b4a7235e2e10  files/opencode-permissions-kit-lib/sh/tui-plugin.sh
 fc51c07b906b60867ec0eadddefc296111ec208a87d4e8e020b8cc8757415e5e  files/opencode-permissions-kit-lib/sh/ui.sh
-936a3e792069b675357092e4fdacddfe4ae34cf013f4ebafe61d4037e54e7eb5  files/opencode-permissions-kit-lib/sh/uninstall-core.sh
+5e68a1c7d42fd3b90c92b6cbfee65b57b0babbacd72634ce7d604106620d32a5  files/opencode-permissions-kit-lib/sh/uninstall-core.sh
 b84c5ae854e30e7286c258f7108e1bced15d9cba829e872e35e3197a9c869f2f  files/opencode-permissions-kit-lib/sh/update-check.sh
 44d2919b325d56d5aaf124590dffe851dd44b173e8a2e474d1323e4b45450a02  files/opencode-permissions-kit-lib/sh/update-core.sh
 49cf2952831b66edadf452762cad54d762477348cb0725ee1e11f9a199c8f8c5  files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh

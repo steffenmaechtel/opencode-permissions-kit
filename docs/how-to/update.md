@@ -103,8 +103,10 @@ current walk (strip those manually: `sudo chmod -t <dir>`).
 
 ### The git-protection question (once)
 
-Since #704 an interactive `opk update` asks once, before the phases
-mutate anything, whether to configure the
+Since #704 an interactive `opk update` asks once, early in the phase
+run (right after the re-deploy phases, before the finalize phases —
+the re-deploys replace kit-owned files only; your configs stay
+untouched throughout), whether to configure the
 [git-protection pointer layout](git-protection.md): answering yes
 initializes the storage, persists `GITDIR_STORAGE` and migrates every
 kit-managed project to the nailed pointer layout in the same run;

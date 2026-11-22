@@ -83,7 +83,7 @@ sudo opk git-protection adopt <path>  # migrate + nail one project
 sudo opk git-protection nail [<path>] # nail pending pointers
 sudo opk git-protection revert <path>|--all   # back to classic .git
 sudo opk git-protection off           # revert --all + drop the config
-opk git-protection status             # classic | nailed | unnailed per project
+opk git-protection status             # per-project layout state (no sudo)
 ```
 
 Each project's `.git` directory becomes a pointer file into an
@@ -92,16 +92,18 @@ external developer-owned sticky storage (default
 `GITDIR_STORAGE` in `install.conf` overrides), nailed with `chattr +i`
 — closing the mv-`.git` wholesale arm of #702 for every actor. The
 migration is per-project atomic (verify + rollback), existing
-worktrees follow via `git worktree repair`, and the relocated #651
-heal normalizes each stored gitdir. `status` needs no root and exits
-non-zero when a row is actionable (classic or unnailed). Consent:
-`opk update` asks once before configuring the storage — declining
-persists `GITDIR_STORAGE=none`; once enabled, every update runs the
-adopt + nail pass. New clones get a two-line adopt hint from the
-git-heal post-* hooks (echo only, needs `opk git-heal on`). The
-measured friction (worktree remove dance, fstype limits, the
-`FETCH_HEAD` residual) and the walk-back:
-[the how-to](../how-to/git-protection.md).
+worktrees follow via `git worktree repair` (and are repaired the same
+way on revert — a worktree registration is never moved itself), and
+the relocated #651 heal normalizes each stored gitdir. `status` needs
+no root, shows classic / nailed / unnailed / foreign-pointer /
+worktree-reg rows, and exits non-zero when a row is actionable
+(classic or unnailed). Consent: `opk update` asks once before
+configuring the storage — declining persists `GITDIR_STORAGE=none`;
+once enabled, every update runs the adopt + nail pass. The adopt hint
+prints on your first checkout in a managed classic tree (needs `opk
+git-heal on` — git runs no hook at clone time). The measured friction
+(worktree remove dance, fstype limits, the `FETCH_HEAD` residual) and
+the walk-back: [the how-to](../how-to/git-protection.md).
 
 ## The `opk` command
 

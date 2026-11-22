@@ -528,8 +528,23 @@ un_git_protection_remove() {
     _un_gpr_ic="${UN_GP_INSTALL_CONF:-/etc/opencode-permissions-kit/install.conf}"
     _un_gpr_val=$(sed -n 's/^GITDIR_STORAGE=//p' "$_un_gpr_ic" 2>/dev/null | tail -n 1)
     if [ -z "$_un_gpr_val" ] || [ "$_un_gpr_val" = "none" ]; then
-        echo "git-protection not configured (no storage) — nothing to do."
-        log "git-protection: not configured"
+        echo "git-protection not configured (no storage)."
+        # #754 a B7: pointers can outlive their config (a broken `off`,
+        # a hand-removed key) — while the CLI exists this is the last
+        # chance to SEE them; report-only, the revert itself needs the
+        # storage locator and stays a manual dance here.
+        _un_gpr_opk0="${UN_GP_OPK:-/usr/local/lib/opencode-permissions-kit/bin/opk}"
+        if [ -f "$_un_gpr_opk0" ] &&
+            sudo sh "$_un_gpr_opk0" git-protection status 2>/dev/null |
+            grep -qE 'pointer, NOT nailed|pointer \+ nailed'; then
+            echo "WARN: kit-shaped pointer projects exist without a storage config —" >&2
+            echo "      they cannot be reverted without the locator; recover per project:" >&2
+            echo "      sudo chattr -i <project>/.git && sudo rm <project>/.git &&" >&2
+            echo "      sudo mv <storage>/<name>.git <project>/.git" >&2
+            log "git-protection: orphaned pointers detected (no storage config)"
+        else
+            log "git-protection: not configured"
+        fi
         return 0
     fi
     _un_gpr_opk="${UN_GP_OPK:-/usr/local/lib/opencode-permissions-kit/bin/opk}"

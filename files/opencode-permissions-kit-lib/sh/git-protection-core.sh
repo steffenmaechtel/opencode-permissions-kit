@@ -24,9 +24,10 @@
 # hop — usage errors need no elevation; the re-exec is loop-guarded,
 # the #479 a F24 shape):
 #   status              per project: classic | nailed | unnailed |
-#                       foreign-pointer; rc 1 when any actionable row
-#                       exists (the verdict-in-rc rule, conventions.md
-#                       "Script output style"), rc 0 when protected/idle
+#                       foreign-pointer | worktree-reg; rc 1 when any
+#                       actionable row exists (the verdict-in-rc rule,
+#                       conventions.md "Script output style"), rc 0
+#                       when protected/idle
 #   on                  storage init + persist GITDIR_STORAGE +
 #                       migrate ALL classic projects + nail (root)
 #   adopt <path>        migrate + nail ONE project (root)
@@ -268,7 +269,10 @@ _gp_storage_init() {
         ui_error "cannot chown $_gpsi_stor"
         return 1
     }
-    chmod 3770 "$_gpsi_stor"
+    chmod 3770 "$_gpsi_stor" || {
+        ui_error "cannot set mode 3770 on $_gpsi_stor — the storage shape is load-bearing (sticky+setgid+group-write)"
+        return 1
+    }
     _gpsi_parent=$(dirname "$_gpsi_stor")
     if [ "$(stat -c '%G' "$_gpsi_parent" 2>/dev/null)" = "$(_gp_group)" ] &&
         [ -n "$(find "$_gpsi_parent" -maxdepth 0 -perm -g+w 2>/dev/null)" ]; then
@@ -340,23 +344,39 @@ _gp_has_i() {
 }
 
 # _gp_worktrees <gitdir>: echo registered worktree paths (minus the
-# main one, which is the project itself).
+# main one, which is the project itself). A failed enumeration is a
+# LOUD warn (#754 a C4), never a silent empty list — registered
+# worktrees would keep dangling pointers with no row at all.
 _gp_worktrees() {
-    git -c safe.directory='*' --git-dir="$1" worktree list --porcelain 2>/dev/null |
-        sed -n 's/^worktree //p' | tail -n +2
+    _gpw_out=$(_gp_devgit -c safe.directory='*' -c core.fsmonitor=false \
+        -c core.hooksPath=/dev/null --git-dir="$1" worktree list --porcelain 2>/dev/null) ||
+        ui_warn "worktree enumeration failed on $1 — repair may be skipped"
+    printf '%s' "$_gpw_out" | sed -n 's/^worktree //p' | tail -n +2
 }
 
 # _gp_heal_gitdir <gitdir>: the relocated #651 heal + the Phase A
 # ownership contract (see header). chmod walks BEFORE the chown walk
 # (L5: the walk order decides who can plant what — after the chmod
 # pass the moved tree is already group-shared, the chown pass then
-# flips ownership without re-opening a plant window).
+# flips ownership without re-opening a plant window). Failure
+# semantics (#754 a C1, closing the A9 trigger): the load-bearing
+# ownership/sticky steps return 1 (the caller's rollback arm is LIVE);
+# the perm-walk failures warn and continue (partial perms are
+# recoverable, an un-owned or un-sticky gitdir is not).
 _gp_heal_gitdir() {
     _gph_gd=$1
-    find "$_gph_gd" -type d -exec chmod g+rwxs {} + 2>/dev/null
-    find "$_gph_gd" -type f -exec chmod g+rw {} + 2>/dev/null
-    chown -R "$(_gp_devuser):$(_gp_group)" "$_gph_gd"
-    chmod +t "$_gph_gd"
+    find "$_gph_gd" -type d -exec chmod g+rwxs {} + 2>/dev/null ||
+        ui_warn "perm walk incomplete on $_gph_gd (chmod)"
+    find "$_gph_gd" -type f -exec chmod g+rw {} + 2>/dev/null ||
+        ui_warn "perm walk incomplete on $_gph_gd (file chmod)"
+    chown -R "$(_gp_devuser):$(_gp_group)" "$_gph_gd" || {
+        ui_error "chown -R failed on $_gph_gd (group '$(_gp_group)' missing?)"
+        return 1
+    }
+    chmod +t "$_gph_gd" || {
+        ui_error "cannot set the sticky bit on $_gph_gd"
+        return 1
+    }
     # config-class pins (dev, no group write, no ACLs)
     if [ -e "$_gph_gd/config" ] && [ ! -L "$_gph_gd/config" ]; then
         chown "$(_gp_devuser)" "$_gph_gd/config"
@@ -387,12 +407,31 @@ _gp_heal_gitdir() {
     return 0
 }
 
+# _gp_devgit <git-args...>: git AS THE REPOSITORY-OWNING DEVELOPER,
+# never as root (#754 a A2): status/worktree-repair honor repo-config
+# `core.fsmonitor` (string form runs the configured command) and hooks
+# as the INVOKING user — on agent-influenceable trees that is arbitrary
+# code execution as root. The dev drop follows the `_ghc_devgit` house
+# pattern (sh/git-heal-core.sh); unprivileged runs (unit suite, the
+# running user owns the fixtures) execute in place — the `-c` arms
+# stay on every leg as defense in depth (they also keep a planted
+# fsmonitor from running as the dev).
+_gp_devgit() {
+    if [ "$(id -u)" -eq 0 ]; then
+        sudo -u "$(_gp_devuser)" git "$@"
+    else
+        git "$@"
+    fi
+}
+
 # _gp_verify <proj> <gitdir>: the migration gate — pointer content,
-# git functional — before anything touches the next project.
+# git functional — before anything touches the next project. git runs
+# through _gp_devgit (A2: never as root).
 _gp_verify() {
     _gpv_p=$1 _gpv_gd=$2
     [ "$(cat "$_gpv_p/.git" 2>/dev/null)" = "gitdir: $_gpv_gd" ] || return 1
-    git -c safe.directory="$_gpv_p" -c safe.directory="$_gpv_gd" \
+    _gp_devgit -c safe.directory="$_gpv_p" -c safe.directory="$_gpv_gd" \
+        -c core.fsmonitor=false -c core.hooksPath=/dev/null \
         -C "$_gpv_p" status --porcelain >/dev/null 2>&1 || return 1
     return 0
 }
@@ -412,6 +451,58 @@ _gp_rollback() {
     return 0
 }
 
+# _gp_pform_ok <path>: FULL-path form gate (#754 a A4): absolute, no
+# dot/empty segment, whitespace or glob character — the same shape
+# arms _gp_root_ok carries, applied to the WHOLE project path. The
+# parent-only gate (`${p%/*}`) strips a trailing `..` away from the
+# checked bytes; `/root/x/..` then gated only `/root/x` while the
+# migration operated one level above it.
+_gp_pform_ok() {
+    case "$1" in
+        /*) ;;
+        *) return 1 ;;
+    esac
+    case "$1" in
+        *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]* | *[\*\?\[]*) return 1 ;;
+    esac
+    return 0
+}
+
+# _gp_storage_sane <stor>: the use-time storage re-check (#754 a A5):
+# form gate + no symlinked component + not a link itself. _gp_storage_init
+# enforces this at creation; every later consumer (migrate/nail/revert)
+# re-derives the path from env/conf and MUST re-check — an
+# agent-writable storage parent (the w11 condition the init warns
+# about) allows swapping the storage for a symlink between runs.
+_gp_storage_sane() {
+    _gpss_s=$1
+    case "$_gpss_s" in
+        /*) ;;
+        *) return 1 ;;
+    esac
+    case "$_gpss_s" in
+        *..* | *//* | *[[:space:]]* | *[\*\?\[]*) return 1 ;;
+    esac
+    _gp_nosym "$_gpss_s" || return 1
+    [ -L "$_gpss_s" ] && return 1
+    return 0
+}
+
+# _gp_unnest <tgt> <proj>: recover the A7 collision-nest — the agent
+# pre-created <tgt> as a directory in the storage AFTER the collision
+# loop checked, so root's `mv .git <tgt>` moved the gitdir INSIDE it
+# (<tgt>/.git). Detect, move ours back out, remove the agent shell,
+# restore the classic layout; the caller then fails loud (next run
+# picks the next suffix). rc 0 = classic layout restored.
+_gp_unnest() {
+    _gpun_t=$1 _gpun_p=$2
+    [ -d "$_gpun_t/.git" ] || return 1
+    ui_warn "collision sabotage shape: $_gpun_t already existed — gitdir nested inside"
+    mv "$_gpun_t/.git" "$_gpun_p/.git" || return 1
+    rmdir "$_gpun_t" 2>/dev/null || ui_warn "could not remove the planted dir $_gpun_t — next run suffixes past it"
+    return 0
+}
+
 # _gp_migrate_one <proj> <nailed:yes|no>: the atomic layout switch.
 # Root context required (or GP_ALLOW_NONROOT). The project path is
 # form-gated and .git re-checked immediately before the move (L5:
@@ -426,6 +517,12 @@ _gp_migrate_one() {
             return 1
             ;;
     esac
+    # FULL-path form gate first (#754 a A4): a trailing `..` hides
+    # from the parent-only gate below.
+    if ! _gp_pform_ok "$_gpm_p"; then
+        ui_error "malformed project path (dot, empty segment, whitespace, or glob): $_gpm_p"
+        return 1
+    fi
     _gpm_rk_rc=0
     _gp_root_ok "${_gpm_p%/*}" || _gpm_rk_rc=$?
     if [ "$_gpm_rk_rc" -ne 0 ]; then
@@ -458,6 +555,12 @@ _gp_migrate_one() {
         ui_error "storage missing: $_gpm_stor (run: opk git-protection on)"
         return 1
     }
+    # use-time storage sanity (#754 a A5): form + no symlinked
+    # component — init-time rigor alone trusts a too-wide window.
+    if ! _gp_storage_sane "$_gpm_stor"; then
+        ui_error "storage failed the use-time sanity check (symlinked component?): $_gpm_stor"
+        return 1
+    fi
 
     _gpm_name=$(basename "$_gpm_p")
     _gpm_tgt="$_gpm_stor/$_gpm_name.git"
@@ -473,26 +576,67 @@ _gp_migrate_one() {
         ui_error "mv failed: $_gpm_p/.git -> $_gpm_tgt"
         return 1
     }
+    # A7 collision shape: a dir planted at _gpm_tgt between the loop
+    # check and the mv nests the gitdir inside it — recover ours and
+    # fail loud (the next run suffixes past the planted name).
+    if [ -d "$_gpm_tgt/.git" ]; then
+        _gp_unnest "$_gpm_tgt" "$_gpm_p" || {
+            ui_error "cannot recover the nested gitdir from $_gpm_tgt — manual recovery needed"
+            return 1
+        }
+        ui_error "migration aborted after collision sabotage shape: $_gpm_p"
+        return 1
+    fi
     _gp_heal_gitdir "$_gpm_tgt" || {
         ui_error "heal failed on $_gpm_tgt -- rolling back"
         _gp_rollback "$_gpm_p" "$_gpm_tgt"
         return 1
     }
 
-    printf 'gitdir: %s\n' "$_gpm_tgt" >"$_gpm_p/.git" || {
-        ui_error "pointer write failed -- rolling back"
+    # A1: the .git name is FREE here and the project dir is
+    # agent-writable — never write/chown/chmod through it directly.
+    # Land the pointer as a staged O_EXCL temp + rename (rename does
+    # not follow symlinks: a plant at .git is replaced, not written
+    # through), with the ownership/mode set on the temp BEFORE the
+    # rename, and refuse when anything re-occupied the name mid-heal.
+    if [ -e "$_gpm_p/.git" ] || [ -L "$_gpm_p/.git" ]; then
+        ui_error "the .git name was re-occupied during the heal -- rolling back"
+        _gp_rollback "$_gpm_p" "$_gpm_tgt"
+        return 1
+    fi
+    _gpm_tmp=$(mktemp "$_gpm_p/.git.opkXXXXXX") || {
+        ui_error "mktemp failed in $_gpm_p — cannot stage the pointer"
         _gp_rollback "$_gpm_p" "$_gpm_tgt"
         return 1
     }
-    chown "$(_gp_devuser):$(_gp_group)" "$_gpm_p/.git"
-    chmod 664 "$_gpm_p/.git"
-    setfacl -b "$_gpm_p/.git" 2>/dev/null
+    printf 'gitdir: %s\n' "$_gpm_tgt" >"$_gpm_tmp" || {
+        ui_error "pointer write failed -- rolling back"
+        rm -f "$_gpm_tmp"
+        _gp_rollback "$_gpm_p" "$_gpm_tgt"
+        return 1
+    }
+    chown "$(_gp_devuser):$(_gp_group)" "$_gpm_tmp" || {
+        ui_error "cannot chown the staged pointer -- rolling back"
+        rm -f "$_gpm_tmp"
+        _gp_rollback "$_gpm_p" "$_gpm_tgt"
+        return 1
+    }
+    chmod 664 "$_gpm_tmp"
+    setfacl -b "$_gpm_tmp" 2>/dev/null
+    mv -f "$_gpm_tmp" "$_gpm_p/.git" || {
+        ui_error "pointer rename failed -- rolling back"
+        rm -f "$_gpm_tmp"
+        _gp_rollback "$_gpm_p" "$_gpm_tgt"
+        return 1
+    }
 
     # existing worktrees: their .git pointer files must follow the
-    # moved gitdir (git worktree repair rewrites them)
+    # moved gitdir (git worktree repair rewrites them; dev-dropped
+    # per A2)
     if [ -n "$_gpm_wts" ]; then
         # shellcheck disable=SC2086
-        git -c safe.directory='*' --git-dir="$_gpm_tgt" worktree repair $_gpm_wts >/dev/null 2>&1 ||
+        _gp_devgit -c safe.directory='*' -c core.fsmonitor=false \
+            -c core.hooksPath=/dev/null --git-dir="$_gpm_tgt" worktree repair $_gpm_wts >/dev/null 2>&1 ||
             ui_warn "worktree repair had issues -- check: git --git-dir=$_gpm_tgt worktree list"
         find "$_gpm_tgt/worktrees" -type d -exec chmod g+rwxs {} + 2>/dev/null
         find "$_gpm_tgt/worktrees" -type f -exec chmod g+rw {} + 2>/dev/null
@@ -516,21 +660,28 @@ _gp_migrate_one() {
 }
 
 # _gp_nail_one <proj> <gitdir>: chattr +i + verify. The pointer
-# TARGET is re-checked (inside the configured storage, gitdir
-# dev-owned, no symlink) before the nail — a hand-planted pointer
-# pointing elsewhere never gets sealed.
+# TARGET is re-checked (a storage CHILD — never the bare storage root,
+# #754 a A3: a planted `gitdir: <storage>` pointer would otherwise
+# pass every gate and seal the root itself; no symlink; gitdir
+# dev-owned) before the nail — a hand-planted pointer pointing
+# elsewhere never gets sealed. Storage sanity re-checked at use time
+# (#754 a A5).
 _gp_nail_one() {
     _gpn_p=$1 _gpn_gd=$2
     _gpn_stor_rc=0
     _gpn_stor=$(_gp_storage) || _gpn_stor_rc=$?
     [ "$_gpn_stor_rc" -eq 0 ] || return 1
     case "$_gpn_gd" in
-        "$_gpn_stor" | "$_gpn_stor"/*) ;;
+        "$_gpn_stor"/*) ;;
         *)
-            ui_warn "not nailing: $_gpn_p/.git points outside the storage ($_gpn_gd)"
+            ui_warn "not nailing: $_gpn_p/.git does not point at a storage child ($_gpn_gd)"
             return 1
             ;;
     esac
+    _gp_storage_sane "$_gpn_stor" || {
+        ui_warn "not nailing: storage failed the use-time sanity check: $_gpn_stor"
+        return 1
+    }
     [ -L "$_gpn_gd" ] && {
         ui_warn "not nailing: gitdir is a symlink: $_gpn_gd"
         return 1
@@ -551,8 +702,15 @@ _gp_nail_one() {
 }
 
 # _gp_revert_one <proj>: chattr -i, pointer out, gitdir back, repair.
-# Kit-owned layouts only: a pointer whose target sits outside the
-# configured storage is not ours and is left untouched.
+# Kit-owned layouts only: a pointer whose target is a storage CHILD
+# (never the bare storage root — #754 a A3: `gitdir: <storage>` would
+# otherwise mv the WHOLE storage into the project), is not a worktree
+# REGISTRATION (#754 a B4: `<stor>/<name>.git/worktrees/<id>` is the
+# registration dir of a linked worktree — moving it breaks the
+# worktree; the MAIN project's revert repairs its worktrees itself),
+# and is dev-owned (#754 a A6: parity with the nail gate — an
+# agent-planted <stor>/evil.git must never be root-mv'd into a
+# project). Storage sanity re-checked at use time (#754 a A5).
 _gp_revert_one() {
     _gpr_p=$1
     case "$_gpr_p" in
@@ -562,6 +720,11 @@ _gp_revert_one() {
             return 1
             ;;
     esac
+    # FULL-path form gate (#754 a A4 — the `x/..` shape).
+    if ! _gp_pform_ok "$_gpr_p"; then
+        ui_error "malformed project path (dot, empty segment, whitespace, or glob): $_gpr_p"
+        return 1
+    fi
     [ -f "$_gpr_p/.git" ] || {
         ui_detail "skip: no pointer file: $_gpr_p"
         return 0
@@ -571,18 +734,6 @@ _gp_revert_one() {
         return 0
     }
     _gpr_tgt=$(sed -n 's/^gitdir: //p' "$_gpr_p/.git" 2>/dev/null | head -n 1)
-    _gpr_stor_rc=0
-    _gpr_stor=$(_gp_storage) || _gpr_stor_rc=$?
-    _gpr_ours=1
-    if [ "$_gpr_stor_rc" -eq 0 ]; then
-        case "$_gpr_tgt" in
-            "$_gpr_stor" | "$_gpr_stor"/*) _gpr_ours=0 ;;
-        esac
-    fi
-    if [ "$_gpr_ours" -ne 0 ]; then
-        ui_detail "skip: pointer target outside storage (not ours): $_gpr_p"
-        return 0
-    fi
     case "$_gpr_tgt" in
         /*) ;;
         *)
@@ -590,6 +741,36 @@ _gp_revert_one() {
             return 0
             ;;
     esac
+    _gpr_stor_rc=0
+    _gpr_stor=$(_gp_storage) || _gpr_stor_rc=$?
+    _gpr_ours=1
+    if [ "$_gpr_stor_rc" -eq 0 ]; then
+        case "$_gpr_tgt" in
+            "$_gpr_stor"/*) _gpr_ours=0 ;;
+        esac
+    fi
+    if [ "$_gpr_ours" -ne 0 ]; then
+        ui_detail "skip: pointer target outside storage (not ours): $_gpr_p"
+        return 0
+    fi
+    # B4: worktree registrations are reverted by their MAIN project's
+    # repair leg, never moved themselves.
+    case "$_gpr_tgt" in
+        */worktrees/*)
+            ui_detail "skip: worktree registration (its main project's revert repairs it): $_gpr_p"
+            return 0
+            ;;
+    esac
+    # A3: the bare storage root can never be a gitdir target.
+    [ "$_gpr_tgt" = "$_gpr_stor" ] && {
+        ui_detail "skip: pointer names the storage root itself (not a gitdir): $_gpr_p"
+        return 0
+    }
+    # A5: use-time storage sanity.
+    _gp_storage_sane "$_gpr_stor" || {
+        ui_error "storage failed the use-time sanity check — not reverting: $_gpr_stor"
+        return 1
+    }
     [ -d "$_gpr_tgt" ] || {
         ui_error "pointer target missing: $_gpr_tgt"
         return 1
@@ -598,28 +779,40 @@ _gp_revert_one() {
         ui_error "pointer target is a symlink: $_gpr_tgt"
         return 1
     }
+    # A6: ownership parity with the nail gate.
+    [ "$(stat -c '%U' "$_gpr_tgt" 2>/dev/null)" = "$(_gp_devuser)" ] || {
+        ui_detail "skip: gitdir not dev-owned (not ours): $_gpr_p"
+        return 0
+    }
 
-    chattr -i "$_gpr_p/.git" 2>/dev/null
+    # C3: a failed chattr -i is named HERE — the manual recovery this
+    # path demands starts with exactly this step.
+    chattr -i "$_gpr_p/.git" 2>/dev/null ||
+        ui_warn "chattr -i failed on $_gpr_p/.git — an immutable pointer blocks the removal below"
     rm -f "$_gpr_p/.git"
     mv "$_gpr_tgt" "$_gpr_p/.git" || {
-        ui_error "mv back failed: $_gpr_tgt -> $_gpr_p/.git (manual recovery needed)"
+        ui_error "mv back failed: $_gpr_tgt -> $_gpr_p/.git (manual recovery: sudo chattr -i $_gpr_p/.git, then mv)"
         return 1
     }
     find "$_gpr_p/.git" -type d -exec chmod g+rwxs {} + 2>/dev/null
     find "$_gpr_p/.git" -type f -exec chmod g+rw {} + 2>/dev/null
     # worktree pointers still point into the (now moved-away) storage
+    # (dev-dropped git per #754 a A2)
     _gpr_wts=$(_gp_worktrees "$_gpr_p/.git")
     if [ -n "$_gpr_wts" ]; then
         # shellcheck disable=SC2086
-        git -c safe.directory='*' --git-dir="$_gpr_p/.git" worktree repair $_gpr_wts >/dev/null 2>&1 ||
+        _gp_devgit -c safe.directory='*' -c core.fsmonitor=false \
+            -c core.hooksPath=/dev/null --git-dir="$_gpr_p/.git" worktree repair $_gpr_wts >/dev/null 2>&1 ||
             ui_warn "worktree repair had issues -- check: git --git-dir=$_gpr_p/.git worktree list"
     fi
     # revert verify: .git is a DIRECTORY again — plain status check
-    git -c safe.directory="$_gpr_p" -C "$_gpr_p" status --porcelain >/dev/null 2>&1 || {
+    _gp_devgit -c safe.directory="$_gpr_p" -c core.fsmonitor=false \
+        -c core.hooksPath=/dev/null -C "$_gpr_p" status --porcelain >/dev/null 2>&1 || {
         ui_warn "verify after revert failed for $_gpr_p -- check manually"
         return 1
     }
     ui_detail "reverted: $_gpr_p"
+    _gp_reverted=1
     return 0
 }
 
@@ -665,7 +858,7 @@ _gp_projects() {
             _gpp_ours=1
             if [ "$_gpp_stor_rc" -eq 0 ]; then
                 case "$_gpp_t" in
-                    "$_gpp_stor" | "$_gpp_stor"/*) _gpp_ours=0 ;;
+                    "$_gpp_stor"/*) _gpp_ours=0 ;;
                 esac
             fi
             if [ "$_gpp_ours" -eq 0 ]; then
@@ -734,7 +927,7 @@ _git_protection_on() {
     _gpon_stor=$(_gp_storage) || _gpon_stor_rc=$?
     if [ "$_gpon_stor_rc" -eq 2 ]; then
         ui_error "git-protection is declined on this host (GITDIR_STORAGE=none)"
-        ui_detail "remove the marker from install.conf or run: opk git-protection on <path>"
+        ui_detail "remove the marker line from install.conf, then run: opk git-protection on"
         exit 1
     fi
     if [ "$_gpon_stor_rc" -ne 0 ]; then
@@ -839,7 +1032,10 @@ _git_protection_nail() {
 }
 
 # _gp_revert_all: every nailed/unnailed project back to classic.
-# Returns (never exits): rc 1 when any revert failed.
+# Returns (never exits): rc 1 when any revert failed. Counters for
+# the `off` honesty gate (#754 a B2): _gpra_n reverted, _gpra_skip
+# skipped-as-not-ours (worktree registrations, non-dev-owned plants,
+# foreign targets).
 _gp_revert_all() {
     _gpra_list=$(mktemp) || {
         ui_error "mktemp failed — cannot enumerate revert targets"
@@ -847,9 +1043,19 @@ _gp_revert_all() {
     }
     _gp_projects >"$_gpra_list" || true
     _gpra_failed=0
+    _gpra_n=0
+    _gpra_skip=0
     while IFS=' ' read -r _gpra_state _gpra_proj; do
         case "$_gpra_state" in
-            nailed | unnailed) _gp_revert_one "$_gpra_proj" || _gpra_failed=1 ;;
+            nailed | unnailed)
+                _gp_reverted=0
+                _gp_revert_one "$_gpra_proj" || _gpra_failed=1
+                if [ "$_gp_reverted" = 1 ]; then
+                    _gpra_n=$((_gpra_n + 1))
+                else
+                    _gpra_skip=$((_gpra_skip + 1))
+                fi
+                ;;
         esac
     done <"$_gpra_list"
     rm -f "$_gpra_list"
@@ -875,10 +1081,33 @@ _git_protection_revert() {
 
 _git_protection_off() {
     ui_section "git-protection: off (#704 O4 pointer layout)"
-    # Revert FIRST, drop config only on success: revert needs the
-    # storage config to recognize kit-owned pointers — dropping it
-    # over failed reverts would orphan them (un-revertable foreign).
+    # Honesty gate before anything is dropped (#754 a B2): pointers
+    # whose locator this config IS must never be orphaned by a
+    # success-shaped run that reverted nothing.
+    _gpof_stor_rc=0
+    _gpof_stor=$(_gp_storage) || _gpof_stor_rc=$?
+    _gpof_list=$(mktemp) || {
+        ui_error "mktemp failed — cannot enumerate pointers"
+        exit 1
+    }
+    _gp_projects >"$_gpof_list" || true
+    _gpof_ptr=$(grep -cE '^(nailed|unnailed|foreign-pointer) ' "$_gpof_list" || true)
+    if [ "$_gpof_stor_rc" -ne 0 ] && [ "${_gpof_ptr:-0}" -gt 0 ]; then
+        ui_error "pointer projects exist ($_gpof_ptr) but the storage is not resolvable —"
+        ui_error "the config is their only locator and is NOT dropped; fix GITDIR_STORAGE, then re-run"
+        rm -f "$_gpof_list"
+        exit 1
+    fi
+    rm -f "$_gpof_list"
+    # Revert FIRST, drop config only on a clean, non-skipping success:
+    # revert needs the storage config to recognize kit-owned pointers.
     if _gp_revert_all; then
+        if [ "${_gpra_skip:-0}" -gt 0 ]; then
+            ui_error "$_gpra_skip pointer project(s) were skipped as not kit-owned (worktree"
+            ui_error "registrations, foreign or non-dev-owned targets) — config NOT dropped;"
+            ui_error "inspect 'opk git-protection status', then re-run"
+            exit 1
+        fi
         _gp_drop_storage || ui_warn "could not drop GITDIR_STORAGE from install.conf"
         ui_success "git-protection off — every kit-managed project is back on the"
         ui_success "classic .git layout and the storage config is dropped"

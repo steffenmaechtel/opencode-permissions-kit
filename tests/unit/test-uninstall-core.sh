@@ -2199,21 +2199,52 @@ _gpu_run() { # output in stdout; the prompt answer rides GPU_ANSWER
     ) 2>&1
 }
 
-# not configured: clean no-op (both the absent key and the marker).
+# not configured: clean no-op (both the absent key and the marker) —
+# with the CLI present, the B7 probe answers "no pointers" silently.
 printf 'DEFAULT_USER=dev\n' >"$WORK/gpu-ic"
-_gpu_out=$(UN_GP_INSTALL_CONF="$WORK/gpu-ic" _gpu_run || true)
-if printf '%s' "$_gpu_out" | grep -qF 'git-protection not configured (no storage)'; then
+: >"$WORK/gpu-opk"
+: >"$GPU_SUDO_LOG"
+_gpu_out=$(UN_GP_INSTALL_CONF="$WORK/gpu-ic" UN_GP_OPK="$WORK/gpu-opk" \
+    _gpu_run || true)
+if printf '%s' "$_gpu_out" | grep -qF 'git-protection not configured (no storage)' &&
+    ! printf '%s' "$_gpu_out" | grep -qF 'WARN: kit-shaped pointer'; then
     pass "git-protection removal: not configured is a clean no-op (#704)"
 else
     fail "git-protection removal: not-configured arm (out=$_gpu_out)"
 fi
 printf 'DEFAULT_USER=dev\nGITDIR_STORAGE=none\n' >"$WORK/gpu-ic"
-_gpu_out=$(UN_GP_INSTALL_CONF="$WORK/gpu-ic" _gpu_run || true)
-if printf '%s' "$_gpu_out" | grep -qF 'git-protection not configured (no storage)'; then
+_gpu_out=$(UN_GP_INSTALL_CONF="$WORK/gpu-ic" UN_GP_OPK="$WORK/gpu-opk" \
+    _gpu_run || true)
+if printf '%s' "$_gpu_out" | grep -qF 'git-protection not configured (no storage)' &&
+    ! printf '%s' "$_gpu_out" | grep -qF 'WARN: kit-shaped pointer'; then
     pass "git-protection removal: the declined marker is not configured (#704)"
 else
     fail "git-protection removal: declined-marker arm (out=$_gpu_out)"
 fi
+
+# B7: not configured BUT kit-shaped pointers visible — the probe warns
+# (the stubbed opk echoes the status shape the real one renders; the
+# recorder sudo is swapped for an exec form so the probe's output can
+# flow through the pipe the section greps).
+cat >"$WORK/gpu-opk" <<'EOF'
+#!/bin/sh
+echo "kv-warn: /var/www/x pointer, NOT nailed (run: sudo opk git-protection nail)"
+EOF
+chmod 755 "$WORK/gpu-opk"
+printf '#!/bin/sh\nexec "$@"\n' >"$WORK/gpu-bin/sudo"
+chmod 755 "$WORK/gpu-bin/sudo"
+_gpu_out=$(UN_GP_INSTALL_CONF="$WORK/gpu-ic" UN_GP_OPK="$WORK/gpu-opk" \
+    _gpu_run || true)
+if printf '%s' "$_gpu_out" | grep -qF 'WARN: kit-shaped pointer projects exist' &&
+    printf '%s' "$_gpu_out" | grep -qF 'cannot be reverted without the locator'; then
+    pass "git-protection removal: orphaned pointers warn on the not-configured arm (#754 a B7)"
+else
+    fail "git-protection removal: B7 orphan arm (out=$_gpu_out)"
+fi
+# restore the recorder stub the later arms grep
+printf '#!/bin/sh\nprintf '"'"'%%s\\n'"'"' "$*" >>"${GPU_SUDO_LOG:?}"\nexit 0\n' >"$WORK/gpu-bin/sudo"
+chmod 755 "$WORK/gpu-bin/sudo"
+: >"$WORK/gpu-opk"
 
 # configured but the CLI is gone: WARN with the manual dance.
 printf 'DEFAULT_USER=dev\nGITDIR_STORAGE=/var/gitdirs-test\n' >"$WORK/gpu-ic"

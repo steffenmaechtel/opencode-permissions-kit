@@ -134,6 +134,29 @@ printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
     "$(id -un)" "$(id -un)" "$(id -gn)" >"$IC"
 mkdir -p "$WORK/roots/r1"
 
+# --- 0. every core function is defined by sourcing (#754 a B10) ---------------------
+# The three-registration-points rule (AGENTS.md, Testing): entry guard
+# (bin/opk's git_protection_cli check) + this list + the derived count.
+_defs="_gp_libdir _gp_var _gp_devuser _gp_agentuser _gp_group _gp_root_ok
+_gp_conf_path _gp_storage _gp_nosym _gp_storage_init _gp_persist_storage
+_gp_drop_storage _gp_has_i _gp_devgit _gp_verify _gp_rollback _gp_worktrees
+_gp_heal_gitdir _gp_pform_ok _gp_storage_sane _gp_unnest _gp_migrate_one
+_gp_nail_one _gp_revert_one _gp_projects _gp_revert_all
+_git_protection_status _git_protection_on _git_protection_adopt
+_git_protection_nail _gp_nail_path _git_protection_revert
+_git_protection_off git_protection_cli"
+_missing=""
+for _fn in $_defs; do
+    sh -c '. "$1" && command -v "$2" >/dev/null' _ "$CORE" "$_fn" 2>/dev/null ||
+        _missing="$_missing $_fn"
+done
+_ndefs="$(printf '%s\n' $_defs | wc -w | tr -d ' ')"
+if [ -z "$_missing" ]; then
+    pass "all $_ndefs core functions defined by sourcing (#754 a B10)"
+else
+    fail "functions missing after sourcing:$_missing"
+fi
+
 # --- 1. sourcing purity + the CLI surface ----------------------------------------
 
 _purity_rc=0
@@ -503,20 +526,29 @@ else
     fail "migrate: happy path (rc=$_rc ptr=$_ptr out=$_out)"
 fi
 
-# the migrated gitdir carries the relocated heal: operand set pinned
-# agent, config/COMMIT_EDITMSG dev (the running user here), sticky +
-# setgid on the gitdir (the #651 group-baseline semantics — the exact
-# base mode rides the source tree's umask, only the added bits are
-# the contract).
-_own_idx=$(stat -c %U "$WORK/storage/proj1.git/index")
-_own_cfg=$(stat -c %U "$WORK/storage/proj1.git/config")
-_own_msg=$(stat -c %U "$WORK/storage/proj1.git/COMMIT_EDITMSG")
-if [ "$_own_idx" = "$(id -un)" ] && [ "$_own_cfg" = "$(id -un)" ] &&
-    [ "$_own_msg" = "$(id -un)" ] &&
+# the migrated gitdir carries the relocated heal: the MODE contract is
+# the discriminator (#754 a B11 — ownership legs are vacuous when
+# dev==agent==runner; the mode classes separate): config-class 644
+# (no group write), operand-class 664, hooks 755 (setgid may ride:
+# numeric chmod does NOT clear a directory's setgid on Linux —
+# measured; harmless, the contract is no group WRITE), sticky+setgid
+# on the gitdir (the #651 group-baseline semantics — the exact base
+# mode rides the source tree's umask, only the added bits are the
+# contract).
+_mode_cfg=$(stat -c %a "$WORK/storage/proj1.git/config")
+_mode_idx=$(stat -c %a "$WORK/storage/proj1.git/index")
+_mode_msg=$(stat -c %a "$WORK/storage/proj1.git/COMMIT_EDITMSG")
+_mode_hooks=$(stat -c %a "$WORK/storage/proj1.git/hooks")
+_hooks_ok=0
+case "$_mode_hooks" in
+    755 | 2755) _hooks_ok=1 ;;
+esac
+if [ "$_mode_cfg" = 644 ] && [ "$_mode_idx" = 664 ] &&
+    [ "$_mode_msg" = 664 ] && [ "$_hooks_ok" = 1 ] &&
     [ -k "$WORK/storage/proj1.git" ] && [ -g "$WORK/storage/proj1.git" ]; then
-    pass "migrate: relocated heal — operands+config+COMMIT_EDITMSG dev, sticky+setgid"
+    pass "migrate: relocated heal — mode classes 644/664/755 + sticky+setgid"
 else
-    fail "migrate: heal contract (idx=$_own_idx cfg=$_own_cfg msg=$_own_msg)"
+    fail "migrate: heal contract (cfg=$_mode_cfg idx=$_mode_idx msg=$_mode_msg hooks=$_mode_hooks)"
 fi
 
 # skip arms: no .git, not a gitdir shape, symlinked .git.
@@ -604,10 +636,19 @@ fi
 mkdir -p "$WORK/outsidestorage/x.git"
 _rc=0
 _out=$(_core_run '_gp_nail_one "$WORK/roots/r1/classic" "$WORK/outsidestorage/x.git"') || _rc=$?
-if [ "$_rc" = 1 ] && printf '%s' "$_out" | grep -qF 'points outside the storage'; then
+if [ "$_rc" = 1 ] && printf '%s' "$_out" | grep -qF 'does not point at a storage child'; then
     pass "nail: pointer target outside the storage refused"
 else
     fail "nail: outside arm (rc=$_rc out=$_out)"
+fi
+
+# the bare storage ROOT is never a sealable target (#754 a A3).
+_rc=0
+_out=$(_core_run '_gp_nail_one "$WORK/roots/r1/classic" "$WORK/storage"') || _rc=$?
+if [ "$_rc" = 1 ] && printf '%s' "$_out" | grep -qF 'does not point at a storage child'; then
+    pass "nail: the storage root itself is refused (#754 a A3)"
+else
+    fail "nail: storage-root arm (rc=$_rc out=$_out)"
 fi
 
 # gitdir not dev-owned: DEFAULT_USER=root while scratch is runner-owned.
@@ -662,15 +703,30 @@ else
     fail "status: actionable rc (rc=$_rc out=$_out)"
 fi
 
-# a clean storage-only tree: rc 0 (pointer present = not classic).
+# a clean storage-only tree: rc 0 — ISOLATED legs (#754 a B12): a
+# NAILED-only root answers rc 0, the same root with the marker gone
+# (unnailed-only) answers rc 1.
 mkdir -p "$WORK/roots/r2"
 printf '%s\n' "$WORK/roots/r2" >"$CONF"
+_mkrepo "$WORK/roots/r2/prot"
+rm -rf "${WORK:?}/roots/r2/prot/.git"
+mkdir -p "$WORK/storage/prot.git"
+printf 'gitdir: %s\n' "$WORK/storage/prot.git" >"$WORK/roots/r2/prot/.git"
+touch "$WORK/roots/r2/prot/.git.nailed"
 _rc=0
 _out=$(_core_run 'git_protection_cli status') || _rc=$?
-if [ "$_rc" = 0 ]; then
-    pass "status: rc 0 when nothing is actionable"
+if [ "$_rc" = 0 ] && printf '%s' "$_out" | grep -qF 'pointer + nailed'; then
+    pass "status: rc 0 with a nailed-only tree (isolated)"
 else
-    fail "status: idle rc (rc=$_rc out=$_out)"
+    fail "status: nailed-only rc (rc=$_rc out=$_out)"
+fi
+rm -f "${WORK:?}/roots/r2/prot/.git.nailed"
+_rc=0
+_out=$(_core_run 'git_protection_cli status') || _rc=$?
+if [ "$_rc" = 1 ] && printf '%s' "$_out" | grep -qF 'pointer, NOT nailed'; then
+    pass "status: rc 1 with an unnailed-only tree (isolated)"
+else
+    fail "status: unnailed-only rc (rc=$_rc out=$_out)"
 fi
 
 # --- 9. revert --------------------------------------------------------------------------
@@ -704,6 +760,162 @@ if [ "$_rc" = 1 ] && printf '%s' "$_out" | grep -qF 'pointer target missing'; th
     pass "revert: vanished target is a loud error"
 else
     fail "revert: missing-target arm (rc=$_rc out=$_out)"
+fi
+
+# --- 10. round-a security arms (#754 a) ---------------------------------------------
+
+printf '%s\n' "$WORK/roots/r1" >"$CONF"
+
+# A3: a planted `gitdir: <storage-root>` pointer is foreign, unsealable
+# and unrevertable — the equality arm is gone.
+mkdir -p "$WORK/roots/r1/rootptr"
+printf 'gitdir: %s\n' "$WORK/storage" >"$WORK/roots/r1/rootptr/.git"
+_out=$(_core_run '_gp_projects')
+if printf '%s' "$_out" | grep -qxF "foreign-pointer $WORK/roots/r1/rootptr"; then
+    pass "security A3: the storage root itself classifies foreign-pointer"
+else
+    fail "security A3: classification (out=$(printf '%s' "$_out" | tr '\n' ';'))"
+fi
+_rc=0
+_out=$(_core_run '_gp_nail_one "$WORK/roots/r1/rootptr" "$WORK/storage"') || _rc=$?
+if [ "$_rc" = 1 ] && printf '%s' "$_out" | grep -qF 'does not point at a storage child'; then
+    pass "security A3: nailing the storage root refused"
+else
+    fail "security A3: nail arm (rc=$_rc out=$_out)"
+fi
+_rc=0
+_out=$(_core_run '_gp_revert_one "$WORK/roots/r1/rootptr"') || _rc=$?
+if [ "$_rc" = 0 ] && printf '%s' "$_out" | grep -qF 'outside storage (not ours)' &&
+    [ -d "$WORK/storage" ] && [ -f "$WORK/roots/r1/rootptr/.git" ]; then
+    pass "security A3: reverting a storage-root pointer skips (storage intact)"
+else
+    fail "security A3: revert arm (rc=$_rc out=$_out)"
+fi
+
+# A4: the trailing `/..` shape is refused by the FULL-path form gate.
+_mkrepo "$WORK/roots/r1/dotdot"
+_rc=0
+_out=$(_core_run '_gp_migrate_one "$WORK/roots/r1/dotdot/.." yes') || _rc=$?
+if [ "$_rc" = 1 ] && printf '%s' "$_out" | grep -qF 'malformed project path' &&
+    [ -d "$WORK/roots/r1/dotdot/.git" ]; then
+    pass "security A4: adopt-shaped /.. path refused before any move"
+else
+    fail "security A4: /.. arm (rc=$_rc out=$_out)"
+fi
+
+# A5: a symlinked storage is refused at use time (migrate leg).
+_mkrepo "$WORK/roots/r1/symstor"
+rm -rf "${WORK:?}/storage-sym"
+ln -s "$WORK/storage" "$WORK/storage-sym"
+_rc=0
+_out=$(_core_run 'GP_STORAGE="$WORK/storage-sym" _gp_migrate_one "$WORK/roots/r1/symstor" yes') || _rc=$?
+if [ "$_rc" = 1 ] && printf '%s' "$_out" | grep -qF 'use-time sanity check' &&
+    [ -d "$WORK/roots/r1/symstor/.git" ]; then
+    pass "security A5: symlinked storage refused at use time"
+else
+    fail "security A5: symstor arm (rc=$_rc out=$_out)"
+fi
+
+# A6: revert requires a dev-owned target — a planted, runner-foreign
+# gitdir (root-owned here: the runner cannot own it) is skipped. The
+# foreign owner rides a SCRATCH install.conf (an env assignment prefix
+# never reaches _gp_var's conf read).
+mkdir -p "$WORK/roots/r1/plant" "$WORK/storage/evil.git"
+printf 'gitdir: %s\n' "$WORK/storage/evil.git" >"$WORK/roots/r1/plant/.git"
+printf 'HEAD' >"$WORK/storage/evil.git/HEAD"
+printf 'DEFAULT_USER=root\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
+    "$(id -un)" "$(id -gn)" >"$WORK/ic-a6"
+_rc=0
+_out=$(_core_run 'GP_INSTALL_CONF="$WORK/ic-a6" _gp_revert_one "$WORK/roots/r1/plant"') || _rc=$?
+if [ "$_rc" = 0 ] && printf '%s' "$_out" | grep -qF 'gitdir not dev-owned' &&
+    [ -d "$WORK/storage/evil.git" ]; then
+    pass "security A6: non-dev-owned storage entry is not reverted"
+else
+    fail "security A6: plant arm (rc=$_rc out=$_out)"
+fi
+
+# B4: linked worktrees survive revert --all (the registration is never
+# moved; the main project's repair leg fixes the worktree pointer).
+# Fresh root r3 so leftover section-5 fixtures cannot pollute the sweep.
+mkdir -p "$WORK/roots/r3"
+printf '%s\n' "$WORK/roots/r3" >"$CONF"
+_mkrepo "$WORK/roots/r3/wtrt"
+git -C "$WORK/roots/r3/wtrt" worktree add "$WORK/roots/r3/wtrt-side" -q 2>/dev/null ||
+    git -C "$WORK/roots/r3/wtrt" worktree add -q "$WORK/roots/r3/wtrt-side"
+_rc=0
+_out=$(_core_run '_gp_migrate_one "$WORK/roots/r3/wtrt" yes') || _rc=$?
+if [ "$_rc" = 0 ]; then
+    # the worktree path ITSELF is a skip while adopted (the B4 guard).
+    _rc=0
+    _out=$(_core_run '_gp_revert_one "$WORK/roots/r3/wtrt-side"') || _rc=$?
+    if [ "$_rc" = 0 ] && printf '%s' "$_out" | grep -qF 'worktree registration'; then
+        pass "security B4: the worktree registration itself is never reverted"
+    else
+        fail "security B4: wt-path arm (rc=$_rc out=$_out)"
+    fi
+    _rc2=0
+    _out2=$(_core_run '_gp_revert_all') || _rc2=$?
+    if [ "$_rc2" = 0 ] && [ -d "$WORK/roots/r3/wtrt/.git" ] &&
+        [ -f "$WORK/roots/r3/wtrt-side/.git" ] &&
+        git -C "$WORK/roots/r3/wtrt-side" status --porcelain >/dev/null 2>&1; then
+        pass "security B4: revert --all leaves linked worktrees working"
+    else
+        fail "security B4: revert roundtrip (rc=$_rc2 wtptr=$(cat "$WORK/roots/r3/wtrt-side/.git" 2>/dev/null))"
+    fi
+else
+    fail "security B4: migrate leg failed (rc=$_rc out=$_out)"
+fi
+printf '%s\n' "$WORK/roots/r1" >"$CONF"
+
+# C1 (with the A9 trigger): a heal chown failure rolls the migration
+# back — the caller's rollback arm is LIVE. The bad group rides a
+# scratch install.conf (env prefixes never reach _gp_var's conf read).
+_mkrepo "$WORK/roots/r1/badgrp"
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=no-such-group-xyz\n' \
+    "$(id -un)" "$(id -un)" >"$WORK/ic-c1"
+_rc=0
+_out=$(_core_run 'GP_INSTALL_CONF="$WORK/ic-c1" _gp_migrate_one "$WORK/roots/r1/badgrp" yes') || _rc=$?
+if [ "$_rc" = 1 ] && printf '%s' "$_out" | grep -qF 'chown -R failed' &&
+    printf '%s' "$_out" | grep -qF 'rolling back' &&
+    [ -d "$WORK/roots/r1/badgrp/.git" ] &&
+    git -C "$WORK/roots/r1/badgrp" status --porcelain >/dev/null 2>&1; then
+    pass "security C1/A9: heal chown failure rolls back loudly"
+else
+    fail "security C1: badgroup arm (rc=$_rc out=$_out)"
+fi
+
+# B2: off with an unresolvable storage over existing pointers refuses
+# and keeps the marker (GP_STORAGE unset so the conf's "none" governs).
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\nGITDIR_STORAGE=none\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" >"$IC"
+_rc=0
+_out=$(_core_run 'unset GP_STORAGE; _git_protection_off') || _rc=$?
+if [ "$_rc" = 1 ] &&
+    printf '%s' "$_out" | grep -qF 'storage is not resolvable' &&
+    [ "$(sed -n 's/^GITDIR_STORAGE=//p' "$IC")" = "none" ]; then
+    pass "security B2: off refuses over orphan-able pointers, keeps the config"
+else
+    fail "security B2: off-honesty arm (rc=$_rc out=$_out)"
+fi
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" >"$IC"
+
+# C5: a getent-failing agent user still refuses the literal agent-home
+# root (the bounded degradation the finding names) — scratch conf with
+# a NONEXISTENT agent user so getent itself fails.
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=no-such-agent-xyz\n' "$(id -un)" >"$WORK/ic-c5"
+printf '%s\n' "/home/no-such-agent-xyz" >"$CONF"
+_out=$(
+    GP_STORAGE="$WORK/storage" GP_CONF="$CONF" GP_INSTALL_CONF="$WORK/ic-c5" sh -c '
+        . "$1"
+        _gp_root_ok "/home/no-such-agent-xyz"
+        echo "rc=$?"
+    ' _ "$CORE" 2>&1
+)
+if printf '%s' "$_out" | grep -qF 'rc=2'; then
+    pass "security C5: literal agent-home arm covers a getent failure"
+else
+    fail "security C5: getent-failure arm (out=$_out)"
 fi
 
 suite_done "git-protection core tests"
