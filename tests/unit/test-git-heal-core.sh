@@ -201,6 +201,48 @@ else
     fail "heal: conf form-arms-under-relax (rc=$_hr_rc out=$_hr_out) (#674/#665)"
 fi
 
+# --- 1c. heal-index-head: the git-protection storage leg (#704) --------------------
+# After adoption the common gitdir lives OUTSIDE every conf root, in
+# the external storage — honored like a conf root through the SAME
+# _gh_root_ok gate. The storage is a plain dir here (not a gitdir
+# shape): reaching the SHAPE refusal proves the allowlist authorized
+# it — the conf holds no matching root.
+mkdir -p "$WORK/gpstor/migrated.git"
+printf '%s\n' "$WORK/r1" >"$CONF"
+_hr_rc=0
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 GH_PROJECTS_CONF="$CONF" \
+    GH_STORAGE="$WORK/gpstor" "$HEAL" "$WORK/gpstor/migrated.git" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 1 ] &&
+    printf '%s' "$_hr_out" | grep -qF 'not a (common) gitdir shape' &&
+    ! printf '%s' "$_hr_out" | grep -qF 'outside kit-managed roots'; then
+    pass "heal: a gitdir under the storage root is authorized (#704)"
+else
+    fail "heal: storage-allowlist arm (rc=$_hr_rc out=$_hr_out)"
+fi
+
+# A bogus (non-absolute) storage value authorizes nothing.
+_hr_rc=0
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 GH_PROJECTS_CONF="$CONF" \
+    GH_STORAGE="not-absolute" "$HEAL" "$WORK/gpstor/migrated.git" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 1 ] &&
+    printf '%s' "$_hr_out" | grep -qF 'outside kit-managed roots'; then
+    pass "heal: a malformed storage value authorizes nothing (#704)"
+else
+    fail "heal: storage-form arm (rc=$_hr_rc out=$_hr_out)"
+fi
+
+# A storage root that is a system path is refused by the reader gate
+# (no relax on this arm) — a bogus install.conf line never heals.
+_hr_rc=0
+_hr_out=$(env GH_ALLOW_NONROOT=1 GH_PROJECTS_CONF="$CONF" \
+    GH_STORAGE="/etc/gitdirs" "$HEAL" "$WORK/gpstor/migrated.git" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 1 ] &&
+    printf '%s' "$_hr_out" | grep -qF 'outside kit-managed roots'; then
+    pass "heal: a system-path storage root is refused (#704)"
+else
+    fail "heal: storage-system-path arm (rc=$_hr_rc out=$_hr_out)"
+fi
+
 printf '%s\n' "$WORK" >"$CONF"
 
 # --- 2. heal-index-head: realpath + gitdir-shape refusals --------------------------
@@ -417,7 +459,7 @@ printf '%s\n' "$WORK/zone" "# a comment line rides along (#660 M6)" "" >"$CONF"
 : >"$LOG"
 
 _gitenv() { # env prefix for every matrix git call
-    printf 'GH_LIBDIR=%s GH_PROJECTS_CONF=%s GH_LOG=%s GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 GH_AGENT_USER=%s' \
+    printf 'GH_LIBDIR=%s GH_PROJECTS_CONF=%s GH_LOG=%s GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 GH_AGENT_USER=%s GP_NO_HINT=1' \
         "$WORK/lib" "$CONF" "$LOG" "$(id -un)"
 }
 _mgit() { # git in the matrix zone (hooks + env applied)
@@ -686,7 +728,78 @@ if [ "$_hr_rc" -eq 0 ] && printf '%s' "$_out" | grep -qF 'heal skipped (sudo una
 else
     fail "sudo-failed arm (rc=$_hr_rc out=$_out)"
 fi
-printf '#!/bin/sh\nexec "$@"\n' >"$WORK/sbin/sudo"
+# Restore the ORIGINAL flag-stripping stub — a bare `exec "$@"`
+# restore (the pre-#704 spelling) leaves a stub that dies on sudo's
+# leading `-n` (exec takes `-n` for the command name: "not found",
+# rc 127), and every later sudo consumer inherits the breakage
+# (found by the #704 storage fast-path arm, measured 2026-11-22).
+printf '#!/bin/sh\nwhile [ $# -gt 0 ]; do\n    case "$1" in\n    -*) shift ;;\n    *) break ;;\n    esac\ndone\nexec "$@"\n' >"$WORK/sbin/sudo"
+
+# --- 6b. hooks: the git-protection fast path + adopt hint (#704) --------------------
+# The storage leg of the fast path: a repo whose COMMON gitdir sits
+# under GP_STORAGE fires the heal even when no conf root matches; the
+# hint (below) is silenced per-arm instead of via _gitenv's blanket
+# GP_NO_HINT=1.
+git -C "$WORK" init -q -b main gpstorage-zone 2>/dev/null
+git -C "$WORK/gpstorage-zone" -c user.email=t@e -c user.name=t commit -q --allow-empty -m x
+printf '%s\n' "$WORK/r1" >"$CONF" # conf deliberately does NOT match
+git -C "$WORK/gpstorage-zone" config core.hooksPath "$WORK/lib/git-heal/hooks"
+_before=$(_mlog)
+env PATH="$WORK/sbin:$PATH" GH_LIBDIR="$WORK/lib" GH_PROJECTS_CONF="$CONF" \
+    GH_LOG="$LOG" GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 GH_AGENT_USER="$(id -un)" \
+    GH_STORAGE="$WORK/gpstorage-zone" GP_STORAGE="$WORK/gpstorage-zone" \
+    git -C "$WORK/gpstorage-zone" checkout -q -b storage-hit 2>/dev/null || true
+if [ "$(_mlog)" -gt "$_before" ]; then
+    pass "hook: a gitdir under the storage root heals (fast path, #704)"
+else
+    fail "hook: storage fast path did not fire (#704)"
+fi
+
+# The adopt hint: a MANAGED tree with a classic .git layout carries
+# the wholesale arm — the hook says so and names the command. GP_NO_HINT
+# is unset for this arm (the matrix blanket silences it).
+printf '%s\n' "$WORK/zone" "# comment" "" >"$CONF"
+_hr_rc=0
+_out=$(env PATH="$WORK/sbin:$PATH" $(_gitenv) GP_STORAGE="$WORK/gpstor" \
+    env -u GP_NO_HINT git -C "$WORK/zone/repo" checkout -q -b hint-arm 2>&1) || _hr_rc=$?
+if printf '%s' "$_out" | grep -qF '[opk git-protection post-checkout] kit-managed tree with classic .git layout' &&
+    printf '%s' "$_out" | grep -qF 'run: sudo opk git-protection adopt'; then
+    pass "hook: classic .git in a managed tree gets the adopt hint (#704)"
+else
+    fail "hook: hint arm (rc=$_hr_rc out=$_out)"
+fi
+
+# Self-silencing: a POINTER .git (adopted layout) gets no hint — git
+# works through the pointer, the hint condition is dir-only.
+git -C "$WORK" init -q -b main gpadopted 2>/dev/null
+git -C "$WORK/gpadopted" -c user.email=t@e -c user.name=t commit -q --allow-empty -m x
+mkdir -p "$WORK/gpstor"
+mv "$WORK/gpadopted/.git" "$WORK/gpstor/adopted.git"
+printf 'gitdir: %s\n' "$WORK/gpstor/adopted.git" >"$WORK/gpadopted/.git"
+git -C "$WORK/gpadopted" config core.hooksPath "$WORK/lib/git-heal/hooks"
+_hr_rc=0
+_out=$(env PATH="$WORK/sbin:$PATH" GH_LIBDIR="$WORK/lib" GH_PROJECTS_CONF="$CONF" \
+    GH_LOG="$LOG" GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 GH_AGENT_USER="$(id -un)" \
+    GP_STORAGE="$WORK/gpstor" \
+    git -C "$WORK/gpadopted" checkout -q -b adopted-quiet 2>&1) || _hr_rc=$?
+if ! printf '%s' "$_out" | grep -qF 'opk git-protection'; then
+    pass "hook: an adopted (pointer .git) tree gets no hint — self-silencing (#704)"
+else
+    fail "hook: pointer-silence arm (rc=$_hr_rc out=$_out)"
+fi
+
+# The decline marker silences the hint (a host that said no is not
+# nagged on every checkout).
+_hr_rc=0
+_out=$(env PATH="$WORK/sbin:$PATH" $(_gitenv) GP_STORAGE=none \
+    env -u GP_NO_HINT git -C "$WORK/zone/repo" checkout -q -b declined-quiet 2>&1) || _hr_rc=$?
+if ! printf '%s' "$_out" | grep -qF 'opk git-protection'; then
+    pass "hook: GITDIR_STORAGE=none silences the hint (#704)"
+else
+    fail "hook: decline-marker arm (rc=$_hr_rc out=$_out)"
+fi
+# restore the conf the matrix expects
+printf '%s\n' "$WORK/zone" "# a comment line rides along (#660 M6)" "" >"$CONF"
 
 # --- 7. git-heal-core.sh: state machine + on/off/usage ------------------------------
 

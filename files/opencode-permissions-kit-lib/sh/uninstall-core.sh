@@ -514,21 +514,29 @@ un_git_heal_remove() {
 # changes made by install.sh are removed", the same class
 # un_projects_revert automates. A declined revert lands in the closing
 # manual-cleanup list.
+# Test override (unit suite only, never set in production):
+#   UN_GP_INSTALL_CONF  install.conf to read GITDIR_STORAGE from
+#                      (default /etc/opencode-permissions-kit/
+#                      install.conf)
+#   UN_GP_OPK           the kit CLI `off` is delegated to (default
+#                      /usr/local/lib/opencode-permissions-kit/
+#                      bin/opk — the seam keeps the arms drivable on
+#                      hosts that carry a real install)
 un_git_protection_remove() {
     echo ""
     echo "--- Removing git-protection pointer layout ---"
-    _un_gpr_ic="/etc/opencode-permissions-kit/install.conf"
+    _un_gpr_ic="${UN_GP_INSTALL_CONF:-/etc/opencode-permissions-kit/install.conf}"
     _un_gpr_val=$(sed -n 's/^GITDIR_STORAGE=//p' "$_un_gpr_ic" 2>/dev/null | tail -n 1)
     if [ -z "$_un_gpr_val" ] || [ "$_un_gpr_val" = "none" ]; then
         echo "git-protection not configured (no storage) — nothing to do."
         log "git-protection: not configured"
         return 0
     fi
-    _un_gpr_opk="/usr/local/lib/opencode-permissions-kit/bin/opk"
+    _un_gpr_opk="${UN_GP_OPK:-/usr/local/lib/opencode-permissions-kit/bin/opk}"
     if [ ! -f "$_un_gpr_opk" ]; then
         echo "WARN: git-protection is configured ($_un_gpr_val) but the kit CLI is" >&2
-        echo "      gone — revert each project manually: sudo chattr -i <project>/.git," >&2
-        echo "      rm <project>/.git, mv $_un_gpr_val/<name>.git <project>/.git" >&2
+        echo "      gone — per project: sudo chattr -i <project>/.git && sudo rm" >&2
+        echo "      <project>/.git && sudo mv $_un_gpr_val/<name>.git <project>/.git" >&2
         log "git-protection: configured but CLI missing"
         return 0
     fi

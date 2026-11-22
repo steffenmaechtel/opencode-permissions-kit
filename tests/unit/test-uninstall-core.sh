@@ -71,7 +71,8 @@ fi
 
 _defs="prompt_yn run_q un_rc_q un_opencode_user_gate un_context_load
 un_sudoers_remove un_wrapper_remove un_cli_remove un_xdg_open_remove
-un_tui_plugins_remove un_wsl_bridge_remove un_git_heal_remove un_library_remove
+un_tui_plugins_remove un_wsl_bridge_remove un_git_heal_remove
+un_git_protection_remove un_library_remove
 un_umask_remove
 un_group_membership_remove un_projects_revert un_config_dirs_remove
 un_audit_log_remove un_user_remove _un_revert_chown un_link_owned"
@@ -126,6 +127,7 @@ fi
 # by the projects-guard pin right below)
 _order="un_context_load un_sudoers_remove un_wrapper_remove un_cli_remove
 un_xdg_open_remove un_tui_plugins_remove un_wsl_bridge_remove un_git_heal_remove
+un_git_protection_remove
 un_library_remove un_umask_remove un_user_remove
 un_config_dirs_remove un_audit_log_remove"
 _prev=0
@@ -2162,6 +2164,90 @@ if printf '%s' "$_out" | grep -qF 'git heal hooks not active (no core.hooksPath 
     pass "git-heal removal: absent value is a clean no-op (#671)"
 else
     fail "git-heal removal: absent arm broken (out=$_out)"
+fi
+
+# --- un_git_protection_remove (#704): revert offer before the library goes --------
+# Four arms at function level, on the documented UN_GP_* seams (the
+# fixed /etc + /usr/local paths stay outside the unit sandbox; a host
+# with a real install must not leak into the arms). prompt_yn is
+# stubbed per arm via GPU_ANSWER (the decline/accept legs without a
+# pty); sudo is a PATH stub that records argv — un_rc_q's real leg
+# never reaches a privileged binary here.
+mkdir -p "$WORK/gpu-bin"
+cat >"$WORK/gpu-bin/sudo" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$*" >>"${GPU_SUDO_LOG:?}"
+exit 0
+EOF
+chmod 755 "$WORK/gpu-bin/sudo"
+GPU_SUDO_LOG="$WORK/gpu-sudo.log"
+export GPU_SUDO_LOG
+
+_gpu_run() { # output in stdout; the prompt answer rides GPU_ANSWER
+    (
+        PATH="$WORK/gpu-bin:/usr/bin:/bin"
+        export PATH
+        DRY_RUN=false
+        YES=false
+        log() { echo "log: $*"; }
+        trace() { :; }
+        prompt_yn() {
+            echo "${GPU_ANSWER:-n}"
+            return 0
+        }
+        un_git_protection_remove
+    ) 2>&1
+}
+
+# not configured: clean no-op (both the absent key and the marker).
+printf 'DEFAULT_USER=dev\n' >"$WORK/gpu-ic"
+_gpu_out=$(UN_GP_INSTALL_CONF="$WORK/gpu-ic" _gpu_run || true)
+if printf '%s' "$_gpu_out" | grep -qF 'git-protection not configured (no storage)'; then
+    pass "git-protection removal: not configured is a clean no-op (#704)"
+else
+    fail "git-protection removal: not-configured arm (out=$_gpu_out)"
+fi
+printf 'DEFAULT_USER=dev\nGITDIR_STORAGE=none\n' >"$WORK/gpu-ic"
+_gpu_out=$(UN_GP_INSTALL_CONF="$WORK/gpu-ic" _gpu_run || true)
+if printf '%s' "$_gpu_out" | grep -qF 'git-protection not configured (no storage)'; then
+    pass "git-protection removal: the declined marker is not configured (#704)"
+else
+    fail "git-protection removal: declined-marker arm (out=$_gpu_out)"
+fi
+
+# configured but the CLI is gone: WARN with the manual dance.
+printf 'DEFAULT_USER=dev\nGITDIR_STORAGE=/var/gitdirs-test\n' >"$WORK/gpu-ic"
+_gpu_out=$(UN_GP_INSTALL_CONF="$WORK/gpu-ic" UN_GP_OPK="$WORK/gpu-opk-missing" \
+    _gpu_run || true)
+if printf '%s' "$_gpu_out" | grep -qF 'kit CLI is' &&
+    printf '%s' "$_gpu_out" | grep -qF 'chattr -i'; then
+    pass "git-protection removal: CLI-gone WARN names the manual dance (#704)"
+else
+    fail "git-protection removal: CLI-gone arm (out=$_gpu_out)"
+fi
+
+# accept: delegates to `sudo sh <opk> git-protection off` (stubbed).
+: >"$WORK/gpu-opk"
+: >"$GPU_SUDO_LOG"
+_gpu_out=$(GPU_ANSWER=y UN_GP_INSTALL_CONF="$WORK/gpu-ic" UN_GP_OPK="$WORK/gpu-opk" \
+    _gpu_run || true)
+if printf '%s' "$_gpu_out" | grep -qF 'git-protection reverted (storage config dropped)' &&
+    grep -qF "sh $WORK/gpu-opk git-protection off" "$GPU_SUDO_LOG"; then
+    pass "git-protection removal: accept runs the off delegation (#704)"
+else
+    fail "git-protection removal: accept arm (out=$_gpu_out sudo=$(cat "$GPU_SUDO_LOG"))"
+fi
+
+# decline: layout left in place, manual instructions, no sudo spawn.
+: >"$GPU_SUDO_LOG"
+_gpu_out=$(GPU_ANSWER=n UN_GP_INSTALL_CONF="$WORK/gpu-ic" UN_GP_OPK="$WORK/gpu-opk" \
+    _gpu_run || true)
+if printf '%s' "$_gpu_out" | grep -qF 'left in place' &&
+    ! printf '%s' "$_gpu_out" | grep -qF 'storage config dropped' &&
+    [ ! -s "$GPU_SUDO_LOG" ]; then
+    pass "git-protection removal: decline leaves the layout, no delegation (#704)"
+else
+    fail "git-protection removal: decline arm (out=$_gpu_out sudo=$(cat "$GPU_SUDO_LOG"))"
 fi
 
 # --- #662 S3: kit-ownership gate on the fixed /usr/local/bin names ---------------
