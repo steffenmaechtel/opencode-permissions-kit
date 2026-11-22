@@ -543,7 +543,17 @@ _hooks_ok=0
 case "$_mode_hooks" in
     755 | 2755) _hooks_ok=1 ;;
 esac
-if [ "$_mode_cfg" = 644 ] && [ "$_mode_idx" = 664 ] &&
+# The index is umask-tolerant: _gp_verify's own status refresh may
+# rewrite it under the invoking umask (002 here -> 664, CI's 022 ->
+# 644; measured on the CI runner) — git floats operand modes by
+# design (#671). The CLASS discriminator is config-no-group-write vs
+# COMMIT_EDITMSG-group-write; the index asserts only the two observed
+# post-status shapes.
+_idx_ok=0
+case "$_mode_idx" in
+    644 | 664) _idx_ok=1 ;;
+esac
+if [ "$_mode_cfg" = 644 ] && [ "$_idx_ok" = 1 ] &&
     [ "$_mode_msg" = 664 ] && [ "$_hooks_ok" = 1 ] &&
     [ -k "$WORK/storage/proj1.git" ] && [ -g "$WORK/storage/proj1.git" ]; then
     pass "migrate: relocated heal — mode classes 644/664/755 + sticky+setgid"
