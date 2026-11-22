@@ -428,6 +428,27 @@ _mlog() {
     printf '%s\n' "${_ml_n:-0}"
 }
 
+_settle_tie() { # clock-step guard (#741): spin (bounded) until the
+    # index on disk is stamped strictly later than f — the physical
+    # invariant the settled half's quiet-guarantee rests on. A backward
+    # host-clock step inside the add->rewrite window stamps status #1's
+    # rewrite at or before f's second (measured on the WSL2 host: steps
+    # up to 2.5 s, ~15/h even idle — #741 journal forensics); in that
+    # state a re-fire is git's documented racy-clean behavior, not a
+    # heal defect, so wait the step out and let a status re-establish a
+    # strictly-newer index before the quiet assertion runs. The body
+    # never runs on an honest clock: status #1 already stamped a later
+    # second, so the loop condition is false on entry.
+    _st_tries=0
+    while [ "$(stat -c %Y "$WORK/zone/repo/.git/index")" \
+        -le "$(stat -c %Y "$WORK/zone/repo/f")" ] &&
+        [ "$_st_tries" -lt 5 ]; do
+        sleep 1
+        _mgit status --porcelain >/dev/null 2>&1
+        _st_tries=$((_st_tries + 1))
+    done
+}
+
 git -C "$WORK/zone" init -q -b main repo
 git -C "$WORK/zone/repo" config user.email t@e
 git -C "$WORK/zone/repo" config user.name t
@@ -515,10 +536,14 @@ fi
 # staged entry's cached mtime ties the index-write second; until a
 # boundary-crossing rewrite stamps a newer index mtime, EVERY status
 # re-smudges (rewrites the index, post-index-change fires) — the tie is
-# between cache and index (both stamped by the add), so the firing is
-# deterministic regardless of when the status runs; the sleep only
-# guarantees the first status's rewrite lands in a later second, which
-# makes the status after it provably quiet (the settled half).
+# between cache and index (both stamped by the add), so the racy firing
+# is deterministic regardless of when the status runs. The settled half's
+# quiet-guarantee, however, holds only on an honest clock: it is the
+# invariant "index on disk stamped strictly later than f", which sleep 1
+# establishes — unless a backward host-clock step lands in the window
+# (#741). _settle_tie verifies the invariant instead of trusting the
+# sleep and converges past a step; the pin below re-imposes the tie to
+# prove the guard discriminates.
 echo racy >"$WORK/zone/repo/f"
 _mgit add f
 sleep 1
@@ -529,12 +554,29 @@ if [ "$(_mlog)" -gt "$_before" ]; then
 else
     fail "matrix: racy-clean status did not fire"
 fi
+_settle_tie
 _before=$(_mlog)
 _mgit status --porcelain >/dev/null
 if [ "$(_mlog)" = "$_before" ]; then
     pass "matrix: tie broken — the settled status after is quiet"
 else
     fail "matrix: settled status fired again (tie not broken)"
+fi
+
+# Guard pin (#741): re-impose the tie directly — touch the index back to
+# f's cached second, the exact end state a backward clock step leaves
+# behind (probe-proven in #741) — and require the guard to converge back
+# to a quiet settled status. Discriminates the guard: without _settle_tie
+# the assert below reds, because the tie still holds when the settled
+# status runs and git legitimately re-smudges.
+touch -d "@$(stat -c %Y "$WORK/zone/repo/f")" "$WORK/zone/repo/.git/index"
+_settle_tie
+_before=$(_mlog)
+_mgit status --porcelain >/dev/null
+if [ "$(_mlog)" = "$_before" ]; then
+    pass "matrix: settled status converges after a re-imposed tie (clock-step guard #741)"
+else
+    fail "matrix: settled status fired on a re-imposed tie (clock-step guard broken)"
 fi
 
 # Fast-forward pull: post-merge fires on --ff-only pulls (the pilot's
