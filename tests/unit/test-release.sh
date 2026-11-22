@@ -50,10 +50,44 @@ _write_cksum_page() {
     } >"$_wcp_file"
 }
 
+# Background-writer immunity (#741): git's detached auto-maintenance —
+# "git maintenance run --auto --quiet --detach", spawned by commit/push —
+# keeps writing pack tempfiles (tmp_mtimes_*, tmp_rev_*, tmp_idx_*) into
+# the PREVIOUS case's repos while the next mkrepo already removes the
+# tree: "Directory not empty" teardown races (measured at 15-33% of runs
+# on the WSL2 host, git 2.55; writer photographed with pid/argv in #741).
+# Env-scoped knobs (GIT_CONFIG_*) provably never reach the trigger inside
+# the sandbox runs, so the repos are configured LOCALLY at init — local
+# config cannot be scrubbed from the environment.
+_git_no_bgwriters() {
+    git -C "$1" config maintenance.auto false
+    git -C "$1" config gc.auto 0
+    git -C "$1" config receive.autogc false
+}
+
+# Belt for writers git may invent next: rm -rf with bounded retries. The
+# detached maintenance writers finish in well under a second (#741);
+# eight 0.25 s attempts absorb any of them. The final attempt runs
+# unsuppressed — a teardown that still fails after the belt is a genuine
+# defect and must stay loud (set -e ends the suite there).
+_rm_rf_settled() {
+    _rr_i=0
+    while [ "$_rr_i" -lt 8 ]; do
+        if rm -rf "$@" 2>/dev/null; then
+            return 0
+        fi
+        _rr_i=$((_rr_i + 1))
+        sleep 0.25
+    done
+    rm -rf "$@"
+}
+
 mkrepo() {
-    rm -rf "${WORK:?}/r" "${WORK:?}/origin.git"
+    _rm_rf_settled "${WORK:?}/r" "${WORK:?}/origin.git"
     git init -q -b master "$WORK/origin.git" --bare
     git init -q -b master "$WORK/r"
+    _git_no_bgwriters "$WORK/origin.git"
+    _git_no_bgwriters "$WORK/r"
     git -C "$WORK/r" config user.email test@invalid
     git -C "$WORK/r" config user.name test
     mkdir -p "$WORK/r/scripts"
@@ -76,6 +110,42 @@ mkrepo() {
     git -C "$WORK/r" remote add origin "$WORK/origin.git"
     git -C "$WORK/r" push -q origin master
 }
+
+# Pin (#741): the teardown belt retries past transient rm failures —
+# deterministically, via a fake rm on PATH (the suite's own fake-bin
+# pattern): it fails twice with the exact race face ("Directory not
+# empty", the detached-maintenance signature photographed in #741) and
+# relays to the real rm from the third call. The belt must absorb both
+# failures (rc 0, tree gone) and consume exactly three attempts — a
+# belt-less teardown reds on the first failure. No live race, no
+# timing luck: the retry semantics are pinned directly.
+_PINBIN741="$WORK/pinbin741"
+mkdir -p "$_PINBIN741"
+_REALRM="$(command -v rm)"
+cat >"$_PINBIN741/rm" <<EOR
+#!/bin/sh
+_c="\$(cat '$WORK/pin-rm-count' 2>/dev/null || echo 0)"
+_c=\$((_c + 1))
+echo "\$_c" >'$WORK/pin-rm-count'
+if [ "\$_c" -le 2 ]; then
+    echo "rm: cannot remove 'pin': Directory not empty" >&2
+    exit 1
+fi
+exec "$_REALRM" "\$@"
+EOR
+chmod 755 "$_PINBIN741/rm"
+_PINDIR="$WORK/pindir741"
+mkdir -p "$_PINDIR/objects"
+: >"$_PINDIR/objects/tmp_pin"
+: >"$WORK/pin-rm-count"
+_pin_rc=0
+PATH="$_PINBIN741:$PATH" _rm_rf_settled "$_PINDIR" || _pin_rc=$?
+_pin_calls="$(cat "$WORK/pin-rm-count" 2>/dev/null || echo 0)"
+if [ "$_pin_rc" = 0 ] && [ ! -e "$_PINDIR" ] && [ "$_pin_calls" = 3 ]; then
+    pass "mkrepo teardown belt retries past transient rm failures (#741)"
+else
+    fail "mkrepo teardown belt did not retry past transient rm failures (rc=$_pin_rc calls=$_pin_calls) (#741)"
+fi
 
 # Fake gh on PATH for EVERY sandbox run (the CI pre-flight must not
 # depend on the host: a real gh would fail on the file:// sandbox origin
