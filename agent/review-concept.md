@@ -230,9 +230,16 @@ nothing to review.
   loop) is disclosed in the reopening round's comment; the proposed
   marker stays as history on the timeline. (RM-0118)
 - Deferred work orders collected during the loop become issues through
-  ONE bundled maintainer gate at loop end: after the last fix wave and
-  BEFORE the closing summary, the loop owner duplicate-checks every
-  collected work order against the tracker — the open list AND a
+  ONE bundled maintainer gate at loop end — collecting is the round's
+  job, filing is the gate's: the round comment's dispositions table IS
+  the work order's ledger entry, `gh issue create` belongs to the gate
+  alone, and autonomous mode covers round cadence and dispositions,
+  never this gate (PR #726 round a filed its collected work order
+  ahead of the ask and paid the disclosure; a session that files ahead
+  anyway follows that recovery shape: closing-summary disclosure,
+  keep/fold/decline ask, append-only gate-record comment). After the
+  last fix wave and BEFORE the closing summary, the loop owner
+  duplicate-checks every collected work order against the tracker — the open list AND a
   search covering issue TITLES AND BODIES (`gh search issues` covers
   both; #407's title-only search missed two live matches), proposes
   the bundling (same-topic orders share one issue) with title, the
@@ -723,6 +730,19 @@ Four places carry review knowledge, each with exactly one job:
   ENOENT and EACCES alike), and the correction had to ride a later
   round comment. A CONFIRMED verdict over an unprobed mechanism is
   `unverified`, not confirmed. (RM-0162)
+- The empirical probe owed before a shell-semantics verdict is the
+  VERIFIER'S OWN probe. A reviewer-reported "empirical" result is a
+  lead-in that may guide what to probe, never evidence that discharges
+  the probe: a reviewer checkpoint can carry a probe claim that is
+  wrong (PR #729 round a — two reviewer axes asserted the same
+  bracket-expression mechanism, one checkpoint claiming an empirical
+  on-host match; the verifier's own scratch probes under dash and bash
+  refuted it, keeping the wrong MED out of the findings table — it
+  retracted into the round comment's "Retracted/ghost findings"
+  section, visible as every retraction owes: "the verification probe
+  is the record"). Probe artifacts that decide a verdict live in the
+  round scratch and are named in the round comment or retraction.
+  (RM-0199)
 - A CONFIRMED verdict covers the finding's MECHANISM, never the
   incidental factual tokens of its prose — numbers, version eras,
   SHAs, names carried in the finding's own wording. Fix text that
@@ -731,6 +751,23 @@ Four places carry review knowledge, each with exactly one job:
   lands (PR #711 round b B1 LOW: the re-quoted "0.0.36-era" stamp
   was 0.0.11–0.0.14 by `git log -S`; the mechanism verdict it rode
   on was correct). (RM-0197)
+- A figure the session itself generates — probe output, corpus counts,
+  suite tallies — and lands in records, rule text, commit messages or
+  PR bodies is derived by a counting command whose output is pasted or
+  cited, never transcribed by eye from scrolling output: the probe
+  output IS the primary source, and an eyeballed count is a draft, not
+  a measurement (PR #724 round a C1 — a first-hand figure read off
+  probe output landed wrong in record, PR body and commit message; a
+  deterministic recount refuted it only after the commit). (RM-0200)
+- A completeness claim in a commit message or PR body states only what
+  the session derived itself, cited by its own grep or sweep pattern.
+  Restating a reviewer axis's coverage self-report as the record's
+  assertion inherits its unverifiability (PR #724 round b A1 — a fix
+  commit restated round a's sweep line as "swept clean"; the re-review
+  found two bare sites of the exact class the line claimed gone);
+  restating requires an independent derivation or an attributed form
+  ("per round a's sweep axis, not re-derived") — never the bare
+  assertion. (RM-0201)
 - A claim about what a make target touches enumerates its transitive
   scans, not just its prerequisites — the re-derivation includes what
   the named commands recursively traverse: pr-00586 round a's A1 read
@@ -897,6 +934,15 @@ here.
   one HOST timestamp at fan-out start and end so subagent windows can
   be normalized against it, and notes observed skew in run
   provenance. (RM-0114)
+- Every phase boundary the run provenance will name — fan-out start,
+  each reviewer return notification, verification start and end,
+  posting — takes its host `date -u` AT the boundary into the case
+  scratch: provenance prose composed later quotes those records only,
+  and a window without a stamp is written as unmeasured, never
+  approximated (PR #726 round a — reviewer-return and verification
+  windows posted as elapsed-time estimates were all falsified by the
+  round-b fan-out clock, and the correction had to ride round b's
+  provenance, append-only). (RM-0202)
 - Med-tier diff-scope rounds: ~8 minutes per agent; low-tier rounds
   (one axis — shipped ≤ ~50 lines, standard non-shipped, fix-wave
   re-reviews) run ~5 — batched greps, targeted
