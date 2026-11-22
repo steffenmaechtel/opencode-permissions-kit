@@ -129,3 +129,16 @@ the no-pack; no lockout).
 - If you share the machine with more than one developer user, each who
   wants the protection runs `opk git-heal on` for their own global
   gitconfig.
+
+## The git-protection companion (#704)
+
+The same hooks carry the adopt hint for the
+[pointer layout](git-protection.md): a kit-managed tree whose `.git`
+is still a classic directory gets a two-line hint (`run: sudo opk
+git-protection adopt <toplevel>`) on checkout — echo only, never
+blocking, self-silencing once adopted or declined. And when a project
+HAS been adopted, its common gitdir lives in the external storage,
+outside every `projects.conf` root — the hooks' fast path and the
+root heal's allowlist both accept gitdirs under the configured
+storage (validated through the same reader gate as conf roots), so
+the heal keeps working unchanged after adoption.

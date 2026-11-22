@@ -72,6 +72,37 @@ activate the hooks. `opk uninstall` unsets the kit-owned value before
 removing the library. Manual steps and limits:
 [the how-to](../how-to/git-heal-hooks.md).
 
+## git-protection
+
+Convert projects to the nailed pointer layout (sudo for everything
+except `status` — the command elevates itself):
+
+```bash
+sudo opk git-protection on            # storage init + migrate all + nail
+sudo opk git-protection adopt <path>  # migrate + nail one project
+sudo opk git-protection nail [<path>] # nail pending pointers
+sudo opk git-protection revert <path>|--all   # back to classic .git
+sudo opk git-protection off           # revert --all + drop the config
+opk git-protection status             # classic | nailed | unnailed per project
+```
+
+Each project's `.git` directory becomes a pointer file into an
+external developer-owned sticky storage (default
+`/var/www/gitdirs`, sibling of the first `projects.conf` root;
+`GITDIR_STORAGE` in `install.conf` overrides), nailed with `chattr +i`
+— closing the mv-`.git` wholesale arm of #702 for every actor. The
+migration is per-project atomic (verify + rollback), existing
+worktrees follow via `git worktree repair`, and the relocated #651
+heal normalizes each stored gitdir. `status` needs no root and exits
+non-zero when a row is actionable (classic or unnailed). Consent:
+`opk update` asks once before configuring the storage — declining
+persists `GITDIR_STORAGE=none`; once enabled, every update runs the
+adopt + nail pass. New clones get a two-line adopt hint from the
+git-heal post-* hooks (echo only, needs `opk git-heal on`). The
+measured friction (worktree remove dance, fstype limits, the
+`FETCH_HEAD` residual) and the walk-back:
+[the how-to](../how-to/git-protection.md).
+
 ## The `opk` command
 
 After installation, one command manages everything (works from anywhere):
@@ -91,6 +122,7 @@ opk ensure-shared      # re-assert group-write on ./.ddev (ddev share fix)
 opk openchamber-secure # pin OpenChamber to the kit wrapper
 opk wsl-add-opencode-1-fix   # opt in to the WSL browser-bridge carrier
 sudo opk git-heal on   # opt in to the git heal hooks (#671)
+sudo opk git-protection on   # opt in to the nailed pointer layout (#704)
 opk uninstall
 opk help        # commands + arguments overview
 opk --version   # the deployed kit version

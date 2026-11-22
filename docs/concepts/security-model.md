@@ -363,6 +363,17 @@ Operational notes:
     after the fact; run `opk status` regularly. (An agent-cloned
     repo under a developer-owned tree trips the same row — inspect,
     then trust.)
+  - **The pointer layout (#704, shipped):** `opk git-protection on`
+    converts each project's `.git` directory into a `chattr +i`-nailed
+    pointer file into an external developer-owned sticky storage —
+    W1's final rename and every wholesale variant die on the immutable
+    inode flag, for both actors, on both `fs.protected_regular`
+    settings (Phase A measured, issue
+    [#704](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/704)).
+    It closes the `.git` swap completely but not W2's project-dir
+    swap at depth (the nailed entry protects only `.git` itself).
+    Opt-in like the heal hooks; measured friction and the walk-back:
+    [the how-to](../how-to/git-protection.md).
   - **`fs.protected_regular` is irrelevant here:** it gates
     O_CREAT opens, never renames — no sysctl value mitigates W1–W3.
     The kit ships at the Ubuntu/WSL default (`=2`); the `=1`

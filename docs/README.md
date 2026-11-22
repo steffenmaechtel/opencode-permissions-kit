@@ -30,6 +30,7 @@ kit fits your setup.
 - [Use JetBrains IDEs](how-to/jetbrains-ides.md)
 - [Harden `.git/config`](how-to/secure-git-config.md)
 - [Keep the agent's git workflow green](how-to/git-heal-hooks.md)
+- [Close the mv .git arm](how-to/git-protection.md)
 - [Update the kit and the binary](how-to/update.md)
 - [Uninstall](how-to/uninstall.md)
 
