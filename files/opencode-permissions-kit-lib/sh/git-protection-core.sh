@@ -412,13 +412,21 @@ _gp_heal_gitdir() {
 # `core.fsmonitor` (string form runs the configured command) and hooks
 # as the INVOKING user — on agent-influenceable trees that is arbitrary
 # code execution as root. The dev drop follows the `_ghc_devgit` house
-# pattern (sh/git-heal-core.sh); unprivileged runs (unit suite, the
-# running user owns the fixtures) execute in place — the `-c` arms
-# stay on every leg as defense in depth (they also keep a planted
-# fsmonitor from running as the dev).
+# pattern (sh/git-heal-core.sh) INCLUDING its `env HOME=` hop (#754 b
+# D4: without it a HOME-preserving sudo makes dev-git resolve root's
+# gitconfig — under a 700 /root that fails every leg); unprivileged
+# runs (unit suite, the running user owns the fixtures) execute in
+# place — the `-c` arms stay on every leg as defense in depth (they
+# also keep a planted fsmonitor from running as the dev).
 _gp_devgit() {
     if [ "$(id -u)" -eq 0 ]; then
-        sudo -u "$(_gp_devuser)" git "$@"
+        _gpdg_home=$(getent passwd "$(_gp_devuser)" 2>/dev/null | cut -d: -f6) ||
+            true
+        if [ -n "$_gpdg_home" ]; then
+            sudo -u "$(_gp_devuser)" env HOME="$_gpdg_home" git "$@"
+        else
+            sudo -u "$(_gp_devuser)" git "$@"
+        fi
     else
         git "$@"
     fi
@@ -491,15 +499,20 @@ _gp_storage_sane() {
 # _gp_unnest <tgt> <proj>: recover the A7 collision-nest — the agent
 # pre-created <tgt> as a directory in the storage AFTER the collision
 # loop checked, so root's `mv .git <tgt>` moved the gitdir INSIDE it
-# (<tgt>/.git). Detect, move ours back out, remove the agent shell,
-# restore the classic layout; the caller then fails loud (next run
-# picks the next suffix). rc 0 = classic layout restored.
+# (<tgt>/.git; a deeper plant at <tgt>/.git/.git nests ours one level
+# further — #754 b D10 — so the DEEPEST .git is ours). Detect, move
+# ours back out, remove the agent shell, restore the classic layout;
+# the caller then fails loud (next run picks the next suffix).
+# rc 0 = classic layout restored.
 _gp_unnest() {
     _gpun_t=$1 _gpun_p=$2
-    [ -d "$_gpun_t/.git" ] || return 1
+    _gpun_ours="$_gpun_t/.git"
+    [ -d "$_gpun_ours/.git" ] && _gpun_ours="$_gpun_ours/.git"
+    [ -d "$_gpun_ours" ] || return 1
     ui_warn "collision sabotage shape: $_gpun_t already existed — gitdir nested inside"
-    mv "$_gpun_t/.git" "$_gpun_p/.git" || return 1
-    rmdir "$_gpun_t" 2>/dev/null || ui_warn "could not remove the planted dir $_gpun_t — next run suffixes past it"
+    mv "$_gpun_ours" "$_gpun_p/.git" || return 1
+    rmdir "$_gpun_t" 2>/dev/null ||
+        ui_warn "could not remove the planted dir $_gpun_t — next run suffixes past it"
     return 0
 }
 
@@ -629,6 +642,16 @@ _gp_migrate_one() {
         _gp_rollback "$_gpm_p" "$_gpm_tgt"
         return 1
     }
+    # D8: rename does not follow symlinks, but a DIRECTORY planted at
+    # .git after the re-occupation check makes mv -f move the temp
+    # INSIDE it (rc 0, pointer at .git/.git.opk*) — the final state
+    # must be a REGULAR FILE at the .git name or we roll back.
+    if [ ! -f "$_gpm_p/.git" ]; then
+        ui_error "the .git name is not a regular file after the pointer rename -- rolling back"
+        rm -f "$_gpm_tmp"
+        _gp_rollback "$_gpm_p" "$_gpm_tgt"
+        return 1
+    fi
 
     # existing worktrees: their .git pointer files must follow the
     # moved gitdir (git worktree repair rewrites them; dev-dropped
@@ -675,6 +698,16 @@ _gp_nail_one() {
         "$_gpn_stor"/*) ;;
         *)
             ui_warn "not nailing: $_gpn_p/.git does not point at a storage child ($_gpn_gd)"
+            return 1
+            ;;
+    esac
+    # D1 belt: a worktree registration is never sealed — a sealed
+    # pointer blocks the main project's repair leg (worktree repair
+    # must rewrite it). The classification excludes worktree-reg rows
+    # from the sweep; this refuses direct `nail <worktree>` calls.
+    case "$_gpn_gd" in
+        *.git/worktrees/*)
+            ui_warn "not nailing: worktree registration (the main project owns it): $_gpn_gd"
             return 1
             ;;
     esac
@@ -753,19 +786,17 @@ _gp_revert_one() {
         ui_detail "skip: pointer target outside storage (not ours): $_gpr_p"
         return 0
     fi
-    # B4: worktree registrations are reverted by their MAIN project's
-    # repair leg, never moved themselves.
+    # B4/D7: worktree registrations are reverted by their MAIN
+    # project's repair leg, never moved themselves — the pattern
+    # anchors on the .git/worktrees/ SHAPE so a storage path that
+    # itself contains a "worktrees" component cannot swallow main
+    # gitdirs.
     case "$_gpr_tgt" in
-        */worktrees/*)
+        *.git/worktrees/*)
             ui_detail "skip: worktree registration (its main project's revert repairs it): $_gpr_p"
             return 0
             ;;
     esac
-    # A3: the bare storage root can never be a gitdir target.
-    [ "$_gpr_tgt" = "$_gpr_stor" ] && {
-        ui_detail "skip: pointer names the storage root itself (not a gitdir): $_gpr_p"
-        return 0
-    }
     # A5: use-time storage sanity.
     _gp_storage_sane "$_gpr_stor" || {
         ui_error "storage failed the use-time sanity check — not reverting: $_gpr_stor"
@@ -855,6 +886,23 @@ _gp_projects() {
         _gpp_proj=$(dirname "$_gpp_g")
         if [ -f "$_gpp_g" ]; then
             _gpp_t=$(sed -n 's/^gitdir: //p' "$_gpp_g" 2>/dev/null | head -n 1)
+            # Worktree registrations FIRST (#754 b D1/D3/D7): a linked
+            # worktree's .git is a pointer file targeting
+            # <something>.git/worktrees/<id> — migrated (under the
+            # storage) or classic (under the project) alike. They are
+            # NEVER actionable: the nail sweep must not seal them (a
+            # sealed pointer blocks the main project's repair leg —
+            # D1), revert must not move them (round a B4), and status
+            # must not advise nailing them. The pattern anchors on the
+            # .git/worktrees/ SHAPE, not a bare */worktrees/* (D7: a
+            # storage path containing a "worktrees" component must not
+            # swallow its own main gitdirs).
+            case "$_gpp_t" in
+                *.git/worktrees/*)
+                    printf 'worktree-reg %s\n' "$_gpp_proj"
+                    continue
+                    ;;
+            esac
             _gpp_ours=1
             if [ "$_gpp_stor_rc" -eq 0 ]; then
                 case "$_gpp_t" in

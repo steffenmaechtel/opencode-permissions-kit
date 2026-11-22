@@ -104,7 +104,11 @@ state without any hooks.
   remove (the registration goes, the directory delete hits `EPERM`):
   finish with `sudo chattr -i <worktree>/.git && sudo rm -rf
   <worktree> && git worktree prune`. The next `opk git-protection
-  status` run shows nothing pending.
+  status` run shows nothing pending. Worktree pointer files themselves
+  are deliberately NEVER nailed by the kit's sweeps (a sealed pointer
+  would block the main project's repair on revert) — hosts that ran a
+  pre-fix `on` may still carry sealed worktree pointers: a one-time
+  `sudo chattr -i <worktree>/.git` restores repairability.
 - `+i` survives reboots (an inode flag). Removing nailed trees needs
   `chattr -i` first even for root.
 - Under `fs.protected_regular=2` a foreign-owned `FETCH_HEAD` can

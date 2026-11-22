@@ -928,4 +928,141 @@ else
     fail "security C5: getent-failure arm (out=$_out)"
 fi
 
+# --- 10b. round-b arms (#754 b) ------------------------------------------------------
+
+# D1: the nail sweep never seals a worktree registration (a sealed
+# pointer would block the main project's repair leg) — run the REAL
+# sweep over a migrated project with a linked worktree.
+mkdir -p "$WORK/roots/r4"
+printf '%s\n' "$WORK/roots/r4" >"$CONF"
+_mkrepo "$WORK/roots/r4/d1p"
+git -C "$WORK/roots/r4/d1p" worktree add "$WORK/roots/r4/d1w" -q 2>/dev/null ||
+    git -C "$WORK/roots/r4/d1p" worktree add -q "$WORK/roots/r4/d1w"
+_rc=0
+_out=$(_core_run '_gp_migrate_one "$WORK/roots/r4/d1p" yes') || _rc=$?
+_rc2=0
+_out2=$(_core_run '_git_protection_nail') || _rc2=$?
+if [ "$_rc" = 0 ] && [ "$_rc2" = 0 ] &&
+    [ ! -e "$WORK/roots/r4/d1w/.git.nailed" ] &&
+    [ -e "$WORK/roots/r4/d1p/.git.nailed" ]; then
+    pass "security D1: the nail sweep seals the main pointer, never the worktree's"
+else
+    fail "security D1: nail-sweep arm (rc=$_rc rc2=$_rc2 out=$_out2)"
+fi
+_out=$(_core_run '_gp_projects')
+if printf '%s' "$_out" | grep -qxF "worktree-reg $WORK/roots/r4/d1w" &&
+    ! printf '%s' "$_out" | grep -q "d1w \(nailed\|unnailed\)"; then
+    pass "security D1/D3: a migrated worktree classifies worktree-reg (not actionable)"
+else
+    fail "security D1/D3: classification (out=$(printf '%s' "$_out" | tr '\n' ';'))"
+fi
+_rc=0
+_out=$(_core_run 'git_protection_cli status') || _rc=$?
+if [ "$_rc" = 0 ]; then
+    pass "security D3: status rc 0 with a nailed main + worktree-reg rows only"
+else
+    fail "security D3: status rc (rc=$_rc out=$_out)"
+fi
+# and off succeeds end-to-end (no skip-refusal over the worktree row):
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\nGITDIR_STORAGE=%s\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" "$WORK/storage" >"$IC"
+_rc=0
+_out=$(_core_run 'unset GP_STORAGE; _git_protection_off') || _rc=$?
+if [ "$_rc" = 0 ] && [ -d "$WORK/roots/r4/d1p/.git" ] &&
+    git -C "$WORK/roots/r4/d1w" status --porcelain >/dev/null 2>&1; then
+    pass "security D1/D2: off succeeds over a worktree host (no forced re-run)"
+else
+    fail "security D1/D2: off arm (rc=$_rc out=$_out)"
+fi
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" >"$IC"
+printf '%s\n' "$WORK/roots/r1" >"$CONF"
+
+# D7: a storage whose OWN path contains a "worktrees" component does
+# not swallow its main gitdirs — classification keys on the
+# .git/worktrees/ shape, not the bare component.
+rm -rf "${WORK:?}/wtcomp"
+mkdir -p "$WORK/wtcomp"
+_mkrepo "$WORK/roots/r1/wtc"
+mv "$WORK/roots/r1/wtc/.git" "$WORK/wtcomp/wtc.git"
+printf 'gitdir: %s\n' "$WORK/wtcomp/wtc.git" >"$WORK/roots/r1/wtc/.git"
+_out=$(_core_run 'GP_STORAGE="$WORK/wtcomp" _gp_projects')
+if printf '%s' "$_out" | grep -qxF "unnailed $WORK/roots/r1/wtc" &&
+    ! printf '%s' "$_out" | grep -q "wtc worktree-reg"; then
+    pass "security D7: a worktrees-named storage keeps classifying its mains"
+else
+    fail "security D7: wtcomp classification (out=$(printf '%s' "$_out" | tr '\n' ';'))"
+fi
+# direct nail call on a worktree registration is refused (D1 belt).
+_rc=0
+_out=$(_core_run '_gp_nail_one "$WORK/roots/r4/d1w" "$WORK/storage/d1p.git/worktrees/d1w"') || _rc=$?
+if [ "$_rc" = 1 ] && printf '%s' "$_out" | grep -qF 'worktree registration'; then
+    pass "security D1: direct nail of a worktree registration refused"
+else
+    fail "security D1: nail belt (rc=$_rc out=$_out)"
+fi
+
+# D6/A1 observables: the pointer is a REGULAR file, no staging residue
+# (noimm: migrated in section 6, still on the pointer layout).
+if [ -f "$WORK/roots/r1/noimm/.git" ] && [ ! -L "$WORK/roots/r1/noimm/.git" ] &&
+    [ -z "$(ls "$WORK/roots/r1/noimm/".git.opk* 2>/dev/null || true)" ]; then
+    pass "fix-wave A1: pointer is a regular file, no staging residue"
+else
+    fail "fix-wave A1: observables (residue=$(ls "$WORK/roots/r1/noimm/".git.opk* 2>/dev/null || true))"
+fi
+
+# D6/A7+D10: _gp_unnest restores ours from the nested shape — both
+# the plain and the deep plant (deepest .git wins).
+_mkrepo "$WORK/roots/r1/nn1"
+mkdir -p "$WORK/storage/nn1.git"
+mv "$WORK/roots/r1/nn1/.git" "$WORK/storage/nn1.git/.git"
+_rc=0
+_out=$(_core_run '_gp_unnest "$WORK/storage/nn1.git" "$WORK/roots/r1/nn1"') || _rc=$?
+if [ "$_rc" = 0 ] && [ -e "$WORK/roots/r1/nn1/.git/HEAD" ]; then
+    pass "fix-wave A7: _gp_unnest restores the nested gitdir (plain)"
+else
+    fail "fix-wave A7: unnest plain (rc=$_rc out=$_out)"
+fi
+_mkrepo "$WORK/roots/r1/nn2"
+mkdir -p "$WORK/storage/nn2.git/.git"
+mv "$WORK/roots/r1/nn2/.git" "$WORK/storage/nn2.git/.git/.git"
+_rc=0
+_out=$(_core_run '_gp_unnest "$WORK/storage/nn2.git" "$WORK/roots/r1/nn2"') || _rc=$?
+if [ "$_rc" = 0 ] && [ -e "$WORK/roots/r1/nn2/.git/HEAD" ]; then
+    pass "fix-wave D10: _gp_unnest takes the deepest .git (deep plant)"
+else
+    fail "fix-wave D10: unnest deep (rc=$_rc out=$_out)"
+fi
+
+# D6/C3: a failed chattr -i on revert is named (GP_CHATTR_FAIL seam).
+_mkrepo "$WORK/roots/r1/c3p"
+rm -rf "${WORK:?}/storage/c3p.git" "${WORK:?}/roots/r1/c3p/.git"
+mkdir -p "$WORK/storage/c3p.git"
+printf 'gitdir: %s\n' "$WORK/storage/c3p.git" >"$WORK/roots/r1/c3p/.git"
+_rc=0
+_out=$(GP_CHATTR_FAIL=1 _core_run '_gp_revert_one "$WORK/roots/r1/c3p"') || _rc=$?
+if printf '%s' "$_out" | grep -qF 'chattr -i failed'; then
+    pass "fix-wave C3: revert names a failed chattr -i"
+else
+    fail "fix-wave C3: chattr warn (rc=$_rc out=$_out)"
+fi
+
+# D6/C4: a failing worktree enumeration warns (PATH-stubbed git).
+mkdir -p "$WORK/badgit"
+printf '#!/bin/sh\nexit 1\n' >"$WORK/badgit/git"
+chmod 755 "$WORK/badgit/git"
+_mkrepo "$WORK/roots/r1/c4p"
+_out=$(
+    PATH="$WORK/badgit:/usr/bin:/bin" sh -c '
+        . "$1"
+        ui_warn() { echo "warn: $*" >&2; }
+        _gp_worktrees "$2"
+    ' _ "$CORE" "$WORK/roots/r1/c4p/.git" 2>&1
+) || true
+if printf '%s' "$_out" | grep -qF 'worktree enumeration failed'; then
+    pass "fix-wave C4: enumeration failure warns"
+else
+    fail "fix-wave C4: enumeration warn (out=$_out)"
+fi
+
 suite_done "git-protection core tests"

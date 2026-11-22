@@ -536,7 +536,7 @@ un_git_protection_remove() {
         _un_gpr_opk0="${UN_GP_OPK:-/usr/local/lib/opencode-permissions-kit/bin/opk}"
         if [ -f "$_un_gpr_opk0" ] &&
             sudo sh "$_un_gpr_opk0" git-protection status 2>/dev/null |
-            grep -qE 'pointer, NOT nailed|pointer \+ nailed'; then
+            grep -qE 'pointer, NOT nailed|pointer \+ nailed|pointer outside storage'; then
             echo "WARN: kit-shaped pointer projects exist without a storage config —" >&2
             echo "      they cannot be reverted without the locator; recover per project:" >&2
             echo "      sudo chattr -i <project>/.git && sudo rm <project>/.git &&" >&2
