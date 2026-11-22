@@ -1856,6 +1856,10 @@ echo "--- 13. Uninstall & cleanup verification ---"
 E 'bash /usr/local/lib/opencode-permissions-kit/management/uninstall.sh --yes' &&
     echo "  ${GREEN}OK${NC}  uninstall.sh completed"
 check_fail "Wrapper removed" E 'test -e /usr/local/bin/opencode'
+# #681 site 4: the cli loop's own row — both suites asserted only the
+# wrapper, so a cli-loop-only regression (un_cli_remove never running,
+# un_link_owned broken for the opk name) would have shipped green.
+check_fail "CLI dispatcher (opk) removed" E 'test -e /usr/local/bin/opk'
 check_fail "Library removed" E 'test -e /usr/local/lib/opencode-permissions-kit'
 check_fail "Sudoers removed" E 'test -e /etc/sudoers.d/opencode-permissions-kit'
 check_fail "/etc/opencode-permissions-kit removed" E 'test -e /etc/opencode-permissions-kit'

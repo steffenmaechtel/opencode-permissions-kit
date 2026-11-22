@@ -22,7 +22,7 @@ Run it as your default user (it asks for `sudo` where needed). Options:
   detected and left untouched
 - sudoers rules, profile scripts, project ACLs/setgid
 - legacy kit artifacts, if present (the old `/etc/opencode/` conf dir, the
-  `/usr/local/lib/opencode/` library, legacy sudoers/profile symlinks) —
+  `/usr/local/lib/opencode/` library, legacy sudoers and helper symlinks) —
   foreign content living under those names is detected and left untouched
 - kit ownership inside the registered project roots: everything the kit
   handed to the `opencode` user (`.ddev/` trees, ddev settings directories,
@@ -31,6 +31,9 @@ Run it as your default user (it asks for `sudo` where needed). Options:
   also catches files whose owner became an orphaned id after the user
   removal
 - `/run/opencode-permissions-kit` and the router-port sysctl file
+  (`/etc/sysctl.d/99-ddev-rootless.conf` — removed only when it still
+  holds the kit's exact one-line content; a file you maintain yourself
+  at that name is detected and left untouched)
 
 **Project file contents are untouched** — only owner and group revert. If
 one of the revert operations cannot complete, the terminal prints a **WARN**
@@ -46,6 +49,11 @@ delete by hand.
 
 ## What stays behind (harmless)
 
+- A file at the kit's pre-0.0.10 umask name
+  (`/etc/profile.d/opencode-umask.sh`) — the name is not kit-namespaced,
+  so the uninstall treats any file there as foreign and leaves it for
+  its owner to remove (kit-written profiles use the
+  `opencode-permissions-kit-umask.sh` name, which IS removed).
 - Shell RC hook lines (`~/.bashrc` / `~/.zshrc` / `~/.profile`, tagged
   `# opencode permissions kit`) — remove the tagged lines manually.
 - Entries `opk ddev-hosts-add` wrote into the **Windows hosts file**

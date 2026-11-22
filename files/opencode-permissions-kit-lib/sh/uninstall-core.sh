@@ -561,21 +561,27 @@ un_library_remove() {
     fi
 }
 
-# Umask profile removal section (+ legacy name).
+# Umask profile removal section.
 un_umask_remove() {
     echo ""
     echo "--- Removing umask profile ---"
+    # No legacy-name cleanup anymore (#681 site 1): the pre-0.0.10 umask
+    # profile name in /etc/profile.d/ (bare "opencode-", no kit prefix)
+    # is NOT kit-namespaced, so its unconditional rm was the last
+    # ungated deletion of a path a foreign file can hold — and the
+    # cohort that ever wrote it can never reach a modern kit (`opk
+    # update` refuses pre-0.0.14; the install base holds no pre-0.0.10
+    # kits). A file at the old name is foreign by default now: left
+    # untouched, its owner removes it manually.
     _un_partial=""
     _un_revert_failed=0
     un_rc_q "rm umask profile" sudo rm -f /etc/profile.d/opencode-permissions-kit-umask.sh
-    # Legacy pre-0.0.10 name (0.0.43a F5) — the same cleanup update.sh and
-    # sudoers-deploy.sh already perform on the install/update path.
-    un_rc_q "rm legacy umask profile" sudo rm -f /etc/profile.d/opencode-umask.sh
     if [ -z "$_un_partial" ]; then
         echo "Umask profile removed."
-        log "umask profile removed: /etc/profile.d/opencode-permissions-kit-umask.sh (+ legacy opencode-umask.sh)"
+        log "umask profile removed: /etc/profile.d/opencode-permissions-kit-umask.sh"
     else
-        echo "WARN: umask profile removal failed ($_un_partial) — remove manually: /etc/profile.d/opencode-*-umask.sh" >&2
+        echo "WARN: umask profile removal failed ($_un_partial) — remove manually:""\
+ /etc/profile.d/opencode-permissions-kit-umask.sh" >&2
         log "umask profile removal FAILED ($_un_partial)"
     fi
 }
@@ -1103,12 +1109,43 @@ un_config_dirs_remove() {
     # success lines (the run_q convention, #211 b W1).
     _un_partial=""
     _un_revert_failed=0
+    # #746 a A2: set by the sysctl rm arm below; the closing enumeration
+    # names the file only when that arm ran (DRY keeps the intended
+    # outcome, #211 b W1).
+    _un_sysctl_gone=0
     un_rc_q "rm /run/opencode-permissions-kit" sudo rm -rf /run/opencode-permissions-kit
-    un_rc_q "rm 99-ddev-rootless.conf" sudo rm -f /etc/sysctl.d/99-ddev-rootless.conf
+    # Router-port sysctl drop-in (#681 site 3): the name is ddev-flavored,
+    # not kit-namespaced, so a foreign file at it (an admin's own
+    # ddev-rootless tuning) must survive. Byte-equality with the kit's
+    # exact one-line write is the ownership proof; probes run at the
+    # rm's authority (sudo) like the openchamber twin below — a hardened
+    # /etc/sysctl.d must not hide a kit file from removal.
+    if sudo test -f /etc/sysctl.d/99-ddev-rootless.conf &&
+        [ "$(sudo cat /etc/sysctl.d/99-ddev-rootless.conf 2>/dev/null)" = 'net.ipv4.ip_unprivileged_port_start=80' ]; then
+        un_rc_q "rm 99-ddev-rootless.conf" sudo rm -f /etc/sysctl.d/99-ddev-rootless.conf
+        # Feeds the closing enumeration (#746 a A2): the success log
+        # names this file only when the rm arm ran — a foreign file at
+        # the name takes the skip arm below and the log must not claim
+        # a removal that did not happen (audit-log honesty; under
+        # DRY_RUN the flag still sets — the [DRY] echo + success lines
+        # report the intended outcome, the run_q convention #211 b W1).
+        _un_sysctl_gone=1
+    elif sudo test -e /etc/sysctl.d/99-ddev-rootless.conf; then
+        # #746 a A4: no parenthetical reason — this arm also fires for
+        # content the probe could not read (hardened perms) and for
+        # non-regular entries (test -f fails, test -e passes), where
+        # "content differs" would assert a comparison that never ran;
+        # the bare not-kit-owned wording matches the wrapper/cli
+        # sections and is truthful in every case.
+        echo "/etc/sysctl.d/99-ddev-rootless.conf is not kit-owned — left untouched."
+        log "sysctl drop-in kept: not kit-owned at /etc/sysctl.d/99-ddev-rootless.conf (#746 a A2)"
+    fi
     # OpenChamber policy pin (issue #154): remove only what the kit wrote — a
     # policy.json pinning OUR wrapper. Any other content is admin-owned and
     # stays; /etc/openchamber itself only goes when empty (OpenChamber may own
-    # more files in it).
+    # more files in it). The non-namespaced path is deliberate (#681 site 3):
+    # /etc/openchamber/policy.json is OpenChamber's canonical config path —
+    # the kit cannot rename it, so content (not name) is the ownership proof.
     # Issue #164: uninstall.sh runs as the developer (root is refused), so the
     # presence probe and the content grep run at the write's authority (sudo) —
     # an admin 0700 /etc/openchamber must not hide a kit pin from removal.
@@ -1134,15 +1171,23 @@ un_config_dirs_remove() {
     un_rc_q "rm /etc/opencode-permissions-kit" sudo rm -rf /etc/opencode-permissions-kit
     if [ -z "$_un_partial" ]; then
         echo "Removed."
-        log "config dirs + runtime artifacts removed (/etc/opencode-permissions-kit""\
-, /run/opencode-permissions-kit, 99-ddev-rootless.conf)"
+        # The sysctl name rides the enumeration only when the rm arm
+        # ran (#746 a A2) — a foreign file at the name survives and the
+        # log must not claim it among the removed artifacts (DRY runs
+        # keep the intended-outcome convention, D2-qualified #746 b).
+        _un_artifacts="/etc/opencode-permissions-kit, /run/opencode-permissions-kit"
+        if [ "${_un_sysctl_gone:-0}" = 1 ]; then
+            _un_artifacts="$_un_artifacts, 99-ddev-rootless.conf"
+        fi
+        log "config dirs + runtime artifacts removed ($_un_artifacts)"
     else
         log "config dirs + runtime artifacts PARTIALLY removed ($_un_partial)"
-        # Every partial cause in this section is a FAILED op today (no
-        # skip causes exist here), so flag and list coincide — the gate
-        # mirrors the project loop's closing and keeps a future skip cause
-        # from false-WARNing; the openchamber arm sets the flag so the
-        # state is never write-only here (#243 b Q2).
+        # Every partial cause in this section is a FAILED op — the skip
+        # arms (openchamber foreign content, the #681 sysctl content
+        # gate) add no partial — so flag and list coincide; the gate
+        # mirrors the project loop's closing and keeps a future skip
+        # cause from false-WARNing; the openchamber arm sets the flag so
+        # the state is never write-only here (#243 b Q2).
         if [ "$_un_revert_failed" -eq 1 ]; then
             echo "WARN: could not fully remove config dirs + runtime artifacts ($_un_partial)" >&2
         fi

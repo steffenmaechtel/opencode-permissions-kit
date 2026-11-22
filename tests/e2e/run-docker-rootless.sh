@@ -428,6 +428,8 @@ E 'cd /tmp && sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/'"$OC_UID2"' doc
 E 'bash /usr/local/lib/opencode-permissions-kit/management/uninstall.sh --yes' &&
     echo "  ${GREEN}OK${NC}  uninstall.sh completed"
 check_fail "Wrapper removed" E 'test -e /usr/local/bin/opencode'
+# #681 site 4: the cli loop's own row (the run.sh twin).
+check_fail "CLI dispatcher (opk) removed" E 'test -e /usr/local/bin/opk'
 check_fail "Library removed" E 'test -e /usr/local/lib/opencode-permissions-kit'
 check_fail "Sudoers removed" E 'test -e /etc/sudoers.d/opencode-permissions-kit'
 check_fail "/etc/opencode-permissions-kit removed" E 'test -e /etc/opencode-permissions-kit'
