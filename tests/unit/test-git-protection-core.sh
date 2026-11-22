@@ -951,7 +951,7 @@ else
 fi
 _out=$(_core_run '_gp_projects')
 if printf '%s' "$_out" | grep -qxF "worktree-reg $WORK/roots/r4/d1w" &&
-    ! printf '%s' "$_out" | grep -q "d1w \(nailed\|unnailed\)"; then
+    ! printf '%s' "$_out" | grep -qxE "(nailed|unnailed) $WORK/roots/r4/d1w"; then
     pass "security D1/D3: a migrated worktree classifies worktree-reg (not actionable)"
 else
     fail "security D1/D3: classification (out=$(printf '%s' "$_out" | tr '\n' ';'))"
@@ -988,7 +988,7 @@ mv "$WORK/roots/r1/wtc/.git" "$WORK/wtcomp/wtc.git"
 printf 'gitdir: %s\n' "$WORK/wtcomp/wtc.git" >"$WORK/roots/r1/wtc/.git"
 _out=$(_core_run 'GP_STORAGE="$WORK/wtcomp" _gp_projects')
 if printf '%s' "$_out" | grep -qxF "unnailed $WORK/roots/r1/wtc" &&
-    ! printf '%s' "$_out" | grep -q "wtc worktree-reg"; then
+    ! printf '%s' "$_out" | grep -qxF "worktree-reg $WORK/roots/r1/wtc"; then
     pass "security D7: a worktrees-named storage keeps classifying its mains"
 else
     fail "security D7: wtcomp classification (out=$(printf '%s' "$_out" | tr '\n' ';'))"
@@ -1024,16 +1024,37 @@ else
     fail "fix-wave A7: unnest plain (rc=$_rc out=$_out)"
 fi
 _mkrepo "$WORK/roots/r1/nn2"
-mkdir -p "$WORK/storage/nn2.git/.git"
-mv "$WORK/roots/r1/nn2/.git" "$WORK/storage/nn2.git/.git/.git"
+# #754 c E1 regression: junk `.git` planted INSIDE the moved gitdir
+# (the reachable state the retired deepest-heuristic misfired on) —
+# unnest must still take the depth-1 dir (ours, junk rides along).
+mkdir -p "$WORK/storage/nn2.git"
+mv "$WORK/roots/r1/nn2/.git" "$WORK/storage/nn2.git/.git"
+mkdir -p "$WORK/storage/nn2.git/.git/.git"
 _rc=0
 _out=$(_core_run '_gp_unnest "$WORK/storage/nn2.git" "$WORK/roots/r1/nn2"') || _rc=$?
-if [ "$_rc" = 0 ] && [ -e "$WORK/roots/r1/nn2/.git/HEAD" ]; then
-    pass "fix-wave D10: _gp_unnest takes the deepest .git (deep plant)"
+if [ "$_rc" = 0 ] && [ -e "$WORK/roots/r1/nn2/.git/HEAD" ] &&
+    [ -d "$WORK/roots/r1/nn2/.git/.git" ]; then
+    pass "fix-wave E1: unnest takes depth 1 (ours) — junk rides inside"
 else
-    fail "fix-wave D10: unnest deep (rc=$_rc out=$_out)"
+    fail "fix-wave E1: unnest junk arm (rc=$_rc out=$_out)"
 fi
 
+# D6/E3: the dir-aware rollback recovers the D8 planted-dir shape —
+# plant (with residue) at .git, gitdir external: rollback must put
+# the gitdir AT the name, not nested inside the plant.
+_mkrepo "$WORK/roots/r1/e2p"
+mv "$WORK/roots/r1/e2p/.git" "$WORK/storage/e2p.git"
+mkdir -p "$WORK/roots/r1/e2p/.git"
+touch "$WORK/roots/r1/e2p/.git/opk-residue"
+_rc=0
+_out=$(_core_run '_gp_rollback "$WORK/roots/r1/e2p" "$WORK/storage/e2p.git"') || _rc=$?
+if [ "$_rc" = 0 ] && [ -e "$WORK/roots/r1/e2p/.git/HEAD" ] &&
+    [ ! -e "$WORK/roots/r1/e2p/.git/e2p.git" ] &&
+    [ ! -e "$WORK/roots/r1/e2p/.git/opk-residue" ]; then
+    pass "fix-wave E2/E3: dir-aware rollback removes the plant, lands the gitdir at the name"
+else
+    fail "fix-wave E2/E3: rollback arm (rc=$_rc out=$_out)"
+fi
 # D6/C3: a failed chattr -i on revert is named (GP_CHATTR_FAIL seam).
 _mkrepo "$WORK/roots/r1/c3p"
 rm -rf "${WORK:?}/storage/c3p.git" "${WORK:?}/roots/r1/c3p/.git"

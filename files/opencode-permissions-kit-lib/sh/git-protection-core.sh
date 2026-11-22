@@ -446,9 +446,21 @@ _gp_verify() {
 
 # _gp_rollback <proj> <gitdir>: pointer out, gitdir back, best-effort
 # group perms. Loud but never fatal (we are already on the error
-# path — the caller reports).
+# path — the caller reports). DIR-AWARE (#754 c E2): when a planted
+# DIRECTORY occupies the `.git` name (the D8 post-rename shape, or a
+# verify-failure race), `rm -f` no-ops and a plain mv would move the
+# gitdir INSIDE the plant with rc 0 — silently defeating the
+# ROLLBACK INCOMPLETE arm. Agent-planted content under the project
+# root is expendable by the kit's model: the plant is removed, then
+# the gitdir lands at its name.
 _gp_rollback() {
     _gpb_p=$1 _gpb_gd=$2
+    if [ -d "$_gpb_p/.git" ] && [ ! -L "$_gpb_p/.git" ]; then
+        rm -rf "$_gpb_p/.git" || {
+            ui_error "ROLLBACK INCOMPLETE: cannot remove the planted directory at $_gpb_p/.git"
+            return 1
+        }
+    fi
     rm -f "$_gpb_p/.git"
     mv "$_gpb_gd" "$_gpb_p/.git" 2>/dev/null || {
         ui_error "ROLLBACK INCOMPLETE: $_gpb_gd is still external; move it back to $_gpb_p/.git manually"
@@ -499,18 +511,19 @@ _gp_storage_sane() {
 # _gp_unnest <tgt> <proj>: recover the A7 collision-nest — the agent
 # pre-created <tgt> as a directory in the storage AFTER the collision
 # loop checked, so root's `mv .git <tgt>` moved the gitdir INSIDE it
-# (<tgt>/.git; a deeper plant at <tgt>/.git/.git nests ours one level
-# further — #754 b D10 — so the DEEPEST .git is ours). Detect, move
-# ours back out, remove the agent shell, restore the classic layout;
-# the caller then fails loud (next run picks the next suffix).
-# rc 0 = classic layout restored.
+# (<tgt>/.git). GNU mv refuses to overwrite a NON-EMPTY directory
+# (probed, #754 c E1) — every reachable nest has ours at depth 1, and
+# a `.git` inside the moved gitdir is agent junk that rides back
+# harmlessly (selecting it — the retired "deepest" heuristic — would
+# strand the real gitdir as an unactionable worktree-reg row).
+# Detect, move ours back out, remove the agent shell, restore the
+# classic layout; the caller then fails loud (next run picks the next
+# suffix). rc 0 = classic layout restored.
 _gp_unnest() {
     _gpun_t=$1 _gpun_p=$2
-    _gpun_ours="$_gpun_t/.git"
-    [ -d "$_gpun_ours/.git" ] && _gpun_ours="$_gpun_ours/.git"
-    [ -d "$_gpun_ours" ] || return 1
+    [ -d "$_gpun_t/.git" ] || return 1
     ui_warn "collision sabotage shape: $_gpun_t already existed — gitdir nested inside"
-    mv "$_gpun_ours" "$_gpun_p/.git" || return 1
+    mv "$_gpun_t/.git" "$_gpun_p/.git" || return 1
     rmdir "$_gpun_t" 2>/dev/null ||
         ui_warn "could not remove the planted dir $_gpun_t — next run suffixes past it"
     return 0
@@ -645,10 +658,11 @@ _gp_migrate_one() {
     # D8: rename does not follow symlinks, but a DIRECTORY planted at
     # .git after the re-occupation check makes mv -f move the temp
     # INSIDE it (rc 0, pointer at .git/.git.opk*) — the final state
-    # must be a REGULAR FILE at the .git name or we roll back.
+    # must be a REGULAR FILE at the .git name or we roll back (the
+    # dir-aware rollback removes the plant including the temp residue,
+    # #754 c E2).
     if [ ! -f "$_gpm_p/.git" ]; then
         ui_error "the .git name is not a regular file after the pointer rename -- rolling back"
-        rm -f "$_gpm_tmp"
         _gp_rollback "$_gpm_p" "$_gpm_tgt"
         return 1
     fi
@@ -705,6 +719,10 @@ _gp_nail_one() {
     # pointer blocks the main project's repair leg (worktree repair
     # must rewrite it). The classification excludes worktree-reg rows
     # from the sweep; this refuses direct `nail <worktree>` calls.
+    # The anchor is the .git/worktrees/ SHAPE: it protects against a
+    # bare "worktrees" path component, NOT against a storage whose own
+    # path ends in <x>.git/worktrees (self-inflicted config — every
+    # main target then carries the shape; #754 c E5).
     case "$_gpn_gd" in
         *.git/worktrees/*)
             ui_warn "not nailing: worktree registration (the main project owns it): $_gpn_gd"
@@ -853,8 +871,11 @@ _gp_revert_one() {
 #   nailed           pointer into OUR storage, chattr i present
 #   unnailed         pointer into OUR storage, no i (degraded)
 #   foreign-pointer  pointer somewhere else (not managed)
-#   worktree-reg     .git dir without HEAD+objects (a worktree
-#                    registration dir — nothing to protect)
+#   worktree-reg     a worktree registration — either a .git DIR
+#                    without HEAD+objects, or (since the #754 b
+#                    classification) a pointer FILE targeting
+#                    <something>.git/worktrees/<id>; never actionable
+#                    (the main project owns repair and nail decisions)
 # Every conf line runs the reader gate first (the files.md root-op
 # contract); refused lines say why and authorize nothing.
 _gp_projects() {
@@ -894,9 +915,11 @@ _gp_projects() {
             # sealed pointer blocks the main project's repair leg —
             # D1), revert must not move them (round a B4), and status
             # must not advise nailing them. The pattern anchors on the
-            # .git/worktrees/ SHAPE, not a bare */worktrees/* (D7: a
-            # storage path containing a "worktrees" component must not
-            # swallow its own main gitdirs).
+            # .git/worktrees/ SHAPE — it defeats a bare "worktrees"
+            # path component (D7); a storage whose OWN path ends in
+            # <x>.git/worktrees still swallows its mains
+            # (self-inflicted config, #754 c E5 — refused nowhere,
+            # documented here).
             case "$_gpp_t" in
                 *.git/worktrees/*)
                     printf 'worktree-reg %s\n' "$_gpp_proj"
@@ -1082,8 +1105,9 @@ _git_protection_nail() {
 # _gp_revert_all: every nailed/unnailed project back to classic.
 # Returns (never exits): rc 1 when any revert failed. Counters for
 # the `off` honesty gate (#754 a B2): _gpra_n reverted, _gpra_skip
-# skipped-as-not-ours (worktree registrations, non-dev-owned plants,
-# foreign targets).
+# skipped-as-not-ours — since the #754 b classification, worktree
+# registrations never reach this filter; a skip means a non-dev-owned
+# or otherwise ungated target inside the storage (the A6 plant shape).
 _gp_revert_all() {
     _gpra_list=$(mktemp) || {
         ui_error "mktemp failed — cannot enumerate revert targets"
@@ -1151,8 +1175,8 @@ _git_protection_off() {
     # revert needs the storage config to recognize kit-owned pointers.
     if _gp_revert_all; then
         if [ "${_gpra_skip:-0}" -gt 0 ]; then
-            ui_error "$_gpra_skip pointer project(s) were skipped as not kit-owned (worktree"
-            ui_error "registrations, foreign or non-dev-owned targets) — config NOT dropped;"
+            ui_error "$_gpra_skip pointer project(s) were skipped as not kit-owned (non-dev-owned"
+            ui_error "or otherwise ungated targets in the storage) — config NOT dropped;"
             ui_error "inspect 'opk git-protection status', then re-run"
             exit 1
         fi
