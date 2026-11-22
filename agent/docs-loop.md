@@ -127,7 +127,14 @@ sessions, one per PR).
   re-states the enumeration) against the full new enumeration, and
   every count comment about a list the wave grew or shrank is
   re-derived or count-freed: greps find
-  drift in what exists; mirrors drift by omission. Scope
+  drift in what exists; mirrors drift by omission — and every
+  factual assertion in the wave's own new prose (provenance, version
+  eras, SHAs, counts, per-site shape claims) is verified at its
+  primary source AT DRAFT TIME, the claim-audit rule's own demand
+  turned on the wave's own diff: PR #716 wrote the added-prose rule
+  and violated it in the same commit (its round a C1, C6, A4 are the
+  calibration set), and the enumerated legs above could not catch
+  what the enumeration did not name. Scope
   models, phrasing, contradictions: two
   half-true descriptions of one mechanism give a reader opposite
   answers (pr-00629 round a A1–A3: a grep-dead pointer written into the
