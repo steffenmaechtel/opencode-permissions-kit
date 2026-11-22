@@ -21,7 +21,8 @@ Every `opencode` invocation goes through the wrapper at
    a silent fallback to a root-equivalent path.
 4. **Execute** — `sudo -u opencode` with `DOCKER_HOST`/`XDG_RUNTIME_DIR`
    exported for the rootless socket (preserved across sudo via the kit's
-   `env_keep`).
+   command-scoped `env_keep` — the keep applies only to the wrapper's own
+   exec target, no other sudo invocation receives it, #679).
 
 The wrapper prints its banner and starts opencode immediately — no `Press
 Enter` pause, no container question (the state is visible in the TUI, see

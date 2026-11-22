@@ -313,8 +313,8 @@ if [ "$_rootless_ok" = true ]; then
         E 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/socket-check '"$SOCKPATH"
     check "RL3: socket-check.sh also works as the opencode user itself" \
         E 'sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/'"$OC_UID"' /usr/local/lib/opencode-permissions-kit/bin/socket-check '"$SOCK"'"'
-    check "RL3: sudoers preserves DOCKER_HOST/XDG_RUNTIME_DIR/OPENCODE_SERVER_PASSWORD across sudo" \
-        E 'sudo grep -q "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD" /etc/sudoers.d/opencode-permissions-kit'
+    check "RL3: sudoers preserves DOCKER_HOST/XDG_RUNTIME_DIR/OPENCODE_SERVER_PASSWORD across sudo (command-scoped, #679)" \
+        E 'sudo grep -q "^Defaults!OPK_ENV_CMNDS env_keep += \"DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME\"$" /etc/sudoers.d/opencode-permissions-kit'
     check "RL3: installed wrapper exports DOCKER_HOST for the rootless backend" \
         E 'grep -q "export DOCKER_HOST" /usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode'
 

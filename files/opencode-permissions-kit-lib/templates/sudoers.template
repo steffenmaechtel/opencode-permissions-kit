@@ -42,7 +42,31 @@
 # fragment could still override both.
 Defaults env_reset
 Defaults !setenv
-Defaults env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME"
+# Command-scoped keep (issue #679): a bare `Defaults env_keep` carries no
+# user or command qualifier — it made EVERY sudo invocation on the host
+# (any user, any command) retain the invoking session's DOCKER_HOST,
+# XDG_RUNTIME_DIR and OPENCODE_SERVER_PASSWORD. The keep now rides a
+# Cmnd_Alias naming
+# ONLY the wrapper's exec target (the real binary under bin/opencode):
+# the per-rule audit (#679) found it the sole reader of the four kept
+# vars — the wrapper exports DOCKER_HOST/XDG_RUNTIME_DIR before the exec
+# (env_reset above would drop them), and the headless-serve auth carries
+# OPENCODE_SERVER_*. The other grants need none: socket-check/cwd-check
+# read only their argv; ddev-as-opencode re-derives HOME, XDG_RUNTIME_DIR
+# and DOCKER_HOST itself (getent + id -u + install.conf, see its header);
+# the
+# RunAs-root git heal stays out deliberately — a chown helper must not
+# receive invoking-session env. User scoping (Defaults:DEFAULT_USER) was
+# the weaker form: it widens every command that user runs via sudo.
+# Grammar: per-command Defaults entries may not carry command-line
+# arguments inline — the alias (which may) is the sanctioned shape
+# (sudoers(5), Defaults). The alias NAME occupies the host-global
+# sudoers alias namespace: a foreign /etc/sudoers.d fragment
+# redefining OPK_ENV_CMNDS makes sudoers fail to parse host-wide
+# until removed (write path is root-only; the OPK_ prefix bounds the
+# accidental-collision risk).
+Cmnd_Alias OPK_ENV_CMNDS = /usr/local/lib/opencode-permissions-kit/bin/opencode *
+Defaults!OPK_ENV_CMNDS env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME"
 
 # Base RunAs: the wrapper always execs opencode as the opencode user.
 DEFAULT_USER ALL=(opencode) NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/opencode *

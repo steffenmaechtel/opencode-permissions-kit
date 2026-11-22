@@ -373,7 +373,9 @@ if [ "$(printf '%s\n2.2.6\n' "$OC_VERSION" | sort -V | tail -n 1)" = "$OC_VERSIO
         E 'curl -sf -u opencode:e2e-probe-pw -X POST -H "content-type: application/json" -d "{\"action\":\"shell\",\"resources\":[\"ls -la\"]}" "http://127.0.0.1:4789/api/session/$(cat /tmp/e2e-probe-sid)/permission" | grep -q "\"effect\":\"allow\""'
     # Teardown: killing the docker-exec client ends the exec session (the
     # container removal at suite end would reap any survivor anyway —
-    # the image ships no procps, so no in-container pkill exists).
+    # pgrep/pkill are in the image via transitive procps, but the kill
+    # stays the primary reaper; corrected 2026-11-22, #733 a B1: the old
+    # "image ships no procps" claim was stale and misled a review).
     kill "$E2E_SERVE_JOB" 2>/dev/null || true
 else
     # Counted through skip() (issue #480 F35): visible in the tally and
@@ -1290,8 +1292,8 @@ E 'cd /var/www/vhosts/test-project && timeout 20 /usr/local/bin/opencode serve -
     echo "  ${GREEN}OK${NC}  wrapper serve ran headless from a project dir"
 check "wrapper serve: listening line also from project dir" \
     E 'grep -q "server listening" /tmp/wrapper-serve2.out'
-check "wrapper serve: sudoers keep OPENCODE_SERVER_PASSWORD across sudo" \
-    E 'sudo grep -q "OPENCODE_SERVER_PASSWORD" /etc/sudoers.d/opencode-permissions-kit'
+check "wrapper serve: sudoers keep OPENCODE_SERVER_PASSWORD across sudo (command-scoped, #679)" \
+    E 'sudo grep -q "^Defaults!OPK_ENV_CMNDS env_keep += \"DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME\"$" /etc/sudoers.d/opencode-permissions-kit'
 
 echo "--- 12e.3 wrapper headless run (orchestrators: cezar, CI, eval harnesses — issue #42) ---"
 # Orchestrators spawn `opencode run` from git worktrees / temp checkouts
@@ -1304,6 +1306,59 @@ check_fail "wrapper run from non-project dir: no project-dir refusal" \
     E 'grep -q "cannot be started here" /tmp/wrapper-run.out /tmp/wrapper-run.err'
 check_fail "wrapper run: no SECURED banner on stdout" \
     E 'grep -q "SECURED BY" /tmp/wrapper-run.out'
+
+echo ""
+echo "--- 12e.4 env_keep scoping: effective env on the RunAs side (issue #679) ---"
+# The keep is command-scoped (Defaults!OPK_ENV_CMNDS). visudo proves
+# SYNTAX only — a subtly wrong alias (path drift) would break the
+# wrapper flow SILENTLY after the next opk update. Two functional arms,
+# both observing the environment production observes:
+#   positive: wrapper-invoked serve carries sentinel env across the
+#     sudo hop into the opencode-user process — /proc/<pid>/environ is
+#     the post-env_reset table sudo exec'd the target with;
+#   negative (the narrowing itself): an out-of-alias sudo invocation
+#     DROPS the same sentinel — under the pre-#679 global keep it
+#     survived, so this arm is the regression pin for the breadth.
+# Sentinel values carry no '/' or '%' (env_check strips those on its
+# own — the negative arm must discriminate the SCOPING, not env_check)
+# and nothing the serve boot parses: DOCKER_HOST is unused without
+# in-session container tools, the password is just the auth secret.
+# Suite-internal dependencies, named so a fixture change reads as a
+# fixture break, not a kit break (#733 round a): the negative arm's
+# /usr/bin/env runs only under dev's ALL grant (Dockerfile fixture —
+# without it sudo refuses and the check_fail passes vacuously, A3);
+# the DOCKER_HOST sentinel survives only because this suite installs
+# podman-rootless daemonless — a backend with CONTAINER_DOCKER_HOST
+# set makes the wrapper OVERWRITE the inherited sentinel before the
+# exec (opencode-as-opencode:142-145) and this arm false-reds loud
+# (B3); the pgrep poll rides TRANSITIVE procps (not Dockerfile-pinned
+# — B1 residual, b D1: if the dependency drops, the serve still runs
+# but the pid stays empty — the WARN below names the pgrep suspect
+# and the two environ rows red). Serve budget 45s vs the 30s poll: a
+# serve found late in the poll must still be alive at the environ read.
+check "env_keep scoping: deployed alias names exactly the wrapper exec target (#679)" \
+    E 'sudo grep -q "^Cmnd_Alias OPK_ENV_CMNDS = /usr/local/lib/opencode-permissions-kit/bin/opencode \*$" /etc/sudoers.d/opencode-permissions-kit'
+check_fail "env_keep scoping: out-of-alias sudo drops DOCKER_HOST (#679)" \
+    E 'DOCKER_HOST=e2e-envkeep-neg-dh sudo -u opencode /usr/bin/env | grep -Fx "DOCKER_HOST=e2e-envkeep-neg-dh"'
+docker exec -u dev -e OPK_UPDATE_CHECK=0 "$E2E_CONTAINER" \
+    sh -c 'cd /tmp && DOCKER_HOST=e2e-envkeep-pos-dh OPENCODE_SERVER_PASSWORD=e2e-envkeep-pw timeout 45 /usr/local/bin/opencode serve --hostname 127.0.0.1 --port 4197 >/tmp/envkeep-serve.out 2>&1' \
+    >/dev/null 2>&1 &
+E2E_ENVKEEP_JOB=$!
+_envkeep_pid=""
+for _ in $(seq 1 30); do
+    _envkeep_pid="$(E 'sudo pgrep -u opencode -f "serve --hostname 127.0.0.1 --port 4197" | head -1' || true)"
+    [ -n "$_envkeep_pid" ] && break
+    sleep 1
+done
+if [ -z "$_envkeep_pid" ]; then
+    echo "  ${RED}WARN${NC}  wrapper serve (env_keep probe) pid not found within 30s — environ reads will fail (serve down or still booting under its 45s budget, or the poll's pgrep missing: rides transitive procps, #733 a B1 / b D1 / c E1)"
+fi
+check "env_keep scoping: wrapper serve carries DOCKER_HOST across sudo (#679)" \
+    E "sudo cat /proc/${_envkeep_pid:-none}/environ | tr '\\0' '\\n' | grep -Fx 'DOCKER_HOST=e2e-envkeep-pos-dh'"
+check "env_keep scoping: wrapper serve carries OPENCODE_SERVER_PASSWORD across sudo (#679)" \
+    E "sudo cat /proc/${_envkeep_pid:-none}/environ | tr '\\0' '\\n' | grep -Fx 'OPENCODE_SERVER_PASSWORD=e2e-envkeep-pw'"
+kill "$E2E_ENVKEEP_JOB" 2>/dev/null || true
+E 'sudo pkill -u opencode -f "port 419[7]" >/dev/null 2>&1 || true'
 
 echo ""
 echo "--- 12f. uninstall.sh --dry-run (no-op) ---"

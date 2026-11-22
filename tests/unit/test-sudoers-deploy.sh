@@ -144,6 +144,63 @@ fi
 check_absent "env posture: no SETENV tag anywhere in the fragment (#726 a Q2)" \
     "$CONF/sudoers" -q SETENV
 
+# --- 1d. env_keep is command-scoped (#679) ---------------------------------
+# The keep must ride a Cmnd_Alias whose ONLY member is the wrapper's exec
+# target (the real binary under bin/opencode) — the per-rule audit found
+# the other grants need none of the four vars. Exact-count pins lock the
+# rendered shape; the absence pins reddens any re-globalized keep. The
+# absence and member pins run over a CONTINUATION-JOINED view of the
+# fragment: alias widening and merged Defaults ride backslash
+# continuations, and the physical-line grep stayed green over a two-line
+# widened alias (sabotage cycle B, 2026-11-22) — the pins must see the
+# LOGICAL line. Commented-out sabotage shapes count too (harness
+# absence contract).
+_scoped_keep=$(grep -c '^Defaults!OPK_ENV_CMNDS env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME"$' "$CONF/sudoers" || true)
+if [ "$_scoped_keep" = 1 ]; then
+    pass "env_keep scoping: exactly one Defaults!OPK_ENV_CMNDS keep line (#679)"
+else
+    fail "env_keep scoping: expected 1 Defaults!OPK_ENV_CMNDS keep line, found $_scoped_keep (#679)"
+fi
+_alias_line=$(grep -c '^Cmnd_Alias OPK_ENV_CMNDS = /usr/local/lib/opencode-permissions-kit/bin/opencode \*$' "$CONF/sudoers" || true)
+if [ "$_alias_line" = 1 ]; then
+    pass "env_keep scoping: alias names exactly the wrapper exec target (#679)"
+else
+    fail "env_keep scoping: expected 1 exact wrapper-only alias line, found $_alias_line (#679)"
+fi
+sed -e ':a' -e '/\\$/N' -e 's/\\\n[[:space:]]*//' -e 'ta' "$CONF/sudoers" >"$WORK/sudoers-joined"
+# Class pin (#733 round a B2+C1, b D2): every live Defaults mention of
+# env_keep except the ONE sanctioned scoped line must be absent. The
+# view is comment-stripped BEFORE joining (a backslash-ending comment
+# would textually swallow a following live line in a plain join —
+# comments are not live sudoers, but the join is textual) and joined
+# (merged and widened shapes ride continuations). The class leg counts
+# OCCURRENCES, not lines (b D2): a rogue keep backslash-glued onto the
+# sanctioned line makes one physical line with two env_keep mentions —
+# occurrences 2 vs sanctioned lines 1 reds it (every such glue shape is
+# also sudoers-invalid, caught by the real-visudo e2e install legs; the
+# occurrence count closes it for the stubbed unit leg too). Catches
+# global, user-, host-, runas-scoped, merged-negation (Defaults
+# !setenv,env_keep — the shape the old ^Defaults[^!]* pin could not
+# cross) and second-alias/second-keep additions, none of which the
+# exact-text count pins alone see.
+grep -v '^[[:space:]]*#' "$CONF/sudoers" |
+    sed -e ':a' -e '/\\$/N' -e 's/\\\n[[:space:]]*//' -e 'ta' >"$WORK/sudoers-class"
+_env_class=$(grep -o 'env_keep' "$WORK/sudoers-class" | wc -l)
+_env_sanctioned=$(grep -cF 'Defaults!OPK_ENV_CMNDS env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME"' "$WORK/sudoers-class" || true)
+if [ "$_env_class" = "$_env_sanctioned" ] && [ "$_env_sanctioned" -ge 1 ]; then
+    pass "env_keep scoping: no Defaults env_keep occurrence outside the sanctioned scoped line (#679, #733 a B2+C1, b D2)"
+else
+    fail "env_keep scoping: expected sanctioned-only env_keep, class-occurrences=$_env_class sanctioned=$_env_sanctioned (#679, #733 a B2+C1, b D2)"
+fi
+check_absent "env_keep scoping: socket-check NOT in the alias (#679 audit: argv-only)" \
+    "$WORK/sudoers-joined" -q 'OPK_ENV_CMNDS = .*socket-check'
+check_absent "env_keep scoping: cwd-check NOT in the alias (#679 audit: argv-only)" \
+    "$WORK/sudoers-joined" -q 'OPK_ENV_CMNDS = .*cwd-check'
+check_absent "env_keep scoping: ddev-as-opencode NOT in the alias (#679 audit: re-derives env)" \
+    "$WORK/sudoers-joined" -q 'OPK_ENV_CMNDS = .*ddev-as-opencode'
+check_absent "env_keep scoping: heal-index-head NOT in the alias (#679 audit: RunAs-root chown helper)" \
+    "$WORK/sudoers-joined" -q 'OPK_ENV_CMNDS = .*heal-index-head'
+
 # --- 2. legacy name cleanup ------------------------------------------------
 
 # A 440 file cannot be overwritten by its (non-root) owner — reset the

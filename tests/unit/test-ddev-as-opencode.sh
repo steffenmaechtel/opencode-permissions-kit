@@ -543,9 +543,9 @@ fi
 check "browser arm plain-runs commands without a describe URL (prompts stay interactive)" \
     grep -qF 'browser open is skipped' "$FUNC" # rider-inversion
 check_live "browser arm parses the describe JSON with python3 (kit prerequisite)" "$FUNC" -q 'python3'
-check_live "sudoers env_keep keeps the transport vars" \
+check_live "sudoers env_keep keeps the transport vars (command-scoped, #679)" \
     "$SUDOERS" \
-    -q 'env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME"'
+    -q 'Defaults!OPK_ENV_CMNDS env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME"'
 check_fail "sudoers no longer keep DDEV_DEBUG (describe transport needs none)" \
     sh -c "grep -q 'DDEV_DEBUG' \"\$1\"" _ "$SUDOERS"
 check_fail "function file no longer uses the FULLURL debug contract" \

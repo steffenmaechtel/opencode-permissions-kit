@@ -521,11 +521,11 @@ for marker in '#@docker-group-begin' '#@ddev-delegated-begin' '#@ddev-sandbox-be
     fi
 done
 
-if live_src "$SUDOERS_FILE" | grep -q 'env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME"' &&
+if live_src "$SUDOERS_FILE" | grep -q 'Defaults!OPK_ENV_CMNDS env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME"' &&
     ! grep -q 'DDEV_DEBUG' "$SUDOERS_FILE" &&
     grep -q '(opencode) NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/opencode' "$SUDOERS_FILE" &&
     live_src "$SUDOERS_FILE" | grep -q 'socket-check \*'; then
-    pass "sudoers.template keeps base RunAs + socket-check + env_keep (no DDEV_DEBUG)"
+    pass "sudoers.template keeps base RunAs + socket-check + scoped env_keep (no DDEV_DEBUG)"
 else
     fail "sudoers.template lost a required rule"
 fi
