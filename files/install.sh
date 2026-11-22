@@ -292,6 +292,7 @@ fetch_kit() {
         opencode-permissions-kit-lib/git-heal/hooks/post-merge \
         opencode-permissions-kit-lib/git-heal/hooks/post-rewrite \
         opencode-permissions-kit-lib/sh/git-heal-core.sh \
+        opencode-permissions-kit-lib/sh/git-protection-core.sh \
         opencode-permissions-kit-lib/tui/kit-mode.tsx \
         opencode-permissions-kit-lib/tui/kit-mode-2x.tsx \
         opencode-permissions-kit-lib/tui/opencode-danger.theme.json \

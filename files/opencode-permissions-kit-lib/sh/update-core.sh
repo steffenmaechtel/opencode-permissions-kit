@@ -733,6 +733,112 @@ gid=$(id -g "$DEFAULT_USER" 2>/dev/null || echo '<gid>'),dmask=027,fmask=037\""
     fi
 }
 
+# git-protection consent + recurring pass (#704 O4, the design agreed
+# 2026-11-21): `opk update` asks before configuring the git-protection
+# storage the FIRST time (kit convention: nothing silent on user
+# trees), and — once the feature is enabled (GITDIR_STORAGE set to a
+# path) — every update runs the migrate+nail pass as root: new classic
+# .git layouts under the conf roots are adopted, pending pointers get
+# their nail. That IS the security gain: the conversion rides the
+# update, no extra command. The operand heal stays the separate opt-in
+# (`opk git-heal on`) it is today — no coupling in either direction.
+# States, in order:
+#   KIT_GITDIR_STORAGE=none (env)     skip this run, no marker (the
+#                                     documented non-interactive out)
+#   KIT_GITDIR_STORAGE=<path> (env)   configure with that path, no
+#                                     question (automation opt-in)
+#   GITDIR_STORAGE=<path> (conf)      enabled: run the pass, no
+#                                     question (consent already given)
+#   GITDIR_STORAGE=none (conf)        declined: skip silently
+#   unset + interactive               ask ONCE [y/N]; y configures,
+#                                     n persists the "none" marker
+#   unset + non-interactive           skip with a hint, no marker
+#                                     (--yes counts as non-interactive:
+#                                     its contract is the default, and
+#                                     the default of a system-changing
+#                                     question is no)
+# The subshell around _git_protection_on converts its exit-on-failure
+# into a warnable rc — a failed project migration is per-project
+# rolled back (atomic), it must not abort the whole update after every
+# other phase already ran.
+update_git_protection_consent() {
+    if [ -z "${GIT_PROTECTION_CORE:-}" ]; then
+        ui_detail "git-protection: core lib absent — pass skipped (a full update deploys it)"
+        return 0
+    fi
+    # shellcheck disable=SC1090
+    . "$GIT_PROTECTION_CORE"
+    # Used-set guard (the cross-lib pairing rule): a present-but-skewed
+    # core is a broken kit and refuses loud — a missing function would
+    # otherwise abort mid-phase under set -e with a bare "not found".
+    for _gpc_fn in _git_protection_on _gp_storage _gp_persist_storage; do
+        command -v "$_gpc_fn" >/dev/null 2>&1 || {
+            ui_error "git-protection: '$_gpc_fn' missing from the core lib — skewed, aborting"
+            return 1
+        }
+    done
+    _gpc_env="${KIT_GITDIR_STORAGE:-}"
+    _gpc_conf=$(sed -n 's/^GITDIR_STORAGE=//p' "$INSTALL_CONF" 2>/dev/null | tail -n 1)
+    if [ "$_gpc_env" = "none" ]; then
+        return 0
+    fi
+    if [ -n "$_gpc_env" ]; then
+        case "$_gpc_env" in
+            /*) ;;
+            *)
+                ui_warn "KIT_GITDIR_STORAGE must be 'none' or an absolute path — ignored"
+                _gpc_env=""
+                ;;
+        esac
+    fi
+    if [ -n "$_gpc_env" ]; then
+        ui_info "git-protection: configuring storage at $_gpc_env (KIT_GITDIR_STORAGE)"
+        (GP_STORAGE="$_gpc_env" _git_protection_on) ||
+            ui_warn "git-protection pass had failures — re-run: sudo opk git-protection on"
+        return 0
+    fi
+    if [ "$_gpc_conf" = "none" ]; then
+        # Declined on this host — never nagged again; the enable path
+        # stays one command away (documented in the how-to).
+        return 0
+    fi
+    if [ -n "$_gpc_conf" ]; then
+        # Enabled: the recurring pass. No question — consent was given
+        # when the storage was configured.
+        ui_info "git-protection: enabled — running the adopt + nail pass"
+        (_git_protection_on) ||
+            ui_warn "git-protection pass had failures — re-run: sudo opk git-protection on"
+        return 0
+    fi
+    # First contact: nothing configured. Interactive hosts get the
+    # one-time question; non-interactive ones a hint (the tty probe
+    # runs in a subshell — a special builtin's failed redirection is
+    # FATAL under dash, the config.sh M1 guard shape, conventions.md
+    # "Shell semantics").
+    if [ "$YES" = true ] || ! (: </dev/tty) 2>/dev/null; then
+        ui_detail "git-protection: not configured — enable with: sudo opk git-protection on"
+        ui_detail "(set KIT_GITDIR_STORAGE=none to silence this hint on unattended updates)"
+        return 0
+    fi
+    _gpc_stor_rc=0
+    _gpc_stor=$(_gp_storage) || _gpc_stor_rc=$?
+    if [ "$_gpc_stor_rc" -ne 0 ]; then
+        ui_detail "git-protection: no storage path derivable (no usable projects.conf root) —"
+        ui_detail "set GITDIR_STORAGE in install.conf, then: sudo opk git-protection on"
+        return 0
+    fi
+    ui_detail "git-protection: .git becomes a chattr+i-nailed pointer file into the storage"
+    if ui_confirm "Configure git-protection at $_gpc_stor and migrate all projects to it?" "n"; then
+        (_git_protection_on) ||
+            ui_warn "git-protection pass had failures — re-run: sudo opk git-protection on"
+    else
+        _gp_persist_storage "none" ||
+            ui_warn "could not persist the decline marker — the question will re-appear"
+        ui_detail "declined — enable later with: sudo opk git-protection on"
+    fi
+    return 0
+}
+
 # --- opencode binary upgrade (--binary / --binary-path) ----------------------
 
 update_binary_resecure() {

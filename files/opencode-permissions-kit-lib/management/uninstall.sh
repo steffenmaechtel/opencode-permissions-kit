@@ -215,6 +215,7 @@ un_pairing_guard() {
     for _npg in un_context_load prompt_yn un_sudoers_remove \
         un_wrapper_remove un_cli_remove un_xdg_open_remove \
         un_tui_plugins_remove un_wsl_bridge_remove un_git_heal_remove \
+        un_git_protection_remove \
         un_library_remove \
         un_umask_remove un_user_remove un_projects_revert \
         un_config_dirs_remove un_audit_log_remove \
@@ -251,6 +252,7 @@ un_xdg_open_remove
 un_tui_plugins_remove
 un_wsl_bridge_remove
 un_git_heal_remove
+un_git_protection_remove
 un_library_remove
 un_umask_remove
 un_user_remove
@@ -291,6 +293,10 @@ echo "      (C:\\Windows\\System32\\drivers\\etc\\hosts) keep resolving"
 echo "      project domains to 127.0.0.1 — remove them manually if you"
 echo "      no longer need them (project domains under *.ddev.site were"
 echo "      never added)."
+echo "    - The git-protection storage directory (the GITDIR_STORAGE"
+echo "      path, e.g. /var/www/gitdirs) is left in place even after a"
+echo "      successful revert — delete it manually if you no longer"
+echo "      want it (empty once every project was reverted)."
 echo ""
 # Session hint (issue #73): the running shell still carries kit leftovers
 # a fresh session drops by itself — the ddev() function from the rc hook

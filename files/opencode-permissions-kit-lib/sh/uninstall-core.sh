@@ -503,6 +503,55 @@ un_git_heal_remove() {
     fi
 }
 
+# Git-protection pointer layout removal (#704): BEFORE un_library_remove
+# deletes the core lib, offer the walk-back — `sudo opk git-protection
+# off` reverts every kit-managed project to the classic .git layout
+# (chattr -i, pointer out, gitdir back) and drops the storage config.
+# The pointer layout itself keeps working without the kit ("gitdir:"
+# pointer files are git-native), but the REVERT needs the kit's core:
+# after the library is gone it is a manual per-project dance (chattr -i
+# + mv), so the offer defaults to yes — uninstall's contract is "ALL
+# changes made by install.sh are removed", the same class
+# un_projects_revert automates. A declined revert lands in the closing
+# manual-cleanup list.
+un_git_protection_remove() {
+    echo ""
+    echo "--- Removing git-protection pointer layout ---"
+    _un_gpr_ic="/etc/opencode-permissions-kit/install.conf"
+    _un_gpr_val=$(sed -n 's/^GITDIR_STORAGE=//p' "$_un_gpr_ic" 2>/dev/null | tail -n 1)
+    if [ -z "$_un_gpr_val" ] || [ "$_un_gpr_val" = "none" ]; then
+        echo "git-protection not configured (no storage) — nothing to do."
+        log "git-protection: not configured"
+        return 0
+    fi
+    _un_gpr_opk="/usr/local/lib/opencode-permissions-kit/bin/opk"
+    if [ ! -f "$_un_gpr_opk" ]; then
+        echo "WARN: git-protection is configured ($_un_gpr_val) but the kit CLI is" >&2
+        echo "      gone — revert each project manually: sudo chattr -i <project>/.git," >&2
+        echo "      rm <project>/.git, mv $_un_gpr_val/<name>.git <project>/.git" >&2
+        log "git-protection: configured but CLI missing"
+        return 0
+    fi
+    if [ "$(prompt_yn "Revert the git-protection pointer layout (gitdirs move back)?" "y")" = "y" ]; then
+        _un_partial=""
+        _un_revert_failed=0
+        un_rc_q "git-protection off" sudo sh "$_un_gpr_opk" git-protection off
+        if [ -z "$_un_partial" ]; then
+            echo "git-protection reverted (storage config dropped)."
+            log "git-protection: reverted (off)"
+        else
+            echo "WARN: git-protection revert failed ($_un_partial) — storage config" >&2
+            echo "      stays; re-run 'sudo opk git-protection off', or revert manually" >&2
+            log "git-protection: revert FAILED ($_un_partial)"
+        fi
+    else
+        echo "git-protection layout left in place (pointers keep working without the kit)."
+        echo "To remove later: sudo chattr -i <project>/.git && sudo rm <project>/.git &&"
+        echo "sudo mv $_un_gpr_val/<name>.git <project>/.git (per project)"
+        log "git-protection: revert declined"
+    fi
+}
+
 # Library + legacy library/symlink removal section.
 un_library_remove() {
     echo ""

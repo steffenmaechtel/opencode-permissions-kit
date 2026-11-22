@@ -285,6 +285,7 @@ opencode-permissions-kit-lib/git-heal/hooks/post-index-change \
 opencode-permissions-kit-lib/git-heal/hooks/post-merge \
 opencode-permissions-kit-lib/git-heal/hooks/post-rewrite \
 opencode-permissions-kit-lib/sh/git-heal-core.sh \
+opencode-permissions-kit-lib/sh/git-protection-core.sh \
 opencode-permissions-kit-lib/tui/kit-mode.tsx \
 opencode-permissions-kit-lib/tui/kit-mode-2x.tsx \
 opencode-permissions-kit-lib/tui/opencode-danger.theme.json \
@@ -875,6 +876,22 @@ for _tgc_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/git-check.sh" "$LI
 done
 [ -n "$_tgc" ] || git_check_report() { :; }
 
+# git-protection core (#704 O4): the update's consent phase
+# (update-core.sh, update_git_protection_consent) runs the layout's
+# adopt+nail pass as root. Checkout-first like every helper above; the
+# file is definitions-only, so a no-op here stays safe — the phase
+# skips with a visible row when the lib is absent (a pre-#704 checkout
+# serving an older deployed lib) and refuses loud when present-but-
+# skewed (its own used-set guard).
+GIT_PROTECTION_CORE=""
+for _gpc_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/git-protection-core.sh" \
+    "$LIBDIR/sh/git-protection-core.sh"; do
+    if [ -f "$_gpc_cand" ]; then
+        GIT_PROTECTION_CORE="$_gpc_cand"
+        break
+    fi
+done
+
 DEFAULT_USER=""
 OPENCODE_USER="opencode"
 INSTALLED_VERSION=""
@@ -1025,6 +1042,11 @@ Usage: ./update.sh [--yes] [--refresh] [--binary] [--only-binary] [--binary-path
                    current major; the TUI registration flips with it)
   --version        upgrade to exactly this opencode version (channel by
                    prefix: 2.* from npm, 1.x from GitHub)
+Environment:
+  KIT_GITDIR_STORAGE=none    skip the one-time git-protection storage
+                             question on unattended updates (#704);
+                             an absolute path configures it without
+                             asking (automation opt-in)
 EOF
             exit 0
             ;;
@@ -1102,7 +1124,8 @@ update_pairing_guard() {
         update_redeploy_sudoers update_redeploy_umask \
         update_redeploy_openchamber update_redeploy_shell_hooks \
         update_redeploy_project_roots update_redeploy_git_safe \
-        update_redeploy_wsl_mntc update_binary_resecure \
+        update_redeploy_wsl_mntc update_git_protection_consent \
+        update_binary_resecure \
         update_binary_upgrade update_redeploy_xdg_shim \
         update_finalize_opencode_home \
         update_finalize_default_config update_finalize_ddev_stamp \
@@ -1174,6 +1197,7 @@ if [ "$ONLY_BINARY" != true ]; then
     update_redeploy_project_roots
     update_redeploy_git_safe
     update_redeploy_wsl_mntc
+    update_git_protection_consent
 fi
 
 update_binary_resecure
