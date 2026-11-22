@@ -737,10 +737,12 @@ Four places carry review knowledge, each with exactly one job:
   wrong (PR #729 round a — two reviewer axes asserted the same
   bracket-expression mechanism, one checkpoint claiming an empirical
   on-host match; the verifier's own scratch probes under dash and bash
-  refuted it, and only they kept the wrong MED out of the round
-  comment — "the verification probe is the record"). Probe artifacts
-  that decide a verdict live in the round scratch and are named in the
-  round comment or retraction. (RM-0199)
+  refuted it, keeping the wrong MED out of the findings table — it
+  retracted into the round comment's "Retracted / ghost findings"
+  section, visible as every retraction owes: "the verification probe
+  is the record"). Probe artifacts that decide a verdict live in the
+  round scratch and are named in the round comment or retraction.
+  (RM-0199)
 - A CONFIRMED verdict covers the finding's MECHANISM, never the
   incidental factual tokens of its prose — numbers, version eras,
   SHAs, names carried in the finding's own wording. Fix text that

@@ -153,10 +153,12 @@ widening the token.
 
 ## Your non-transferable roles in autonomous cases
 
-GO-less mode does not remove you: the two roles the loop cannot run
+GO-less mode does not remove you: the three roles the loop cannot run
 itself are **pattern-level catches** (defect classes no automated
-gate sees — the Pilot 3 glue catch) and **scope authority** (steering
-and freezing scope mid-case; the Pilot 3 scope freeze). Steering
+gate sees — the Pilot 3 glue catch), **scope authority** (steering
+and freezing scope mid-case; the Pilot 3 scope freeze) and the
+**work-order gate** (the bundled loop-end ask over deferred work
+orders — a maintainer decision in both modes). Steering
 lands in the case's next round comment as a standing disclosure.
 
 ## Snapshot-scope reviews — triggers, findings, aftermath
