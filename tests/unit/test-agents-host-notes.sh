@@ -182,18 +182,26 @@ echo "-- 3. the notes carry every failure-mode -> workaround pair --"
 
 # Docs-pin shape (agent/conventions.md "Source-counting pins"): raw
 # greps over markdown, each literal a single-line fragment chosen
-# against the file's wrap. One literal per pair plus its workaround.
+# against the file's wrap. Every pair pins its symptom and each of its
+# workaround sentences, in file order; the two standing instructions
+# (the safety line, the scope line) ride the same list (#770 b F1).
 for _lit in \
+    'never reach for' \
     'whoami' \
     'opk status' \
     'could not write config file' \
     'git push origin <branch>' \
     '--no-track' \
+    'git config --global' \
     'unable to write new index file' \
     "couldn't set 'HEAD'" \
     'update_ref failed' \
+    'Do not repair ownership' \
     'sudo opk git-heal on' \
+    'Moving, deleting or replacing' \
     'git-protection' \
+    'plain git commands work unchanged' \
+    'Never write into' \
     'git worktree add <dir> -b <branch>'; do
     check "host notes carry: $_lit" grep -qF -- "$_lit" "$NOTES_MD"
 done
