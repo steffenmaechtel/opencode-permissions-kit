@@ -36,7 +36,13 @@
 # swapped for a symlink between validation and the executors resolves
 # the operand through it while the leaf gates pass (the #266 class's
 # last unswept sibling). Skip loud on a hit, mirroring the leaf
-# gate's wording.
+# gate's wording. #759 restructures the two executors into per-entry
+# batched walk workers (_ho_gwalk for g+w, _ho_owalk for the
+# re-own): sealed git-protection pointers are skipped (chattr +i
+# refuses chmod/chown even for root), every entry gets an exec-time
+# [ -L ] recheck, chown keeps its -h per entry (the 0.0.44a V24
+# link semantics), and the old wholesale 2>/dev/null over the
+# executors is gone -- a failing entry names itself.
 
 # Generic ownership switch between the two kit users, for
 # mixed-owner trees (e.g. a checkout where BOTH the developer and
@@ -87,6 +93,110 @@ _ho_chain_sane() {
         esac
         [ -L "$_hcs_pre" ] && return 1
     done
+    return 0
+}
+
+# _ho_gwalk <root>: the group-write walk — chmod g+w over every
+# non-symlink entry below <root>, batched through a find worker
+# (#759). Sealed git-protection pointers (.git as a regular FILE with
+# the immutable flag, #704/#754) refuse chmod even for root (EPERM —
+# the seal IS the protection) and are SKIPPED: the pointer ships
+# dev:<group> 664 before its nail, so g+w already holds on every
+# kit-created pointer. The worker adds the exec-time [ -L ] recheck
+# per entry (the scan-time ! -type l alone left the scan->act window
+# of the #211 a F1 class; an operand swapped for a link after the
+# scan is skipped, never followed — chmod never dereferences it).
+# Worker-string rules: apostrophe-free comments, no single quotes (an
+# apostrophe would terminate the single-quoted worker string) — the
+# lsattr flags field is isolated by parameter expansion,
+# never a grepped whole line (a path containing i would false-
+# positive the skip). A missing lsattr leaves the skip inert: the
+# entry stays a normal operand and a real EPERM fails the walk loud.
+_ho_gwalk() {
+    find "$1" ! -type l -exec sh -c '
+        _fail=0
+        for _p in "$@"; do
+            [ -L "$_p" ] && continue
+            case "$_p" in
+            */.git)
+                if [ -f "$_p" ]; then
+                    _v=$(lsattr "$_p" 2>/dev/null)
+                    _v=${_v%% *}
+                    case "$_v" in
+                    *i*) continue ;;
+                    esac
+                fi
+                ;;
+            esac
+            chmod g+w "$_p" || _fail=1
+        done
+        [ "$_fail" -eq 0 ]
+    ' sh {} +
+}
+
+# _ho_owalk <root> <user> <group>: the ownership walk — chown -h per
+# non-symlink entry, batched (#759; replaces the old chown -R -h
+# single command, which could not exclude a sealed pointer). Same
+# sealed-pointer skip and exec-time [ -L ] recheck as _ho_gwalk; -h
+# stays on every chown so a link planted after the scan is re-owned
+# as the new owner own link, never dereferenced — the 0.0.44a V24
+# semantics of chown -R -h carried over per entry. user and group
+# travel as fixed argv into the worker, never interpolated into its
+# string.
+_ho_owalk() {
+    find "$1" ! -type l -exec sh -c '
+        _u="$1"
+        _g="$2"
+        shift 2
+        _fail=0
+        for _p in "$@"; do
+            [ -L "$_p" ] && continue
+            case "$_p" in
+            */.git)
+                if [ -f "$_p" ]; then
+                    _v=$(lsattr "$_p" 2>/dev/null)
+                    _v=${_v%% *}
+                    case "$_v" in
+                    *i*) continue ;;
+                    esac
+                fi
+                ;;
+            esac
+            chown -h "$_u:$_g" "$_p" || _fail=1
+        done
+        [ "$_fail" -eq 0 ]
+    ' sh "$2" "$3" {} +
+}
+
+# _ho_sealed_note <root>: dry-run preview helper — counts sealed
+# pointers below <root> and notes that the real run leaves them
+# untouched (#759; what --dry-run announces must match what the run
+# does, the 0.0.39i F4 principle). Fail-soft by design: an unreadable
+# subtree or a failing helper suppresses the note — the note is
+# preview-only, the executor skip is the enforced arm (named-cause
+# mktemp guard per the shipped-code convention).
+_ho_sealed_note() {
+    _hsn_t=$(mktemp "${TMPDIR:-/tmp}/opk-ho-note.XXXXXXXX") || {
+        echo "  note: sealed-pointer preview unavailable (mktemp failed — is \$TMPDIR writable?)" >&2
+        return 0
+    }
+    if command -v _tmp_track >/dev/null 2>&1; then
+        _tmp_track "$_hsn_t"
+    fi
+    find "$1" -name .git -type f -print >"$_hsn_t" 2>/dev/null || true
+    _hsn_n=0
+    while IFS= read -r _hsn_p; do
+        [ -n "$_hsn_p" ] || continue
+        _hsn_v=$(lsattr "$_hsn_p" 2>/dev/null)
+        _hsn_v=${_hsn_v%% *}
+        case "$_hsn_v" in
+            *i*) _hsn_n=$((_hsn_n + 1)) ;;
+        esac
+    done <"$_hsn_t"
+    rm -f "$_hsn_t"
+    if [ "$_hsn_n" -gt 0 ]; then
+        echo "  would leave $_hsn_n sealed .git pointer(s) untouched (git-protection, chattr +i)"
+    fi
     return 0
 }
 
@@ -346,6 +456,9 @@ PYEOF
                 echo "  would refuse: '$_ho_a' crosses a symlinked path component (chown -R/chmod -R would follow it)"
             else
                 echo "  would hand over: $_ho_a -> $_ho_user:$_ho_group (recursive, g+w)"
+                # Sealed-pointer preview (#759, the 0.0.39i F4 match
+                # rule): the real run leaves them untouched — say so.
+                _ho_sealed_note "$_ho_a"
             fi
         done
         exit 0
@@ -370,9 +483,10 @@ PYEOF
         # reverse for agent->dev — the S4 reorder had closed the
         # dev->agent window but re-opened scan-then-act for `me`):
         #   handover opencode (dev->agent): the tree is dev-owned and
-        #   not agent-writable — the find+chmod pass runs FIRST, the
-        #   agent cannot swap what it cannot write; chown -R -h runs
-        #   LAST, race-free by construction (lchown never
+        #   not agent-writable — the group-write walk (_ho_gwalk,
+        #   #759) runs FIRST, the agent cannot swap what it cannot
+        #   write; the ownership walk (_ho_owalk, chown -h per entry)
+        #   runs LAST, race-free by construction (chown -h never
         #   dereferences — a link planted after the scan is re-owned
         #   as the agent's own link, nothing outside the tree,
         #   0.0.44a V24).
@@ -380,10 +494,10 @@ PYEOF
         #   agent-owned or mixed — chmod FIRST would run while the
         #   agent can still swap a scanned file for a symlink (root
         #   chmod g+w through the link on out-of-tree targets).
-        #   chown -R -h to the dev runs FIRST instead: after it no
-        #   entry is agent-owned, and on a tree the agent owned
+        #   The ownership walk to the dev runs FIRST instead: after
+        #   it no entry is agent-owned, and on a tree the agent owned
         #   without group write no agent write path remains — the
-        #   chmod pass races no one.
+        #   group-write walk races no one.
         # Inherent residual in EITHER order: any mode-based write
         # path the agent pre-arranged — g+w granted by an earlier
         # handover, or o+w entries it created while it owned the
@@ -392,10 +506,11 @@ PYEOF
         # agent-writable through the run; pre-existing, accepted,
         # not closed by ordering (wording broadened 0.0.45e W2:
         # it was never only the previous-handover g+w case).
-        # Plain chmod WOULD follow an operand link — the [ ! -L ]
-        # recheck below plus the validation gates are load-bearing
-        # for the chmod half's operand; find -P itself skips a link
-        # operand (! -type l).
+        # Plain chmod WOULD follow an operand link — the validation
+        # gates plus the per-entry [ -L ] recheck inside both walk
+        # workers (#759) are load-bearing for the chmod half's
+        # operands; find -P itself skips a link operand (! -type l)
+        # at scan time, the worker re-checks at exec time.
         if [ -L "$_ho_a" ]; then
             ui_error "handover: '$_ho_a' is a symlink — refusing (recursive chown/chmod follow it)"
             _ho_rc=1
@@ -412,9 +527,11 @@ PYEOF
         fi
         if [ "$_ho_target" = opencode ]; then
             # dev->agent: group write while dev-owned, hand over last
-            if [ ! -L "$_ho_a" ] &&
-                find "$_ho_a" ! -type l -exec chmod g+w {} + 2>/dev/null &&
-                chown -R -h "$_ho_user:$_ho_group" "$_ho_a" 2>/dev/null; then
+            # (#759: the walks skip sealed pointers and surface the
+            # per-entry reason on failure — the old wholesale
+            # 2>/dev/null mask over both executors is gone)
+            if [ ! -L "$_ho_a" ] && _ho_gwalk "$_ho_a" &&
+                _ho_owalk "$_ho_a" "$_ho_user" "$_ho_group"; then
                 echo "  handover: $_ho_a -> $_ho_user:$_ho_group"
             else
                 ui_error "handover failed: $_ho_a"
@@ -423,9 +540,8 @@ PYEOF
         else
             # agent->dev: re-own FIRST (no agent write path once
             # every entry is dev's), then grant group write
-            if [ ! -L "$_ho_a" ] &&
-                chown -R -h "$_ho_user:$_ho_group" "$_ho_a" 2>/dev/null &&
-                find "$_ho_a" ! -type l -exec chmod g+w {} + 2>/dev/null; then
+            if [ ! -L "$_ho_a" ] && _ho_owalk "$_ho_a" "$_ho_user" "$_ho_group" &&
+                _ho_gwalk "$_ho_a"; then
                 echo "  handover: $_ho_a -> $_ho_user:$_ho_group"
             else
                 ui_error "handover failed: $_ho_a"
