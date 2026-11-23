@@ -1173,8 +1173,15 @@ for _q_sh in dash bash; do
                 _q_fail="$_q_fail refused:[$_q_w]"
                 continue
             }
-        _q_rt=$("$_q_sh" -c 'eval "set -- $1"; printf "%s|%s" "$#" "$1"' _ "$_q_q")
-        [ "$_q_rt" = "1|$_q_w" ] || _q_fail="$_q_fail $_q_sh:[$_q_w]->[$_q_q]"
+        # rc on the assignment: broken quoting makes the parsing child
+        # die (an unterminated quote is a syntax error there) — that
+        # must reach the comparison, not abort this set -e suite before
+        # its FAIL row (sabotage w02, #765 fix wave a).
+        _q_rc=0
+        _q_rt=$("$_q_sh" -c 'eval "set -- $1"; printf "%s|%s" "$#" "$1"' _ "$_q_q") || _q_rc=$?
+        if [ "$_q_rc" != 0 ] || [ "$_q_rt" != "1|$_q_w" ]; then
+            _q_fail="$_q_fail $_q_sh:[$_q_w]->[$_q_q]"
+        fi
     done <"$WORK/q-words"
 done
 if [ -z "$_q_fail" ]; then
@@ -1259,20 +1266,23 @@ fi
 # a trailing-slash GITDIR_STORAGE is the same storage (#765 a M2): the
 # path is normalized once in _gp_storage, so classification, the
 # reference list and the orphan pass agree — and the pre-existing nail
-# and revert gates recognize the pointers again (same class).
+# gate recognizes the pointer again (same class). Every call UNSETS the
+# GP_STORAGE seam first: _core_run always exports it, and the seam
+# answers before the conf is ever read (the pin was vacuous until
+# sabotage w06 showed it).
 printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\nGITDIR_STORAGE=%s/\n' \
     "$(id -un)" "$(id -un)" "$(id -gn)" "$WORK/storage" >"$WORK/ic-slash"
 printf '%s\n' "$WORK/roots/r5" >"$CONF"
 _m2_ok=0
-_out=$(_core_run 'GP_INSTALL_CONF="$WORK/ic-slash" _gp_storage')
+_out=$(_core_run 'unset GP_STORAGE; GP_INSTALL_CONF="$WORK/ic-slash" _gp_storage')
 if [ "$_out" = "$WORK/storage" ]; then
     _rc=0
-    _out=$(_core_run 'GP_INSTALL_CONF="$WORK/ic-slash" git_protection_cli status') || _rc=$?
+    _out=$(_core_run 'unset GP_STORAGE; GP_INSTALL_CONF="$WORK/ic-slash" git_protection_cli status') || _rc=$?
     if printf '%s' "$_out" | grep -qF "kv-ok: $WORK/roots/r5/n1 pointer + nailed" &&
         ! printf '%s' "$_out" | grep -qE "storage/?(n1|u1|n1wt)\.git unreferenced"; then
         _m2_ok=1
         _rc=0
-        _core_run 'GP_INSTALL_CONF="$WORK/ic-slash" _gp_nail_one "$WORK/roots/r5/u1" "$WORK/storage/u1.git"' >/dev/null ||
+        _core_run 'unset GP_STORAGE; GP_INSTALL_CONF="$WORK/ic-slash" _gp_nail_one "$WORK/roots/r5/u1" "$WORK/storage/u1.git"' >/dev/null ||
             _rc=$?
         if [ "$_rc" != 0 ] || [ ! -e "$WORK/roots/r5/u1/.git.nailed" ]; then
             _m2_ok=0
