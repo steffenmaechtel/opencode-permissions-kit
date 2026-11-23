@@ -841,8 +841,12 @@ ln -s "$WORK/elsewhere-lnk" "$_sto/lnk.git"
 
 # the reference list _gp_projects appends to: exactly the storage
 # children some pointer targets — mains and the worktree registration
-# alike, never the unreferenced entries or the outside pointer.
-_out=$(_core_run "_gp_projects \"$WORK/r5-ref.out\" >/dev/null; LC_ALL=C sort \"$WORK/r5-ref.out\"")
+# alike, never the unreferenced entries or the outside pointer. rc on
+# the assignment: a missing list makes sort die (rc 2), and a failing
+# substitution would abort this set -e suite BEFORE the FAIL row —
+# the red must come from the assertion (sabotage c06, #764).
+_rc=0
+_out=$(_core_run "_gp_projects \"$WORK/r5-ref.out\" >/dev/null; LC_ALL=C sort \"$WORK/r5-ref.out\"") || _rc=$?
 if [ "$_out" = "$(printf '%s\n' n1.git n1wt.git u1.git)" ]; then
     pass "projects: the reference list names every pointed-at storage child (#764 topic 4)"
 else
