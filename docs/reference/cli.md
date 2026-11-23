@@ -425,7 +425,9 @@ order. Sealed [git-protection](../how-to/git-protection.md) pointers (a `.git` p
 file nailed with `chattr +i`) are skipped by both passes and stay untouched
 — the seal refuses `chown`/`chmod` even for root, and the pointer already
 carries `<developer>:opencode 664`; `--dry-run` announces how many a tree
-has (issue #759).
+has (issue #759). A `.git` pointer file as the OPERAND (`opk handover me
+repo/.git`) is refused outright — hand over the project tree, not the
+pointer (a plain `.git` directory stays a legal operand).
 
 Direction — **ownership follows the writer**: `handover me` is for trees
 *you* write (source code you take back, your checkouts);
