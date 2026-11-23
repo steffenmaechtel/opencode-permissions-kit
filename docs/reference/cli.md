@@ -424,7 +424,7 @@ them; pre-arranged group/world-writable paths survive the passes in either
 order. Sealed [git-protection](../how-to/git-protection.md) pointers (a `.git` pointer
 file nailed with `chattr +i`) are skipped by both passes and stay untouched
 — the seal refuses `chown`/`chmod` even for root, and the pointer already
-carries `<developer>:<group> 664`; `--dry-run` announces how many a tree
+carries `<developer>:opencode 664`; `--dry-run` announces how many a tree
 has (issue #759).
 
 Direction — **ownership follows the writer**: `handover me` is for trees

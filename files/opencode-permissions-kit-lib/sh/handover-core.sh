@@ -103,7 +103,7 @@ _ho_chain_sane() {
 # (#759). Sealed git-protection pointers (.git as a regular FILE with
 # the immutable flag, #704/#754) refuse chmod even for root (EPERM —
 # the seal IS the protection) and are SKIPPED: the pointer ships
-# dev:<group> 664 before its nail, so g+w already holds on every
+# dev:opencode 664 before its nail, so g+w already holds on every
 # kit-created pointer. Symlinks are excluded at every stage of THIS
 # walk: plain chmod WOULD follow an operand link, so find drops them
 # at scan time (! -type l) and the worker re-checks the leaf at exec
@@ -344,18 +344,22 @@ handover_core() {
  (symlink gates cannot see through trailing slashes or .. components)"
                 ;;
         esac
-        # A .git-named operand is the git-protection POINTER itself
+        # A .git FILE operand is the git-protection POINTER itself
         # (#761 a C6): both spellings misbehave — repo/.git matches
         # the walks' sealed-skip pattern (skipped silently, then the
         # success line prints over a no-op) while a bare .git does
-        # not match it (EPERM, "handover failed"). Refuse with the
-        # named cause before either can happen: hand over the tree.
-        case "${_ho_np##*/}" in
-            .git)
-                _ho_err "handover: refusing .git operand '$_ho_np'""\
- — hand over the project tree, not the pointer (a sealed pointer cannot change owner anyway)"
-                ;;
-        esac
+        # not match it (EPERM, "handover failed"). A .git DIRECTORY
+        # stays a legal operand (the classic gitdir — directories
+        # are never sealed; round b caught the first cut refusing
+        # it, #761 b B1). Refuse the pointer with the named cause.
+        if [ -f "$_ho_np" ]; then
+            case "${_ho_np##*/}" in
+                .git)
+                    _ho_err "handover: refusing .git pointer '$_ho_np'""\
+ — hand over the project tree, not the pointer"
+                    ;;
+            esac
+        fi
         [ -e "$_ho_np" ] || _ho_err "handover: no such path: $_ho_a"
     done
     # Declared container-tree warning (#352 / #313 phase 3): when a

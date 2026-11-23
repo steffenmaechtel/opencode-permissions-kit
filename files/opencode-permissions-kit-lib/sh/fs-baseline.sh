@@ -414,7 +414,7 @@ _fsb_pass() {
                     # (EPERM — the seal IS the protection), which
                     # failed the chgrp and files passes wholesale on
                     # every git-protection project. The migration
-                    # writes pointers dev:<group> 664 BEFORE chattr +i,
+                    # writes pointers dev:opencode 664 BEFORE chattr +i,
                     # so the target state of these passes holds
                     # already — skip instead of failing the batch.
                     # lsattr-gated: an unnailed pointer or a worktree
@@ -956,7 +956,7 @@ _fsb_heal_git() {
 # The sharing passes SKIP nailed .git POINTER FILES (#704/#754, issue
 # #758): a pointer sealed with chattr +i refuses chgrp/chmod even for
 # root (EPERM by design), and the migration writes the pointer
-# dev:<group> 664 BEFORE the nail — the passes' target state holds
+# dev:opencode 664 BEFORE the nail — the passes' target state holds
 # without touching it (the lsattr gate in the _fsb_pass worker; a .git
 # DIRECTORY is never skipped, and an unnailed pointer stays a normal
 # operand).

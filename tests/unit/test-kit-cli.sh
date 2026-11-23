@@ -759,13 +759,33 @@ if printf '%s\n' "$_ho759c5_out" | grep -qF 'sealed-pointer preview unavailable 
 else
     fail "C5 note: mktemp arm silent (got: $_ho759c5_out)"
 fi
-# C6: a .git-named operand is refused at validation, both spellings.
+# C6: a .git-named FILE operand is refused at validation — both
+# spellings (B2: slashed AND bare, resolved against the cwd); the
+# capture keeps BOTH streams (B3: production ui_error writes stdout,
+# the fake lib's fallback stderr — a stdout-discard would false-red).
 _ho759c6_out="$(OPK_INSTALL_CONF="$WORK/install.conf" \
-    "$BIN/opk" handover me "$_ho759/tree/.git" 2>&1 >/dev/null || true)"
-if printf '%s\n' "$_ho759c6_out" | grep -qF 'refusing .git operand'; then
-    pass "C6 validation: .git operand refused with the named cause (#761 a C6)"
+    "$BIN/opk" handover me "$_ho759/tree/.git" 2>&1 || true)"
+if printf '%s\n' "$_ho759c6_out" | grep -qF 'refusing .git pointer'; then
+    pass "C6 validation: .git file operand refused with the named cause (#761 a C6)"
 else
-    fail "C6 validation: .git operand not refused (got: $_ho759c6_out)"
+    fail "C6 validation: .git file operand not refused (got: $_ho759c6_out)"
+fi
+_ho759c6b_out="$(cd "$_ho759/tree" && OPK_INSTALL_CONF="$WORK/install.conf" \
+    "$BIN/opk" handover me .git 2>&1 || true)"
+if printf '%s\n' "$_ho759c6b_out" | grep -qF 'refusing .git pointer'; then
+    pass "C6 validation: bare .git spelling refused too (#761 b B2)"
+else
+    fail "C6 validation: bare spelling not refused (got: $_ho759c6b_out)"
+fi
+# B1: a .git DIRECTORY operand stays legal (the classic gitdir — the
+# first cut refused it with a sealed-pointer rationale).
+_ho759b1_out="$(OPK_INSTALL_CONF="$WORK/install.conf" \
+    "$BIN/opk" handover me "$_ho759/tree/classic/.git" --dry-run 2>&1 || true)"
+if printf '%s\n' "$_ho759b1_out" | grep -qF 'would hand over' &&
+    ! printf '%s\n' "$_ho759b1_out" | grep -qF 'refusing .git pointer'; then
+    pass "B1 validation: a .git directory operand is not refused (#761 b B1)"
+else
+    fail "B1 validation: .git dir refused wrongly (got: $_ho759b1_out)"
 fi
 
 # --- #422: exec-time component walk before the executors ----------------------------

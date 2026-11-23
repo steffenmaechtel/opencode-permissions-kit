@@ -104,7 +104,7 @@ state without any hooks.
   --refresh`) skips nailed pointers: `chattr +i` refuses `chgrp`/
   `chmod` even for root, which used to fail the whole refresh on
   pointer projects — and a pointer the kit sealed already ships
-  `<developer>:<group> 664`, so the skip loses nothing there. A
+  `<developer>:opencode 664`, so the skip loses nothing there. A
   pointer re-nailed by hand or carried sealed from an older kit
   keeps its drifted state: the seal blocks `chgrp`/`chmod` for
   everyone, and nothing reports the drift (issue #758).
@@ -112,7 +112,7 @@ state without any hooks.
   pointer used to fail wholesale (`chown -R`/`chmod` hit `EPERM` on
   the sealed file, reason masked): both walks skip sealed pointers
   now and `--dry-run` announces them (issue #759). The pointer stays
-  `<developer>:<group> 664` through any handover — by design.
+  `<developer>:opencode 664` through any handover — by design.
 - `git worktree remove` over a nailed pointer ends in a partial
   remove (the registration goes, the directory delete hits `EPERM`):
   finish with `sudo chattr -i <worktree>/.git && sudo rm -rf
