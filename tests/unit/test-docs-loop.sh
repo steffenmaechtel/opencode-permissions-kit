@@ -354,6 +354,39 @@ else
     fail "M2: in-progress / n/a rows missing (got: $(grep -E '^\| (2026-W4[347]|HEAD) \| 2026-' "$WORK/out2.txt" | tr '\n' ' '))"
 fi
 
+# --- 2e. table shape ----------------------------------------------------------
+
+# GitHub renders a table only when the header row and the delimiter row
+# carry the same number of cells; a ragged table degrades to one
+# paragraph. (The M1 table shipped with 8 delimiter cells under a
+# 9-cell header and rendered as prose on GitHub.) The content pins
+# above grep rows and cannot see that -- this check reads the shape.
+table_shape() { # $1 = markdown file -> FAIL rows on stdout (empty = every table is rectangular)
+    awk '
+        function cells(line, n) { n = split(line, parts, "|"); return n - 2 }
+        /^\|/ {
+            if (!intable) { intable = 1; want = cells($0); header = NR; next }
+            if (cells($0) != want)
+                printf "FAIL %s: table at line %d has %d header cells, line %d has %d\n", FILENAME, header, want, NR, cells($0)
+            next
+        }
+        { intable = 0 }
+    ' "$1"
+}
+
+_ts_rows=$(table_shape "$WORK/out.txt")
+if [ -z "$_ts_rows" ]; then
+    pass "tables: every table of the snapshot is rectangular (header, delimiter and rows share one cell count)"
+else
+    fail "tables: $_ts_rows"
+fi
+printf '%s\n' '| a | b |' '|---|---|---|' '| 1 | 2 | 3 |' '' '| x | y |' '|---|---|' '| 1 | 2 |' >"$WORK/shape.md"
+_ts_arm=$(table_shape "$WORK/shape.md")
+case $_ts_arm in
+    "FAIL $WORK/shape.md: table at line 1 has 2 header cells, line 2 has 3"*"line 3 has 3") pass "tables arm: a ragged table is flagged, a rectangular one is not" ;;
+    *) fail "tables arm: the ragged fixture must be flagged and the rectangular one left alone (got: $_ts_arm)" ;;
+esac
+
 # --- 2d. fail-loud arms -------------------------------------------------------
 
 _ms_rc=0

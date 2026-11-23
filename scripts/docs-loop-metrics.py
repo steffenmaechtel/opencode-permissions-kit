@@ -264,7 +264,7 @@ def render_m1(rows, excluded, weeks):
         "| Week | Lead n | Lead prompt | Lead uncached | Lead cache read"
         " | Subagent n | Subagent prompt | Subagent uncached | Subagent cache read |"
     )
-    out.append("|---|---|---|---|---|---|---|---|")
+    out.append("|---|---|---|---|---|---|---|---|---|")
     for week in weeks:
         stats = rows.get(week, {"lead": [], "sub": []})
         lead, sub = stats["lead"], stats["sub"]
