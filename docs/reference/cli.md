@@ -421,7 +421,13 @@ component of the chain leading to it — and operands carrying `/`, `.` or
 link (`--dry-run` lists the refusals it would make). The
 chown/chmod passes are ordered per direction so a planted link cannot steer
 them; pre-arranged group/world-writable paths survive the passes in either
-order.
+order. Sealed [git-protection](../how-to/git-protection.md) pointers (a `.git` pointer
+file nailed with `chattr +i`) are skipped by both passes and stay untouched
+— the seal refuses `chown`/`chmod` even for root, and the pointer already
+carries `<developer>:opencode 664`; `--dry-run` announces how many a tree
+has (issue #759). A `.git` pointer file as the OPERAND (`opk handover me
+repo/.git`) is refused outright — hand over the project tree, not the
+pointer (a plain `.git` directory stays a legal operand).
 
 Direction — **ownership follows the writer**: `handover me` is for trees
 *you* write (source code you take back, your checkouts);

@@ -386,9 +386,9 @@ for _bad in / /usr /etc /var "/home/$(id -un)" /etc/apache2 /usr/local/foo /var/
 done
 
 # slash-terminated operands are refused (0.0.44a V2): [ -L "x/" ] is FALSE
-# while chown -R -h and find x/ both act on the link's target — the symlink
-# gate cannot see through trailing slashes, so the operand FORMS are
-# refused at validation (x/, x//, x/., link/ alike).
+# while the recursive handover walks and find x/ both act on the link's
+# target — the symlink gate cannot see through trailing slashes, so the
+# operand FORMS are refused at validation (x/, x//, x/., link/ alike).
 for _slashed in "$WORK/ho-tree/sub/" "$WORK/ho-tree//" "$WORK/ho-tree/."; do
     errout="$(OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opk" handover me "$_slashed" 2>&1 >/dev/null || true)"
     case "$errout" in
@@ -504,8 +504,8 @@ fi
 # Comment-strip rider on the extraction legs too (#261): a commented-out
 # executor line must not be extracted — sed substitutes (never deletes),
 # so the grep -n numbers still match the real file.
-_ho_chmod_lns=$(live_src "$HOCORE" | grep -n 'find "\$_ho_a" ! -type l -exec chmod g+w' | cut -d: -f1)
-_ho_chown_lns=$(live_src "$HOCORE" | grep -n 'chown -R -h "\$_ho_user:\$_ho_group" "\$_ho_a"' | cut -d: -f1)
+_ho_chmod_lns=$(live_src "$HOCORE" | grep -n '_ho_gwalk "\$_ho_a"' | cut -d: -f1)
+_ho_chown_lns=$(live_src "$HOCORE" | grep -n '_ho_owalk "\$_ho_a" "\$_ho_user" "\$_ho_group"' | cut -d: -f1)
 # Guarded counts (#260, the #244 f W1 class — sites beyond the issue's
 # list, found by this wave's sweep): an executor line vanishing from the
 # kit script leaves grep -c . counting zero non-empty lines, rc 1 —
@@ -548,6 +548,10 @@ for _ho_tgt in opencode me; do
     PATH="$_ho_pin_dir/bin:$PATH" sh -c "$(
         printf 'ui_info() { :; }\nui_error() { echo "$1" >&2; }\nset -- "%s"\n' "${_ho_pin_dir}/tree"
         extract_func "$HOCORE" _ho_chain_sane
+        # the walk workers since #759 (the loop legs call them; without
+        # the extraction the loop fails both passes and the pin reds)
+        extract_func "$HOCORE" _ho_gwalk
+        extract_func "$HOCORE" _ho_owalk
         _ho_extract
     )" >/dev/null 2>&1 || true
     _ho_first_chown=$(grep -n '^chown ' "$_ho_pin_dir/log" 2>/dev/null | head -1 | cut -d: -f1)
@@ -564,6 +568,225 @@ for _ho_tgt in opencode me; do
         fail "handover $_ho_tgt: executor did not run both passes (chown=$_ho_first_chown chmod=$_ho_first_chmod, W1)"
     fi
 done
+
+# --- #759: the walk workers skip sealed git-protection pointers -----------------------
+# Direct-drive of _ho_gwalk/_ho_owalk over a fixture tree: the sealed
+# pointer (regular .git file, lsattr-i via the PATH-stub marker) keeps
+# mode and owner; every other operand — unnailed worktree-registration
+# pointer, plain file, classic .git dir — is processed like before.
+# lsattr is a PATH stub (per-file .nailed marker; the real chattr needs
+# capabilities the unit sandbox lacks), chown a log+noop stub (the
+# ownership flip itself is root territory).
+_ho759="$(work_new)"
+mkdir -p "$_ho759/tree/classic/.git" "$_ho759/tree/wt" "$_ho759/bin"
+printf 'gitdir: /var/tmp/ho759-storage/proj.git\n' >"$_ho759/tree/.git"
+printf 'gitdir: /var/tmp/ho759-storage/x.git/worktrees/wt\n' >"$_ho759/tree/wt/.git"
+echo keep >"$_ho759/tree/file"
+echo keep >"$_ho759/tree/wt/file"
+touch "$_ho759/tree/.git.nailed" "$_ho759/tree/classic/.git.nailed"
+chmod 600 "$_ho759/tree/.git" "$_ho759/tree/wt/.git" "$_ho759/tree/file" "$_ho759/tree/wt/file"
+chmod 700 "$_ho759/tree/classic/.git"
+cat >"$_ho759/bin/lsattr" <<'EOS'
+#!/bin/sh
+for _la in "$@"; do
+    if [ -e "$_la.nailed" ]; then
+        printf -- '----i--------------- %s\n' "$_la"
+    else
+        printf -- '-------------------- %s\n' "$_la"
+    fi
+done
+exit 0
+EOS
+cat >"$_ho759/bin/chown" <<'EOS'
+#!/bin/sh
+echo "chown $*" >>"${HO759_LOG:?}"
+exit 0
+EOS
+chmod 755 "$_ho759/bin/lsattr" "$_ho759/bin/chown"
+PATH="$_ho759/bin:$PATH" sh -c '. "$1" && _ho_gwalk "$2"' _ "$HOCORE" "$_ho759/tree" >/dev/null 2>&1
+assert_eq "759 gwalk: sealed pointer untouched (600 stays)" "600" \
+    "$(stat -c %a "$_ho759/tree/.git")"
+assert_eq "759 gwalk: unnailed pointer stays a normal operand (600 -> 620, g+w)" "620" \
+    "$(stat -c %a "$_ho759/tree/wt/.git")"
+assert_eq "759 gwalk: regular file processed (600 -> 620, g+w)" "620" \
+    "$(stat -c %a "$_ho759/tree/file")"
+assert_eq "759 gwalk: classic .git dir processed (700 -> 720, g+w)" "720" \
+    "$(stat -c %a "$_ho759/tree/classic/.git")"
+HO759_LOG="$_ho759/owalk.log" PATH="$_ho759/bin:$PATH" \
+    sh -c '. "$1" && _ho_owalk "$2" "$(id -un)" "$(id -gn)"' \
+    _ "$HOCORE" "$_ho759/tree" >/dev/null 2>&1
+# End-anchored: the log line for the .git.nailed MARKER file would
+# false-positive a bare substring grep (the marker is a normal operand
+# and legitimately chowned).
+if grep -q -- "$_ho759/tree/.git\$" "$_ho759/owalk.log"; then
+    fail "759 owalk: the sealed pointer was chowned"
+else
+    pass "759 owalk: the sealed pointer is never chowned"
+fi
+if grep -qF -- "$_ho759/tree/file" "$_ho759/owalk.log" &&
+    grep -qF -- "$_ho759/tree/classic/.git" "$_ho759/owalk.log" &&
+    grep -qF -- "$_ho759/tree/wt/.git" "$_ho759/owalk.log"; then
+    pass "759 owalk: every non-sealed entry chowned (file, classic dir, unnailed pointer)"
+else
+    fail "759 owalk: a non-sealed entry missed its chown (log: $(cat "$_ho759/owalk.log" 2>/dev/null))"
+fi
+# dry-run preview note (the 0.0.39i F4 match rule): the sealed pointer
+# is announced as untouched — count 1 (the unnailed reg never counts).
+_ho759_note="$(PATH="$_ho759/bin:$PATH" sh -c '. "$1" && _ho_sealed_note "$2"' \
+    _ "$HOCORE" "$_ho759/tree" 2>&1)"
+if printf '%s\n' "$_ho759_note" | grep -qF 'would leave 1 sealed .git pointer(s) untouched'; then
+    pass "759 dry-run note: the sealed pointer is announced as untouched"
+else
+    fail "759 dry-run note: sealed pointer not announced (got: $_ho759_note)"
+fi
+# wiring pin: the note rides the REAL dry-run branch — the direct-drive
+# above pins the function alone; deleting the branch call stays green
+# without this pin (caught by the sab4 cycle of the #759 wave).
+_ho759_dry="$(OPK_INSTALL_CONF="$WORK/install.conf" PATH="$_ho759/bin:$PATH" \
+    "$BIN/opk" handover me "$_ho759/tree" --dry-run 2>&1 || true)"
+if printf '%s\n' "$_ho759_dry" | grep -qF 'would hand over' &&
+    printf '%s\n' "$_ho759_dry" | grep -qF 'would leave 1 sealed .git pointer(s) untouched'; then
+    pass "759 dry-run wiring: the sealed-pointer note rides the preview"
+else
+    fail "759 dry-run wiring: note missing from the preview (got: $_ho759_dry)"
+fi
+# the old executor form is gone for good (regression-by-revert guard)
+check_absent "handover: the chown -R executor is gone (per-entry _ho_owalk since #759)" \
+    "$HOCORE" -qF 'chown -R -h "$_ho_user'
+
+# --- #761 a fix wave b pins (C1-C6) --------------------------------------------------
+# C1: the owalk lchowns in-tree symlinks again (the 0.0.44a V24
+# semantics round a found silently dropped).
+ln -s file "$_ho759/tree/link"
+HO759_LOG="$_ho759/owalk2.log" PATH="$_ho759/bin:$PATH" \
+    sh -c '. "$1" && _ho_owalk "$2" "$(id -un)" "$(id -gn)"' \
+    _ "$HOCORE" "$_ho759/tree" >/dev/null 2>&1
+if grep -qF -- "$_ho759/tree/link" "$_ho759/owalk2.log"; then
+    pass "C1 owalk: in-tree symlinks are lchowned (V24 restored, #761 a C1)"
+else
+    fail "C1 owalk: symlink not re-owned (log: $(cat "$_ho759/owalk2.log" 2>/dev/null))"
+fi
+# C2+C3: the gwalk worker body, extracted and driven with a hand-fed
+# batch (find cannot replay a mid-walk parent swap): the body starts
+# at the root recheck — the extraction anchor is the recheck line,
+# never _fail=0 (the recheck and the shift sit BEFORE it).
+_ho759_gwbody=$(awk '
+    !s && /^ *if \[ -L "\$1" \]; then$/ { s = 1 }
+    s { print }
+    s && /^ *\[ "\$_fail" -eq 0 \]$/ { exit }
+' "$HOCORE")
+if [ -n "$(printf '%s\n' "$_ho759_gwbody" | grep -F 'chmod g+w "$_p"')" ]; then
+    pass "C2 extraction: the gwalk worker body is extractable (anchor: root recheck)"
+else
+    fail "C2 extraction: gwalk worker body not extracted (empty)"
+fi
+_ho759c2="$(work_new)"
+mkdir -p "$_ho759c2/root/clean" "$_ho759c2/root/a/b" "$_ho759c2/bin" "$_ho759c2/away"
+echo x >"$_ho759c2/root/clean/file"
+echo x >"$_ho759c2/root/a/b/file"
+ln -s "$_ho759c2/root/clean/file" "$_ho759c2/root/link"
+# the mid-walk swap: a becomes a symlink AFTER the (hand-fed) scan
+mv "$_ho759c2/root/a" "$_ho759c2/away/a"
+ln -s "$_ho759c2/away/a" "$_ho759c2/root/a"
+cat >"$_ho759c2/bin/chmod" <<'EOS'
+#!/bin/sh
+for _a in "$@"; do
+    case "$_a" in -*) ;; *) echo "chmod $_a" >>"${HO759C2_LOG:?}" ;; esac
+done
+exit 0
+EOS
+chmod 755 "$_ho759c2/bin/chmod"
+HO759C2_LOG="$_ho759c2/log" PATH="$_ho759c2/bin:$PATH" \
+    sh -c "$_ho759_gwbody" xargs-sh "$_ho759c2/root" \
+    "$_ho759c2/root/clean/file" "$_ho759c2/root/a/b/file" "$_ho759c2/root/link" \
+    >/dev/null 2>&1 || true
+if grep -qF -- "$_ho759c2/root/clean/file" "$_ho759c2/log"; then
+    pass "C2 gwalk: clean operand processed"
+else
+    fail "C2 gwalk: clean operand missing (log: $(cat "$_ho759c2/log" 2>/dev/null))"
+fi
+if grep -qF -- "$_ho759c2/root/a/b/file" "$_ho759c2/log"; then
+    fail "C2 gwalk: operand under a swapped parent was acted on (#761 a C2)"
+else
+    pass "C2 gwalk: operand under a mid-walk parent swap is skipped (#761 a C2)"
+fi
+if grep -qF -- "$_ho759c2/root/link" "$_ho759c2/log"; then
+    fail "C3 gwalk: symlink operand was acted on (#761 a C3)"
+else
+    pass "C3 gwalk: exec-time [ -L ] recheck skips symlink operands (#761 a C3)"
+fi
+# C2 root leg: a scan root that IS a symlink now refuses the batch.
+ln -s "$_ho759c2/root/clean" "$_ho759c2/rootlink"
+_ho759c2r_rc=0
+_ho759c2r_out="$(PATH="$_ho759c2/bin:$PATH" \
+    sh -c "$_ho759_gwbody" xargs-sh "$_ho759c2/rootlink" "$_ho759c2/root/clean/file" 2>&1)" ||
+    _ho759c2r_rc=$?
+if [ "$_ho759c2r_rc" -ne 0 ] &&
+    printf '%s\n' "$_ho759c2r_out" | grep -qF 'became a symlink'; then
+    pass "C2 gwalk: a swapped scan root refuses the batch (#761 a C2)"
+else
+    fail "C2 gwalk: root swap not refused (rc=$_ho759c2r_rc out=$_ho759c2r_out)"
+fi
+# C4: a failing entry fails the walk loud AND names itself (the
+# un-masked stderr the wave promises).
+cat >"$_ho759c2/bin/chmod" <<'EOS'
+#!/bin/sh
+for _a in "$@"; do
+    case "$_a" in
+    -*) ;;
+    *badfile*) echo "chmod: simulating EPERM on $_a" >&2; exit 1 ;;
+    *) ;;
+    esac
+done
+exit 0
+EOS
+chmod 755 "$_ho759c2/bin/chmod"
+_ho759c2_rc=0
+_ho759c2_out="$(PATH="$_ho759c2/bin:$PATH" \
+    sh -c "$_ho759_gwbody" xargs-sh "$_ho759c2/root" "$_ho759c2/root/badfile" 2>&1)" ||
+    _ho759c2_rc=$?
+if [ "$_ho759c2_rc" -ne 0 ] &&
+    printf '%s\n' "$_ho759c2_out" | grep -qF 'chmod: simulating EPERM on'; then
+    pass "C4 gwalk: a failing entry fails the walk and names itself (#761 a C4)"
+else
+    fail "C4 gwalk: failure not loud (rc=$_ho759c2_rc out=$_ho759c2_out)"
+fi
+# C5: the note helper's mktemp arm executes its named-cause degrade.
+_ho759c5_out="$(TMPDIR="$_ho759/nonexistent-tmpdir" \
+    sh -c '. "$1" && _ho_sealed_note "$2"' _ "$HOCORE" "$_ho759/tree" 2>&1)"
+if printf '%s\n' "$_ho759c5_out" | grep -qF 'sealed-pointer preview unavailable (mktemp failed'; then
+    pass "C5 note: mktemp failure degrades with the named cause (#761 a C5)"
+else
+    fail "C5 note: mktemp arm silent (got: $_ho759c5_out)"
+fi
+# C6: a .git-named FILE operand is refused at validation — both
+# spellings (B2: slashed AND bare, resolved against the cwd); the
+# capture keeps BOTH streams (B3: production ui_error writes stdout,
+# the fake lib's fallback stderr — a stdout-discard would false-red).
+_ho759c6_out="$(OPK_INSTALL_CONF="$WORK/install.conf" \
+    "$BIN/opk" handover me "$_ho759/tree/.git" 2>&1 || true)"
+if printf '%s\n' "$_ho759c6_out" | grep -qF 'refusing .git pointer'; then
+    pass "C6 validation: .git file operand refused with the named cause (#761 a C6)"
+else
+    fail "C6 validation: .git file operand not refused (got: $_ho759c6_out)"
+fi
+_ho759c6b_out="$(cd "$_ho759/tree" && OPK_INSTALL_CONF="$WORK/install.conf" \
+    "$BIN/opk" handover me .git 2>&1 || true)"
+if printf '%s\n' "$_ho759c6b_out" | grep -qF 'refusing .git pointer'; then
+    pass "C6 validation: bare .git spelling refused too (#761 b B2)"
+else
+    fail "C6 validation: bare spelling not refused (got: $_ho759c6b_out)"
+fi
+# B1: a .git DIRECTORY operand stays legal (the classic gitdir — the
+# first cut refused it with a sealed-pointer rationale).
+_ho759b1_out="$(OPK_INSTALL_CONF="$WORK/install.conf" \
+    "$BIN/opk" handover me "$_ho759/tree/classic/.git" --dry-run 2>&1 || true)"
+if printf '%s\n' "$_ho759b1_out" | grep -qF 'would hand over' &&
+    ! printf '%s\n' "$_ho759b1_out" | grep -qF 'refusing .git pointer'; then
+    pass "B1 validation: a .git directory operand is not refused (#761 b B1)"
+else
+    fail "B1 validation: .git dir refused wrongly (got: $_ho759b1_out)"
+fi
 
 # --- #422: exec-time component walk before the executors ----------------------------
 # The leaf [ -L ] gates cannot see a PARENT swapped for a symlink since
