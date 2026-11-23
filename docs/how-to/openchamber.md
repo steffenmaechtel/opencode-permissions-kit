@@ -151,13 +151,10 @@ HTTP 500. OpenChamber ≥ 1.22.2 relocates the root via `OPENCHAMBER_CHATS_DIR`.
 Prepare it like a project root so both users can work in it:
 
 ```bash
-sudo install -d -o "$USER" -g <group> -m 2775 /var/www/vhosts/openchamber-chats
-sudo setfacl -d -m g:<group>:rwx /var/www/vhosts/openchamber-chats
+sudo install -d -o "$USER" -g opencode -m 2775 /var/www/vhosts/openchamber-chats
+sudo setfacl -d -m g:opencode:rwx /var/www/vhosts/openchamber-chats
 echo 'export OPENCHAMBER_CHATS_DIR=/var/www/vhosts/openchamber-chats' >> ~/.bashrc
 ```
-
-`<group>` is the kit's sharing group — `opencode` on a default install
-(`OPENCODE_GROUP` at install time overrides it).
 
 (`opencode` here is the kit's sharing group; adjust if yours differs —
 `opk status` shows it under *Sharing*.) Existing chats are not moved — new

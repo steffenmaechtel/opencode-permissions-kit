@@ -262,7 +262,7 @@ ancestors automatically. To repair an older install:
 ```bash
 sudo opk config refresh
 # or manually (traverse-only, no read):
-sudo setfacl -m g:<sharing-group>:X /home/<you> /home/<you>/www
+sudo setfacl -m g:opencode:X /home/<you> /home/<you>/www
 ```
 
 `opk status` shows a warning per affected root.
