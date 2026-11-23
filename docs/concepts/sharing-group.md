@@ -30,6 +30,11 @@ semantics):
 | `chmod g+rw` | every existing file, so you and the agent can edit each other's pre-install files |
 | default ACLs `g:opencode:rwx` | every directory (governs new files' access) |
 
+One entry class is skipped: a [git-protection](../how-to/git-protection.md)
+pointer (`.git` as a sealed pointer file) carries `chattr +i`, which refuses
+`chgrp`/`chmod` even for root — and the kit writes it `<developer>:opencode
+664` before sealing, so the baseline's target state already holds there.
+
 First runs over large trees (hundreds of repos) take minutes per pass; the
 helper prints a live per-pass entry counter.
 

@@ -408,6 +408,32 @@ _fsb_pass() {
                         done
                         ;;
                     esac
+                    # Nailed .git pointer (#704/#754, issue #758): a
+                    # regular file named .git carrying the immutable
+                    # inode flag refuses chgrp/chmod even for root
+                    # (EPERM — the seal IS the protection), which
+                    # failed the chgrp and files passes wholesale on
+                    # every git-protection project. The migration
+                    # writes pointers dev:<group> 664 BEFORE chattr +i,
+                    # so the target state of these passes holds
+                    # already — skip instead of failing the batch.
+                    # lsattr-gated: an unnailed pointer or a worktree
+                    # registration (plain files, never sealed) stays a
+                    # normal operand; -f-gated: a .git DIRECTORY is
+                    # never skipped (only the pointer FILE layout
+                    # carries +i). A missing lsattr leaves the skip
+                    # inert — the old fail-loud behavior applies.
+                    case "$_p" in
+                    */.git)
+                        if [ -f "$_p" ]; then
+                            _lsv=$(lsattr "$_p" 2>/dev/null)
+                            _lsv=${_lsv%% *}
+                            case "$_lsv" in
+                            *i*) continue ;;
+                            esac
+                        fi
+                        ;;
+                    esac
                     # shellcheck disable=SC2086  # kit-fixed, space-free words
                     $_c "$_p" || _fail=1
                 done
@@ -927,6 +953,13 @@ _fsb_heal_git() {
 #      developer-owned without group write. The passes and the heal run
 #      in this order every time, so a re-run re-shares and re-heals in
 #      one idempotent cycle.
+# The sharing passes SKIP nailed .git POINTER FILES (#704/#754, issue
+# #758): a pointer sealed with chattr +i refuses chgrp/chmod even for
+# root (EPERM by design), and the migration writes the pointer
+# dev:<group> 664 BEFORE the nail — the passes' target state holds
+# without touching it (the lsattr gate in the _fsb_pass worker; a .git
+# DIRECTORY is never skipped, and an unnailed pointer stays a normal
+# operand).
 # Idempotent; re-runs on install, `config.sh projects add` / `refresh`
 # and `update.sh --refresh`. Ancestors come first (fs_ensure_traversable
 # above): the passes below fix <root> down, but without traversable

@@ -695,6 +695,63 @@ else
     fail "fs-baseline: batch loop body extractable (W11)"
 fi
 
+# --- 7d. nailed .git pointer: the sharing passes skip it (#758) -------------------------
+# A git-protection pointer (.git as a regular FILE, chattr +i — #704/
+# PR #754) refuses chgrp/chmod even for root: before the skip, the
+# chgrp and files-g+rw passes failed rc 123 on every such project and
+# the whole refresh aborted with "N baseline pass(es) failed". lsattr
+# is a PATH stub here (per-file .nailed marker — the controlled-PATH
+# rule; the real chattr needs capabilities the unit sandbox lacks).
+# Fixtures keep mode 600: the files pass would land 660 if it ran —
+# the skip's observable. Three discriminators in one run: the nailed
+# pointer stays 600 (skip), the unnailed worktree-registration pointer
+# lands 660 (no i flag — normal operand), and a classic .git DIRECTORY
+# carrying the same marker lands 3770 (the skip is file-only).
+GP7D="$WORK/gp7d"
+GP7DBIN="$WORK/gp7dbin"
+mkdir -p "$GP7D/proj" "$GP7D/wt" "$GP7D/classic/.git" "$GP7DBIN"
+printf 'gitdir: /var/tmp/gp7d-storage/proj.git\n' >"$GP7D/proj/.git"
+printf 'gitdir: /var/tmp/gp7d-storage/x.git/worktrees/wt\n' >"$GP7D/wt/.git"
+printf 'a\n' >"$GP7D/proj/file.txt"
+touch "$GP7D/proj/.git.nailed" "$GP7D/classic/.git.nailed"
+chmod 600 "$GP7D/proj/.git" "$GP7D/wt/.git" "$GP7D/proj/file.txt"
+chmod 700 "$GP7D/classic/.git"
+cat >"$GP7DBIN/lsattr" <<'EOS'
+#!/bin/sh
+# lsattr stub (#758): real output shape (flags grid, space, path);
+# i is rendered iff a "<path>.nailed" marker exists.
+for _la in "$@"; do
+    if [ -e "$_la.nailed" ]; then
+        printf -- '----i--------------- %s\n' "$_la"
+    else
+        printf -- '-------------------- %s\n' "$_la"
+    fi
+done
+exit 0
+EOS
+chmod 755 "$GP7DBIN/lsattr"
+GP7DOUT="$(PATH="$GP7DBIN:$PATH" FS_SUDO="" \
+    sh -c '. "$1" && fs_baseline_root "$2" "$3" && echo BASELINE-RC0' \
+    _ "$LIB" "$GP7D" "$GRP" 2>&1)"
+if printf '%s\n' "$GP7DOUT" | grep -qF 'BASELINE-RC0'; then
+    pass "7d: baseline over a nailed pointer completes rc 0 (#758)"
+else
+    fail "7d: baseline aborted on the nailed pointer (out: $GP7DOUT)"
+fi
+if printf '%s\n' "$GP7DOUT" | grep -qF 'hit errors'; then
+    fail "7d: pass-failure warn present over the pointer (out: $GP7DOUT)"
+else
+    pass "7d: no pass-failure warn over the pointer (#758)"
+fi
+assert_eq "7d: nailed pointer NOT touched by the passes (600 stays)" "600" \
+    "$(stat -c %a "$GP7D/proj/.git")"
+assert_eq "7d: unnailed pointer stays a normal operand (600 -> 660)" "660" \
+    "$(stat -c %a "$GP7D/wt/.git")"
+assert_eq "7d: regular files still shared (600 -> 660)" "660" \
+    "$(stat -c %a "$GP7D/proj/file.txt")"
+assert_eq "7d: classic .git dir with the same marker is NOT skipped (2770+sticky)" "3770" \
+    "$(stat -c %a "$GP7D/classic/.git")"
+
 # --- 8. Makefile + CI wiring -----------------------------------------------------------
 # Chain membership via the wrapped test: span (issue #464): a bare grep
 # would also match the suite's .PHONY line and pass without membership --
