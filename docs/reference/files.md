@@ -178,9 +178,9 @@ The deployed library mirrors the repository layout
 (`files/opencode-permissions-kit-lib/`) one-to-one. Folder semantics:
 `bin/` = commands (no extension), `sh/` = sourced shell libraries,
 `py/` = python, `management/` = management entry scripts,
-`templates/` = render sources, `tui/` = TUI assets, `git-heal/` =
-the git heal hooks subsystem (#671; root-owned, executed by git and
-sudo — see [the how-to](../how-to/git-heal-hooks.md)).
+`templates/` = render sources and the agent host notes, `tui/` = TUI
+assets, `git-heal/` = the git heal hooks subsystem (#671; root-owned,
+executed by git and sudo — see [the how-to](../how-to/git-heal-hooks.md)).
 
 | Path | Purpose |
 |---|---|
@@ -239,6 +239,7 @@ sudo — see [the how-to](../how-to/git-heal-hooks.md)).
 | `/usr/local/lib/opencode-permissions-kit/templates/sudoers.template` | Template: sudoers rendering |
 | `/usr/local/lib/opencode-permissions-kit/templates/opencode.jsonc` | Template: the agent's soft deny config |
 | `/usr/local/lib/opencode-permissions-kit/templates/opencode-deny-all.jsonc` | Template: default-user lockout config |
+| `/usr/local/lib/opencode-permissions-kit/templates/AGENTS-HOST.md` | Host notes for AI agents (#721) |
 | `/usr/local/lib/opencode-permissions-kit/tui/` | TUI mode display: plugin + theme/config templates |
 
 Deployment notes:
@@ -257,6 +258,12 @@ Deployment notes:
   channel: live row in `opk status`, once-per-day note in the wrapper banner
   (cached per user in `~/.cache/opencode-permissions-kit/`).
 - `sh/ddev-terminal.sh` is hooked into the default user's rc files.
+- `templates/AGENTS-HOST.md` — the notes AI agents read on an installed
+  kit: the git failures the kit causes on purpose, and what to do
+  instead. An agent reaches them through the pointer block you copy
+  into its `AGENTS.md` — see
+  [Tell your agent about the kit](../how-to/agent-host-notes.md).
+  Deployed `644`: the agent user must be able to read it.
 
 ## /var/log/opencode-permissions-kit/
 

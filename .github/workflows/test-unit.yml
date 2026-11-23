@@ -107,6 +107,8 @@ jobs:
         run: ./tests/unit/test-docs.sh
       - name: Run pages entry tests (short one-liner URLs)
         run: ./tests/unit/test-pages.sh
+      - name: Run agent host notes tests (shipped notes + pointer block)
+        run: ./tests/unit/test-agents-host-notes.sh
       - name: Run agent skills lint (issue #178)
         run: ./tests/unit/test-skills-lint.sh
       - name: Run reviews-meta aggregator pins (meta run 2026-10-22)

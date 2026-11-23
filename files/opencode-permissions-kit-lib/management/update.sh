@@ -245,6 +245,7 @@ opencode-permissions-kit-lib/management/uninstall.sh \
 opencode-permissions-kit-lib/templates/opencode.jsonc \
 opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc \
 opencode-permissions-kit-lib/templates/sudoers.template \
+opencode-permissions-kit-lib/templates/AGENTS-HOST.md \
 etc/umask.sh \
 opencode-permissions-kit-lib/bin/opencode-as-opencode \
 opencode-permissions-kit-lib/bin/opk \

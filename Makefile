@@ -61,6 +61,7 @@
     test-sudoers-deploy \
     test-sandbox-policy \
     test-pages \
+    test-agents-host-notes \
     test-rules-index-parity \
     test-rider-lint \
     test-stdin-anchor \
@@ -199,6 +200,7 @@ help:
 	@echo "  make test-workflows Run CI workflow consistency tests"
 	@echo "  make test-docs     Run docs link check"
 	@echo "  make test-pages    Run pages site tests"
+	@echo "  make test-agents-host-notes  Run agent host notes tests"
 	@echo "  make test-install-args  Run install.sh arg-parsing tests"
 	@echo "  make test-kit-files     Run kit file list consistency tests"
 	@echo "  make test-uninstall     Run uninstall.sh tests"
@@ -274,6 +276,7 @@ test: lint \
       test-kit-files \
       test-e2e-sources \
       test-pages \
+      test-agents-host-notes \
       test-security-advisories \
       test-log \
       test-deploy-lib \
@@ -754,6 +757,10 @@ test-sandbox-policy:
 test-pages:
 	@echo "=== Pages Site Tests ==="
 	@./tests/unit/test-pages.sh
+
+test-agents-host-notes:
+	@echo "=== Agent Host Notes Tests ==="
+	@./tests/unit/test-agents-host-notes.sh
 
 test-rules-index-parity:
 	@echo "=== Rules INDEX Parity Tests ==="

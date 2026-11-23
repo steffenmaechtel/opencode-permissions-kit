@@ -20,6 +20,9 @@
 #      the workflow, and the drift pin (hash matches stable or tree —
 #      the two sanctioned states; structural only where no stable ref
 #      exists, e.g. CI clones).
+#   6. issue #721: the agent-notes pointer block — README.md, the
+#      landing page and the how-to carry ONE byte-identical marker
+#      block naming the deployed host-notes path.
 #
 # Run: sh tests/unit/test-pages.sh
 set -u
@@ -229,6 +232,74 @@ if [ -n "$_ck_ref" ]; then
     done
 else
     pass "no stable ref in this clone (CI) — structural checksum pins only"
+fi
+
+# --- 6. the agent-notes pointer block (#721) ---------------------------------
+# The block that points an agent at the shipped host notes
+# (templates/AGENTS-HOST.md) is rendered in THREE places — the repo
+# README, this landing page and the how-to — because each audience has
+# its own entry surface, and a copied block cannot be updated by the
+# kit. Three copies are one block: the bytes between the markers must
+# be IDENTICAL everywhere (a hand-edited copy would quietly name a
+# path the kit does not deploy). test-agents-host-notes.sh owns the
+# contract between the block's path and the deploy manifest; this
+# section owns copy identity, marker shape and block presence.
+SNIP_START='<!-- opk-agents-snippet:start -->'
+SNIP_END='<!-- opk-agents-snippet:end -->'
+SNIP_PATH='/usr/local/lib/opencode-permissions-kit/templates/AGENTS-HOST.md'
+HOWTO="$REPO/docs/how-to/agent-host-notes.md"
+
+# snippet_block <file> — the marker-delimited block, markers included.
+snippet_block() {
+    sed -n "/^${SNIP_START}\$/,/^${SNIP_END}\$/p" "$1"
+}
+
+# Reference first, with the emptiness tripwire: with the markers gone
+# from EVERY copy the identity comparisons below would see empty ==
+# empty and pass — the block must exist, and it must name the path
+# the kit deploys (one line, exactly the path).
+_ref="$(snippet_block "$REPO/README.md")"
+if [ -n "$_ref" ] && printf '%s\n' "$_ref" | grep -qxF "$SNIP_PATH"; then
+    pass "README.md snippet block exists and names the deployed host-notes path"
+else
+    fail "README.md snippet block is empty or lacks the path line $SNIP_PATH"
+fi
+
+for _f in "$REPO/README.md" "$INDEX" "$HOWTO"; do
+    [ -f "$_f" ] || {
+        fail "${_f#"$REPO"/} missing — snippet pin cannot run"
+        continue
+    }
+    # Occurrences, not lines: a second marker glued onto the same
+    # physical line must not slip past a line count.
+    _s=$(grep -oF "$SNIP_START" "$_f" | wc -l)
+    _e=$(grep -oF "$SNIP_END" "$_f" | wc -l)
+    if [ "$_s" -eq 1 ] && [ "$_e" -eq 1 ]; then
+        pass "${_f#"$REPO"/} carries exactly one snippet marker pair"
+    else
+        fail "${_f#"$REPO"/} snippet marker count wrong (start=$_s end=$_e)"
+    fi
+    [ "$_f" = "$REPO/README.md" ] && continue
+    if [ "$(snippet_block "$_f")" = "$_ref" ]; then
+        pass "${_f#"$REPO"/} snippet block is byte-identical to README.md"
+    else
+        fail "${_f#"$REPO"/} snippet block DIFFERS from README.md"
+    fi
+done
+
+# Canary: the identity check must SEE a drift — a copy of the README
+# whose block names a different file has to differ from the reference
+# (a comparison that cannot fail is decoration). Scratch via the work
+# registry (no local trap: it would disarm the harness cleanup).
+WORK="$(work_new)" || {
+    echo "pages tests: scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
+sed "s|${SNIP_PATH}|${SNIP_PATH%.md}.RENAMED.md|" "$REPO/README.md" >"$WORK/readme-drift.md"
+if [ "$(snippet_block "$WORK/readme-drift.md")" = "$_ref" ]; then
+    fail "canary: a drifted snippet copy is NOT detected (identity check is blind!)"
+else
+    pass "canary: a drifted snippet copy is detected"
 fi
 
 echo ""

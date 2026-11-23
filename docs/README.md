@@ -31,6 +31,7 @@ kit fits your setup.
 - [Harden `.git/config`](how-to/secure-git-config.md)
 - [Keep the agent's git workflow green](how-to/git-heal-hooks.md)
 - [Close the mv .git arm](how-to/git-protection.md)
+- [Tell your agent about the kit](how-to/agent-host-notes.md)
 - [Update the kit and the binary](how-to/update.md)
 - [Uninstall](how-to/uninstall.md)
 
