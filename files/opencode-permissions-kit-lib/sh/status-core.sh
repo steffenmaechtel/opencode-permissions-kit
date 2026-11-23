@@ -543,7 +543,8 @@ status_section_git_protection() {
     # literal guard, not a loop variable).
     if ! command -v _gp_storage >/dev/null 2>&1 || ! command -v _gp_enabled >/dev/null 2>&1 ||
         ! command -v _gp_projects >/dev/null 2>&1 || ! command -v _gp_rows >/dev/null 2>&1 ||
-        ! command -v _gp_orphan_rows >/dev/null 2>&1; then
+        ! command -v _gp_orphan_rows >/dev/null 2>&1 ||
+        ! command -v _gp_declined_rows >/dev/null 2>&1; then
         ui_kv_warn "git-protection" "not checked — kit file sh/git-protection-core.sh missing or outdated""\
  (fix: sudo opk update)"
         return 0
@@ -552,9 +553,7 @@ status_section_git_protection() {
     _st_gp_stor=$(_gp_storage) || _st_gp_stor_rc=$?
     case "$_st_gp_stor_rc" in
         2)
-            ui_kv_warn "git-protection" "declined (GITDIR_STORAGE=none) — every project keeps a classic .git""\
- (wholesale swap possible)"
-            ui_detail "run: sudo opk git-protection on (the command replaces the decline marker)"
+            _gp_declined_rows git-protection
             return 0
             ;;
         0) _gp_enabled || _st_gp_stor_rc=1 ;;
@@ -581,6 +580,13 @@ status_section_git_protection() {
         ui_kv_warn "git-protection" "project rows unavailable (mktemp failed)"
         return 0
     }
+    # The reference list must EXIST before the classification pass:
+    # _gp_projects only appends to it, so a host with no pointer into
+    # the storage left it absent and the orphan pass took its skip arm
+    # — a counted warning on a healthy host, and orphans unreported
+    # exactly when no live pointer exists (#765 a M1). The CLI status
+    # pre-creates its list with mktemp; this is the same shape.
+    : >"$_st_gp_td/ref"
     # The core's stderr (refused conf lines, scan notes) is captured
     # and re-rendered as detail rows below: a raw line would print
     # under --short's one-line contract (ui_detail stays muted there).
@@ -598,6 +604,10 @@ status_section_git_protection() {
     _gp_orphan_rows "$_st_gp_stor" "$_st_gp_td/ref"
     while IFS= read -r _st_gp_note; do
         [ -n "$_st_gp_note" ] || continue
+        # The core's own scan note already carries this prefix — strip
+        # it, or the row reads "git-protection: git-protection: …"
+        # (#765 a M3); the refused-conf lines carry none.
+        _st_gp_note=${_st_gp_note#git-protection: }
         ui_detail "git-protection: $_st_gp_note"
     done <"$_st_gp_td/err"
     rm -rf "${_st_gp_td:?}"

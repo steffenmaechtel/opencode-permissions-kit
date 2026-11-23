@@ -146,7 +146,7 @@ _gp_persist_storage
 _gp_drop_storage _gp_has_i _gp_devgit _gp_verify _gp_rollback _gp_worktrees
 _gp_heal_gitdir _gp_pform_ok _gp_storage_sane _gp_unnest _gp_conf_root_p
 _gp_entry_name _gp_migrate_one _gp_nail_one _gp_revert_one _gp_projects _gp_rows
-_gp_disp _gp_orphan_rows _gp_revert_all
+_gp_disp _gp_q _gp_orphan_rows _gp_declined_rows _gp_revert_all
 _git_protection_status _git_protection_on _git_protection_adopt
 _git_protection_nail _gp_nail_path _git_protection_revert
 _git_protection_off git_protection_cli"
@@ -872,7 +872,8 @@ fi
 
 # unreferenced entries render as INFO rows (plain kv:, counted nowhere)
 # with the removal hint; referenced entries render nothing; a symlink
-# is flagged; a name that is not paste-safe gets NO removal command.
+# is flagged; a name with a space gets its path SINGLE-QUOTED in the
+# hint (paste-safe, #765 a S3) and never raw.
 # (`${_sto:?}` inside the expected strings: the sandbox floor walks
 # message prose on live lines too, #630 — a literal `rm` next to a
 # `"$VAR/suffix"` in one statement reads as an unguarded deletion.)
@@ -881,7 +882,9 @@ if printf '%s' "$_out" |
     printf '%s' "$_out" | grep -qF "inspect, then remove: sudo rm -rf ${_sto:?}/orphan1.git" &&
     printf '%s' "$_out" | grep -qF "kv: $_sto/.orphan2.git unreferenced storage entry" &&
     printf '%s' "$_out" | grep -qF "kv: $_sto/lnk.git unreferenced storage entry (a symlink)" &&
+    ! printf '%s' "$_out" | grep -qF "sudo rm -rf ${_sto:?}/lnk.git/" &&
     printf '%s' "$_out" | grep -qF "kv: $_sto/odd name.git unreferenced storage entry" &&
+    printf '%s' "$_out" | grep -qF "inspect, then remove: sudo rm -rf '$_sto/odd name.git'" &&
     ! printf '%s' "$_out" | grep -qF "sudo rm -rf ${_sto:?}/odd name.git" &&
     ! printf '%s' "$_out" | grep -qE "storage/(n1|u1|n1wt)\.git unreferenced"; then
     pass "status: unreferenced entries are INFO rows with a paste-safe removal hint (#764)"
@@ -918,8 +921,9 @@ _out=$(_core_run 'git_protection_cli status') || _rc=$?
 rm -f "${WORK:?}/storage/bad${NL}FORGED.git"
 if printf '%s' "$_out" | grep -qF "kv: $_sto/bad?FORGED.git unreferenced storage entry" &&
     ! printf '%s' "$_out" | grep -q '^FORGED' &&
-    ! printf '%s' "$_out" | grep -qF "sudo rm -rf ${_sto:?}/bad?FORGED.git"; then
-    pass "status: a newline in an entry name cannot forge a row (#764)"
+    ! printf '%s' "$_out" | grep -qF "sudo rm -rf ${_sto:?}/bad?FORGED.git" &&
+    printf '%s' "$_out" | grep -qF 'detail: inspect it by hand -- the name carries a control byte'; then
+    pass "status: a newline in an entry name cannot forge a row, and gets no removal command (#764)"
 else
     fail "status: forged-row arm (out=$(printf '%s' "$_out" | grep -a FORGED))"
 fi
@@ -1021,9 +1025,12 @@ else
     fail "status: not-enabled arm (rc=$_rc out=$_out)"
 fi
 
-# not enabled — nothing derivable (empty conf): the pre-#764 row.
+# not enabled — nothing derivable (empty conf): the pre-#764 row. rc on
+# the assignment like every neighboring arm (#765 a M4): a future
+# rc≠0 must reach the comparison, not abort this set -e suite.
 : >"$CONF"
-_out=$(_core_run 'unset GP_STORAGE; git_protection_cli status')
+_rc=0
+_out=$(_core_run 'unset GP_STORAGE; git_protection_cli status') || _rc=$?
 if printf '%s' "$_out" | grep -qF 'kv-warn: storage not configured (default would be a sibling' &&
     printf '%s' "$_out" | grep -qF 'detail: run: sudo opk git-protection on'; then
     pass "status: nothing derivable keeps the not-configured row + the on hint (#764)"
@@ -1032,21 +1039,25 @@ else
 fi
 
 # declined (maintainer decision for #764: an explicit `on` replaces
-# the marker): the storage row keeps its "'sudo opk git-protection
-# on' enables" wording — true again — and a classic row names `on`.
+# the marker): the storage row is the COUNTED not-enabled row — the
+# same pair the `opk status` section renders (_gp_declined_rows, one
+# wording for both surfaces, #765 a Q5) — and a classic row names `on`.
+_dec='declined (GITDIR_STORAGE=none) — every project keeps a classic .git (wholesale swap possible)'
 printf '%s\n' "$WORK/roots/r6" >"$CONF"
 printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\nGITDIR_STORAGE=none\n' \
     "$(id -un)" "$(id -un)" "$(id -gn)" >"$IC"
 _rc=0
 _out=$(_core_run 'unset GP_STORAGE; git_protection_cli status') || _rc=$?
 if [ "$_rc" = 1 ] &&
+    printf '%s' "$_out" | grep -qF "kv-warn: storage $_dec" &&
     printf '%s' "$_out" |
-    grep -qF "kv: storage declined (GITDIR_STORAGE=none) — 'sudo opk git-protection on' enables" &&
+    grep -qF 'detail: run: sudo opk git-protection on (the command replaces the decline marker)' &&
     printf '%s' "$_out" |
     grep -qF "kv-bad: $WORK/roots/r6/c1 classic .git (unprotected -- the mv .git arm)" &&
     printf '%s' "$_out" | grep -qF "arm) -- run: sudo opk git-protection on" &&
-    ! printf '%s' "$_out" | grep -qF 'git-protection adopt'; then
-    pass "status: declined -> the storage row names on, and on is the classic rows' command (#764)"
+    ! printf '%s' "$_out" | grep -qF 'git-protection adopt' &&
+    ! printf '%s' "$_out" | grep -qF 'kv: storage declined'; then
+    pass "status: declined -> counted storage row (one wording), on is the classic rows' command (#764)"
 else
     fail "status: declined arm (rc=$_rc out=$_out)"
 fi
@@ -1129,6 +1140,152 @@ if [ "$_rc" = 1 ] &&
 else
     fail "on: declined-not-derivable arm (rc=$_rc out=$_out ic=$(cat "$IC"))"
 fi
+
+# --- 8c. fix wave a (#765): paste-safe commands, env-carried persist,
+# trailing-slash storage ------------------------------------------------------
+
+# _gp_q: paste-safe words (#765 a S3). Every word is printed, then a
+# fresh shell of the same dialect parses the printed text as SOURCE —
+# the way a pasted command line is read — and the parsed argument must
+# be byte-identical to the original and the only one. The shell is the
+# authority here, never a hand-rolled quote check (conventions.md
+# "Quoting-aware test machinery").
+cat >"$WORK/q-words" <<'EOF'
+plain.git
+/var/www/a+b-c.git
+it's
+a b.git
+a;b
+a$(id)git
+a`id`.git
+ü.git
+x\y.git
+-dash.git
+"
+'
+''
+EOF
+_q_fail=""
+for _q_sh in dash bash; do
+    while IFS= read -r _q_w || [ -n "$_q_w" ]; do
+        _q_q=$("$_q_sh" -c '. "$1"; _gp_q "$2"' _ "$CORE" "$_q_w") ||
+            {
+                _q_fail="$_q_fail refused:[$_q_w]"
+                continue
+            }
+        _q_rt=$("$_q_sh" -c 'eval "set -- $1"; printf "%s|%s" "$#" "$1"' _ "$_q_q")
+        [ "$_q_rt" = "1|$_q_w" ] || _q_fail="$_q_fail $_q_sh:[$_q_w]->[$_q_q]"
+    done <"$WORK/q-words"
+done
+if [ -z "$_q_fail" ]; then
+    pass "_gp_q: every word round-trips through dash and bash as one identical argument (#765 a S3)"
+else
+    fail "_gp_q round-trip failures:$_q_fail"
+fi
+_out=$(_core_run '_gp_q "/var/www/a+b.git"')
+if [ "$_out" = "/var/www/a+b.git" ] && [ -n "$_out" ] &&
+    _out=$(_core_run '_gp_q "-dash.git"') && [ "$_out" = "'-dash.git'" ]; then
+    pass "_gp_q: a plain word stays bare, a leading dash is quoted (#765 a S3)"
+else
+    fail "_gp_q plain/dash forms (got $_out)"
+fi
+_q_nl=$(printf '\nX')
+_q_nl=${_q_nl%X}
+_q_bad=""
+for _q_c in "a${_q_nl}b" "$(printf 'a\tb')" "$(printf 'a\033b')"; do
+    if sh -c '. "$1"; _gp_q "$2"' _ "$CORE" "$_q_c" >/dev/null 2>&1; then
+        _q_bad="$_q_bad accepted"
+    fi
+done
+if [ -z "$_q_bad" ] && [ -n "$_q_nl" ]; then
+    pass "_gp_q: a control byte (newline, tab, escape) is refused, nothing printed (#765 a S3)"
+else
+    fail "_gp_q control-byte arms:$_q_bad"
+fi
+
+# the rows (#765 a S3): a path the migration form gate refuses gets NO
+# command (adopt would refuse it) and names the rename; a path with a
+# shell metacharacter gets its command with the path single-quoted; a
+# path with a control byte gets no command at all.
+_s3="$WORK/roots/r6"
+mkdir -p "$_s3/sub dir/p/.git/objects" "$_s3/a;b/.git/objects" "$_s3/a\$(id)b/.git/objects"
+printf 'ref: x\n' >"$_s3/sub dir/p/.git/HEAD"
+printf 'ref: x\n' >"$_s3/a;b/.git/HEAD"
+printf 'ref: x\n' >"$_s3/a\$(id)b/.git/HEAD"
+_q_tab=$(printf '\t')
+mkdir -p "$_s3/a${_q_tab}b"
+printf 'gitdir: %s\n' "$WORK/storage/u1.git" >"$_s3/a${_q_tab}b/.git"
+printf '%s\n' "$WORK/roots/r6" >"$CONF"
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\nGITDIR_STORAGE=%s\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" "$WORK/storage" >"$IC"
+_rc=0
+_out=$(_core_run 'unset GP_STORAGE; git_protection_cli status') || _rc=$?
+if [ "$_rc" = 1 ] &&
+    printf '%s' "$_out" |
+    grep -qF "kv-bad: $_s3/sub dir/p classic .git (unprotected -- the mv .git arm) -- no command for this path" &&
+    printf '%s' "$_out" | grep -qF "kv-bad: $_s3/a;b classic .git (unprotected -- the mv .git arm)" &&
+    printf '%s' "$_out" |
+    grep -qF " -- run: sudo opk git-protection adopt '$_s3/a;b'" &&
+    printf '%s' "$_out" |
+    grep -qF " -- run: sudo opk git-protection adopt '$_s3/a\$(id)b'" &&
+    printf '%s' "$_out" |
+    grep -qF "kv-warn: $_s3/a${_q_tab}b pointer, NOT nailed -- no command for this path" &&
+    ! printf '%s' "$_out" | grep -qF "adopt $_s3/a;b" &&
+    ! printf '%s' "$_out" | grep -qF "adopt $_s3/sub dir/p" &&
+    printf '%s' "$_out" | grep -qF 'rename the folder, then adopt it'; then
+    pass "rows: gate-refused paths get no command, metacharacter paths get a quoted one (#765 a S3)"
+else
+    fail "rows: paste-safety arms (rc=$_rc out=$_out)"
+fi
+
+# _gp_persist_storage carries the value through the environment: a
+# backslash in the storage path survives byte-for-byte (#765 a S2 —
+# `awk -v` turned `\n` into a real newline).
+_s2v='/var/www/a\nb\\c'
+printf 'DEFAULT_USER=%s\nGITDIR_STORAGE=/old\n' "$(id -un)" >"$WORK/ic-s2"
+# GP_INSTALL_CONF names the SCRATCH conf: without it the function aims
+# at the real /etc install.conf (a root suite user would write it).
+_out=$(
+    GP_INSTALL_CONF="$WORK/ic-s2" \
+        sh -c '. "$1"; ui_error() { echo "error: $*" >&2; }; _gp_persist_storage "$3"; sed -n "s/^GITDIR_STORAGE=//p" "$2"' \
+        _ "$CORE" "$WORK/ic-s2" "$_s2v" 2>&1
+) || _out="(persist failed)"
+if [ "$_out" = "$_s2v" ] && [ "$(grep -c '^GITDIR_STORAGE=' "$WORK/ic-s2")" = 1 ]; then
+    pass "persist: a backslash in the storage path round-trips, one line (#765 a S2)"
+else
+    fail "persist: backslash arm (got [$_out])"
+fi
+
+# a trailing-slash GITDIR_STORAGE is the same storage (#765 a M2): the
+# path is normalized once in _gp_storage, so classification, the
+# reference list and the orphan pass agree — and the pre-existing nail
+# and revert gates recognize the pointers again (same class).
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\nGITDIR_STORAGE=%s/\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" "$WORK/storage" >"$WORK/ic-slash"
+printf '%s\n' "$WORK/roots/r5" >"$CONF"
+_m2_ok=0
+_out=$(_core_run 'GP_INSTALL_CONF="$WORK/ic-slash" _gp_storage')
+if [ "$_out" = "$WORK/storage" ]; then
+    _rc=0
+    _out=$(_core_run 'GP_INSTALL_CONF="$WORK/ic-slash" git_protection_cli status') || _rc=$?
+    if printf '%s' "$_out" | grep -qF "kv-ok: $WORK/roots/r5/n1 pointer + nailed" &&
+        ! printf '%s' "$_out" | grep -qE "storage/?(n1|u1|n1wt)\.git unreferenced"; then
+        _m2_ok=1
+        _rc=0
+        _core_run 'GP_INSTALL_CONF="$WORK/ic-slash" _gp_nail_one "$WORK/roots/r5/u1" "$WORK/storage/u1.git"' >/dev/null ||
+            _rc=$?
+        if [ "$_rc" != 0 ] || [ ! -e "$WORK/roots/r5/u1/.git.nailed" ]; then
+            _m2_ok=0
+            _out="nail rc=$_rc under the trailing-slash storage"
+        fi
+    fi
+fi
+if [ "$_m2_ok" = 1 ]; then
+    pass "storage: a trailing slash is normalized — classification, orphans and nail agree (#765 a M2)"
+else
+    fail "storage: trailing-slash arm (out=$_out)"
+fi
+printf '%s\n' "$WORK/roots/r6" >"$CONF"
 printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
     "$(id -un)" "$(id -un)" "$(id -gn)" >"$IC"
 

@@ -874,6 +874,48 @@ else
 fi
 printf '%s\n' "$_gpc_work/roots/r1" >"$_gpc_work/projects.conf"
 
+# d2) enabled with NO pointer into the storage (#765 a M1): the
+# reference list is pre-created by the section — _gp_projects only
+# appends to it — so a healthy host renders no "check skipped"
+# warning, and a storage entry nothing points at is listed (the
+# orphan pass used to skip exactly when no live pointer existed).
+mkdir -p "$_gpc_work/roots/r7"
+printf '%s\n' "$_gpc_work/roots/r7" >"$_gpc_work/projects.conf"
+_gpc_out=$(_gpc_run real "$_gpc_work/install.conf" || true)
+printf '%s\n' "$_gpc_work/roots/r1" >"$_gpc_work/projects.conf"
+if printf '%s' "$_gpc_out" |
+    grep -qF "kv: git-protection ON — storage $_gpc_sto; no project under the configured roots is nailed yet" &&
+    ! printf '%s' "$_gpc_out" | grep -qF 'check skipped' &&
+    [ "$(_gpc_tag kv-warn)" = 0 ] && [ "$(_gpc_tag kv-bad)" = 0 ] &&
+    printf '%s' "$_gpc_out" | grep -qF "kv: $_gpc_sto/orphan1.git unreferenced storage entry" &&
+    printf '%s' "$_gpc_out" | grep -qF "inspect, then remove: sudo rm -rf ${_gpc_sto:?}/orphan1.git"; then
+    pass "git-protection section: no pointer into the storage -> no skip warning, orphan listed (#765 a M1)"
+else
+    fail "git-protection section: zero-pointer arm (out=$_gpc_out)"
+fi
+
+# d3) the core's own scan note carries one prefix (#765 a M3). Root-
+# hermetic: a root suite user reads the 000 subtree, so the note
+# never fires there.
+if [ "$(id -u)" != 0 ]; then
+    mkdir -p "$_gpc_work/roots/r8/locked/sub"
+    chmod 000 "$_gpc_work/roots/r8/locked/sub"
+    printf '%s\n' "$_gpc_work/roots/r8" >"$_gpc_work/projects.conf"
+    _gpc_out=$(_gpc_run real "$_gpc_work/install.conf" || true)
+    chmod 755 "$_gpc_work/roots/r8/locked/sub"
+    printf '%s\n' "$_gpc_work/roots/r1" >"$_gpc_work/projects.conf"
+    if printf '%s' "$_gpc_out" |
+        grep -qF 'detail: git-protection: scan may be incomplete under' &&
+        ! printf '%s' "$_gpc_out" | grep -qF 'git-protection: git-protection:' &&
+        [ ! -s "$_gpc_work/err" ]; then
+        pass "git-protection section: the core's scan note renders with one prefix (#765 a M3)"
+    else
+        fail "git-protection section: doubled-prefix arm (out=$_gpc_out)"
+    fi
+else
+    echo "  SKIP  scan-note prefix arm needs a non-root suite user (#765 a M3)"
+fi
+
 # e) enabled but the storage dir is gone: a counted row, and the
 # classic command becomes `on` (adopt would refuse).
 _gpc_out=$(_gpc_run real "$_gpc_work/install-nodir.conf" || true)
