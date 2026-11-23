@@ -89,17 +89,25 @@ opk git-protection status             # per-project layout state (no sudo)
 Each project's `.git` directory becomes a pointer file into an
 external developer-owned sticky storage (default
 `/var/www/gitdirs`, sibling of the first `projects.conf` root;
-`GITDIR_STORAGE` in `install.conf` overrides), nailed with `chattr +i`
+`GITDIR_STORAGE` in `install.conf` overrides), stored as
+`<folder>-<name>.git` — a project directly under a `projects.conf`
+root keeps its plain basename — and nailed with `chattr +i`
 — closing the mv-`.git` wholesale arm of #702 for every actor. The
 migration is per-project atomic (verify + rollback), existing
 worktrees follow via `git worktree repair` (and are repaired the same
 way on revert — a worktree registration is never moved itself), and
 the relocated #651 heal normalizes each stored gitdir. `status` needs
 no root, shows classic / nailed / unnailed / foreign-pointer /
-worktree-reg rows, and exits non-zero when a row is actionable
-(classic or unnailed). Consent: `opk update` asks once before
-configuring the storage — declining persists `GITDIR_STORAGE=none`;
-once enabled, every update runs the adopt + nail pass. The adopt hint
+worktree-reg rows plus INFO rows for storage entries no pointer targets
+any more (with the manual-removal hint), and exits non-zero when a row
+is actionable (classic or unnailed) — each actionable row naming its
+command (`adopt <path>`, `nail <path>`, or `on` while no storage is
+set up). The `Git protection` section of `opk status` shows the same
+state and deviation rows. Consent: `opk
+update` asks once before configuring the storage — declining persists
+`GITDIR_STORAGE=none` (an explicit `sudo opk git-protection on`
+replaces the marker); once enabled, every update runs the adopt + nail
+pass. The adopt hint
 prints on your first checkout in a managed classic tree (needs `opk
 git-heal on` — git runs no hook at clone time). The measured friction
 (worktree remove dance, fstype limits, the `FETCH_HEAD` residual) and
@@ -671,7 +679,10 @@ alert/warning tally). The git-heal section also carries the #703
 wholesale-swap detection: a `.git owner` warn row per repository whose
 `.git` directory owner differs from its project directory's owner
 (display-only — inspect before trusting git output; see
-[the security model](../concepts/security-model.md)).
+[the security model](../concepts/security-model.md)). The
+`Git protection` section reports the
+[nailed pointer layout](../how-to/git-protection.md) — its rows and
+their commands are described with the command.
 
 `status` is the install-wide **green-board**: run it from anywhere —
 it reads state and reports, never prompts, never repairs. Per-project
@@ -697,12 +708,16 @@ no verdict line — the named function and the repair hint land on stderr
 with `fix: sudo opk update`). Rows the caller cannot judge at their own
 privilege ("unknown — needs root to check") and optional-feature rows never
 count toward the verdict: `sudo opk status` resolves the privilege
-unknowns. Two exceptions always count: a managed binary that is missing,
-unexecutable or corrupt (no privilege can fix that), and a missing kit
+unknowns. Exceptions that always count include a managed binary that is missing,
+unexecutable or corrupt (no privilege can fix that), a missing kit
 library file from the checked helper families (a damaged deploy — the row
 names the missing kit file and
 the repair hint `fix: sudo opk update`; the advisories row names the
-skipped security checks instead).
+skipped security checks instead), and a
+[git-protection](../how-to/git-protection.md) that is not enabled —
+never configured, or declined (issue #764: the wholesale `.git` swap
+stays possible for every project until the feature is turned on, so
+that state is a warning, not an optional feature that is simply off).
 
 The agent-config row in the Core section counts the same way (issue
 #382): only a regular file at the agent's config path (`opencode.jsonc`,

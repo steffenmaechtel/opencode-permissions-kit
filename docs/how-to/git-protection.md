@@ -20,7 +20,7 @@ offers no per-entry "may not rename" bit — which is the whole problem.
 
 `opk git-protection` converts each project's `.git` **directory** into
 a pointer **file** — the worktree/submodule form, `gitdir:
-/var/www/gitdirs/<name>.git` — into an external, developer-owned,
+/var/www/gitdirs/<folder>-<name>.git` — into an external, developer-owned,
 sticky storage outside every `projects.conf` root, and nails the
 pointer with `chattr +i` (the ext4/xfs immutable inode flag: no
 rename, no unlink, no replace, no append — for every actor, root
@@ -33,7 +33,8 @@ on the maintainer host lives this way).
 ```bash
 sudo opk git-protection on      # storage init + persist + migrate ALL + nail
 opk git-protection status       # per project: classic | nailed | unnailed |
-                                #   foreign-pointer | worktree-reg (no sudo)
+                                #   foreign-pointer | worktree-reg, plus INFO
+                                #   rows for unreferenced storage entries
 sudo opk git-protection adopt /var/www/vhosts/myproj   # migrate + nail ONE
 sudo opk git-protection nail    # nail pending pointers (the root pass)
 sudo opk git-protection revert --all   # walk back to the classic layout
@@ -41,18 +42,43 @@ sudo opk git-protection off     # revert --all + drop the storage config
 ```
 
 `status` exits non-zero when an actionable row exists (a classic
-`.git`, or an unnailed pointer) — cron-friendly without parsing. The
-two remaining row kinds are informational: `foreign-pointer` (a
+`.git`, or an unnailed pointer) — cron-friendly without parsing. Every
+actionable row names the command that helps right now: a classic
+project carries `sudo opk git-protection adopt <path>` (two or more
+add the one-run hint `sudo opk git-protection on`; before the storage
+is set up the rows name `on` instead — `adopt` refuses without one),
+an unnailed pointer carries `sudo opk git-protection nail <path>`.
+Paste the command as printed: a path that is not plain is
+single-quoted there. A project path the migration gates refuse
+(whitespace, a glob character, a dot segment) gets no command but the
+rename hint — `adopt` would refuse it. The
+remaining row kinds are informational: `foreign-pointer` (a
 pointer to somewhere else — every linked worktree of a not-yet-migrated
 project shows this shape) and `worktree-reg` (a `.git` directory
 without the gitdir payload — a worktree registration or similar).
+
+### Unreferenced storage entries
+
+A storage entry that no pointer under your configured roots targets
+any more — a project removed without `revert`, a leftover from an
+earlier pilot — renders as an INFO row on both report surfaces naming
+the entry and the manual removal: inspect it, then
+`sudo rm -rf /var/www/gitdirs/<entry>` (a name that is not plain is
+single-quoted in that command; a name carrying a control character
+gets no command — inspect it by hand). INFO
+on purpose: an unreferenced entry is harmless (nothing follows it) and
+the removal is your call. "Unreferenced" is measured against the
+configured roots only — a project adopted outside them, or under a
+root you since removed from `projects.conf`, still uses its entry.
 
 ### Consent: update asks once
 
 `opk update` asks before configuring the storage the first time (the
 kit never silently rewrites your trees). Declining persists
 `GITDIR_STORAGE=none` in `install.conf` — the question never returns,
-and `sudo opk git-protection on` stays one command away. Unattended
+and `sudo opk git-protection on` stays one command away: the command
+replaces the decline marker (no default storage derivable from your
+`projects.conf` roots, it names the line to edit instead). Unattended
 updates skip the question with a hint; set `KIT_GITDIR_STORAGE=none`
 in the environment to silence that too, or to an absolute path to
 configure non-interactively.
@@ -74,9 +100,18 @@ could move the whole storage aside); the filesystem must support
 
 ## What the migration does
 
-Per project, atomic with rollback: `.git` moves into the storage
-(name collisions get `-2`, `-3`… suffixes), the relocated
-[#651 heal](../concepts/security-model.md) normalizes it
+Per project, atomic with rollback: `.git` moves into the storage under
+a self-describing name — `<folder>-<name>.git`, so
+`/var/www/vhosts/myorg/myproj` becomes `myorg-myproj.git` and two
+checkouts that share a name (a project and a worktree of the same
+repository) no longer collide. A project directly under a
+`projects.conf` root keeps its plain basename (`documents.git`); a
+composed name too long for the filesystem falls back to the basename
+too. A name that is already taken gets `-2`, `-3`… — the belt for two
+same-named projects in one folder. Projects migrated before this rule
+keep their basename-only names: renaming a nailed pointer is the
+`chattr -i` dance for no protection gain. The relocated
+[#651 heal](../concepts/security-model.md) normalizes the stored gitdir
 (config/hooks developer-owned, operand set agent-owned — with
 `COMMIT_EDITMSG` pinned developer-side, the Phase A finding: git only
 rewrites it in place, and an agent-pinned one blocks the developer
@@ -142,6 +177,20 @@ opk git-protection status        # storage + per-project layout state
 sudo opk git-protection off      # revert every project + drop the config
 ```
 
+`opk status` reports the state in its `Git protection` section, from
+the same rows as `opk git-protection status`. While git-protection is
+enabled, that is an `ON` state row — with the number of protected
+projects, or saying that none is protected yet — plus one row per
+deviation with its command: a classic project counts as an alert, an
+unnailed pointer as a warning. Unreferenced storage entries are listed
+here too, as INFO rows. If the storage directory is gone, a warning
+replaces the state row and the rows name `on`. While it is not
+enabled (never configured, or declined), the
+section is one warning naming `sudo opk git-protection on`: the
+wholesale swap stays possible for every project until the feature is
+turned on, so — unlike an optional feature that is simply off — that
+state counts.
+
 `off` reverts first and drops `GITDIR_STORAGE` only when every
 revert succeeded AND nothing was skipped as not kit-owned (orphaned
 pointers could never be recognized again); when pointer projects
@@ -157,8 +206,9 @@ the kit — it is plain git).
 ## Limits
 
 - The agent can still plant additional directories inside the storage
-  (harmless — nothing discovers them; the kit walks pointers, not
-  the storage).
+  (harmless — nothing follows them: the kit walks pointers, not the
+  storage). Both report surfaces list such entries as unreferenced
+  (`opk git-protection status` and the `opk status` section).
 - Filesystems without `chattr` support degrade loudly: migrations
   succeed, the nail warns and `status` reports `unnailed` — degraded,
   not protected.

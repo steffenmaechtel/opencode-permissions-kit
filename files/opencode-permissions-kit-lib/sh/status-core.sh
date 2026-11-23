@@ -6,7 +6,10 @@
 # output order byte-identical. Sourced (never executed) by status.sh,
 # checkout-first; POSIX sh, no top-level side effects (definitions and
 # comments only), zero runtime dependencies beyond the probes the report
-# itself names (world A). The functions run in the CALLER's shell under
+# itself names (world A) and the cross-lib functions the entry sources
+# behind file guards (git-check, the ddev/update-check/advisories libs,
+# and — for the Git protection section, #764 — sh/git-protection-core.sh;
+# every such call site is command-v-guarded with a counted fallback row). The functions run in the CALLER's shell under
 # its `set -u`: they read the globals status.sh main sets (LIBDIR,
 # VERSION, KIT_CHANNEL, DEFAULT_USER, OPENCODE_USER, OPENCODE_GROUP,
 # CONTAINER_BACKEND, DDEV_VERSION, PROJECTS_CONF, STATUS_SHORT) and bump
@@ -513,6 +516,101 @@ status_section_git_heal() {
         done
     done <"$_st_gh_list"
     rm -f "$_st_gh_list"
+}
+
+# === Git protection (issue #704 layout, #764 topic 2) =============================
+# The install-wide rows for the nailed pointer layout — the feature
+# that closes the wholesale .git swap, and the arm the one-command
+# health view must not miss. Enabled: every project still on the
+# classic layout is a counted alert carrying its adopt command, every
+# unnailed pointer a counted warning carrying its nail command (both
+# from the git-protection core's shared renderer — one classification
+# and one wording for `opk status` and `opk git-protection status`
+# alike). NOT enabled (never configured, or declined): one counted
+# warning naming the enable command — unlike the optional git-heal OFF
+# row above this one counts, because the wholesale swap stays possible
+# for every project until the feature is turned on (maintainer
+# decision, #764). Unreferenced storage entries render as INFO rows
+# (#764 topic 4). Read-only like every section: nothing here calls the
+# core's migrate/nail/revert functions (the #368 boundary).
+status_section_git_protection() {
+    ui_section "Git protection"
+    # Cross-lib call-site guard (#456): status is fail-soft, and a
+    # missing helper would rc-127 into a silently dropped section
+    # behind a green summary — a COUNTED warn row instead (the #165
+    # class). Literal command -v per function: the list is every core
+    # function this section calls (the cross-lib rider greps the
+    # literal guard, not a loop variable).
+    if ! command -v _gp_storage >/dev/null 2>&1 || ! command -v _gp_enabled >/dev/null 2>&1 ||
+        ! command -v _gp_projects >/dev/null 2>&1 || ! command -v _gp_rows >/dev/null 2>&1 ||
+        ! command -v _gp_orphan_rows >/dev/null 2>&1 ||
+        ! command -v _gp_declined_rows >/dev/null 2>&1; then
+        ui_kv_warn "git-protection" "not checked — kit file sh/git-protection-core.sh missing or outdated""\
+ (fix: sudo opk update)"
+        return 0
+    fi
+    _st_gp_stor_rc=0
+    _st_gp_stor=$(_gp_storage) || _st_gp_stor_rc=$?
+    case "$_st_gp_stor_rc" in
+        2)
+            _gp_declined_rows git-protection
+            return 0
+            ;;
+        0) _gp_enabled || _st_gp_stor_rc=1 ;;
+    esac
+    if [ "$_st_gp_stor_rc" -ne 0 ]; then
+        ui_kv_warn "git-protection" "not configured — every project keeps a classic .git (wholesale swap possible)"
+        ui_detail "run: sudo opk git-protection on"
+        return 0
+    fi
+    # Enabled. The classic rows' fix command follows the storage state
+    # (#764 topic 3): `adopt` works only with an initialized storage.
+    _st_gp_fix=adopt
+    _st_gp_state=""
+    if [ -d "$_st_gp_stor" ]; then
+        _st_gp_state=ok
+    else
+        _st_gp_fix=on
+        ui_kv_warn "git-protection" "storage missing: $_st_gp_stor — pointer projects cannot resolve their gitdir"
+        ui_detail "re-create it: sudo opk git-protection on"
+    fi
+    # Loud but never fatal (#674 b D3): a swallowed mktemp failure
+    # would silently drop the rows this section exists to show.
+    _st_gp_td=$(mktemp -d) || {
+        ui_kv_warn "git-protection" "project rows unavailable (mktemp failed)"
+        return 0
+    }
+    # The reference list must EXIST before the classification pass:
+    # _gp_projects only appends to it, so a host with no pointer into
+    # the storage left it absent and the orphan pass took its skip arm
+    # — a counted warning on a healthy host, and orphans unreported
+    # exactly when no live pointer exists (#765 a M1). The CLI status
+    # pre-creates its list with mktemp; this is the same shape.
+    : >"$_st_gp_td/ref"
+    # The core's stderr (refused conf lines, scan notes) is captured
+    # and re-rendered as detail rows below: a raw line would print
+    # under --short's one-line contract (ui_detail stays muted there).
+    # || true: an absent projects.conf (rc 1) classifies nothing.
+    _gp_projects "$_st_gp_td/ref" >"$_st_gp_td/list" 2>"$_st_gp_td/err" || true
+    if [ "$_st_gp_state" = ok ]; then
+        _st_gp_n=$(grep -c '^nailed ' "$_st_gp_td/list" || true)
+        if [ "${_st_gp_n:-0}" -gt 0 ]; then
+            ui_kv_ok "git-protection" "ON — $_st_gp_n project(s) on the nailed pointer layout (storage $_st_gp_stor)"
+        else
+            ui_kv "git-protection" "ON — storage $_st_gp_stor; no project under the configured roots is nailed yet"
+        fi
+    fi
+    _gp_rows "$_st_gp_td/list" gaps "$_st_gp_fix"
+    _gp_orphan_rows "$_st_gp_stor" "$_st_gp_td/ref"
+    while IFS= read -r _st_gp_note; do
+        [ -n "$_st_gp_note" ] || continue
+        # The core's own scan note already carries this prefix — strip
+        # it, or the row reads "git-protection: git-protection: …"
+        # (#765 a M3); the refused-conf lines carry none.
+        _st_gp_note=${_st_gp_note#git-protection: }
+        ui_detail "git-protection: $_st_gp_note"
+    done <"$_st_gp_td/err"
+    rm -rf "${_st_gp_td:?}"
 }
 
 # === Security advisories (issue #107) ============================================

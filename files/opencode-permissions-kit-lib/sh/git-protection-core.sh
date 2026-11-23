@@ -14,22 +14,28 @@
 # Sourced (never executed) by bin/opk through its SELF-resolved $LIBDIR
 # (checkout-first); the pairing guard in the dispatcher refuses a
 # version-skewed pairing. update.sh sources it too (the consent phase,
-# update_git_protection_consent) with the same lookup order. POSIX sh,
-# no top-level side effects (definitions and comments only). The
-# functions run in the CALLER's shell (bin/opk sets set -u only) and
-# read the globals the dispatcher sets: LIBDIR, INSTALL_CONF and the
-# ui_* helpers.
+# update_git_protection_consent) with the same lookup order, and
+# management/status.sh for the `Git protection` section (#764,
+# checkout-first, call-site-guarded). POSIX sh, no top-level side
+# effects (definitions and comments only). The functions run in the
+# CALLER's shell — every entry sets `set -u`, update.sh adds `-e` —
+# and read the globals the dispatcher sets: LIBDIR, INSTALL_CONF and
+# the ui_* helpers.
 #
 # Commands (git_protection_cli parses and validates BEFORE the sudo
 # hop — usage errors need no elevation; the re-exec is loop-guarded,
 # the #479 a F24 shape):
 #   status              per project: classic | nailed | unnailed |
-#                       foreign-pointer | worktree-reg; rc 1 when any
-#                       actionable row exists (the verdict-in-rc rule,
-#                       conventions.md "Script output style"), rc 0
-#                       when protected/idle
+#                       foreign-pointer | worktree-reg, plus INFO
+#                       rows for unreferenced storage entries (#764
+#                       topic 4); rc 1 when any actionable row exists
+#                       (the verdict-in-rc rule, conventions.md
+#                       "Script output style"), rc 0 when
+#                       protected/idle
 #   on                  storage init + persist GITDIR_STORAGE +
-#                       migrate ALL classic projects + nail (root)
+#                       migrate ALL classic projects + nail (root); an
+#                       explicit `on` replaces a GITDIR_STORAGE=none
+#                       decline marker (#764)
 #   adopt <path>        migrate + nail ONE project (root)
 #   nail [<path>]       nail pending pointers; with <path> only that
 #                       project's pointer (root)
@@ -38,9 +44,20 @@
 #
 # Migrations are per-project ATOMIC: verify (pointer content + git
 # status) gates every step, rollback (pointer out, gitdir back) on
-# failure; name collisions in the storage get -2, -3... suffixes;
-# existing worktrees follow the moved gitdir through `git worktree
-# repair` in the same breath.
+# failure; existing worktrees follow the moved gitdir through `git
+# worktree repair` in the same breath. Storage entries are named
+# `<parent>-<basename>.git` for NEW migrations (#764 topic 1, the
+# rule and its fallbacks: _gp_entry_name); same-name duplicates take
+# -2, -3... suffixes. Entries migrated before #764 keep their
+# basename-only names — renaming a nailed pointer is the chattr -i
+# dance for no protection gain.
+#
+# Reporting (one renderer, two surfaces — #764 topics 2-4): every
+# actionable row names the command that helps in the CURRENT storage
+# state (_gp_rows), and storage children no pointer targets any more
+# render as INFO rows (_gp_orphan_rows). `opk git-protection status`
+# shows everything; the `opk status` section (sh/status-core.sh,
+# status_section_git_protection) shows the state plus the deviations.
 #
 # Heal contract (Phase A findings, the issue's run log):
 #   - The relocated #651 heal pins config/hooks dev (no group write,
@@ -172,24 +189,48 @@ _gp_conf_path() {
 # _gp_storage: resolve the storage path (the Phase B design, issue
 # #704's design comment): explicit conf wins (GP_STORAGE test seam,
 # then GITDIR_STORAGE from install.conf — the marker "none" means
-# DECLINED, rc 2), else the sibling of the first usable conf root
-# (/var/www/vhosts -> /var/www/gitdirs; agent-home and refused lines
-# are skipped). Echoes the path on rc 0; rc 1 when nothing is
-# derivable; rc 2 when explicitly declined. The caller re-validates
-# any derived path through _gp_root_ok before creating anything.
+# DECLINED, rc 2), else the derived default (_gp_storage_derive).
+# Echoes the path on rc 0, TRAILING SLASHES STRIPPED (#765 a M2):
+# every consumer recognizes the storage by a prefix match
+# (`"$stor"/*` -- classification, the reference list, the nail and
+# revert gates), and a value spelled `/var/www/gitdirs/` made every
+# kit-written pointer look foreign while the orphan pass reported the
+# live entries. The slash is spelling, not location; `/` itself stays
+# as written (the pattern below needs a character in front of the
+# slash). rc 1 when nothing is derivable; rc 2 when explicitly
+# declined. The caller re-validates any derived path through
+# _gp_root_ok before creating anything.
 _gp_storage() {
     if [ -n "${GP_STORAGE:-}" ]; then
-        printf '%s\n' "$GP_STORAGE"
-        return 0
+        _gps_out=$GP_STORAGE
+    else
+        _gps_s=$(_gp_var GITDIR_STORAGE)
+        if [ "$_gps_s" = "none" ]; then
+            return 2
+        fi
+        if [ -n "$_gps_s" ]; then
+            _gps_out=$_gps_s
+        else
+            _gps_out=$(_gp_storage_derive) || return 1
+        fi
     fi
-    _gps_s=$(_gp_var GITDIR_STORAGE)
-    if [ "$_gps_s" = "none" ]; then
-        return 2
-    fi
-    if [ -n "$_gps_s" ]; then
-        printf '%s\n' "$_gps_s"
-        return 0
-    fi
+    while :; do
+        case "$_gps_out" in
+            ?*/) _gps_out="${_gps_out%/}" ;;
+            *) break ;;
+        esac
+    done
+    printf '%s\n' "$_gps_out"
+}
+
+# _gp_storage_derive: the default storage — the sibling of the first
+# usable conf root (/var/www/vhosts -> /var/www/gitdirs; agent-home
+# and refused lines are skipped), ignoring anything configured or
+# declined in install.conf. Split out of _gp_storage for the one
+# caller that must derive PAST a decline marker: `on` (#764, the
+# maintainer decision that an explicit `on` outranks a recorded
+# decline). Echoes the path on rc 0, rc 1 when nothing is derivable.
+_gp_storage_derive() {
     _gps_conf=$(_gp_conf_path)
     [ -f "$_gps_conf" ] || return 1
     _gps_agent=$(_gp_agentuser)
@@ -207,6 +248,21 @@ _gp_storage() {
         return 0
     done <"$_gps_conf"
     return 1
+}
+
+# _gp_enabled: rc 0 when git-protection is ENABLED on this host — the
+# storage is an explicit configuration (the GP_STORAGE test seam, or a
+# GITDIR_STORAGE=<path> that `on` / the update consent persisted into
+# install.conf), never the sibling default that _gp_storage merely
+# DERIVES from projects.conf. The discriminator the report surfaces
+# need (#764 topics 2 and 3): a derived default with classic projects
+# is "not configured" — `adopt` refuses without an initialized
+# storage — and `off` drops the key while the storage dir stays
+# behind, so directory existence is no enable signal.
+_gp_enabled() {
+    [ -n "${GP_STORAGE:-}" ] && return 0
+    _gpenv_v=$(_gp_var GITDIR_STORAGE)
+    [ -n "$_gpenv_v" ] && [ "$_gpenv_v" != none ]
 }
 
 # _gp_nosym <path>: rc 0 when no path COMPONENT is a symlink (L5:
@@ -297,10 +353,14 @@ _gp_persist_storage() {
         ui_error "mktemp failed (is \$TMPDIR writable?) — cannot persist the storage path"
         return 1
     }
-    awk -v v="$_gpps_val" '
-        /^GITDIR_STORAGE=/ { print "GITDIR_STORAGE=" v; seen = 1; next }
+    # The value rides the ENVIRONMENT, never `awk -v`: a -v assignment
+    # processes backslash escapes, so a storage path holding `\n`
+    # would land as two lines in the root-owned install.conf while
+    # mkdir had just created the literal directory (#765 a S2).
+    GPPS_VAL="$_gpps_val" awk '
+        /^GITDIR_STORAGE=/ { print "GITDIR_STORAGE=" ENVIRON["GPPS_VAL"]; seen = 1; next }
         { print }
-        END { if (!seen) print "GITDIR_STORAGE=" v }
+        END { if (!seen) print "GITDIR_STORAGE=" ENVIRON["GPPS_VAL"] }
     ' "$_gpps_ic" >"$_gpps_tmp" || {
         rm -f "$_gpps_tmp"
         return 1
@@ -533,6 +593,79 @@ _gp_unnest() {
     return 0
 }
 
+# _gp_conf_root_p <dir>: rc 0 when <dir> is a projects.conf ROOT line
+# (trailing slashes stripped — the reader gate's normalization). The
+# naming rule's "directly under a conf root" test (#764 topic 1). A
+# lexical compare on purpose: the migration path is form-gated
+# upstream (no dot or empty segment), and a path the `on` sweep took
+# from a conf line spells its directory exactly as the line does. An
+# `adopt <path>` argument brings whatever spelling it was given — a
+# differently spelled route to the same folder simply takes the
+# prefixed name (cosmetic: a different entry name, nothing else;
+# #765 a Q9). An absent or unreadable conf
+# answers "no root" (rc 1): with no root to compare against, every
+# project takes the prefix — the same answer as a project outside
+# every conf root.
+_gp_conf_root_p() {
+    _gpnr_conf=$(_gp_conf_path)
+    [ -f "$_gpnr_conf" ] || return 1
+    while IFS= read -r _gpnr_line; do
+        case "$_gpnr_line" in '' | '#'*) continue ;; esac
+        _gpnr_n="$_gpnr_line"
+        while :; do
+            case "$_gpnr_n" in
+                */) _gpnr_n="${_gpnr_n%/}" ;;
+                *) break ;;
+            esac
+        done
+        [ "$_gpnr_n" = "$1" ] && return 0
+    done <"$_gpnr_conf"
+    return 1
+}
+
+# _gp_entry_name <proj>: the storage entry name (without ".git") for
+# a project about to migrate — "<parent>-<basename>" (#764 topic 1).
+# Two checkouts sharing a basename (a main checkout and a git worktree
+# of the same repository) used to collide into opaque -2, -3 suffixes,
+# and an entry left behind could not be attributed to its folder. The
+# rule applies to NEW migrations only: entries migrated before #764
+# keep their names (renaming a nailed pointer is the chattr -i dance
+# for no protection gain). Three fallbacks to the plain basename:
+#   - the project sits DIRECTLY in a projects.conf root: no
+#     distinguishing folder exists, and the root's own basename would
+#     prefix every such entry alike (maintainer decision, #764);
+#   - no parent component resolves (the caller's form gates refuse
+#     such paths earlier anyway);
+#   - the composed name exceeds 200 bytes: it would not fit a
+#     255-byte filename (NAME_MAX on ext4/xfs, the chattr-capable
+#     filesystems) next to ".git" and a collision suffix. Measured in
+#     BYTES via wc -c — ${#} counts characters under UTF-8 locales.
+#     The fallback covers the COMPOSED name only: a basename that is
+#     itself too long for `<basename>.git` (252 bytes and more) still
+#     fails at the mv, loud — as it did before #764 (#765 a S1).
+# Same-name duplicates under one parent (a re-created checkout, a
+# pre-#764 entry of that name) still take the -2, -3... suffix loop.
+_gp_entry_name() {
+    _gpen_p="$1"
+    while :; do
+        case "$_gpen_p" in
+            */) _gpen_p="${_gpen_p%/}" ;;
+            *) break ;;
+        esac
+    done
+    _gpen_base="${_gpen_p##*/}"
+    _gpen_par="${_gpen_p%/*}"
+    _gpen_par="${_gpen_par##*/}"
+    _gpen_c="$_gpen_par-$_gpen_base"
+    if [ -n "$_gpen_base" ] && [ -n "$_gpen_par" ] &&
+        ! _gp_conf_root_p "${_gpen_p%/*}" &&
+        [ "$(printf '%s' "$_gpen_c" | wc -c)" -le 200 ]; then
+        printf '%s\n' "$_gpen_c"
+    else
+        printf '%s\n' "$_gpen_base"
+    fi
+}
+
 # _gp_migrate_one <proj> <nailed:yes|no>: the atomic layout switch.
 # Root context required (or GP_ALLOW_NONROOT). The project path is
 # form-gated and .git re-checked immediately before the move (L5:
@@ -592,7 +725,10 @@ _gp_migrate_one() {
         return 1
     fi
 
-    _gpm_name=$(basename "$_gpm_p")
+    # entry name: <parent>-<basename> for nested projects, the plain
+    # basename directly under a conf root and for over-long names
+    # (#764 topic 1, _gp_entry_name).
+    _gpm_name=$(_gp_entry_name "$_gpm_p")
     _gpm_tgt="$_gpm_stor/$_gpm_name.git"
     _gpm_n=1
     while [ -e "$_gpm_tgt" ]; do
@@ -882,7 +1018,18 @@ _gp_revert_one() {
 #                    (the main project owns repair and nail decisions)
 # Every conf line runs the reader gate first (the files.md root-op
 # contract); refused lines say why and authorize nothing.
+# Optional argument <ref-file> (#764 topic 4): when given, every
+# pointer whose target lies INSIDE the storage appends the storage
+# CHILD it keeps alive (one name per line) — mains and worktree
+# registrations alike, because a surviving worktree still uses the
+# common gitdir after its main checkout is gone. The orphan pass
+# (_gp_orphan_rows) diffs that list against the storage's children.
+# The comparison is LEXICAL on the target as written (leading slashes
+# collapsed): kit-written and git-repaired pointers are canonical, and
+# an unusual spelling can only ever produce an INFO row, never a root
+# operation.
 _gp_projects() {
+    _gpp_ref="${1:-}"
     _gpp_conf=$(_gp_conf_path)
     [ -f "$_gpp_conf" ] || return 1
     _gpp_stor_rc=0
@@ -911,6 +1058,25 @@ _gp_projects() {
         _gpp_proj=$(dirname "$_gpp_g")
         if [ -f "$_gpp_g" ]; then
             _gpp_t=$(sed -n 's/^gitdir: //p' "$_gpp_g" 2>/dev/null | head -n 1)
+            # referenced storage child, for the orphan pass (#764
+            # topic 4) — recorded before any classification branches.
+            if [ -n "$_gpp_ref" ] && [ "$_gpp_stor_rc" -eq 0 ]; then
+                case "$_gpp_t" in
+                    "$_gpp_stor"/*)
+                        _gpp_c="${_gpp_t#"$_gpp_stor"}"
+                        while :; do
+                            case "$_gpp_c" in
+                                /*) _gpp_c="${_gpp_c#/}" ;;
+                                *) break ;;
+                            esac
+                        done
+                        _gpp_c=${_gpp_c%%/*}
+                        if [ -n "$_gpp_c" ]; then
+                            printf '%s\n' "$_gpp_c" >>"$_gpp_ref"
+                        fi
+                        ;;
+                esac
+            fi
             # Worktree registrations FIRST (#754 b D1/D3/D7): a linked
             # worktree's .git is a pointer file targeting
             # <something>.git/worktrees/<id> — migrated (under the
@@ -953,45 +1119,251 @@ _gp_projects() {
     done
 }
 
+# _gp_q <word>: the word as a PASTE-SAFE shell word for a command the
+# report prints (#765 a S3) — unquoted when it is plain (letters,
+# digits and `._/+-`, not starting with a dash), single-quoted with
+# every embedded quote escaped (`'\''`, the POSIX spelling) otherwise;
+# rc 1, nothing printed, for a word carrying a control byte (no
+# quoting makes a raw newline or escape byte safe to render in a
+# report row). A printed `sudo …` line is data until a developer
+# pastes it — then it is shell structure, and a project path or a
+# storage entry name is agent-influenceable (group-writable trees): an
+# unquoted `$(…)` or `;` in a name would run at paste time.
+_gp_q() {
+    case "$1" in
+        *[[:cntrl:]]*) return 1 ;;
+    esac
+    case "$1" in
+        '' | -* | *[!A-Za-z0-9._/+-]*) ;;
+        *)
+            printf '%s\n' "$1"
+            return 0
+            ;;
+    esac
+    _gpq_out="'"
+    _gpq_rest=$1
+    while :; do
+        case "$_gpq_rest" in
+            *"'"*)
+                _gpq_out="$_gpq_out${_gpq_rest%%"'"*}'\\''"
+                _gpq_rest=${_gpq_rest#*"'"}
+                ;;
+            *)
+                _gpq_out="$_gpq_out$_gpq_rest'"
+                break
+                ;;
+        esac
+    done
+    printf '%s\n' "$_gpq_out"
+    return 0
+}
+
+# _gp_rows <list> <all|gaps> <adopt|on>: render the per-project
+# rows for a classified list (_gp_projects output) — the ONE renderer
+# behind both report surfaces: `opk git-protection status` (mode all:
+# every state, worktree registrations as detail lines) and the
+# `opk status` section (mode gaps: deviations only — the protected
+# projects are the state row's count there, #764 topic 2). Rows print
+# in the MAIN shell from the temp-file list (never inside a pipeline:
+# the ui counters a summary tallies die in a subshell, conventions.md
+# "Script output style"). Every actionable row names the command that
+# helps in the CURRENT storage state (#764 topic 3 — the house style
+# of opk status / opk doctor), selected by the third argument:
+#   adopt     storage initialized: sudo opk git-protection adopt <path>
+#   anything else (`on`)  no initialized storage — `adopt` refuses
+#             without one, while `on` sets it up, migrates everything
+#             and (since #764) replaces a GITDIR_STORAGE=none marker
+# The path in a command goes through _gp_q, and a path the migration
+# form gate refuses (whitespace, glob character, dot segment —
+# `_gp_pform_ok`) gets NO command: `adopt` would refuse it, so the row
+# names the rename instead (#765 a S3). A no-command row whose path
+# carries a CONTROL byte renders its key through _gp_disp — that byte
+# must not reach the terminal raw (#765 b F1); a merely whitespace-
+# bearing path keeps its key as is (a UTF-8 name must not turn into
+# question marks).
+# Two or more classic rows under `adopt` add the all-at-once hint
+# (`on` migrates every project in one run — the better fit there).
+# _gp_rows_actionable is the callers' counter (1 when a classic or
+# unnailed row rendered — the status rc); _gp_rows_classic is this
+# function's own, it drives the all-at-once hint.
+_gp_rows() {
+    _gprl_list=$1 _gprl_mode=$2
+    _gp_rows_actionable=0
+    _gp_rows_classic=0
+    case "$3" in
+        adopt) _gprl_fix=" -- run: sudo opk git-protection adopt" ;;
+        *) _gprl_fix=" -- run: sudo opk git-protection on" ;;
+    esac
+    while IFS=' ' read -r _gprl_state _gprl_proj; do
+        [ -n "${_gprl_state:-}" ] || continue
+        case "$_gprl_state" in
+            classic)
+                _gprl_q=""
+                if _gp_pform_ok "$_gprl_proj" && _gprl_q=$(_gp_q "$_gprl_proj"); then
+                    _gprl_msg="classic .git (unprotected -- the mv .git arm)$_gprl_fix"
+                    [ "$3" = adopt ] && _gprl_msg="$_gprl_msg $_gprl_q"
+                    ui_kv_bad "$_gprl_proj" "$_gprl_msg"
+                else
+                    _gprl_key=$_gprl_proj
+                    case "$_gprl_key" in *[[:cntrl:]]*) _gprl_key=$(_gp_disp "$_gprl_key") ;; esac
+                    ui_kv_bad "$_gprl_key" "classic .git (unprotected -- the mv .git arm) -- no command""\
+ for this path"
+                    ui_detail "the path fails a migration gate or cannot be pasted safely (whitespace, glob"
+                    ui_detail "character, dot segment or control byte) -- rename the folder, then adopt it"
+                fi
+                _gp_rows_actionable=1
+                _gp_rows_classic=$((_gp_rows_classic + 1))
+                ;;
+            unnailed)
+                _gprl_q=$(_gp_q "$_gprl_proj") || _gprl_q=""
+                if [ -n "$_gprl_q" ]; then
+                    ui_kv_warn "$_gprl_proj" "pointer, NOT nailed (run: sudo opk git-protection nail $_gprl_q)"
+                else
+                    _gprl_key=$(_gp_disp "$_gprl_proj")
+                    ui_kv_warn "$_gprl_key" "pointer, NOT nailed -- no command for this path"
+                    ui_detail "the path carries a control byte -- rename the folder, then nail it"
+                fi
+                _gp_rows_actionable=1
+                ;;
+            nailed)
+                [ "$_gprl_mode" = all ] && ui_kv_ok "$_gprl_proj" "pointer + nailed"
+                ;;
+            foreign-pointer)
+                [ "$_gprl_mode" = all ] &&
+                    ui_kv "$_gprl_proj" "pointer outside storage (not managed)"
+                ;;
+            worktree-reg)
+                [ "$_gprl_mode" = all ] && ui_detail "worktree registration: $_gprl_proj"
+                ;;
+        esac
+    done <"$_gprl_list"
+    if [ "$_gp_rows_classic" -ge 2 ] && [ "$3" = adopt ]; then
+        ui_detail "several projects -- one run adopts them all: sudo opk git-protection on"
+    fi
+    return 0
+}
+
+# _gp_disp <string>: a display-safe copy of an agent-influenced name —
+# every byte outside printable ASCII becomes "?" (control characters
+# included: a storage entry name is agent-writable input, and a raw
+# newline or escape byte in a report row would forge or corrupt rows).
+# LC_ALL=C pins the class to its byte meaning across locales.
+_gp_disp() {
+    printf '%s' "$1" | LC_ALL=C tr -c '[:print:]' '?'
+}
+
+# _gp_orphan_rows <storage> <ref-file>: INFO rows for storage children
+# no pointer targets any more (#764 topic 4 — a project removed
+# without `revert`, a pilot-era leftover). Plain ui_kv/ui_detail rows,
+# never counted and never actionable: an unreferenced entry is
+# harmless (nothing discovers it) and the removal is the developer's
+# call after inspecting it. Display-only — no root operation reads
+# this list. Three safety properties, all because the storage is
+# AGENT-WRITABLE (mode 3770):
+#   - names are enumerated by glob, never line-split (a newline in a
+#     name cannot forge a second row) and rendered through _gp_disp;
+#   - the removal hint prints the path through _gp_q (plain names
+#     bare, anything else single-quoted — never a raw shell
+#     metacharacter a developer would paste) and never with a trailing
+#     slash: `rm -rf <link>/` would follow a planted symlink and
+#     delete the target's content; a name carrying a control byte gets
+#     no command at all;
+#   - an absent or unreadable reference list skips the pass with a
+#     counted row instead of reporting every child unreferenced (a
+#     caller bug must not read as N orphans).
+# Scope: "unreferenced" means no pointer under the CONFIGURED roots
+# targets it — a project adopted outside every conf root, or under a
+# root since removed from projects.conf, still uses its entry.
+_gp_orphan_rows() {
+    _gpo_stor=$1 _gpo_ref=$2
+    [ -d "$_gpo_stor" ] || return 0
+    [ -r "$_gpo_ref" ] || {
+        ui_kv_warn "git-protection" "unreferenced-entry check skipped (no readable reference list)"
+        return 0
+    }
+    for _gpo_e in "$_gpo_stor"/* "$_gpo_stor"/.*; do
+        _gpo_n=${_gpo_e##*/}
+        case "$_gpo_n" in
+            . | ..) continue ;;
+        esac
+        [ -e "$_gpo_e" ] || [ -L "$_gpo_e" ] || continue
+        grep -qxF -- "$_gpo_n" "$_gpo_ref" && continue
+        _gpo_kind=""
+        [ -L "$_gpo_e" ] && _gpo_kind=" (a symlink)"
+        ui_kv "$(_gp_disp "$_gpo_e")" "unreferenced storage entry$_gpo_kind -- no pointer under the""\
+ configured roots targets it"
+        if _gpo_q=$(_gp_q "$_gpo_e"); then
+            ui_detail "inspect, then remove: sudo rm -rf $_gpo_q"
+        else
+            ui_detail "inspect it by hand -- the name carries a control byte, so no removal command is printed"
+        fi
+    done
+    return 0
+}
+
+# _gp_declined_rows <key>: the declined-state row pair — ONE wording
+# for both report surfaces (#765 a Q5): a counted warn plus the enable
+# command. A decline is a recorded "no", and the reports count it
+# exactly like "never configured": until `on` runs, the wholesale swap
+# stays possible for every project. <key> is each surface's row label
+# (`storage` in the command, `git-protection` in the status section).
+_gp_declined_rows() {
+    ui_kv_warn "$1" "declined (GITDIR_STORAGE=none) — every project keeps a classic .git (wholesale swap possible)"
+    ui_detail "run: sudo opk git-protection on (the command replaces the decline marker)"
+}
+
 _git_protection_status() {
     ui_section "git-protection (#704 O4 pointer layout)"
     _gpst_stor_rc=0
     _gpst_stor=$(_gp_storage) || _gpst_stor_rc=$?
+    # The classic rows' fix command follows the storage state (#764
+    # topic 3): `adopt` works only with an initialized storage; `on`
+    # works in every other state — a declined marker included, the
+    # explicit command replaces it.
+    _gpst_fix=on
     case "$_gpst_stor_rc" in
-        0) ui_kv "storage" "$_gpst_stor" ;;
-        2) ui_kv "storage" "declined (GITDIR_STORAGE=none) — 'sudo opk git-protection on' enables" ;;
+        2)
+            _gp_declined_rows storage
+            ;;
+        0)
+            if _gp_enabled; then
+                if [ -d "$_gpst_stor" ]; then
+                    _gpst_fix=adopt
+                    ui_kv "storage" "$_gpst_stor"
+                else
+                    ui_kv_warn "storage" "configured but missing: $_gpst_stor"
+                    ui_detail "re-create it: sudo opk git-protection on"
+                fi
+            else
+                ui_kv_warn "storage" "not configured (derived default: $_gpst_stor)"
+                ui_detail "run: sudo opk git-protection on"
+            fi
+            ;;
         *)
             ui_kv_warn "storage" "not configured (default would be a sibling of the first projects.conf root)"
+            ui_detail "run: sudo opk git-protection on"
             ;;
     esac
     _gpst_actionable=0
-    # Temp-file list, not a pipeline into the loop (conventions.md
-    # "Script output style": rows printed inside a pipeline's
-    # subshell would bypass the tally).
+    # Temp files, not a pipeline into the loop (conventions.md
+    # "Script output style": rows printed inside a pipeline's subshell
+    # would bypass the tally).
     _gpst_list=$(mktemp) || {
         ui_error "mktemp failed — cannot enumerate projects"
         exit 1
     }
+    _gpst_ref=$(mktemp) || {
+        ui_error "mktemp failed — cannot collect pointer targets"
+        rm -f "$_gpst_list"
+        exit 1
+    }
     # || true: an absent projects.conf (rc 1) means "nothing to
     # classify" — stderr (refused conf lines, scan notes) still flows.
-    _gp_projects >"$_gpst_list" || true
-    while IFS=' ' read -r _gpst_state _gpst_proj; do
-        [ -n "${_gpst_state:-}" ] || continue
-        case "$_gpst_state" in
-            classic)
-                ui_kv_bad "$_gpst_proj" "classic .git (unprotected -- the mv .git arm)"
-                _gpst_actionable=1
-                ;;
-            nailed) ui_kv_ok "$_gpst_proj" "pointer + nailed" ;;
-            unnailed)
-                ui_kv_warn "$_gpst_proj" "pointer, NOT nailed (run: sudo opk git-protection nail)"
-                _gpst_actionable=1
-                ;;
-            foreign-pointer) ui_kv "$_gpst_proj" "pointer outside storage (not managed)" ;;
-            worktree-reg) ui_detail "worktree registration: $_gpst_proj" ;;
-        esac
-    done <"$_gpst_list"
-    rm -f "$_gpst_list"
+    _gp_projects "$_gpst_ref" >"$_gpst_list" || true
+    _gp_rows "$_gpst_list" all "$_gpst_fix"
+    _gpst_actionable=$_gp_rows_actionable
+    [ "$_gpst_stor_rc" -eq 0 ] && _gp_orphan_rows "$_gpst_stor" "$_gpst_ref"
+    rm -f "$_gpst_ref" "$_gpst_list"
     ui_detail "nail check: lsattr is unprivileged -- this row is cheap to re-run"
     [ "$_gpst_actionable" -eq 0 ]
 }
@@ -1001,9 +1373,22 @@ _git_protection_on() {
     _gpon_stor_rc=0
     _gpon_stor=$(_gp_storage) || _gpon_stor_rc=$?
     if [ "$_gpon_stor_rc" -eq 2 ]; then
-        ui_error "git-protection is declined on this host (GITDIR_STORAGE=none)"
-        ui_detail "remove the marker line from install.conf, then run: opk git-protection on"
-        exit 1
+        # A recorded decline never blocks the explicit command
+        # (maintainer decision, #764): the marker's job is to keep
+        # `opk update` from asking again — `on` IS the consent. The
+        # default storage is derived past the marker; persisting it
+        # below replaces the `none` line, so every later run — and
+        # the status rows that say "'sudo opk git-protection on'
+        # enables" — finds the feature enabled.
+        _gpon_stor_rc=0
+        _gpon_stor=$(_gp_storage_derive) || _gpon_stor_rc=$?
+        if [ "$_gpon_stor_rc" -ne 0 ]; then
+            ui_error "git-protection is declined on this host (GITDIR_STORAGE=none) and no default"
+            ui_error "storage is derivable (no usable projects.conf root)"
+            ui_detail "replace that line with an absolute storage path, then run: opk git-protection on"
+            exit 1
+        fi
+        ui_info "git-protection was declined on this host (GITDIR_STORAGE=none) -- this run enables it"
     fi
     if [ "$_gpon_stor_rc" -ne 0 ]; then
         ui_error "no storage path derivable — none configured, no usable projects.conf root"

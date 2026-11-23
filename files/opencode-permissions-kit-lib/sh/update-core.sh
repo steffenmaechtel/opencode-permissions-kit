@@ -799,7 +799,8 @@ update_git_protection_consent() {
     fi
     if [ "$_gpc_conf" = "none" ]; then
         # Declined on this host — never nagged again; the enable path
-        # stays one command away (documented in the how-to).
+        # stays one command away (documented in the how-to; `on`
+        # replaces the marker).
         return 0
     fi
     if [ -n "$_gpc_conf" ]; then

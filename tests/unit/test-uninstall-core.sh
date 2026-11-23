@@ -2228,7 +2228,9 @@ fi
 # flow through the pipe the section greps).
 cat >"$WORK/gpu-opk" <<'EOF'
 #!/bin/sh
-echo "kv-warn: /var/www/x pointer, NOT nailed (run: sudo opk git-protection nail)"
+# the row as the real renderer prints it since #764 / #765 a Q8: the
+# nail command carries the project path
+echo "kv-warn: /var/www/x pointer, NOT nailed (run: sudo opk git-protection nail /var/www/x)"
 EOF
 chmod 755 "$WORK/gpu-opk"
 printf '#!/bin/sh\nexec "$@"\n' >"$WORK/gpu-bin/sudo"

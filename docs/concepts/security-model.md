@@ -372,7 +372,8 @@ Operational notes:
     [#704](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/704)).
     It closes the `.git` swap completely but not W2's project-dir
     swap at depth (the nailed entry protects only `.git` itself).
-    Opt-in like the heal hooks; measured friction and the walk-back:
+    Opt-in like the heal hooks; `opk status` reports the layout in its
+    `Git protection` section; measured friction and the walk-back:
     [the how-to](../how-to/git-protection.md).
   - **`fs.protected_regular` is irrelevant here:** it gates
     O_CREAT opens, never renames — no sysctl value mitigates W1–W3.

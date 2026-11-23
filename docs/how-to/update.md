@@ -111,7 +111,8 @@ untouched throughout), whether to configure the
 initializes the storage, persists `GITDIR_STORAGE` and migrates every
 kit-managed project to the nailed pointer layout in the same run;
 answering no persists `GITDIR_STORAGE=none` — the question never
-returns, and `sudo opk git-protection on` stays one command away.
+returns, and `sudo opk git-protection on` stays one command away
+(the command replaces the decline marker).
 Unattended runs (`--yes`, no terminal) skip the question with a hint
 and persist nothing; `KIT_GITDIR_STORAGE=none` in the environment
 silences the hint, an absolute path configures without asking. Once
