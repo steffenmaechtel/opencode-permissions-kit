@@ -323,9 +323,9 @@ else
     fail "excluded table: expected | 2026-W46 | 3 | 2 | 2 | 2 | 1 | and | 2026-W47 | 2 | 0 | 0 | 0 | 1 |"
 fi
 if grep -qF -- '8000' "$WORK/out.txt"; then
-    fail "excluded sessions leaked into the tables (an 8000-token figure appeared)"
+    fail "excluded sessions: a token figure of an excluded session appeared verbatim (8000)"
 else
-    pass "excluded sessions (X1-X4, X6) stay out of every measured figure"
+    pass "excluded sessions: none of their token figures appears verbatim (the exact-row pins above are the discriminators)"
 fi
 
 # --- 2c. M2 pins --------------------------------------------------------------
