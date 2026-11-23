@@ -20,7 +20,10 @@
 #   3. The command blocks documented in agent/docs-loop.md (the trigger
 #      check and the sweep list): extracted from the page as written and
 #      executed under a stubbed gh -- an edit that breaks a failure path
-#      or the count reds here.
+#      or the count arithmetic reds here. The stub answers for gh and
+#      reads none of its arguments: the trigger block's jq programs and
+#      its --label filter are NOT exercised (the sweep's jq program is,
+#      by a separate pin when jq is installed).
 #
 # Run: sh tests/unit/test-docs-loop.sh
 set -u
@@ -483,7 +486,9 @@ fi
 # fenced blocks; a block that fails open turns an API error into a
 # count. Both blocks are extracted from the page AS WRITTEN and run
 # under a stubbed gh, so an edit that breaks a failure path or the
-# count reds here. No network: the stub answers for gh.
+# count reds here. No network: the stub answers for gh. It reads none
+# of gh's arguments -- the list-side jq programs and the label filter of
+# the trigger block are not exercised here (PR #769 round b, F1).
 
 doc_block() { # $1 = heading text -> the first fenced sh block after it
     awk -v h="$1" '

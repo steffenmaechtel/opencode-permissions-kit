@@ -286,7 +286,7 @@ issue's creation when there is none):
 gh issue list -R steffenmaechtel/opk-agent-feedback --state open --limit 300 \
     --json number,createdAt,comments,labels \
     -q '.[] | select(([.labels[].name] | index("promoted")) | not)
-      | ([.comments[] | select(.body | test("(?m)^[[:space:]]*Session:[[:space:]]*ses_"))]
+      | ([.comments[] | select(.body | test("(?m)^[[:space:]]*Session:[[:space:]]*ses_[A-Za-z0-9]+"))]
          | last.createdAt) as $last
       | "#\(.number) [\([.labels[].name] | join(","))] filed \(.createdAt) last-session \($last // .createdAt)"' ||
     echo "SWEEP FAILED: the candidate list could not be read" >&2
