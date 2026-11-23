@@ -16,7 +16,7 @@ opk config projects add /var/www/vhosts/new-project
 Multiple paths at once are fine, and `~` works. System paths (`/`, `/usr`,
 `/home`, `/tmp`, …) are rejected — use a dedicated folder like
 `/var/www/vhosts` or `~/dev`. Adding a root applies the **group baseline**
-(group `opencode`, setgid, default ACLs `g:opencode:rwx`) in one step.
+(group `<group>`, setgid, default ACLs `g:<group>:rwx`) in one step.
 
 A project root must be a **real directory** — a path that is itself a
 symlink is refused (`projects add`, `handover`, `refresh`, `opk update`,
@@ -30,18 +30,22 @@ readlink -f /var/www/vhosts/my-link                   # resolve a link to its ta
 ```
 
 Roots below your home directory (like `~/dev`) work too: adding or
-refreshing a root also grants **traverse-only** ACLs (`g:opencode:--x`, no
+refreshing a root also grants **traverse-only** ACLs (`g:<group>:--x`, no
 listing/reading) on ancestors that would otherwise block the agent — a home
 directory is `0750` on Ubuntu 24.04, and without `+x` on every component
 above the root, opencode cannot reach it at all.
 
 ### Manual equivalent
 
+`<group>` is the kit's sharing group — `opencode` on a default install;
+`OPENCODE_GROUP` at install time overrides it
+([the sharing group](../concepts/sharing-group.md)).
+
 ```bash
 echo /var/www/vhosts/new-project | sudo tee -a /etc/opencode-permissions-kit/projects.conf
-sudo chgrp -R opencode /var/www/vhosts/new-project
+sudo chgrp -R <group> /var/www/vhosts/new-project
 sudo chmod g+s /var/www/vhosts/new-project
-sudo setfacl -R -d -m g:opencode:rwx /var/www/vhosts/new-project
+sudo setfacl -R -d -m g:<group>:rwx /var/www/vhosts/new-project
 ```
 
 ## List configured directories
