@@ -100,6 +100,14 @@ state without any hooks.
   your own restructuring of `.git` itself needs the `sudo chattr -i`
   dance. Removing a project is `sudo opk git-protection revert
   <path>`.
+- The group baseline (install, `opk config refresh`, `opk update
+  --refresh`) skips nailed pointers: `chattr +i` refuses `chgrp`/
+  `chmod` even for root, which used to fail the whole refresh on
+  pointer projects — and a pointer the kit sealed already ships
+  `<developer>:<group> 664`, so the skip loses nothing there. A
+  pointer re-nailed by hand or carried sealed from an older kit
+  keeps its drifted state: the seal blocks `chgrp`/`chmod` for
+  everyone, and nothing reports the drift (issue #758).
 - `git worktree remove` over a nailed pointer ends in a partial
   remove (the registration goes, the directory delete hits `EPERM`):
   finish with `sudo chattr -i <worktree>/.git && sudo rm -rf

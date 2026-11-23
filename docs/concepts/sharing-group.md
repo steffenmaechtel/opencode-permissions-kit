@@ -8,7 +8,7 @@ The kit uses the `opencode` user's own primary usergroup as the sharing
 group — no `www-data`, no extra group:
 
 - the developer is added as a member (`usermod -aG opencode <dev>`),
-- project roots carry setgid + default ACLs `g:opencode:rwx`,
+- project roots carry setgid + default ACLs `g:<group>:rwx`,
 - `umask 002` (via the kit's profile script) makes agent-created files
   group-writable for the developer.
 
@@ -25,10 +25,18 @@ semantics):
 
 | Operation | Scope |
 |---|---|
-| `chgrp -R opencode` | every file and directory |
+| `chgrp -R <group>` | every file and directory |
 | `chmod g+rwxs` (setgid + group rwx) | every directory |
 | `chmod g+rw` | every existing file, so you and the agent can edit each other's pre-install files |
-| default ACLs `g:opencode:rwx` | every directory (governs new files' access) |
+| default ACLs `g:<group>:rwx` | every directory (governs new files' access) |
+
+One entry class is skipped: a [git-protection](../how-to/git-protection.md)
+pointer (`.git` as a sealed pointer file) carries `chattr +i`, which refuses
+`chgrp`/`chmod` even for root — and the kit writes it `<developer>:<group>
+664` before sealing, so the baseline's target state already holds on the
+pointers it sealed itself. A pointer re-nailed by hand (or sealed by an
+older kit) keeps its drifted state silently: the seal blocks `chgrp`/
+`chmod` for everyone, so refreshes skip it either way.
 
 First runs over large trees (hundreds of repos) take minutes per pass; the
 helper prints a live per-pass entry counter.
