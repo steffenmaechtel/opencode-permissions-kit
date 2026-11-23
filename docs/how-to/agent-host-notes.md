@@ -21,18 +21,21 @@ The kit ships a short notes file for agents, the **host notes**:
 /usr/local/lib/opencode-permissions-kit/templates/AGENTS-HOST.md
 ```
 
-It lists the failures an agent meets on a kit host and what to do
-instead — nothing more: no script, nothing that executes. Read it
-yourself with `cat` (it fits on one screen). `sudo opk update` keeps it
-current; on an install that predates it, it appears with the first
-update that carries it.
+It lists the expected git failures the kit documents for an agent's
+main checkout, and what to do instead — nothing more: no script,
+nothing that executes. It is not the full cost list of the `.git` heal
+— that lives in the
+[security model](../concepts/security-model.md). Read it yourself with
+`cat` (it fits on one screen). `sudo opk update` keeps it current; on an
+install that predates it, it appears with the first update that carries
+it.
 
 ## Add the pointer
 
 The kit never writes an `AGENTS.md` — placing the pointer is your step,
-and a one-time one. opencode loads `AGENTS.md` from the agent's global
-config file, `/home/opencode/.config/opencode/AGENTS.md` (create it if
-it does not exist; you keep write access through the `opencode`
+and a one-time one. opencode loads a global `AGENTS.md` from the agent's
+config directory: `/home/opencode/.config/opencode/AGENTS.md` (create it
+if it does not exist; you keep write access through the `opencode`
 group). Copy the block verbatim:
 
 <!-- opk-agents-snippet:start -->
@@ -65,6 +68,8 @@ pointer in the global file.
 
 - The agent reads the notes before its first git command or
   file-permission change in a project — one small file per session.
-- The notes file lies outside the project, and the agent's config asks
-  before any access outside the project (`external_directory` in the
-  agent's `opencode.jsonc`): approve that request when it appears.
+- The notes file lies outside the project. With the kit's default agent
+  config, opencode asks before any access outside the project
+  (`external_directory` in the agent's `opencode.jsonc`): approve that
+  request when it appears. A config you wrote yourself decides this on
+  its own.

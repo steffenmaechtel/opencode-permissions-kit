@@ -28,7 +28,7 @@ d9b85097bf72668e8122b2623cb8fe62c27ff0feb741ccaf36738d508b1b73c3  files/opencode
 785c7d7d8a262956a5334acf387637c1d601d6e9d83ddfaa9037473624dc4bae  files/opencode-permissions-kit-lib/sh/ddev-hosts.sh
 a6f317ab7f4589bdc244db55296119a882c27f855bc14442cedf301dd06ca7e4  files/opencode-permissions-kit-lib/sh/ddev-migrate.sh
 47d414945a1f7c4bc00047afc4321fd6b647bff990f109e985d905b3df651ca1  files/opencode-permissions-kit-lib/sh/ddev-terminal.sh
-417344ca846c54e810bb5cf95549b3bbd8bb0f0da02df748e9398a53571bb431  files/opencode-permissions-kit-lib/sh/deploy-lib.sh
+9b39876de8ca322f7e83e995a1eb7c5da3f5f9645fd37bb0244b388db017d9de  files/opencode-permissions-kit-lib/sh/deploy-lib.sh
 db10fdee1914af11a158b46fa5dc39bd54c3b9e75969ebd2373bc5945680026c  files/opencode-permissions-kit-lib/sh/doctor-core.sh
 b137417664afbdc06ff757dd5785236112ffd05f4c85d358c558def543ac96f9  files/opencode-permissions-kit-lib/sh/fs-baseline.sh
 80579d6005c882c689086a3af913ccdf686059905451f43b496aa74005fd0b41  files/opencode-permissions-kit-lib/sh/git-check.sh

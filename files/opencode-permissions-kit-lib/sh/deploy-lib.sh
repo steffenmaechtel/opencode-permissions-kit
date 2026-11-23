@@ -9,7 +9,8 @@
 #
 # Layout (internal/records/streamline.md): bin/ = commands (no extension),
 # sh/ = sourced shell libraries, py/ = python, management/ = the
-# management entry scripts, templates/ = rendered/deployed templates.
+# management entry scripts, templates/ = render sources plus the agent
+# host notes (AGENTS-HOST.md, prose).
 # The manifest below is the SINGLE SOURCE OF TRUTH for what ships into
 # /usr/local/lib/opencode-permissions-kit — tests/unit/test-kit-files.sh
 # enforces it against the fetch lists (adding a kit file means adding

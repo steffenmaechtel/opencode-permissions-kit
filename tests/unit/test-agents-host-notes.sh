@@ -21,6 +21,11 @@
 # The three rendered copies of the pointer block (README, landing
 # page, how-to) are pinned byte-identical in tests/unit/test-pages.sh;
 # the deployed mode is pinned by tests/unit/test-deploy-lib.sh.
+# The file NAME is a stability contract (docs/how-to/agent-host-notes.md):
+# users copy the absolute path into their AGENTS.md, where no kit update
+# can reach it. Every pin below spells the name on purpose -- a rename
+# reddens this suite until the wave either reverts it or ships a stub at
+# the old path (#770 a C2).
 # Sabotage (committed tree, then restore + re-run green): drop the
 # entry from one fetch list -> the list-drift guards in
 # tests/unit/test-kit-files.sh AND section 1 go red; rename the file
@@ -80,7 +85,8 @@ READ_EFFECT="$WORK/read_effect.py"
 # Prints the effect the template's read rules resolve to for one path
 # (last matching rule wins), through the kit's own jsonc parser. The
 # wildcard translation is the one tests/unit/test-template-bash-rules.sh
-# anchors to the upstream matcher and to live tests.
+# anchors to the upstream matcher and to live tests, the trailing-" *"
+# branch included; `selftest` pins that translation here (#770 a S2).
 cat >"$READ_EFFECT" <<'PYEOF'
 import importlib.util
 import re
@@ -92,12 +98,37 @@ def wildcard_match(value, pattern):
     expr = pattern.replace("\\", "/")
     expr = re.sub(r"[.+^${}()|[\]\\]", lambda m: "\\" + m.group(0), expr)
     expr = expr.replace("*", ".*").replace("?", ".")
+    if expr.endswith(" .*"):
+        expr = expr[:-3] + "( .*)?"
     return re.fullmatch(expr, text, re.DOTALL) is not None
 
 
+def selftest():
+    # Ground truth for the translation (opencode's matcher): "*" spans
+    # "/" and matches the empty run; a pattern ending in " *" also
+    # matches the bare value. A row that flips means THIS translation
+    # broke -- not the template.
+    rows = [
+        ("git status", "git status *", True),
+        ("git status -s", "git status *", True),
+        ("git statusx", "git status *", False),
+        ("/x/README.md", "*README.md", True),
+        ("/x/AGENTS-HOST.md", "*README.md", False),
+    ]
+    ok = True
+    for value, pattern, want in rows:
+        got = wildcard_match(value, pattern)
+        if got != want:
+            print(f"selftest: {pattern!r} vs {value!r}: replica={got} want={want}", file=sys.stderr)
+            ok = False
+    return 0 if ok else 1
+
+
 def main():
+    if len(sys.argv) == 2 and sys.argv[1] == "selftest":
+        sys.exit(selftest())
     if len(sys.argv) != 4:
-        sys.exit("usage: read_effect.py <jsonc-parser.py> <opencode.jsonc> <path>")
+        sys.exit("usage: read_effect.py selftest | <jsonc-parser.py> <opencode.jsonc> <path>")
     spec = importlib.util.spec_from_file_location("jsonc_parser", sys.argv[1])
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -111,6 +142,11 @@ def main():
 
 main()
 PYEOF
+
+# The replica proves its own translation before any template claim:
+# without the trailing-" *" branch the first selftest row flips.
+check 'replica selftest: trailing-" *" optional, anchored, "*" spans "/"' \
+    python3 "$READ_EFFECT" selftest
 
 # The deployed location derives from install.sh's own LIBDIR literal --
 # never a second spelling of the path.
@@ -154,6 +190,7 @@ for _lit in \
     'git push origin <branch>' \
     '--no-track' \
     'unable to write new index file' \
+    "couldn't set 'HEAD'" \
     'update_ref failed' \
     'sudo opk git-heal on' \
     'git-protection' \
@@ -241,8 +278,10 @@ else
     fail "how-to page missing: $HOWTO_MD"
 fi
 # The how-to tells users to expect an approval request for the read
-# (the notes file lies outside the project) -- that sentence holds
-# only while the agent template keeps the ask.
+# (the notes file lies outside the project) -- that sentence holds only
+# while the agent template keeps the ask, and only on an install whose
+# agent config IS the kit's: a config the user wrote is left alone by
+# the installer and decides on its own (#770 a C1).
 check "agent template keeps external_directory at ask (the how-to's approval note)" \
     grep -qF -- '"external_directory": "ask"' "$TEMPLATE"
 
