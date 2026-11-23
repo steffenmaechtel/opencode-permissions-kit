@@ -190,9 +190,12 @@ if pointer_names_shipped_file "$README_MD"; then
 else
     fail "README pointer block does not name exactly one shipped file under $LIBDIR"
 fi
-# Canary: the same check over a COPY whose pointer target is renamed
-# must fail -- a contract pin that cannot see a rename is decoration.
-sed "s|${LIBDIR}/templates/AGENTS-HOST.md|${LIBDIR}/templates/RENAMED-NOTES.md|" \
+# Canary: the same check over a COPY of the README whose pointer
+# target is renamed must fail -- a contract pin that cannot see a
+# rename is decoration. The rename replaces whatever path line the
+# block carries (not a second spelling of the path), so the canary
+# stays meaningful while the pin above is red for a wrong path.
+sed "s|^${LIBDIR}/templates/[^ ]*|${LIBDIR}/templates/RENAMED-NOTES.md|" \
     "$README_MD" >"$WORK/readme-renamed.md"
 if cmp -s "$README_MD" "$WORK/readme-renamed.md"; then
     fail "canary: the renamed-pointer fixture did not change the README copy"

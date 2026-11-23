@@ -287,19 +287,25 @@ for _f in "$REPO/README.md" "$INDEX" "$HOWTO"; do
     fi
 done
 
-# Canary: the identity check must SEE a drift — a copy of the README
-# whose block names a different file has to differ from the reference
-# (a comparison that cannot fail is decoration). Scratch via the work
+# Canary: the identity check must SEE a drift. The fixture is the
+# reference block with its path line replaced -- whatever path line
+# the block carries, so the canary stays meaningful while the block
+# pin above is red for a wrong path. When the premise is gone (no
+# block, no path line) the row says so: that state is the block
+# pin's finding, not a blind identity check. Scratch via the work
 # registry (no local trap: it would disarm the harness cleanup).
 WORK="$(work_new)" || {
     echo "pages tests: scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2
     exit 1
 }
-sed "s|${SNIP_PATH}|${SNIP_PATH%.md}.RENAMED.md|" "$REPO/README.md" >"$WORK/readme-drift.md"
-if [ "$(snippet_block "$WORK/readme-drift.md")" = "$_ref" ]; then
-    fail "canary: a drifted snippet copy is NOT detected (identity check is blind!)"
+printf '%s\n' "$_ref" | sed 's|^/[^ ]*$|/drifted/path.md|' >"$WORK/readme-drift.md"
+_drift="$(snippet_block "$WORK/readme-drift.md")"
+if [ -z "$_ref" ] || ! printf '%s\n' "$_ref" | grep -qE '^/[^ ]*$'; then
+    fail "canary: not runnable -- the README block carries no path line to drift (the block pin above is the finding)"
+elif [ "$_drift" = "$_ref" ]; then
+    fail "canary: a drifted snippet block is NOT detected (identity check is blind!)"
 else
-    pass "canary: a drifted snippet copy is detected"
+    pass "canary: a drifted snippet block is detected"
 fi
 
 echo ""

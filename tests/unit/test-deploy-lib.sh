@@ -86,7 +86,10 @@ check '"-" entry: templates/opencode.jsonc deployed (mode follows source)' \
     test -f "$LIBD/templates/opencode.jsonc"
 # The host notes are read by the AGENT user (#721): the world-read
 # bit is the contract, so the mode is explicit 644, not the "-" the
-# data templates carry.
+# data templates carry. Discrimination boundary: a fresh checkout is
+# 644 already, so this row tells wrong EXPLICIT modes apart but not a
+# regression to "-" there (kit-managed checkouts carry 664) -- the
+# manifest text is pinned in tests/unit/test-agents-host-notes.sh.
 check "mode: templates/AGENTS-HOST.md 644 (agent-readable host notes)" \
     mode_is "$LIBD/templates/AGENTS-HOST.md" 644
 
