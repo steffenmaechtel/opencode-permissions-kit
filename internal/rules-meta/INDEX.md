@@ -8,11 +8,11 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**210 metas · 207 active · 3 retired · 27 review-pending · next due 2026-11-20**
+**218 metas · 215 active · 3 retired · 35 review-pending · next due 2026-11-20**
 
 ## Actionable
 
-- **Review pending:** RM-0190, RM-0191, RM-0192, RM-0193, RM-0194, RM-0195, RM-0196, RM-0197, RM-0198, RM-0199, RM-0200, RM-0201, RM-0202, RM-0203, RM-0204, RM-0205, RM-0206, RM-0207, RM-0208, RM-0209, RM-0210
+- **Review pending:** RM-0190, RM-0191, RM-0192, RM-0193, RM-0194, RM-0195, RM-0196, RM-0197, RM-0198, RM-0199, RM-0200, RM-0201, RM-0202, RM-0203, RM-0204, RM-0205, RM-0206, RM-0207, RM-0208, RM-0209, RM-0210, RM-0211, RM-0212, RM-0213, RM-0214, RM-0215, RM-0216, RM-0217, RM-0218
 - **Amended — pending:** RM-0133 (2026-11-21), RM-0078 (2026-11-22), RM-0135 (2026-11-22), RM-0136 (2026-11-22), RM-0154 (2026-11-22), RM-0182 (2026-11-22)
 
 ## AGENTS.md
@@ -30,6 +30,7 @@
 | [RM-0103](0/1/0/RM-0103.md) | The security model is deliberately | active | approved | 1m | 2026-11-20 |
 | [RM-0104](0/1/0/RM-0104.md) | The kit never edits user-owned | active | approved | 1m | 2026-11-20 |
 | [RM-0105](0/1/0/RM-0105.md) | Run the L1–L7 checklist before | active | approved | 1m | 2026-11-20 |
+| [RM-0218](0/2/1/RM-0218.md) | AGENTS.md does not grow past | active | **pending** | 1m | 2026-12-23 |
 
 ## agent/conventions.md
 
@@ -148,6 +149,12 @@
 | [RM-0116](0/1/1/RM-0116.md) | Every RM key appears at exactly three sites | active | approved | 1m | 2026-11-24 |
 | [RM-0180](0/1/8/RM-0180.md) | Citation-FIXING waves are the prime | active | approved | 1m | 2026-12-20 |
 
+### Referencing reflection topics
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0217](0/2/1/RM-0217.md) | A feedback issue is cited by | active | **pending** | 1m | 2026-12-23 |
+
 ### Standing prose: history, not rosters
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
@@ -176,6 +183,20 @@
 
 ## agent/docs-loop.md
 
+### Promotion — recurrence is the gate
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0211](0/2/1/RM-0211.md) | A topic is PROMOTED at | active | **pending** | 1m | 2026-12-23 |
+| [RM-0212](0/2/1/RM-0212.md) | Two overrides, both the maintainer's | active | **pending** | 1m | 2026-12-23 |
+| [RM-0213](0/2/1/RM-0213.md) | research-candidate issues are outside the | active | **pending** | 1m | 2026-12-23 |
+
+### When a docs wave runs
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0214](0/2/1/RM-0214.md) | The trigger counts PROMOTED issues | active | **pending** | 1m | 2026-12-23 |
+
 ### What doc waves owe beyond the ordinary loop
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
@@ -188,6 +209,13 @@
 | [RM-0167](0/1/6/RM-0167.md) | A wave codifying a reflection | active | approved | 1m | 2026-12-17 |
 | [RM-0182](0/1/8/RM-0182.md) | The wave's own new prose | active | **amended — pending** | 1m | 2026-12-20 |
 | [RM-0183](0/1/8/RM-0183.md) | The self-application sweep's sibling-read is | active | approved | 1m | 2026-12-20 |
+| [RM-0215](0/2/1/RM-0215.md) | A landed topic's feedback issue | active | **pending** | 1m | 2026-12-23 |
+
+### Hygiene — the monthly sweep
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0216](0/2/1/RM-0216.md) | Stale-close is a recorded disposition | active | **pending** | 1m | 2026-12-23 |
 
 ## agent/review-concept.md
 

@@ -124,6 +124,10 @@ where its review role ends.
   disposition report ends by asking you — "run the `opk-improve-docs`
   skill now?" — answer drives the invocation; what the skill then
   does lives in the skill alone, never restated here.
+- The filed topics come back to you through the docs loop
+  ([agent/docs-loop.md](../../agent/docs-loop.md)): the promotion
+  overrides, the wave commission and the monthly sweep and snapshot
+  commission are maintainer turns, named there.
 - **Required approvals = 1 on master** is the hard merge gate: the
   machine account cannot approve its own PRs, so only your approval
   unlocks a merge. Bot-authored PRs are safe by construction.

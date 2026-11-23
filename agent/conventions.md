@@ -917,6 +917,21 @@ Citations in new text name the file and section, never the bare ID:
   committing to the reword, and cite by file + section + item in the
   replacement text. (RM-0180)
 
+## Referencing reflection topics
+
+Reflection topics live in a second tracker since the docs-loop cutover
+(the implementation PR of issue #755):
+`steffenmaechtel/opk-agent-feedback`. Issue numbers are per repository,
+so a number alone no longer says which tracker it means.
+
+- A feedback issue is cited by its repository-qualified short form,
+  `opk-agent-feedback#N`, never a bare `#N`: a bare number resolves
+  inside THIS repository and silently points at an unrelated issue
+  here, and GitHub autolinks nothing inside repository files — the
+  form is a grep key, not a link. Text written before the cutover
+  keeps its bare numbers: they mean this repository's own reflection
+  archive. (RM-0217)
+
 ## Referencing, not restating
 
 Content (a contract, question, label list, command shape) should

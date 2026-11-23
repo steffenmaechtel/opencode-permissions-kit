@@ -14,9 +14,9 @@ this repository — the router. Detail lives next to its audience:
 - [agent/review-concept.md](agent/review-concept.md) — the review
   process: loop, stop rule, verification duty, reviewer mechanics
 - [agent/docs-loop.md](agent/docs-loop.md) — the docs-improvement
-  loop: how `Docs:` reflection issues (from the `opk-improve-docs`
-  skill) are triaged, batched into waves and closed — the consumer
-  side of that skill
+  loop: how reflection topics (filed by the `opk-improve-docs` skill
+  in the feedback repo) reach quorum, are triaged, batched into waves
+  and closed — the consumer side of that skill
 - `.agents/skills/` — loadable procedures for on-demand workflows
   (opencode loads them by description match): the session EXECUTING a
   review pass loads the `opk-review-pass` skill first — rules stay in
@@ -150,6 +150,12 @@ expect the reported paths to exist locally.
 - **Run the L1–L7 checklist before committing and again before declaring
   the work done** — every new feature is a new instance of a known error
   class; `agent/learnings.md` is authoritative. (RM-0105)
+- **`AGENTS.md` does not grow past its byte cap** — 27 KiB, pinned by
+  `tests/unit/test-docs-loop.sh`: every session pays this file up
+  front, and the docs-loop pilot grew it by half in a week. New detail
+  routes into an `agent/` on-demand file; overflow means compress or
+  move. The cap is a first stop, not the target — the size question
+  beyond it is tracked in #768. (RM-0218)
 
 ## Testing
 
