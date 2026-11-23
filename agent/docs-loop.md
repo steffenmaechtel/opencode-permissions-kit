@@ -12,13 +12,13 @@ Two trackers, one loop. Topics filed before the cutover (the
 implementation PR of issue #755) are the v1 corpus: bundled `Docs:`
 issues in THIS repository, kept as the retro-labeled archive —
 `label:"from-reflection"` stays their query key — and cited by rule
-text as bare numbers. Their open tail is worked under the triage
-below, bundle by bundle. A `Docs:` issue arriving here after the
-cutover is a straggler from a checkout that still carries the old
-skill: transfer it to the feedback repo and close it with a pointer.
-From the cutover on, new topics live in the feedback repo only, and
-new text cites them by its short name (conventions.md, "Referencing
-reflection topics").
+text as bare numbers. Their open tail never passes the gate: it is
+commissioned by number (see Triage). A `Docs:` issue arriving here
+after the cutover is a straggler from a checkout that still carries the
+old skill: transfer it to the feedback repo and close it with a
+pointer. From the cutover on, new topics live in the feedback repo
+only, and new text cites them by its short name (conventions.md,
+"Referencing reflection topics").
 
 ## Promotion — recurrence is the gate
 
@@ -60,29 +60,49 @@ self-started wave.
 
 ## Counting sessions — the trigger check
 
-The check is one `gh issue view` per open issue: the count is the
-number of distinct session ids in the body plus the comments. Run it,
-read the `number count` lines, and promote what reaches three:
+The check is one `gh issue view` per open reflection issue: the count
+is the number of distinct session ids in the body plus the comments.
+Run it and read the `#number [labels] sessions=N` lines:
 
 ```sh
 REPO=steffenmaechtel/opk-agent-feedback
-for n in $(gh issue list -R "$REPO" --state open --limit 300 --json number -q '.[].number'); do
-    printf '%s ' "$n"
-    gh issue view -R "$REPO" "$n" --json body,comments -q '[.body] + [.comments[].body] | .[]' |
-        sed -n 's/^[[:space:]]*Session:[[:space:]]*\(ses_[A-Za-z0-9]\+\).*/\1/p' | sort -u | wc -l
-done
+if ! issues=$(gh issue list -R "$REPO" --state open --label from-reflection --limit 300 \
+        --json number,labels \
+        -q '.[] | select(([.labels[].name] | index("promoted")) | not)
+             | "\(.number) \([.labels[].name] | join(","))"'); then
+    echo "TRIGGER CHECK FAILED: the issue list could not be read — no count was taken" >&2
+elif [ -z "$issues" ]; then
+    echo "no unpromoted reflection issue is open"
+else
+    printf '%s\n' "$issues" | while read -r n labels; do
+        body=$(gh issue view -R "$REPO" "$n" --json body,comments \
+            -q '[.body] + [.comments[].body] | .[]') ||
+            { echo "#$n: FETCH FAILED — not counted" >&2; continue; }
+        ids=$(printf '%s\n' "$body" |
+            sed -n 's/^[[:space:]]*Session:[[:space:]]*\(ses_[A-Za-z0-9]\+\).*/\1/p' | sort -u)
+        printf '#%s [%s] sessions=%s\n' "$n" "$labels" "$(printf '%s\n' "$ids" | grep -c .)"
+    done
+fi
 ```
 
-The count includes the filer (the body's own `Session:` line), so 1
-means no other session has hit the topic. A promotion is recorded, not
-just observed: `gh issue edit -R … --add-label promoted`, plus the
-ledger comment naming the count and the session ids.
+Both failure paths say so instead of printing a result: a list that
+cannot be read, an issue that cannot be fetched. The count includes the
+filer (the body's own `Session:` line), so 1 means no other session has
+hit the topic. Promote what reaches three, and every `prio:high` issue
+whatever its count; `research-candidate` issues are not listed — they
+never count toward a wave. A promotion is recorded, not just observed:
+`gh issue edit -R … --add-label promoted`, plus the ledger comment
+naming the count and the session ids.
 
 ## Triage — every item gets a disposition class
 
-Promotion is the filter: triage runs at wave time, on the commissioned
-PROMOTED issues only — nothing below quorum is read, classified or
-closed before then. A promoted issue is one topic, but it may decompose
+Promotion is the filter for the feedback repository's topics: triage
+runs at wave time, on the commissioned PROMOTED issues only — nothing
+below quorum is read, classified or closed before then. The v1 open
+tail is the one backlog that never passes the gate: those bundles were
+filed in THIS repository before the cutover, carry no `Session:` lines,
+and are commissioned by number — the same pass decomposes them. A
+promoted issue is one topic, but it may decompose
 into items (a rule-text item and a code item for the same mechanism);
 the v1 bundles decomposed the same way (#535 alone carried three items
 across two rule files). One triage pass decomposes every commissioned
@@ -256,14 +276,20 @@ sessions, one per PR).
 The sweep shares its commission with the monthly metrics snapshot —
 the maintainer's, like a wave
 ([internal/process/review.md](../internal/process/review.md)).
-Candidates are the open issues without `promoted` whose last comment
-predates the window — `number, last activity` per line:
+Candidates are every open issue without `promoted` — reflection topics
+for the stale-close, `research-candidate` ones for the keep-or-close
+decision, anything else for a disposition — with the date of their last
+confirming comment, the last one carrying a `Session:` line (the
+issue's creation when there is none):
 
 ```sh
 gh issue list -R steffenmaechtel/opk-agent-feedback --state open --limit 300 \
     --json number,createdAt,comments,labels \
     -q '.[] | select(([.labels[].name] | index("promoted")) | not)
-         | "\(.number) \(.comments[-1].createdAt // .createdAt)"'
+      | ([.comments[] | select(.body | test("(?m)^[[:space:]]*Session:[[:space:]]*ses_"))]
+         | last.createdAt) as $last
+      | "#\(.number) [\([.labels[].name] | join(","))] filed \(.createdAt) last-session \($last // .createdAt)"' ||
+    echo "SWEEP FAILED: the candidate list could not be read" >&2
 ```
 
 - Stale-close is a recorded disposition, never a silent rot: an

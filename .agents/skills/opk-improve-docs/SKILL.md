@@ -43,7 +43,10 @@ incident ("Closing summary posted while CI still runs", not
 ## Templates
 
 Write the body to a file and post it with `--body-file` — narratives
-carry backticks, `$` and quotes that an inline `--body` mangles.
+carry backticks, `$` and quotes that an inline `--body` mangles. The
+`Session:` lines hold a placeholder: put the value of
+`printenv OPENCODE_SESSION_ID` in its place. A quoted heredoc leaves a
+`$` variable literal, and a literal line matches no count.
 
 Issue body:
 
@@ -59,7 +62,7 @@ Issue body:
 (session records, logs, opencode.db where useful) — a later session must
 be able to re-derive the case without guessing (#620)>
 
-Session: $OPENCODE_SESSION_ID
+Session: <the value of $OPENCODE_SESSION_ID>
 Ref: <PR, branch or round, if any>
 ```
 
@@ -69,7 +72,7 @@ Confirming comment:
 Confirmed — same mechanism.
 <how it manifested here, 2–5 sentences>
 
-Session: $OPENCODE_SESSION_ID
+Session: <the value of $OPENCODE_SESSION_ID>
 Ref: <PR, branch or round, if any>
 ```
 
@@ -83,14 +86,18 @@ count — a session confirming twice is one session.
 - `from-reflection` + `prio:high` — rare but severe (data loss, security
   class): promoted without quorum, the maintainer decides directly; add
   a `Severity:` line saying why.
-- `research-candidate` — not about this repository's docs or rules
-  (general tool behavior, another project): file it, but it never
-  counts toward a docs wave.
+- `research-candidate` on its own (no `from-reflection`, no priority
+  label) — not about this repository's docs or rules (general tool
+  behavior, another project): file it with that label alone. It never
+  counts toward a docs wave, and the trigger check does not list it.
 
 ## Before posting
 
 No credentials, no environment dumps, no customer data; paths are
-repo-relative unless the absolute form is the evidence. The issue is
+repo-relative unless the absolute form is the evidence. opencode.db and
+the session logs are shared by every project of this user: quote your
+own session's rows only, and only what the topic needs — no other
+project's paths, no other session's content. The issue is
 self-contained at creation — session scratch is gone tomorrow.
 
 The consuming side — how topics reach quorum, are triaged and closed —

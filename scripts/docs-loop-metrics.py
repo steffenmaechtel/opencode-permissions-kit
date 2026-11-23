@@ -28,12 +28,18 @@ instruction_state(session_id, initial_values) and
 instruction_blob(hash, value) -- keys core/environment (the working
 directory) and core/instructions (the loaded files, path + content).
 Sessions are selected by --match (default: the origin remote's
-repository name) in session_v2.directory.
+repository name) in session_v2.directory, an SQL LIKE match:
+case-insensitive, with _ and % in the value acting as wildcards. The
+working directory is read up to its first space -- one that contains a
+space is not recognized, and its sessions count as having no AGENTS.md
+of their own.
 
 M2 -- corpus size. AGENTS.md, agent/*.md and the rule-meta count at
-HEAD, and the same per ISO week from git history: the last commit at
-or before each week's end that touches AGENTS.md, agent/ or
-internal/rules-meta (needs a full clone -- CI checkouts are depth-1).
+HEAD, and the same per ISO week from git history, read on the
+first-parent chain: the last commit at or before each week's end whose
+tree differs from its first parent in AGENTS.md, agent/ or
+internal/rules-meta. A side-branch commit counts from its merge, never
+from its own date (needs a full clone -- CI checkouts are depth-1).
 """
 import argparse
 import datetime
@@ -286,7 +292,7 @@ def render_m1(rows, excluded, weeks):
     )
     out.append("")
     out.append(
-        "| Week | Repo sessions | Other AGENTS.md loaded (workspace level)"
+        "| Week | Repo sessions | Another AGENTS.md loaded (ancestor or subdirectory)"
         " | No own AGENTS.md | No instruction record | Repo session, no first message |"
     )
     out.append("|---|---|---|---|---|---|")
@@ -337,7 +343,8 @@ def m2(repo, since, until):
         as_of = min(week_end, until)
         label = as_of.isoformat() + (" (in progress)" if week_end > until else "")
         commit = git(
-            repo, "rev-list", "-1", "--before=" + as_of.isoformat() + " 23:59:59",
+            repo, "rev-list", "--first-parent", "-1",
+            "--before=" + as_of.isoformat() + " 23:59:59",
             "HEAD", "--", *M2_PATHS,
         ).strip()
         if commit:
@@ -356,8 +363,9 @@ def render_m2(rows):
     out.append("## M2 - corpus size")
     out.append("")
     out.append(
-        "Bytes of `AGENTS.md` and `agent/*.md`, and the rule-meta count, at the last"
-        " commit on or before each date that touches them."
+        "Bytes of `AGENTS.md` and `agent/*.md`, and the rule-meta count, on the"
+        " first-parent chain: the last commit on or before each date that"
+        " touches them (a side branch counts from its merge)."
     )
     out.append("")
     out.append("| Week | State at | Commit | AGENTS.md | agent/*.md | AGENTS.md + agent/*.md | Rule metas |")

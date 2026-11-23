@@ -17,6 +17,10 @@
 #      frames (os._exit, no close), so the never-write pin can tell a
 #      read-only open from a read-write one: a read-write connection
 #      checkpoints and deletes the WAL when it closes.
+#   3. The command blocks documented in agent/docs-loop.md (the trigger
+#      check and the sweep list): extracted from the page as written and
+#      executed under a stubbed gh -- an edit that breaks a failure path
+#      or the count reds here.
 #
 # Run: sh tests/unit/test-docs-loop.sh
 set -u
@@ -224,6 +228,8 @@ fi
 #   A 2026-11-05: AGENTS.md 100, agent/a.md 50, 2 metas
 #   B 2026-11-12: AGENTS.md 300, + agent/b.md 25, + 3 metas
 #   C 2026-11-20: README only (must not move the weekly state)
+#   S 2026-11-18 on a side branch, merged 2026-11-24: AGENTS.md 400
+#      (must not move W47 either -- the merge date counts, not S's)
 GR="$WORK/gitrepo"
 mkdir -p "$GR/agent/sub" "$GR/internal/rules-meta/0/0/1"
 git -C "$GR" init -q
@@ -249,6 +255,17 @@ printf 'readme\n' >"$GR/README.md"
 git -C "$GR" add README.md
 GIT_COMMITTER_DATE="2026-11-20 12:00:00" git -C "$GR" -c user.name=t -c user.email=t@e commit -q -m C
 SHA_C=$(git -C "$GR" rev-parse --short=7 HEAD)
+# A side branch committed on 2026-11-18 (inside W47) and merged on
+# 2026-11-24 (after the reported window): the weekly rows up to W47
+# must keep the mainline state; only the HEAD row shows the merge.
+DEF=$(git -C "$GR" symbolic-ref --short HEAD)
+git -C "$GR" checkout -q -b feature
+printf '%399s\n' "" | tr ' ' S >"$GR/AGENTS.md"
+git -C "$GR" add AGENTS.md
+GIT_COMMITTER_DATE="2026-11-18 12:00:00" git -C "$GR" -c user.name=t -c user.email=t@e commit -q -m S
+git -C "$GR" checkout -q "$DEF"
+GIT_COMMITTER_DATE="2026-11-24 12:00:00" git -C "$GR" -c user.name=t -c user.email=t@e merge -q --no-ff -m Mg feature
+SHA_M=$(git -C "$GR" rev-parse --short=7 HEAD)
 
 # --- 2a. never-write pin (runs FIRST: it needs the untouched WAL) ------------
 
@@ -332,11 +349,16 @@ fi
 
 if grep -qF -- "| 2026-W45 | 2026-11-08 | $SHA_A | 100 | 50 | 150 | 2 |" "$WORK/out.txt" &&
     grep -qF -- "| 2026-W46 | 2026-11-15 | $SHA_B | 300 | 75 | 375 | 5 |" "$WORK/out.txt" &&
-    grep -qF -- "| 2026-W47 | 2026-11-22 | $SHA_B | 300 | 75 | 375 | 5 |" "$WORK/out.txt" &&
-    grep -qF -- "| HEAD | 2026-11-20 | $SHA_C | 300 | 75 | 375 | 5 |" "$WORK/out.txt"; then
+    grep -qF -- "| 2026-W47 | 2026-11-22 | $SHA_B | 300 | 75 | 375 | 5 |" "$WORK/out.txt"; then
     pass "M2: weekly state from git history (subdirectory .md and non-RM files not counted)"
 else
-    fail "M2: expected W45=A 100|50|150|2, W46+W47=B 300|75|375|5, HEAD=C 300|75|375|5 (got: $(grep -E '^\| (2026-W[0-9]+|HEAD) \| 2026-' "$WORK/out.txt" | tr '\n' ' '))"
+    fail "M2: expected W45=A 100|50|150|2 and W46+W47=B 300|75|375|5 (got: $(grep -E '^\| 2026-W[0-9]+ \| 2026-' "$WORK/out.txt" | tr '\n' ' '))"
+fi
+if grep -qF -- "| 2026-W47 | 2026-11-22 | $SHA_B | 300 | 75 | 375 | 5 |" "$WORK/out.txt" &&
+    grep -qF -- "| HEAD | 2026-11-24 | $SHA_M | 400 | 75 | 475 | 5 |" "$WORK/out.txt"; then
+    pass "M2: a side-branch commit merged after a week's end does not move that week (first-parent chain)"
+else
+    fail "M2: W47 must stay at B (300 bytes) while HEAD shows the merge (400 bytes) -- got: $(grep -E '^\| (2026-W47|HEAD) \| 2026-' "$WORK/out.txt" | tr '\n' ' ')"
 fi
 if grep -qF -- 'Sessions: `opk-test` in' "$WORK/out.txt"; then
     pass "default --match derives from the origin remote's repository name"
@@ -354,7 +376,7 @@ else
     fail "M2: in-progress / n/a rows missing (got: $(grep -E '^\| (2026-W4[347]|HEAD) \| 2026-' "$WORK/out2.txt" | tr '\n' ' '))"
 fi
 
-# --- 2e. table shape ----------------------------------------------------------
+# --- 2d. table shape ----------------------------------------------------------
 
 # GitHub renders a table only when the header row and the delimiter row
 # carry the same number of cells; a ragged table degrades to one
@@ -387,7 +409,7 @@ case $_ts_arm in
     *) fail "tables arm: the ragged fixture must be flagged and the rectangular one left alone (got: $_ts_arm)" ;;
 esac
 
-# --- 2d. fail-loud arms -------------------------------------------------------
+# --- 2e. fail-loud arms -------------------------------------------------------
 
 _ms_rc=0
 python3 "$SCRIPT" --db "$WORK/no-such.db" --repo "$GR" >/dev/null 2>"$WORK/err2.txt" || _ms_rc=$?
@@ -454,6 +476,120 @@ if [ "$_ms_rc" -eq 2 ] && grep -qF -- 'no origin remote in ' "$WORK/err7.txt"; t
     pass "fail-loud: no origin remote and no --match exits 2 and says what to pass"
 else
     fail "fail-loud: a missing origin must exit 2 without --match (rc=$_ms_rc err=$(cat "$WORK/err7.txt"))"
+fi
+
+# --- 2f. documented command blocks (agent/docs-loop.md) -----------------------
+# The trigger check and the sweep list are run by hand from the page's
+# fenced blocks; a block that fails open turns an API error into a
+# count. Both blocks are extracted from the page AS WRITTEN and run
+# under a stubbed gh, so an edit that breaks a failure path or the
+# count reds here. No network: the stub answers for gh.
+
+doc_block() { # $1 = heading text -> the first fenced sh block after it
+    awk -v h="$1" '
+        index($0, h) { f = 1 }
+        f && /^```sh$/ { b = 1; next }
+        b && /^```$/ { exit }
+        b { print }
+    ' "$REPO_ROOT/agent/docs-loop.md"
+}
+doc_block "## Counting sessions" >"$WORK/trigger-block.sh"
+doc_block "## Hygiene" >"$WORK/sweep-block.sh"
+if [ -s "$WORK/trigger-block.sh" ] && [ -s "$WORK/sweep-block.sh" ]; then
+    pass "docs blocks: both fenced blocks extracted from agent/docs-loop.md"
+else
+    fail "docs blocks: extraction empty -- heading or fence drift in agent/docs-loop.md"
+fi
+if sh -n "$WORK/trigger-block.sh" && sh -n "$WORK/sweep-block.sh"; then
+    pass "docs blocks: both parse as shell"
+else
+    fail "docs blocks: a fenced block of agent/docs-loop.md does not parse (sh -n)"
+fi
+
+mkdir -p "$WORK/ghstub"
+cat >"$WORK/ghstub/gh" <<'EOF'
+#!/bin/sh
+# stub for the documented blocks: $1 = issue, $2 = list|view, $5 = number
+case "$FAKE_MODE" in
+    listfail) echo "gh: HTTP 403: rate limit" >&2; exit 1 ;;
+esac
+if [ "$2" = list ]; then
+    [ "$FAKE_MODE" = empty ] && exit 0
+    printf '7 from-reflection,prio:med\n8 from-reflection,prio:high\n'
+    exit 0
+fi
+if [ "$FAKE_MODE" = viewfail ]; then
+    echo "gh: issue $5 not found (HTTP 404)" >&2
+    exit 1
+fi
+case "$5" in
+    7) printf 'body line\nSession: ses_AAA\n'; printf 'Confirmed\nSession: ses_BBB\n'; printf 'dup\n  Session: ses_AAA\n' ;;
+    8) printf 'Session: ses_CCC\n' ;;
+esac
+EOF
+chmod 755 "$WORK/ghstub/gh"
+
+run_trigger() { # $1 = gh mode -> stdout/stderr in $WORK/t.out / $WORK/t.err
+    FAKE_MODE="$1" PATH="$WORK/ghstub:$PATH" sh "$WORK/trigger-block.sh" >"$WORK/t.out" 2>"$WORK/t.err"
+}
+run_trigger listfail
+if grep -qF -- 'TRIGGER CHECK FAILED' "$WORK/t.err" && ! grep -qF -- 'sessions=' "$WORK/t.out"; then
+    pass "trigger block: an unreadable issue list says so and prints no count"
+else
+    fail "trigger block: a failed issue list must say so and print no count (out=$(tr '\n' '|' <"$WORK/t.out") err=$(tr '\n' '|' <"$WORK/t.err"))"
+fi
+run_trigger empty
+if grep -qxF -- 'no unpromoted reflection issue is open' "$WORK/t.out"; then
+    pass "trigger block: an empty intake is said, not left silent"
+else
+    fail "trigger block: an empty issue list must be said (out=$(tr '\n' '|' <"$WORK/t.out"))"
+fi
+run_trigger viewfail
+if grep -qF -- '#7: FETCH FAILED' "$WORK/t.err" && grep -qF -- '#8: FETCH FAILED' "$WORK/t.err" &&
+    ! grep -qF -- 'sessions=' "$WORK/t.out"; then
+    pass "trigger block: an issue that cannot be fetched is marked, never counted as zero"
+else
+    fail "trigger block: a failed issue fetch must be marked and not counted (out=$(tr '\n' '|' <"$WORK/t.out") err=$(tr '\n' '|' <"$WORK/t.err"))"
+fi
+run_trigger ok
+if grep -qxF -- '#7 [from-reflection,prio:med] sessions=2' "$WORK/t.out" &&
+    grep -qxF -- '#8 [from-reflection,prio:high] sessions=1' "$WORK/t.out"; then
+    pass "trigger block: distinct session ids counted (an indented duplicate is one session)"
+else
+    fail "trigger block: expected #7 sessions=2 and #8 sessions=1 (got: $(tr '\n' '|' <"$WORK/t.out"))"
+fi
+
+FAKE_MODE=listfail PATH="$WORK/ghstub:$PATH" sh "$WORK/sweep-block.sh" >"$WORK/s.out" 2>"$WORK/s.err"
+if grep -qF -- 'SWEEP FAILED' "$WORK/s.err" && [ ! -s "$WORK/s.out" ]; then
+    pass "sweep block: an unreadable candidate list says so"
+else
+    fail "sweep block: a failed issue list must say so (out=$(tr '\n' '|' <"$WORK/s.out") err=$(tr '\n' '|' <"$WORK/s.err"))"
+fi
+
+# The sweep's jq expression dates a candidate by its last CONFIRMING
+# comment (one with a Session: line), not by the last comment of any
+# author. Host-dependent pin: jq is not a suite requirement -- without
+# it the pin is skipped and says so, it never passes silently.
+if command -v jq >/dev/null 2>&1; then
+    awk -v q="-q '" 'index($0, q) { f = 1; $0 = substr($0, index($0, q) + length(q)) }
+        f { if (sub(/\047 \|\|$/, "")) { print; exit } print }' "$WORK/sweep-block.sh" >"$WORK/sweep.jq"
+    cat >"$WORK/sweep.json" <<'EOF'
+[{"number":9,"createdAt":"2026-08-01T10:00:00Z","labels":[{"name":"from-reflection"}],"comments":[
+  {"createdAt":"2026-08-05T10:00:00Z","body":"Confirmed\nSession: ses_abc123"},
+  {"createdAt":"2026-11-20T10:00:00Z","body":"Maintainer note (no session line)"}]},
+ {"number":10,"createdAt":"2026-09-01T10:00:00Z","labels":[{"name":"research-candidate"}],"comments":[]},
+ {"number":11,"createdAt":"2026-09-01T10:00:00Z","labels":[{"name":"from-reflection"},{"name":"promoted"}],"comments":[]}]
+EOF
+    jq -r -f "$WORK/sweep.jq" "$WORK/sweep.json" >"$WORK/sweep.out" 2>"$WORK/sweep.err"
+    if [ "$(wc -l <"$WORK/sweep.out" | tr -d ' ')" -eq 2 ] &&
+        grep -qF -- '#9 [from-reflection] filed 2026-08-01T10:00:00Z last-session 2026-08-05T10:00:00Z' "$WORK/sweep.out" &&
+        grep -qF -- '#10 [research-candidate] filed 2026-09-01T10:00:00Z last-session 2026-09-01T10:00:00Z' "$WORK/sweep.out"; then
+        pass "sweep block: the last confirming comment dates a candidate (a later note does not); a promoted issue is left out"
+    else
+        fail "sweep block: the jq expression must date #9 by its confirming comment and drop the promoted #11 (got: $(tr '\n' '|' <"$WORK/sweep.out") $(cat "$WORK/sweep.err"))"
+    fi
+else
+    echo "  pin skipped: the sweep jq expression was not exercised -- jq is not installed here (host-dependent)"
 fi
 
 # --- summary gate --------------------------------------------------------------
