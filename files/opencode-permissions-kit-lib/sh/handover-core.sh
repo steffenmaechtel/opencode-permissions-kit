@@ -39,10 +39,12 @@
 # gate's wording. #759 restructures the two executors into per-entry
 # batched walk workers (_ho_gwalk for g+w, _ho_owalk for the
 # re-own): sealed git-protection pointers are skipped (chattr +i
-# refuses chmod/chown even for root), every entry gets an exec-time
-# [ -L ] recheck, chown keeps its -h per entry (the 0.0.44a V24
-# link semantics), and the old wholesale 2>/dev/null over the
-# executors is gone -- a failing entry names itself.
+# refuses chmod/chown even for root), both workers re-test every
+# parent component and the scan root at exec time (#761 a C2, the
+# _fsb_pass gates), the gwalk skips links at every stage while the
+# owalk lchowns them (the 0.0.44a V24 link semantics carried over,
+# #761 a C1), and the old wholesale 2>/dev/null over the executors
+# is gone -- a failing entry names itself.
 
 # Generic ownership switch between the two kit users, for
 # mixed-owner trees (e.g. a checkout where BOTH the developer and
@@ -102,21 +104,49 @@ _ho_chain_sane() {
 # the immutable flag, #704/#754) refuse chmod even for root (EPERM —
 # the seal IS the protection) and are SKIPPED: the pointer ships
 # dev:<group> 664 before its nail, so g+w already holds on every
-# kit-created pointer. The worker adds the exec-time [ -L ] recheck
-# per entry (the scan-time ! -type l alone left the scan->act window
-# of the #211 a F1 class; an operand swapped for a link after the
-# scan is skipped, never followed — chmod never dereferences it).
-# Worker-string rules: apostrophe-free comments, no single quotes (an
-# apostrophe would terminate the single-quoted worker string) — the
-# lsattr flags field is isolated by parameter expansion,
-# never a grepped whole line (a path containing i would false-
-# positive the skip). A missing lsattr leaves the skip inert: the
-# entry stays a normal operand and a real EPERM fails the walk loud.
+# kit-created pointer. Symlinks are excluded at every stage of THIS
+# walk: plain chmod WOULD follow an operand link, so find drops them
+# at scan time (! -type l) and the worker re-checks the leaf at exec
+# time — the skip is the guard, never chmod itself (#761 a C1/C7;
+# the re-own walk below includes links instead). Parents get the
+# #211 a F1 treatment (#761 a C2): every component between the scan
+# root and the operand is re-tested per entry, and the scan root per
+# batch (the #421 shape of the _fsb_pass worker) — an operand whose
+# path crosses a link planted mid-walk is skipped, never acted on
+# through the swap. Residual: the microsecond gap between an entry's
+# recheck and its chmod (the accepted residual the fs-baseline
+# worker documents for the same walk). Worker-string rules:
+# apostrophe-free comments, no single quotes (an apostrophe would
+# terminate the single-quoted worker string) — the lsattr flags
+# field is isolated by parameter expansion, never a grepped whole
+# line (a path containing i would false-positive the skip). A
+# missing lsattr leaves the skip inert: the entry stays a normal
+# operand and a real EPERM fails the walk loud.
 _ho_gwalk() {
     find "$1" ! -type l -exec sh -c '
+        if [ -L "$1" ]; then
+            echo "  warn: scan root $1 became a symlink — batch refused" >&2
+            exit 1
+        fi
+        _root=$1
+        shift
         _fail=0
         for _p in "$@"; do
             [ -L "$_p" ] && continue
+            case "$_p" in
+            "$_root"/*)
+                _pre=$_root
+                _rest=${_p#"$_root"/}
+                while [ -n "$_rest" ]; do
+                    case "$_rest" in
+                        */*) _pre=$_pre/${_rest%%/*}
+                             _rest=${_rest#*/} ;;
+                        *) _rest="" ;;
+                    esac
+                    [ -L "$_pre" ] && continue 2
+                done
+                ;;
+            esac
             case "$_p" in
             */.git)
                 if [ -f "$_p" ]; then
@@ -131,26 +161,51 @@ _ho_gwalk() {
             chmod g+w "$_p" || _fail=1
         done
         [ "$_fail" -eq 0 ]
-    ' sh {} +
+    ' sh "$1" {} +
 }
 
 # _ho_owalk <root> <user> <group>: the ownership walk — chown -h per
-# non-symlink entry, batched (#759; replaces the old chown -R -h
-# single command, which could not exclude a sealed pointer). Same
-# sealed-pointer skip and exec-time [ -L ] recheck as _ho_gwalk; -h
-# stays on every chown so a link planted after the scan is re-owned
-# as the new owner own link, never dereferenced — the 0.0.44a V24
-# semantics of chown -R -h carried over per entry. user and group
-# travel as fixed argv into the worker, never interpolated into its
-# string.
+# entry, batched (#759; replaces the old chown -R -h single command,
+# which could not exclude a sealed pointer). LINKS ARE INCLUDED:
+# chown -h acts on the link inode itself (lchown) and never
+# dereferences, so every symlink below <root> — scanned or planted
+# after the scan — is re-owned as the new owner own link: the
+# 0.0.44a V24 semantics of chown -R -h, carried over per entry
+# (#761 a C1 — the first cut of this worker skipped links like the
+# gwalk does, silently dropping the re-own for them). Sealed
+# git-protection pointers are skipped like everywhere (the seal
+# refuses chown too). The parent-component recheck and the per-batch
+# scan-root recheck are the gwalk's (#761 a C2); the leaf is
+# deliberately NOT [ -L ]-checked here — a link operand is a
+# legitimate lchown target, and -h makes the act safe by
+# construction. user and group travel as fixed argv, never
+# interpolated into the worker string.
 _ho_owalk() {
-    find "$1" ! -type l -exec sh -c '
+    find "$1" -exec sh -c '
+        if [ -L "$1" ]; then
+            echo "  warn: scan root $1 became a symlink — batch refused" >&2
+            exit 1
+        fi
         _u="$1"
         _g="$2"
-        shift 2
+        _root=$3
+        shift 3
         _fail=0
         for _p in "$@"; do
-            [ -L "$_p" ] && continue
+            case "$_p" in
+            "$_root"/*)
+                _pre=$_root
+                _rest=${_p#"$_root"/}
+                while :; do
+                    case "$_rest" in
+                        */*) _pre=$_pre/${_rest%%/*}
+                             _rest=${_rest#*/}
+                             [ -L "$_pre" ] && continue 2 ;;
+                        *) break ;;
+                    esac
+                done
+                ;;
+            esac
             case "$_p" in
             */.git)
                 if [ -f "$_p" ]; then
@@ -165,7 +220,7 @@ _ho_owalk() {
             chown -h "$_u:$_g" "$_p" || _fail=1
         done
         [ "$_fail" -eq 0 ]
-    ' sh "$2" "$3" {} +
+    ' sh "$2" "$3" "$1" {} +
 }
 
 # _ho_sealed_note <root>: dry-run preview helper — counts sealed
@@ -275,7 +330,8 @@ handover_core() {
         # class; the MID single-dot form joined 0.0.45c S7): path
         # resolution goes through the link before lstat ever sees
         # one — [ -L "x/" ], [ -L "x/.." ] and [ -L "x/./y" ] are
-        # FALSE while chown -R -h and find act on the resolved
+        # FALSE while the recursive walk commands and find act on the
+        # resolved
         # TARGET (a trailing slash: the link itself; "..": the link
         # target's PARENT; "./": through an intermediate link).
         # Checked on the RAW operand, after the path policy above
@@ -286,6 +342,18 @@ handover_core() {
             */ | */. | *//* | */./* | */.. | */../*)
                 _ho_err "handover: '$_ho_a' carries a slash/dotdot path form — pass the path itself""\
  (symlink gates cannot see through trailing slashes or .. components)"
+                ;;
+        esac
+        # A .git-named operand is the git-protection POINTER itself
+        # (#761 a C6): both spellings misbehave — repo/.git matches
+        # the walks' sealed-skip pattern (skipped silently, then the
+        # success line prints over a no-op) while a bare .git does
+        # not match it (EPERM, "handover failed"). Refuse with the
+        # named cause before either can happen: hand over the tree.
+        case "${_ho_np##*/}" in
+            .git)
+                _ho_err "handover: refusing .git operand '$_ho_np'""\
+ — hand over the project tree, not the pointer (a sealed pointer cannot change owner anyway)"
                 ;;
         esac
         [ -e "$_ho_np" ] || _ho_err "handover: no such path: $_ho_a"
@@ -451,9 +519,9 @@ PYEOF
             # 0.0.39i F4 class: the real run's component-walk refuse
             # must not surprise a dry run that announced a handover).
             if [ -L "$_ho_a" ]; then
-                echo "  would refuse: '$_ho_a' is a symlink (chown -R/chmod -R follow it)"
+                echo "  would refuse: '$_ho_a' is a symlink (recursive chown/chmod follow it)"
             elif ! _ho_chain_sane "$_ho_a"; then
-                echo "  would refuse: '$_ho_a' crosses a symlinked path component (chown -R/chmod -R would follow it)"
+                echo "  would refuse: '$_ho_a' crosses a symlinked path component (recursive chown/chmod would follow it)"
             else
                 echo "  would hand over: $_ho_a -> $_ho_user:$_ho_group (recursive, g+w)"
                 # Sealed-pointer preview (#759, the 0.0.39i F4 match
@@ -507,10 +575,15 @@ PYEOF
         # not closed by ordering (wording broadened 0.0.45e W2:
         # it was never only the previous-handover g+w case).
         # Plain chmod WOULD follow an operand link — the validation
-        # gates plus the per-entry [ -L ] recheck inside both walk
-        # workers (#759) are load-bearing for the chmod half's
-        # operands; find -P itself skips a link operand (! -type l)
-        # at scan time, the worker re-checks at exec time.
+        # gates plus the gwalk worker's exec-time [ -L ] recheck are
+        # load-bearing for the chmod half's operands (find -P skips
+        # link operands at scan time there, the worker re-checks at
+        # exec time); BOTH workers additionally re-test every parent
+        # component per entry and the scan root per batch (#761 a
+        # C2, the _fsb_pass gates) — a mid-walk swap of a parent or
+        # the root skips the operand instead of acting through it.
+        # The owalk needs no leaf gate: chown -h is an lchown, safe
+        # on a link operand by construction (#761 a C1).
         if [ -L "$_ho_a" ]; then
             ui_error "handover: '$_ho_a' is a symlink — refusing (recursive chown/chmod follow it)"
             _ho_rc=1
