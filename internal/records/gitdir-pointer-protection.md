@@ -1,9 +1,11 @@
 # .git as a nailed pointer file — closing the wholesale arm without sticky (O4)
 
-> Status: **CURRENT** (living reference — Phase A measured green
-> 2026-11-21, prototype soak on the maintainer host, branch
-> `feature/tmp-git-protection`; implementation NOT commissioned — the
-> follow-up is tracked in #722). This record is
+> Status: **IMPLEMENTED** (the #704 implementation wave, PR #754;
+> follow-ups to date PR #760, PR #761 and PR #765; shipped behavior:
+> [the how-to](../../docs/how-to/git-protection.md); record upkeep
+> tracked in #722). Phase A measured green 2026-11-21; a prototype soak
+> on the maintainer host (branch `feature/tmp-git-protection`)
+> preceded the wave. This record is
 > the durable in-repo summary of the O4 mechanics, the measured facts
 > and the agreed design; the full timeline (phase-A verdict, design
 > record, harness artifact, final run log) lives in issue #704. It

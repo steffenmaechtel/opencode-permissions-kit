@@ -22,7 +22,7 @@ archive).
 | [path-sane-lib.md](path-sane-lib.md) | one project-root policy gate (sh/path-sane.sh) | IMPLEMENTED |
 | [wsl-conf-consent.md](wsl-conf-consent.md) | the kit never writes /etc/wsl.conf implicitly — scope | CURRENT |
 | [root-sticky-removal.md](root-sticky-removal.md) | root/ancestor sticky removal trade (#702/#703) | IMPLEMENTED |
-| [gitdir-pointer-protection.md](gitdir-pointer-protection.md) | O4: .git as chattr+i-nailed pointer (#704) | CURRENT |
+| [gitdir-pointer-protection.md](gitdir-pointer-protection.md) | O4: .git nailed with chattr +i (#704) | IMPLEMENTED |
 | [restructure-docs.md](restructure-docs.md) | docs restructure: two-world split, birth-PR review cases | IMPLEMENTED |
 | [rootless-backend.md](rootless-backend.md) | rootless backends: provisioning + selection reference | CURRENT |
 | [opencode-2x.md](opencode-2x.md) | opencode 2.x compatibility: model, detection, open items | CURRENT |

@@ -68,6 +68,33 @@ The installer asks a few questions and shows a plan before touching anything.
 The full walkthrough (including verification) lives in
 [Getting Started](docs/getting-started.md).
 
+## Tell Your Agent About the Kit
+
+The kit changes a few git behaviors on purpose — an AI agent working on
+an installed kit does not know that. Point it at the notes the kit
+ships for exactly this case. Optional, and a one-time step: the pointer
+stays valid across updates. Copy the block into the agent's global
+`AGENTS.md` (`/home/opencode/.config/opencode/AGENTS.md`):
+
+<!-- opk-agents-snippet:start -->
+
+```text
+This host runs the opencode permissions kit. Before your first git
+command or file-permission change in a project, read the host notes
+and follow them — some git failures are expected here and must not
+be "fixed":
+
+/usr/local/lib/opencode-permissions-kit/templates/AGENTS-HOST.md
+
+(No such file: this machine has no kit installed — ignore this note.)
+```
+
+<!-- opk-agents-snippet:end -->
+
+The notes live at the path above and are kept current by `sudo opk update`.
+What they cover and how the pointer works:
+[Tell your agent about the kit](docs/how-to/agent-host-notes.md).
+
 ## Requirements
 
 - WSL2 (or any Linux with ACL support and, for docker-rootless, systemd)

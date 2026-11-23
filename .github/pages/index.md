@@ -42,6 +42,30 @@ shows it). Channel switches live in the
 streamed updates and version pins in
 [Streamed install and update (advanced)](https://github.com/steffenmaechtel/opencode-permissions-kit/blob/master/docs/advanced/streamed-install-update.md).
 
+## Tell your agent about the kit
+
+The kit changes a few git behaviors on purpose. Optional, and a
+one-time step: copy this block into the agent's global `AGENTS.md`
+(`/home/opencode/.config/opencode/AGENTS.md`) so the agent reads the
+notes the kit ships:
+
+<!-- opk-agents-snippet:start -->
+
+```text
+This host runs the opencode permissions kit. Before your first git
+command or file-permission change in a project, read the host notes
+and follow them — some git failures are expected here and must not
+be "fixed":
+
+/usr/local/lib/opencode-permissions-kit/templates/AGENTS-HOST.md
+
+(No such file: this machine has no kit installed — ignore this note.)
+```
+
+<!-- opk-agents-snippet:end -->
+
+What the notes cover: [Tell your agent about the kit](https://github.com/steffenmaechtel/opencode-permissions-kit/blob/master/docs/how-to/agent-host-notes.md).
+
 ## Documentation
 
 - [Getting started](https://github.com/steffenmaechtel/opencode-permissions-kit/blob/master/docs/getting-started.md)

@@ -158,5 +158,6 @@ ddev start <project> && ddev import-db <project> --file=<dump>.sql.gz
 
 - [Allow docker/ddev in a project](how-to/container-tools.md)
 - [Manage project directories](how-to/manage-projects.md)
+- [Tell your agent about the kit](how-to/agent-host-notes.md)
 - [Security model](concepts/security-model.md)
 - [Troubleshooting](troubleshooting.md)

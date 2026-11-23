@@ -9,7 +9,8 @@
 #
 # Layout (internal/records/streamline.md): bin/ = commands (no extension),
 # sh/ = sourced shell libraries, py/ = python, management/ = the
-# management entry scripts, templates/ = rendered/deployed templates.
+# management entry scripts, templates/ = render sources plus the agent
+# host notes (AGENTS-HOST.md, prose).
 # The manifest below is the SINGLE SOURCE OF TRUTH for what ships into
 # /usr/local/lib/opencode-permissions-kit — tests/unit/test-kit-files.sh
 # enforces it against the fetch lists (adding a kit file means adding
@@ -124,6 +125,12 @@ opencode-permissions-kit-lib/management/update.sh 755
 opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc -
 opencode-permissions-kit-lib/templates/opencode.jsonc -
 opencode-permissions-kit-lib/templates/sudoers.template 440
+# AGENTS-HOST.md: the host notes for AI agents on installed hosts
+# (#721) -- the first prose file in the shipped lib; nothing executes
+# it. Explicit 644, not "-": the agent user must be able to READ it,
+# so the world-read bit is pinned instead of following the checkout
+# mode.
+opencode-permissions-kit-lib/templates/AGENTS-HOST.md 644
 # bin/ commands
 opencode-permissions-kit-lib/bin/browser-bridge 755
 opencode-permissions-kit-lib/bin/cwd-check 755
