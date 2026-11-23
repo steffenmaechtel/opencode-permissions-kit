@@ -15,7 +15,7 @@ with `whoami`).
 `opk status` (no sudo) reports the kit's state. Run it before you
 diagnose a git failure. Kit management (`sudo opk …`) is the
 developer's job: when a note below says so, report what you did and
-what failed, and stop.
+what failed instead of working around it.
 
 ## Git failures and what to do instead
 
