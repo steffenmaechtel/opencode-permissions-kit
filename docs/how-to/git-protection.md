@@ -33,7 +33,8 @@ on the maintainer host lives this way).
 ```bash
 sudo opk git-protection on      # storage init + persist + migrate ALL + nail
 opk git-protection status       # per project: classic | nailed | unnailed |
-                                #   foreign-pointer | worktree-reg (no sudo)
+                                #   foreign-pointer | worktree-reg, plus INFO
+                                #   rows for unreferenced storage entries
 sudo opk git-protection adopt /var/www/vhosts/myproj   # migrate + nail ONE
 sudo opk git-protection nail    # nail pending pointers (the root pass)
 sudo opk git-protection revert --all   # walk back to the classic layout
@@ -46,7 +47,11 @@ actionable row names the command that helps right now: a classic
 project carries `sudo opk git-protection adopt <path>` (two or more
 add the one-run hint `sudo opk git-protection on`; before the storage
 is set up the rows name `on` instead — `adopt` refuses without one),
-an unnailed pointer carries `sudo opk git-protection nail <path>`. The
+an unnailed pointer carries `sudo opk git-protection nail <path>`.
+Paste the command as printed: a path that is not plain is
+single-quoted there. A project path the migration gates refuse
+(whitespace, a glob character, a dot segment) gets no command but the
+rename hint — `adopt` would refuse it. The
 remaining row kinds are informational: `foreign-pointer` (a
 pointer to somewhere else — every linked worktree of a not-yet-migrated
 project shows this shape) and `worktree-reg` (a `.git` directory
@@ -56,8 +61,11 @@ without the gitdir payload — a worktree registration or similar).
 
 A storage entry that no pointer under your configured roots targets
 any more — a project removed without `revert`, a leftover from an
-earlier pilot — renders as an INFO row naming the entry and the manual
-removal: inspect it, then `sudo rm -rf /var/www/gitdirs/<entry>`. INFO
+earlier pilot — renders as an INFO row on both report surfaces naming
+the entry and the manual removal: inspect it, then
+`sudo rm -rf /var/www/gitdirs/<entry>` (a name that is not plain is
+single-quoted in that command; a name carrying a control character
+gets no command — inspect it by hand). INFO
 on purpose: an unreferenced entry is harmless (nothing follows it) and
 the removal is your call. "Unreferenced" is measured against the
 configured roots only — a project adopted outside them, or under a
@@ -169,11 +177,15 @@ opk git-protection status        # storage + per-project layout state
 sudo opk git-protection off      # revert every project + drop the config
 ```
 
-`opk status` reports the state in its `Git protection` section. While
-git-protection is enabled, that is an `ON` row with the number of
-protected projects plus one row per deviation, each with its command —
-a classic project counts as an alert, an unnailed pointer as a
-warning. While it is not enabled (never configured, or declined), the
+`opk status` reports the state in its `Git protection` section, from
+the same rows as `opk git-protection status`. While git-protection is
+enabled, that is an `ON` state row — with the number of protected
+projects, or saying that none is protected yet — plus one row per
+deviation with its command: a classic project counts as an alert, an
+unnailed pointer as a warning. Unreferenced storage entries are listed
+here too, as INFO rows. If the storage directory is gone, a warning
+replaces the state row and the rows name `on`. While it is not
+enabled (never configured, or declined), the
 section is one warning naming `sudo opk git-protection on`: the
 wholesale swap stays possible for every project until the feature is
 turned on, so — unlike an optional feature that is simply off — that
@@ -195,8 +207,8 @@ the kit — it is plain git).
 
 - The agent can still plant additional directories inside the storage
   (harmless — nothing follows them: the kit walks pointers, not the
-  storage). `opk git-protection status` lists such entries as
-  unreferenced.
+  storage). Both report surfaces list such entries as unreferenced
+  (`opk git-protection status` and the `opk status` section).
 - Filesystems without `chattr` support degrade loudly: migrations
   succeed, the nail warns and `status` reports `unnailed` — degraded,
   not protected.

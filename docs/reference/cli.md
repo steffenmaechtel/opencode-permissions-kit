@@ -102,10 +102,8 @@ worktree-reg rows plus INFO rows for storage entries no pointer targets
 any more (with the manual-removal hint), and exits non-zero when a row
 is actionable (classic or unnailed) — each actionable row naming its
 command (`adopt <path>`, `nail <path>`, or `on` while no storage is
-set up). `opk status` carries the state in its `Git protection`
-section: while the feature is enabled, a classic project is an alert
-and an unnailed pointer a warning, each with its command; while it is
-not enabled, one warning names the enable command. Consent: `opk
+set up). The `Git protection` section of `opk status` shows the same
+state and deviation rows. Consent: `opk
 update` asks once before configuring the storage — declining persists
 `GITDIR_STORAGE=none` (an explicit `sudo opk git-protection on`
 replaces the marker); once enabled, every update runs the adopt + nail
@@ -683,11 +681,8 @@ wholesale-swap detection: a `.git owner` warn row per repository whose
 (display-only — inspect before trusting git output; see
 [the security model](../concepts/security-model.md)). The
 `Git protection` section reports the
-[nailed pointer layout](../how-to/git-protection.md): while it is
-enabled, an `ON` row with the number of protected projects plus one
-row per deviation with its command (a classic project is an alert, an
-unnailed pointer a warning); while it is not enabled, one warning
-naming the enable command.
+[nailed pointer layout](../how-to/git-protection.md) — its rows and
+their commands are described with the command.
 
 `status` is the install-wide **green-board**: run it from anywhere —
 it reads state and reports, never prompts, never repairs. Per-project
@@ -713,7 +708,7 @@ no verdict line — the named function and the repair hint land on stderr
 with `fix: sudo opk update`). Rows the caller cannot judge at their own
 privilege ("unknown — needs root to check") and optional-feature rows never
 count toward the verdict: `sudo opk status` resolves the privilege
-unknowns. Three exceptions always count: a managed binary that is missing,
+unknowns. Exceptions that always count include a managed binary that is missing,
 unexecutable or corrupt (no privilege can fix that), a missing kit
 library file from the checked helper families (a damaged deploy — the row
 names the missing kit file and
