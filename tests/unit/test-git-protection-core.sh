@@ -1213,15 +1213,17 @@ fi
 # the rows (#765 a S3): a path the migration form gate refuses gets NO
 # command (adopt would refuse it) and names the rename; a path with a
 # shell metacharacter gets its command with the path single-quoted; a
-# path with a control byte gets no command at all.
+# path with a control byte gets no command at all — and its row KEY is
+# rendered through _gp_disp, the raw byte appears nowhere (#765 b F1).
 _s3="$WORK/roots/r6"
 mkdir -p "$_s3/sub dir/p/.git/objects" "$_s3/a;b/.git/objects" "$_s3/a\$(id)b/.git/objects"
 printf 'ref: x\n' >"$_s3/sub dir/p/.git/HEAD"
 printf 'ref: x\n' >"$_s3/a;b/.git/HEAD"
 printf 'ref: x\n' >"$_s3/a\$(id)b/.git/HEAD"
 _q_tab=$(printf '\t')
-mkdir -p "$_s3/a${_q_tab}b"
+mkdir -p "$_s3/a${_q_tab}b" "$_s3/c${_q_tab}d/.git/objects"
 printf 'gitdir: %s\n' "$WORK/storage/u1.git" >"$_s3/a${_q_tab}b/.git"
+printf 'ref: x\n' >"$_s3/c${_q_tab}d/.git/HEAD"
 printf '%s\n' "$WORK/roots/r6" >"$CONF"
 printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\nGITDIR_STORAGE=%s\n' \
     "$(id -un)" "$(id -un)" "$(id -gn)" "$WORK/storage" >"$IC"
@@ -1236,11 +1238,15 @@ if [ "$_rc" = 1 ] &&
     printf '%s' "$_out" |
     grep -qF " -- run: sudo opk git-protection adopt '$_s3/a\$(id)b'" &&
     printf '%s' "$_out" |
-    grep -qF "kv-warn: $_s3/a${_q_tab}b pointer, NOT nailed -- no command for this path" &&
+    grep -qF "kv-warn: $_s3/a?b pointer, NOT nailed -- no command for this path" &&
+    printf '%s' "$_out" |
+    grep -qF "kv-bad: $_s3/c?d classic .git (unprotected -- the mv .git arm) -- no command for this path" &&
+    ! printf '%s' "$_out" | grep -qF "a${_q_tab}b" &&
+    ! printf '%s' "$_out" | grep -qF "c${_q_tab}d" &&
     ! printf '%s' "$_out" | grep -qF "adopt $_s3/a;b" &&
     ! printf '%s' "$_out" | grep -qF "adopt $_s3/sub dir/p" &&
     printf '%s' "$_out" | grep -qF 'rename the folder, then adopt it'; then
-    pass "rows: gate-refused paths get no command, metacharacter paths get a quoted one (#765 a S3)"
+    pass "rows: gate-refused paths get no command, metacharacter paths a quoted one, control bytes never render (#765 a S3, b F1)"
 else
     fail "rows: paste-safety arms (rc=$_rc out=$_out)"
 fi
