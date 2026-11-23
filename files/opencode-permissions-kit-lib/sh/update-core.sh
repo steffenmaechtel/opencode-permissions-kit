@@ -799,8 +799,8 @@ update_git_protection_consent() {
     fi
     if [ "$_gpc_conf" = "none" ]; then
         # Declined on this host — never nagged again; the enable path
-        # is documented in the how-to (`on` refuses while the marker
-        # stands, so the marker line goes first).
+        # stays one command away (documented in the how-to; `on`
+        # replaces the marker).
         return 0
     fi
     if [ -n "$_gpc_conf" ]; then
@@ -835,8 +835,7 @@ update_git_protection_consent() {
     else
         _gp_persist_storage "none" ||
             ui_warn "could not persist the decline marker — the question will re-appear"
-        ui_detail "declined — enable later by removing the GITDIR_STORAGE=none line from install.conf,"
-        ui_detail "then running: sudo opk git-protection on (it refuses while the marker stands)"
+        ui_detail "declined — enable later with: sudo opk git-protection on"
     fi
     return 0
 }

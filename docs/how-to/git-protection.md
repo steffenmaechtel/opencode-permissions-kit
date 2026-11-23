@@ -67,9 +67,10 @@ root you since removed from `projects.conf`, still uses its entry.
 
 `opk update` asks before configuring the storage the first time (the
 kit never silently rewrites your trees). Declining persists
-`GITDIR_STORAGE=none` in `install.conf` — the question never returns.
-To enable later, remove that line and run `sudo opk git-protection on`
-(the command refuses while the marker stands). Unattended
+`GITDIR_STORAGE=none` in `install.conf` — the question never returns,
+and `sudo opk git-protection on` stays one command away: the command
+replaces the decline marker (no default storage derivable from your
+`projects.conf` roots, it names the line to edit instead). Unattended
 updates skip the question with a hint; set `KIT_GITDIR_STORAGE=none`
 in the environment to silence that too, or to an absolute path to
 configure non-interactively.

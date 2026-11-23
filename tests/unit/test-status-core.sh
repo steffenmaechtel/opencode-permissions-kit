@@ -824,10 +824,11 @@ fi
 _gpc_full='declined (GITDIR_STORAGE=none) — every project keeps a classic .git (wholesale swap possible)'
 _gpc_out=$(_gpc_run real "$_gpc_work/install-declined.conf" || true)
 if printf '%s' "$_gpc_out" | grep -qF "kv-warn: git-protection $_gpc_full" &&
-    printf '%s' "$_gpc_out" | grep -qF 'detail: to enable: remove that line from install.conf, then run: sudo opk git-protection on' &&
+    printf '%s' "$_gpc_out" |
+    grep -qF 'detail: run: sudo opk git-protection on (the command replaces the decline marker)' &&
     [ "$(_gpc_tag kv-warn)" = 1 ] && [ "$(_gpc_tag kv-bad)" = 0 ] &&
     ! printf '%s' "$_gpc_out" | grep -qF 'classic .git (unprotected'; then
-    pass "git-protection section: declined = one counted warning with the true recipe (#764)"
+    pass "git-protection section: declined = one counted warning naming the one-command enable (#764)"
 else
     fail "git-protection section: declined arm (out=$_gpc_out)"
 fi

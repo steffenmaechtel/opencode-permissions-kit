@@ -106,9 +106,10 @@ set up). `opk status` carries the state in its `Git protection`
 section: while the feature is enabled, a classic project is an alert
 and an unnailed pointer a warning, each with its command; while it is
 not enabled, one warning names the enable command. Consent: `opk
-update` asks once before
-configuring the storage — declining persists `GITDIR_STORAGE=none`;
-once enabled, every update runs the adopt + nail pass. The adopt hint
+update` asks once before configuring the storage — declining persists
+`GITDIR_STORAGE=none` (an explicit `sudo opk git-protection on`
+replaces the marker); once enabled, every update runs the adopt + nail
+pass. The adopt hint
 prints on your first checkout in a managed classic tree (needs `opk
 git-heal on` — git runs no hook at clone time). The measured friction
 (worktree remove dance, fstype limits, the `FETCH_HEAD` residual) and

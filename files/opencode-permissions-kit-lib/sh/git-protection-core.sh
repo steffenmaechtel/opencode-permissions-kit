@@ -31,7 +31,9 @@
 #                       "Script output style"), rc 0 when
 #                       protected/idle
 #   on                  storage init + persist GITDIR_STORAGE +
-#                       migrate ALL classic projects + nail (root)
+#                       migrate ALL classic projects + nail (root); an
+#                       explicit `on` replaces a GITDIR_STORAGE=none
+#                       decline marker (#764)
 #   adopt <path>        migrate + nail ONE project (root)
 #   nail [<path>]       nail pending pointers; with <path> only that
 #                       project's pointer (root)
@@ -185,11 +187,10 @@ _gp_conf_path() {
 # _gp_storage: resolve the storage path (the Phase B design, issue
 # #704's design comment): explicit conf wins (GP_STORAGE test seam,
 # then GITDIR_STORAGE from install.conf — the marker "none" means
-# DECLINED, rc 2), else the sibling of the first usable conf root
-# (/var/www/vhosts -> /var/www/gitdirs; agent-home and refused lines
-# are skipped). Echoes the path on rc 0; rc 1 when nothing is
-# derivable; rc 2 when explicitly declined. The caller re-validates
-# any derived path through _gp_root_ok before creating anything.
+# DECLINED, rc 2), else the derived default (_gp_storage_derive).
+# Echoes the path on rc 0; rc 1 when nothing is derivable; rc 2 when
+# explicitly declined. The caller re-validates any derived path
+# through _gp_root_ok before creating anything.
 _gp_storage() {
     if [ -n "${GP_STORAGE:-}" ]; then
         printf '%s\n' "$GP_STORAGE"
@@ -203,6 +204,17 @@ _gp_storage() {
         printf '%s\n' "$_gps_s"
         return 0
     fi
+    _gp_storage_derive
+}
+
+# _gp_storage_derive: the default storage — the sibling of the first
+# usable conf root (/var/www/vhosts -> /var/www/gitdirs; agent-home
+# and refused lines are skipped), ignoring anything configured or
+# declined in install.conf. Split out of _gp_storage for the one
+# caller that must derive PAST a decline marker: `on` (#764, the
+# maintainer decision that an explicit `on` outranks a recorded
+# decline). Echoes the path on rc 0, rc 1 when nothing is derivable.
+_gp_storage_derive() {
     _gps_conf=$(_gp_conf_path)
     [ -f "$_gps_conf" ] || return 1
     _gps_agent=$(_gp_agentuser)
@@ -1092,11 +1104,9 @@ _gp_projects() {
 # helps in the CURRENT storage state (#764 topic 3 — the house style
 # of opk status / opk doctor), selected by the third argument:
 #   adopt     storage initialized: sudo opk git-protection adopt <path>
-#   on        nothing initialized — `adopt` refuses without a storage,
-#             `on` configures it and migrates everything
-#   declined   GITDIR_STORAGE=none: `on` and `adopt` both refuse while
-#             the marker stands, so the row prints NO command — the
-#             storage row carries the recipe
+#   anything else (`on`)  no initialized storage — `adopt` refuses
+#             without one, while `on` sets it up, migrates everything
+#             and (since #764) replaces a GITDIR_STORAGE=none marker
 # Two or more classic rows under `adopt` add the all-at-once hint
 # (`on` migrates every project in one run — the better fit there).
 # Counters for the callers: _gp_rows_actionable (1 when a classic or
@@ -1107,8 +1117,7 @@ _gp_rows() {
     _gp_rows_classic=0
     case "$3" in
         adopt) _gprl_fix=" -- run: sudo opk git-protection adopt" ;;
-        on) _gprl_fix=" -- run: sudo opk git-protection on" ;;
-        *) _gprl_fix=" -- git-protection is declined on this host (the storage row has the recipe)" ;;
+        *) _gprl_fix=" -- run: sudo opk git-protection on" ;;
     esac
     while IFS=' ' read -r _gprl_state _gprl_proj; do
         [ -n "${_gprl_state:-}" ] || continue
@@ -1206,13 +1215,13 @@ _git_protection_status() {
     _gpst_stor_rc=0
     _gpst_stor=$(_gp_storage) || _gpst_stor_rc=$?
     # The classic rows' fix command follows the storage state (#764
-    # topic 3): `adopt` works only with an initialized storage.
+    # topic 3): `adopt` works only with an initialized storage; `on`
+    # works in every other state — a declined marker included, the
+    # explicit command replaces it.
     _gpst_fix=on
     case "$_gpst_stor_rc" in
         2)
-            _gpst_fix=declined
-            ui_kv "storage" "declined (GITDIR_STORAGE=none) -- to enable: remove that line from install.conf,"
-            ui_detail "then run: sudo opk git-protection on"
+            ui_kv "storage" "declined (GITDIR_STORAGE=none) — 'sudo opk git-protection on' enables"
             ;;
         0)
             if _gp_enabled; then
@@ -1262,9 +1271,22 @@ _git_protection_on() {
     _gpon_stor_rc=0
     _gpon_stor=$(_gp_storage) || _gpon_stor_rc=$?
     if [ "$_gpon_stor_rc" -eq 2 ]; then
-        ui_error "git-protection is declined on this host (GITDIR_STORAGE=none)"
-        ui_detail "remove the marker line from install.conf, then run: opk git-protection on"
-        exit 1
+        # A recorded decline never blocks the explicit command
+        # (maintainer decision, #764): the marker's job is to keep
+        # `opk update` from asking again — `on` IS the consent. The
+        # default storage is derived past the marker; persisting it
+        # below replaces the `none` line, so every later run — and
+        # the status rows that say "'sudo opk git-protection on'
+        # enables" — finds the feature enabled.
+        _gpon_stor_rc=0
+        _gpon_stor=$(_gp_storage_derive) || _gpon_stor_rc=$?
+        if [ "$_gpon_stor_rc" -ne 0 ]; then
+            ui_error "git-protection is declined on this host (GITDIR_STORAGE=none) and no default"
+            ui_error "storage is derivable (no usable projects.conf root)"
+            ui_detail "replace that line with an absolute storage path, then run: opk git-protection on"
+            exit 1
+        fi
+        ui_info "git-protection was declined on this host (GITDIR_STORAGE=none) -- this run enables it"
     fi
     if [ "$_gpon_stor_rc" -ne 0 ]; then
         ui_error "no storage path derivable — none configured, no usable projects.conf root"

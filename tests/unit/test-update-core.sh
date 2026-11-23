@@ -1054,12 +1054,8 @@ fi
 _uc_driver n
 _uc_out=$(script -qec "sh '$WORK/ucdriver.sh'" /dev/null 2>/dev/null || true)
 if [ "$(sed -n 's/^GITDIR_STORAGE=//p' "$UC_IC")" = none ] &&
-    printf '%s' "$_uc_out" | grep -qF 'declined — enable later' &&
-    # #764: the hint names the recipe that actually works — `on`
-    # refuses while the marker stands (git-protection-core,
-    # _git_protection_on), so the marker line goes first.
-    printf '%s' "$_uc_out" | grep -qF 'removing the GITDIR_STORAGE=none line from install.conf'; then
-    pass "consent: interactive decline persists the none marker + names the true enable recipe (#704, #764)"
+    printf '%s' "$_uc_out" | grep -qF 'declined — enable later with: sudo opk git-protection on'; then
+    pass "consent: interactive decline persists the none marker + the one-command enable hint (#704, #764)"
 else
     fail "consent: decline arm (out=$_uc_out ic=$(cat "$UC_IC"))"
 fi

@@ -554,7 +554,7 @@ status_section_git_protection() {
         2)
             ui_kv_warn "git-protection" "declined (GITDIR_STORAGE=none) — every project keeps a classic .git""\
  (wholesale swap possible)"
-            ui_detail "to enable: remove that line from install.conf, then run: sudo opk git-protection on"
+            ui_detail "run: sudo opk git-protection on (the command replaces the decline marker)"
             return 0
             ;;
         0) _gp_enabled || _st_gp_stor_rc=1 ;;

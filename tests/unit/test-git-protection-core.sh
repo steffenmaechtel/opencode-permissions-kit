@@ -141,7 +141,8 @@ mkdir -p "$WORK/roots/r1"
 # The three-registration-points rule (AGENTS.md, Testing): entry guard
 # (bin/opk's git_protection_cli check) + this list + the derived count.
 _defs="_gp_libdir _gp_var _gp_devuser _gp_agentuser _gp_group _gp_root_ok
-_gp_conf_path _gp_storage _gp_enabled _gp_nosym _gp_storage_init _gp_persist_storage
+_gp_conf_path _gp_storage _gp_storage_derive _gp_enabled _gp_nosym _gp_storage_init
+_gp_persist_storage
 _gp_drop_storage _gp_has_i _gp_devgit _gp_verify _gp_rollback _gp_worktrees
 _gp_heal_gitdir _gp_pform_ok _gp_storage_sane _gp_unnest _gp_conf_root_p
 _gp_entry_name _gp_migrate_one _gp_nail_one _gp_revert_one _gp_projects _gp_rows
@@ -1030,20 +1031,22 @@ else
     fail "status: not-derivable arm (out=$_out)"
 fi
 
-# declined: the storage row carries the true two-step recipe (`on`
-# refuses while the marker stands) and a classic row prints NO command.
+# declined (maintainer decision for #764: an explicit `on` replaces
+# the marker): the storage row keeps its "'sudo opk git-protection
+# on' enables" wording — true again — and a classic row names `on`.
 printf '%s\n' "$WORK/roots/r6" >"$CONF"
 printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\nGITDIR_STORAGE=none\n' \
     "$(id -un)" "$(id -un)" "$(id -gn)" >"$IC"
 _rc=0
 _out=$(_core_run 'unset GP_STORAGE; git_protection_cli status') || _rc=$?
 if [ "$_rc" = 1 ] &&
-    printf '%s' "$_out" | grep -qF 'kv: storage declined (GITDIR_STORAGE=none) -- to enable: remove that line' &&
-    printf '%s' "$_out" | grep -qF 'detail: then run: sudo opk git-protection on' &&
-    printf '%s' "$_out" | grep -qF "kv-bad: $WORK/roots/r6/c1 classic .git (unprotected -- the mv .git arm)" &&
-    printf '%s' "$_out" | grep -qF ' -- git-protection is declined on this host (the storage row has the recipe)' &&
+    printf '%s' "$_out" |
+    grep -qF "kv: storage declined (GITDIR_STORAGE=none) — 'sudo opk git-protection on' enables" &&
+    printf '%s' "$_out" |
+    grep -qF "kv-bad: $WORK/roots/r6/c1 classic .git (unprotected -- the mv .git arm)" &&
+    printf '%s' "$_out" | grep -qF "arm) -- run: sudo opk git-protection on" &&
     ! printf '%s' "$_out" | grep -qF 'git-protection adopt'; then
-    pass "status: declined -> storage row has the recipe, classic rows name no refusing command (#764)"
+    pass "status: declined -> the storage row names on, and on is the classic rows' command (#764)"
 else
     fail "status: declined arm (rc=$_rc out=$_out)"
 fi
@@ -1079,6 +1082,47 @@ if [ "$_rc" = 1 ] &&
     pass "status: a missing storage dir turns the classic command into on (#764)"
 else
     fail "status: missing-storage arm (rc=$_rc out=$_out)"
+fi
+
+# `on` on a DECLINED host replaces the marker (the same decision): the
+# default storage is derived PAST GITDIR_STORAGE=none, initialized,
+# persisted over the marker and the classic project migrated — one
+# command, as the how-tos claim. Fixture set HERE (the arm once
+# inherited the previous arm's install.conf and ran past the decline).
+printf '%s\n' "$WORK/roots/r6" >"$CONF"
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\nGITDIR_STORAGE=none\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" >"$IC"
+_rc=0
+_out=$(_core_run 'unset GP_STORAGE; git_protection_cli on') || _rc=$?
+if [ "$_rc" = 0 ] &&
+    printf '%s' "$_out" |
+    grep -qF 'info: git-protection was declined on this host (GITDIR_STORAGE=none) -- this run enables it' &&
+    [ "$(sed -n 's/^GITDIR_STORAGE=//p' "$IC")" = "$WORK/roots/gitdirs" ] &&
+    [ "$(grep -c '^GITDIR_STORAGE=' "$IC")" = 1 ] &&
+    [ -d "$WORK/roots/gitdirs" ] && [ -k "$WORK/roots/gitdirs" ] &&
+    [ "$(cat "$WORK/roots/r6/c1/.git")" = "gitdir: $WORK/roots/gitdirs/c1.git" ] &&
+    git -C "$WORK/roots/r6/c1" status --porcelain >/dev/null 2>&1; then
+    pass "on: a declined marker is replaced — storage derived, persisted over none, project migrated (#764)"
+else
+    fail "on: declined-override arm (rc=$_rc out=$_out ic=$(cat "$IC"))"
+fi
+
+# ... with no default derivable, `on` still refuses and names the line
+# to edit; the marker stays.
+: >"$CONF"
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\nGITDIR_STORAGE=none\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" >"$IC"
+_rc=0
+_out=$(_core_run 'unset GP_STORAGE; git_protection_cli on') || _rc=$?
+printf '%s\n' "$WORK/roots/r6" >"$CONF"
+if [ "$_rc" = 1 ] &&
+    printf '%s' "$_out" |
+    grep -qF 'error: git-protection is declined on this host (GITDIR_STORAGE=none) and no default' &&
+    printf '%s' "$_out" | grep -qF 'replace that line with an absolute storage path' &&
+    [ "$(sed -n 's/^GITDIR_STORAGE=//p' "$IC")" = none ]; then
+    pass "on: declined with no derivable default refuses loud, names the line, keeps the marker (#764)"
+else
+    fail "on: declined-not-derivable arm (rc=$_rc out=$_out ic=$(cat "$IC"))"
 fi
 printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
     "$(id -un)" "$(id -un)" "$(id -gn)" >"$IC"

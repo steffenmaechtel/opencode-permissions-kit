@@ -1921,6 +1921,15 @@ check "12q: revert walks perm-check back to the classic layout" \
     E 'test -d /var/www/vhosts/perm-check/.git && git -C /var/www/vhosts/perm-check status --porcelain >/dev/null'
 check "12q: gp-adopt stays adopted (the blanket revert rides the uninstall below)" \
     E 'test -f /var/www/vhosts/gp-adopt/.git && grep -qF "gitdir: /var/www/gitdirs/gp-adopt.git" /var/www/vhosts/gp-adopt/.git'
+# #764 (maintainer decision): a recorded decline never blocks the
+# explicit command — `on` derives the default storage past a
+# GITDIR_STORAGE=none marker and persists the path over it. The marker
+# is planted by hand (the update question is interactive-only).
+E 'sudo sed -i "s|^GITDIR_STORAGE=.*|GITDIR_STORAGE=none|" /etc/opencode-permissions-kit/install.conf'
+E 'sudo opk git-protection on >/tmp/gp-on-declined.log 2>&1' &&
+    echo "  ${GREEN}OK${NC}  opk git-protection on over a declined marker completed"
+check "12q: on replaces a GITDIR_STORAGE=none marker and migrates (#764)" \
+    E 'grep -qx "GITDIR_STORAGE=/var/www/gitdirs" /etc/opencode-permissions-kit/install.conf && grep -qF "this run enables it" /tmp/gp-on-declined.log && test -f /var/www/vhosts/perm-check/.git && grep -qF "gitdir: /var/www/gitdirs/perm-check.git" /var/www/vhosts/perm-check/.git'
 E 'rm -rf /tmp/gp-update-test /tmp/gp-*.log'
 
 echo ""
