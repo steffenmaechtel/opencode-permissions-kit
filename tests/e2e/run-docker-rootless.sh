@@ -307,6 +307,10 @@ echo "--- RL2c/#704: git-protection pointer layout (migrate, status, revert) ---
 E 'opk git-protection status >/tmp/gp-status-before.log 2>&1; test $? -eq 1'
 check "RL2c: status (unconfigured) shows the classic row + rc 1" \
     E 'grep -qF "classic .git (unprotected -- the mv .git arm)" /tmp/gp-status-before.log'
+# #764 topic 2: before the opt-in the health view counts the open arm
+# as one warning; after `on` it carries the layout (ON, no classic row).
+check "RL2c: opk status counts the not-configured state as a warning (#764)" \
+    E 'opk status >/tmp/gp-st-before.log 2>&1; grep -qF "git-protection not configured — every project keeps a classic .git" /tmp/gp-st-before.log'
 E 'sudo opk git-protection on >/tmp/gp-on.log 2>&1' &&
     echo "  ${GREEN}OK${NC}  opk git-protection on completed"
 check "RL2c: storage created + persisted" \
@@ -315,6 +319,8 @@ check "RL2c: rl-gh migrated — pointer file + agent git green" \
     E 'test -f /var/www/vhosts/rl-gh/.git && grep -qF "gitdir: /var/www/gitdirs/rl-gh.git" /var/www/vhosts/rl-gh/.git && sudo -u opencode -H git -C /var/www/vhosts/rl-gh status --porcelain >/dev/null'
 check "RL2c: status rows are nail-state honest (branched)" \
     E 'if lsattr /var/www/vhosts/rl-gh/.git 2>/dev/null | awk "{print \$1}" | grep -q i; then opk git-protection status >/tmp/gp-status.log 2>&1; test $? -eq 0 && grep -qF "pointer + nailed" /tmp/gp-status.log; else opk git-protection status >/tmp/gp-status.log 2>&1; test $? -eq 1 && grep -qF "pointer, NOT nailed" /tmp/gp-status.log; fi'
+check "RL2c: opk status carries the Git protection section — ON, no classic row left (#764)" \
+    E 'opk status >/tmp/gp-st-section.log 2>&1; grep -qF "git-protection ON — " /tmp/gp-st-section.log && ! grep -qF "classic .git (unprotected" /tmp/gp-st-section.log'
 check "RL2c: the adopt hint fires on a fresh classic tree (hooks on)" \
     E 'git -C /var/www/vhosts init -q rl-gp2 && cd /var/www/vhosts/rl-gp2 && git -c user.email=t@e -c user.name=t commit -q --allow-empty -m x && git checkout -q -b hint 2>/tmp/gp-hint.log && grep -q "opk git-protection" /tmp/gp-hint.log'
 check "RL2c: no adopt hint on the adopted tree (self-silencing)" \

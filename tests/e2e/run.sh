@@ -1863,6 +1863,10 @@ echo "--- 12q/#704: git-protection pointer layout — migrate, status, consent, 
 E 'opk git-protection status >/tmp/gp-status-before.log 2>&1; test $? -eq 1'
 check "12q: status (unconfigured) shows the classic row + rc 1" \
     E 'grep -qF "classic .git (unprotected -- the mv .git arm)" /tmp/gp-status-before.log && grep -qF "storage" /tmp/gp-status-before.log'
+# #764 topic 2: before the opt-in, the health view counts the open arm
+# as one warning naming the enable command (no project rows).
+check "12q: opk status counts the not-configured state as a warning (#764)" \
+    E 'opk status >/tmp/gp-st-before.log 2>&1; grep -qF "git-protection not configured — every project keeps a classic .git" /tmp/gp-st-before.log'
 E 'mkdir -p /var/www/vhosts/gp-adopt && git -C /var/www/vhosts/gp-adopt init -q && printf "gp\n" >/var/www/vhosts/gp-adopt/f.txt && git -C /var/www/vhosts/gp-adopt add f.txt && git -C /var/www/vhosts/gp-adopt -c user.email=t@e.st -c user.name=t commit -qm c1'
 E 'sudo opk git-protection on >/tmp/gp-on.log 2>&1' &&
     echo "  ${GREEN}OK${NC}  opk git-protection on completed"
@@ -1882,6 +1886,18 @@ check "12q: status rows are nail-state honest (branched: overlayfs degrades)" \
     E 'if lsattr /var/www/vhosts/perm-check/.git 2>/dev/null | awk "{print \$1}" | grep -q i; then opk git-protection status >/tmp/gp-status.log 2>&1; test $? -eq 0 && grep -qF "pointer + nailed" /tmp/gp-status.log; else opk git-protection status >/tmp/gp-status.log 2>&1; test $? -eq 1 && grep -qF "pointer, NOT nailed" /tmp/gp-status.log; fi'
 check "12q: the on-run named the nail degradation loud when it happened" \
     E 'if grep -q "pointer + nailed" /tmp/gp-status.log; then true; else grep -qF "stays UNNAILED" /tmp/gp-on.log; fi'
+# #764 topic 2: the one-command health view carries the layout — ON
+# with the adopted count and no classic row left.
+check "12q: opk status carries the Git protection section — ON, no classic row left (#764)" \
+    E 'opk status >/tmp/gp-st-section.log 2>&1; grep -qF "git-protection ON — " /tmp/gp-st-section.log && ! grep -qF "classic .git (unprotected" /tmp/gp-st-section.log'
+# #764 topic 1: a project NESTED below the root is stored as
+# <parent>-<basename>.git (one directly under the root keeps its
+# basename — perm-check and gp-adopt above).
+E 'mkdir -p /var/www/vhosts/gp-nest/gp-nested && git -C /var/www/vhosts/gp-nest/gp-nested init -q && git -C /var/www/vhosts/gp-nest/gp-nested -c user.email=t@e.st -c user.name=t commit -q --allow-empty -m c1'
+E 'sudo opk git-protection adopt /var/www/vhosts/gp-nest/gp-nested >/tmp/gp-adopt-nest.log 2>&1' &&
+    echo "  ${GREEN}OK${NC}  opk git-protection adopt (nested project) completed"
+check "12q: a nested project is stored as <parent>-<basename>.git (#764)" \
+    E 'grep -qF "gitdir: /var/www/gitdirs/gp-nest-gp-nested.git" /var/www/vhosts/gp-nest/gp-nested/.git && git -C /var/www/vhosts/gp-nest/gp-nested status --porcelain >/dev/null'
 # The adopt hint (hooks are on since 2c): silent on the ADOPTED tree,
 # still advertising on a classic one.
 check "12q: no adopt hint on the adopted tree (self-silencing)" \
@@ -1948,6 +1964,8 @@ check "13a: project group reverted to the developer's login group" \
 # storage directory stays as the documented manual-cleanup leftover.
 check "13a: git-protection reverted gp-adopt to classic .git (uninstall --yes)" \
     E 'test -d /var/www/vhosts/gp-adopt/.git'
+check "13a: git-protection reverted the nested gp-nested to classic .git (#764)" \
+    E 'test -d /var/www/vhosts/gp-nest/gp-nested/.git'
 check "13a: the git-protection storage dir stays (documented leftover)" \
     E 'test -d /var/www/gitdirs'
 

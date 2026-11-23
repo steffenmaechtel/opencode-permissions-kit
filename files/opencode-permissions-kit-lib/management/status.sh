@@ -121,6 +121,24 @@ if [ -f "$GIT_CHECK_LIB" ]; then
     . "$GIT_CHECK_LIB"
 fi
 
+# git-protection core (issue #764 topic 2): the Git protection section
+# (status-core.sh, status_section_git_protection) classifies the .git
+# entries through the `opk git-protection` core's OWN functions — one
+# classification for both report surfaces; a re-implemented copy in
+# status-core would drift from the command's rows. Checkout-first like
+# ui.sh above (a checkout status.sh renders its own sections). The
+# core is cross-lib here, NOT part of the status_pairing_guard below
+# (that pins the status-core pairing): a missing or outdated copy
+# keeps the report fail-soft — the section's call site renders a
+# COUNTED warn row (conventions.md "Lib pairing and cross-lib guards"),
+# never a silently dropped section.
+GIT_PROTECTION_CORE="$ST_CALL_DIR/../sh/git-protection-core.sh"
+[ -f "$GIT_PROTECTION_CORE" ] || GIT_PROTECTION_CORE="$LIBDIR/sh/git-protection-core.sh"
+if [ -f "$GIT_PROTECTION_CORE" ]; then
+    # shellcheck disable=SC1090
+    . "$GIT_PROTECTION_CORE"
+fi
+
 VERSION="0.0.0"
 DEFAULT_USER=""
 OPENCODE_USER="opencode"
@@ -209,8 +227,8 @@ fi
 # status-core.sh's function definitions (the test-suite completeness
 # riders enforce both directions).
 status_pairing_guard() {
-    for _spg in status_section_core status_section_git_heal status_section_advisories \
-        status_section_projects status_section_backend status_section_ddev \
+    for _spg in status_section_core status_section_git_heal status_section_git_protection \
+        status_section_advisories status_section_projects status_section_backend status_section_ddev \
         status_section_wsl2 status_section_root_equiv \
         status_section_leak_scan status_section_management \
         _opk_timeout_ok _st_ancestor_grants_x _st_dbdump_gap \
@@ -231,6 +249,7 @@ status_pairing_guard || exit 1
 # --- sections, in report order (output order is user-visible) -----------------
 status_section_core
 status_section_git_heal
+status_section_git_protection
 status_section_advisories
 status_section_projects
 status_section_backend

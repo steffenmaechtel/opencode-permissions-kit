@@ -17,6 +17,10 @@
 #     LIBDIR (hit list, unscannable config, no config)
 #   - the Advisories section's missing-binary gate and healthy-binary
 #     verdict against a scratch LIBDIR with the real shipped database
+#   - the Git protection section (#764): the cross-lib call-site
+#     guard (missing and partially skewed core), the not-enabled
+#     counted warning, the enabled rows (state, deviations with their
+#     commands, INFO orphans), stderr capture, mktemp degradation
 # Run: sh tests/unit/test-status-core.sh
 set -e
 
@@ -54,7 +58,8 @@ else
 fi
 
 # --- 2. every section entry point + helper is defined by sourcing -----------------
-_defs="status_section_core status_section_git_heal status_section_advisories
+_defs="status_section_core status_section_git_heal status_section_git_protection
+status_section_advisories
 status_section_projects status_section_backend status_section_ddev
 status_section_wsl2 status_section_root_equiv status_section_leak_scan
 status_section_management
@@ -566,7 +571,8 @@ _xl_combined="$(
 # status-core resolves ddev-migrate.sh, ddev-handover.sh,
 # ddev-hosts.sh, update-check.sh and advisories.sh behind file guards
 # (#461 a Q3 extended the list past the original four — the rider once
-# pinned the incompleteness green); wsl-browser-bridge.sh's
+# pinned the incompleteness green; #764 added git-protection-core.sh,
+# the Git protection section's cross-lib); wsl-browser-bridge.sh's
 # never-shadow probe is the optional surface the xdg call site
 # command-v-guards. Not the whole sh/ glob — its wrapper-side scripts
 # define shell hooks (ddev(), note()) that are not status's callable
@@ -580,6 +586,7 @@ for _xl_rel in opencode-permissions-kit-lib/sh/git-check.sh \
     opencode-permissions-kit-lib/sh/ddev-hosts.sh \
     opencode-permissions-kit-lib/sh/update-check.sh \
     opencode-permissions-kit-lib/sh/advisories.sh \
+    opencode-permissions-kit-lib/sh/git-protection-core.sh \
     opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh; do
     _xl_lib="$SCRIPT_DIR/../../files/$_xl_rel"
     [ -f "$_xl_lib" ] || {
@@ -700,6 +707,218 @@ if printf '%s' "$_gate_share_out" | grep -qF 'sh/ddev-handover.sh outdated'; the
     pass "share-scan gate fires on a truncated ddev-handover.sh (executed, #456)"
 else
     fail "share-scan gate must fire on a truncated ddev-handover.sh (out=$_gate_share_out) (#456)"
+fi
+
+# --- 8. Git protection section (issue #764 topic 2) ---------------------------------
+# status_section_git_protection at function level: the real status-core
+# plus the real git-protection core, the ui helpers stubbed to tagged
+# lines (the tag IS the severity), a scratch conf / storage /
+# install.conf, and the lsattr marker stub of test-git-protection-core
+# (the i flag reads a "<path>.nailed" marker — the real flag needs
+# root to set). Every row the section renders carries a fix command
+# or is a state row; the not-enabled states are COUNTED warnings with
+# no project rows (maintainer decision, #764).
+GP_CORE="$REPO_FILES/sh/git-protection-core.sh"
+_gpc_work="$(work_new)"
+mkdir -p "$_gpc_work/bin" "$_gpc_work/roots/r1/sub" "$_gpc_work/roots/r2" "$_gpc_work/storage"
+cat >"$_gpc_work/bin/lsattr" <<'EOF'
+#!/bin/sh
+if [ -e "$1.nailed" ]; then
+    printf -- "----i---------e------- %s\n" "$1"
+else
+    printf -- "--------------e------- %s\n" "$1"
+fi
+EOF
+chmod 755 "$_gpc_work/bin/lsattr"
+_gpc_repo() { # a scratch repo with one commit (identity inline)
+    mkdir -p "$1"
+    git -C "$1" init -q
+    printf 'hello\n' >"$1/file.txt"
+    git -C "$1" add file.txt
+    git -C "$1" -c user.email=t@e.st -c user.name=t commit -qm c1
+}
+_gpc_repo "$_gpc_work/roots/r1/top"
+_gpc_repo "$_gpc_work/roots/r1/sub/nested"
+_gpc_repo "$_gpc_work/roots/r1/unnailedp"
+rm -rf "${_gpc_work:?}/roots/r1/unnailedp/.git"
+mkdir -p "$_gpc_work/storage/unnailedp.git" "$_gpc_work/storage/orphan1.git"
+printf 'gitdir: %s\n' "$_gpc_work/storage/unnailedp.git" >"$_gpc_work/roots/r1/unnailedp/.git"
+mkdir -p "$_gpc_work/roots/r1/wtreg/.git"
+_gpc_repo "$_gpc_work/roots/r2/nailedp"
+rm -rf "${_gpc_work:?}/roots/r2/nailedp/.git"
+mkdir -p "$_gpc_work/storage/nailedp.git"
+printf 'gitdir: %s\n' "$_gpc_work/storage/nailedp.git" >"$_gpc_work/roots/r2/nailedp/.git"
+touch "$_gpc_work/roots/r2/nailedp/.git.nailed"
+printf '%s\n' "$_gpc_work/roots/r1" >"$_gpc_work/projects.conf"
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\nGITDIR_STORAGE=%s\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" "$_gpc_work/storage" >"$_gpc_work/install.conf"
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\nGITDIR_STORAGE=none\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" >"$_gpc_work/install-declined.conf"
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\nGITDIR_STORAGE=%s\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" "$_gpc_work/no-such-storage" >"$_gpc_work/install-nodir.conf"
+_gpc_run() { # <real|none|trunc> <install.conf> [VAR=VALUE ...] -> rows on stdout, stderr apart
+    _gpc_mode=$1 _gpc_ic=$2
+    shift 2
+    (
+        PATH="$_gpc_work/bin:$STUB:$PATH"
+        export PATH NO_COLOR=1
+        # env carries the scratch seams (plus the caller's extras, if
+        # any) into a fresh sh mirroring status.sh's own shell flags:
+        # set -u yes, set -e no (the report is fail-soft by design).
+        env GP_CONF="$_gpc_work/projects.conf" GP_CONF_RELAX=1 INSTALL_CONF="$_gpc_ic" "$@" sh -cu '
+            . "$1"
+            case "$2" in
+                real) . "$3" ;;
+                trunc) _gp_storage() { :; } ;;
+            esac
+            ui_section() { echo "section: $*"; }
+            ui_kv() { echo "kv: $1 $2"; }
+            ui_kv_ok() { echo "kv-ok: $1 $2"; }
+            ui_kv_warn() { echo "kv-warn: $1 $2"; }
+            ui_kv_bad() { echo "kv-bad: $1 $2"; }
+            ui_detail() { echo "detail: $*"; }
+            status_section_git_protection
+        ' _ "$LIB" "$_gpc_mode" "$GP_CORE"
+    ) 2>"$_gpc_work/err"
+}
+_gpc_tag() { # <tag> -> number of rows carrying it
+    printf '%s\n' "$_gpc_out" | grep -c "^$1: " || true
+}
+
+# a) cross-lib call-site guard: no core at all, and a PARTIAL skew
+# (the #461 a S5 shape — only _gp_storage survives) — both land in the
+# COUNTED warn row, never a silently dropped section (an undefined
+# call would rc-127 under status.sh's set -u without set -e). The
+# literal spans the row's dq-splice wrap: the unwrapped phrase pinned
+# whole is the execution proof that the wrap is byte-identical.
+_gpc_full='not checked — kit file sh/git-protection-core.sh missing or outdated (fix: sudo opk update)'
+_gpc_out=$(_gpc_run none "$_gpc_work/install.conf" || true)
+if printf '%s' "$_gpc_out" | grep -qF "kv-warn: git-protection $_gpc_full" &&
+    [ "$(_gpc_tag kv-warn)" = 1 ] && [ "$(_gpc_tag kv-bad)" = 0 ]; then
+    pass "git-protection section: missing core renders the counted warn row (#764)"
+else
+    fail "git-protection section: missing core (out=$_gpc_out)"
+fi
+_gpc_out=$(_gpc_run trunc "$_gpc_work/install.conf" || true)
+if printf '%s' "$_gpc_out" | grep -qF "kv-warn: git-protection $_gpc_full" &&
+    [ "$(_gpc_tag kv-warn)" = 1 ]; then
+    pass "git-protection section: a partially skewed core (one helper left) is caught too (#764)"
+else
+    fail "git-protection section: partial skew (out=$_gpc_out)"
+fi
+
+# b) not enabled: ONE counted warning naming the enable command, no
+# project rows — the classic layout is not a finding before the
+# opt-in, the open arm is.
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" >"$_gpc_work/install-nokey.conf"
+_gpc_out=$(_gpc_run real "$_gpc_work/install-nokey.conf" || true)
+if printf '%s' "$_gpc_out" | grep -qF 'kv-warn: git-protection not configured — every project keeps a classic .git' &&
+    printf '%s' "$_gpc_out" | grep -qF 'detail: run: sudo opk git-protection on' &&
+    [ "$(_gpc_tag kv-warn)" = 1 ] && [ "$(_gpc_tag kv-bad)" = 0 ] &&
+    ! printf '%s' "$_gpc_out" | grep -qF 'classic .git (unprotected'; then
+    pass "git-protection section: not configured = one counted warning, no project rows (#764)"
+else
+    fail "git-protection section: not-configured arm (out=$_gpc_out)"
+fi
+_gpc_full='declined (GITDIR_STORAGE=none) — every project keeps a classic .git (wholesale swap possible)'
+_gpc_out=$(_gpc_run real "$_gpc_work/install-declined.conf" || true)
+if printf '%s' "$_gpc_out" | grep -qF "kv-warn: git-protection $_gpc_full" &&
+    printf '%s' "$_gpc_out" | grep -qF 'detail: to enable: remove that line from install.conf, then run: sudo opk git-protection on' &&
+    [ "$(_gpc_tag kv-warn)" = 1 ] && [ "$(_gpc_tag kv-bad)" = 0 ] &&
+    ! printf '%s' "$_gpc_out" | grep -qF 'classic .git (unprotected'; then
+    pass "git-protection section: declined = one counted warning with the true recipe (#764)"
+else
+    fail "git-protection section: declined arm (out=$_gpc_out)"
+fi
+
+# c) enabled with deviations: the state row counts the protected
+# projects, classic rows are alerts and unnailed rows warnings — each
+# with its command and path — and no per-project green row, no
+# worktree-registration line and nothing on stderr (the core's notes
+# re-render as detail rows). `${_gpc_sto:?}` inside the expected
+# string: the sandbox floor walks message prose on live lines too
+# (#630) — a literal `rm` next to a `"$VAR/suffix"` in one statement
+# reads as an unguarded deletion.
+_gpc_r1="$_gpc_work/roots/r1"
+_gpc_sto="$_gpc_work/storage"
+_gpc_out=$(_gpc_run real "$_gpc_work/install.conf" || true)
+if printf '%s' "$_gpc_out" | grep -qF "kv: git-protection ON — storage $_gpc_sto; no project under the configured roots is nailed yet" &&
+    printf '%s' "$_gpc_out" | grep -qF "kv-bad: $_gpc_r1/top classic .git (unprotected -- the mv .git arm)" &&
+    printf '%s' "$_gpc_out" | grep -qF " -- run: sudo opk git-protection adopt $_gpc_r1/top" &&
+    printf '%s' "$_gpc_out" | grep -qF " -- run: sudo opk git-protection adopt $_gpc_r1/sub/nested" &&
+    printf '%s' "$_gpc_out" |
+    grep -qF "kv-warn: $_gpc_r1/unnailedp pointer, NOT nailed (run: sudo opk git-protection nail $_gpc_r1/unnailedp)" &&
+    [ "$(_gpc_tag kv-bad)" = 2 ] && [ "$(_gpc_tag kv-warn)" = 1 ] && [ "$(_gpc_tag kv-ok)" = 0 ] &&
+    ! printf '%s' "$_gpc_out" | grep -qF 'pointer + nailed' &&
+    ! printf '%s' "$_gpc_out" | grep -qF 'worktree registration' &&
+    printf '%s' "$_gpc_out" | grep -qF "kv: $_gpc_sto/orphan1.git unreferenced storage entry" &&
+    printf '%s' "$_gpc_out" | grep -qF "detail: inspect, then remove: sudo rm -rf ${_gpc_sto:?}/orphan1.git" &&
+    [ ! -s "$_gpc_work/err" ]; then
+    pass "git-protection section: enabled rows = state + alert/warn deviations with commands + INFO orphans (#764)"
+else
+    fail "git-protection section: enabled arm (out=$_gpc_out err=$(cat "${_gpc_work:?}/err"))"
+fi
+
+# d) all protected: one green state row carrying the count, no finding.
+printf '%s\n' "$_gpc_work/roots/r2" >"$_gpc_work/projects.conf"
+_gpc_out=$(_gpc_run real "$_gpc_work/install.conf" || true)
+if printf '%s' "$_gpc_out" |
+    grep -qF "kv-ok: git-protection ON — 1 project(s) on the nailed pointer layout (storage $_gpc_sto)" &&
+    [ "$(_gpc_tag kv-ok)" = 1 ] && [ "$(_gpc_tag kv-warn)" = 0 ] && [ "$(_gpc_tag kv-bad)" = 0 ] &&
+    ! printf '%s' "$_gpc_out" | grep -qF 'nailedp pointer'; then
+    pass "git-protection section: an all-nailed root renders one green state row, no per-project rows (#764)"
+else
+    fail "git-protection section: all-nailed arm (out=$_gpc_out)"
+fi
+printf '%s\n' "$_gpc_work/roots/r1" >"$_gpc_work/projects.conf"
+
+# e) enabled but the storage dir is gone: a counted row, and the
+# classic command becomes `on` (adopt would refuse).
+_gpc_out=$(_gpc_run real "$_gpc_work/install-nodir.conf" || true)
+if printf '%s' "$_gpc_out" |
+    grep -qF "kv-warn: git-protection storage missing: $_gpc_work/no-such-storage — pointer projects cannot" &&
+    printf '%s' "$_gpc_out" | grep -qF 'detail: re-create it: sudo opk git-protection on' &&
+    printf '%s' "$_gpc_out" | grep -qF "kv-bad: $_gpc_r1/top classic .git (unprotected -- the mv .git arm) -- run: sudo opk git-protection on" &&
+    ! printf '%s' "$_gpc_out" | grep -qF 'git-protection adopt' &&
+    ! printf '%s' "$_gpc_out" | grep -qF 'unreferenced storage entry'; then
+    pass "git-protection section: a missing storage dir warns, switches the classic command to on, lists no orphans (#764)"
+else
+    fail "git-protection section: missing-storage arm (out=$_gpc_out)"
+fi
+
+# f) the core's stderr never leaks raw (the --short one-line
+# contract): a refused conf line re-renders as a detail row. Enabled
+# conf — only the enabled arm reaches the classification pass whose
+# notes this captures.
+printf 'relative/path\n%s\n' "$_gpc_work/roots/r1" >"$_gpc_work/projects.conf"
+_gpc_out=$(_gpc_run real "$_gpc_work/install.conf" || true)
+printf '%s\n' "$_gpc_work/roots/r1" >"$_gpc_work/projects.conf"
+if printf '%s' "$_gpc_out" | grep -qF 'detail: git-protection: refused-conf not an absolute root' &&
+    [ ! -s "$_gpc_work/err" ]; then
+    pass "git-protection section: the core's stderr re-renders as a detail row, stderr stays empty (#764)"
+else
+    fail "git-protection section: stderr capture (out=$_gpc_out err=$(cat "$_gpc_work/err"))"
+fi
+
+# g) a failed scratch allocation is a counted row, never a dropped
+# section (the #674 b D3 twin — TMPDIR points nowhere, mktemp -d dies).
+_gpc_out=$(_gpc_run real "$_gpc_work/install.conf" "TMPDIR=$_gpc_work/no-such-dir" || true)
+if printf '%s' "$_gpc_out" | grep -qF 'kv-warn: git-protection project rows unavailable (mktemp failed)' &&
+    [ "$(_gpc_tag kv-bad)" = 0 ]; then
+    pass "git-protection section: mktemp failure degrades into a counted row (#764)"
+else
+    fail "git-protection section: mktemp arm (out=$_gpc_out)"
+fi
+
+# h) entry wiring: status.sh resolves the core checkout-first (the
+# ui.sh / git-check.sh resolver shape) — a deployed-first lookup would
+# run an older core against a checkout's status-core.
+if live_src "$STATUS_ENTRY" | grep -qF 'GIT_PROTECTION_CORE="$ST_CALL_DIR/../sh/git-protection-core.sh"' &&
+    live_src "$STATUS_ENTRY" | grep -qF '. "$GIT_PROTECTION_CORE"'; then
+    pass "status.sh resolves sh/git-protection-core.sh checkout-first and sources it (#764)"
+else
+    fail "status.sh must resolve + source sh/git-protection-core.sh checkout-first (#764)"
 fi
 
 # --- progress tee under hostile PYTHONHOME (#249) ---------------------------------
