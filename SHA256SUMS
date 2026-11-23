@@ -30,11 +30,11 @@ a6f317ab7f4589bdc244db55296119a882c27f855bc14442cedf301dd06ca7e4  files/opencode
 47d414945a1f7c4bc00047afc4321fd6b647bff990f109e985d905b3df651ca1  files/opencode-permissions-kit-lib/sh/ddev-terminal.sh
 609f9ff8048a288d9eb2ba5d675a7212292737643cacded9638671fdc0d1ab90  files/opencode-permissions-kit-lib/sh/deploy-lib.sh
 db10fdee1914af11a158b46fa5dc39bd54c3b9e75969ebd2373bc5945680026c  files/opencode-permissions-kit-lib/sh/doctor-core.sh
-84d6fc7ce8f9db515c85b93693720cf3fff57c97be602d5e6c04a24e8c89812c  files/opencode-permissions-kit-lib/sh/fs-baseline.sh
+b137417664afbdc06ff757dd5785236112ffd05f4c85d358c558def543ac96f9  files/opencode-permissions-kit-lib/sh/fs-baseline.sh
 80579d6005c882c689086a3af913ccdf686059905451f43b496aa74005fd0b41  files/opencode-permissions-kit-lib/sh/git-check.sh
 d78f6d51f910142ab1b17c13b2c7a46160709a1b98f34bbc6e789eabc9ec5b2f  files/opencode-permissions-kit-lib/sh/git-heal-core.sh
 b424aa5f1523b07907fcc7aacccf87371a008f551fe475bbbc4abebac318ba62  files/opencode-permissions-kit-lib/sh/git-protection-core.sh
-b42ecabe40ab998d1cc3c72fe669035e75a48304425146132abce24a5fe4cb34  files/opencode-permissions-kit-lib/sh/handover-core.sh
+4ff157c60de6cddfc8f7af2a834aeb067bdad410f39756a9bbd92493de6cc9f7  files/opencode-permissions-kit-lib/sh/handover-core.sh
 2dae08bdf66e64c4362baa190490937519ba7e2e9e1de551401d673ea9e28c43  files/opencode-permissions-kit-lib/sh/install-core.sh
 575266d6e05f87e5b5444464538ab3c222931bf5d5753d44695308aac067c3bf  files/opencode-permissions-kit-lib/sh/log.sh
 590d0a5899e7a902c3c4a1e4cf3254dfef7d4fc63cfc6f530cb6002630a8eee2  files/opencode-permissions-kit-lib/sh/openchamber-core.sh
