@@ -1,36 +1,112 @@
-# The docs-improvement loop — from `Docs:` issues to merged waves
+# The docs-improvement loop — from reflection topics to merged waves
 
 Implementation sessions may end with the `opk-improve-docs` skill —
-its contract lives in the skill alone; what lands on the tracker is
-`Docs:` reflection issues carrying the `from-reflection` label. That
-is the PRODUCER side. This page is the CONSUMER side: how the open
-`Docs:` backlog is triaged, batched into waves and closed with every
-item dispositioned — nothing rots, nothing lands twice. The label is
-the corpus's query key: `label:"from-reflection"` finds every issue
-born of a reflection — the `Docs:` issues plus the work orders refiled
-out of their triage (class extract; the first three were #541–#543),
-the whole population retro-labeled 2026-11-16 when the label was
-introduced. The `Docs:` title prefix stays the docs-class
-discriminator inside that query. The founding backlog: the seven
-issues #523, #524, #528, #530, #534, #535, #538, filed 2026-11-15 by
-the first seven reflections.
+its contract lives in the skill alone; what it files are single-topic
+reflection issues in the feedback repo
+`steffenmaechtel/opk-agent-feedback`. That is the PRODUCER side. This
+page is the CONSUMER side: how a topic proves that it recurs, gets
+promoted, is triaged, batched into waves and closed with every item
+dispositioned — nothing rots, nothing lands twice.
+
+Two trackers, one loop. Topics filed before the cutover (the
+implementation PR of issue #755) are the v1 corpus: bundled `Docs:`
+issues in THIS repository, kept as the retro-labeled archive —
+`label:"from-reflection"` stays their query key — and cited by rule
+text as bare numbers. Their open tail never passes the gate: it is
+commissioned by number (see Triage). A `Docs:` issue arriving here
+after the cutover is a straggler from a checkout that still carries the
+old skill: transfer it to the feedback repo and close it with a
+pointer. From the cutover on, new topics live in the feedback repo
+only, and new text cites them by its short name (conventions.md,
+"Referencing reflection topics").
+
+## Promotion — recurrence is the gate
+
+Whether a topic is general is measured, not judged: the sorting
+decision sat with the person holding the least evidence for it (a
+one-off and a pattern read the same from the triage chair), so the
+redesign moved it to the sessions that hit the topic (issue #755).
+
+- A topic is PROMOTED at quorum: three distinct sessions — the filer
+  plus two independent confirmations — counted by distinct `Session:`
+  ids over the issue body and its comments, never by comment count.
+  The count is taken at every trigger check and at the monthly sweep; a
+  newly promoted issue gets the `promoted` label and a ledger comment
+  naming the count. (RM-0211)
+- Two overrides, both the maintainer's: an issue filed `prio:high`
+  (rare but severe — data loss, security class) is promoted on filing,
+  the quorum bypassed; and the maintainer may promote any issue by hand
+  or reject one that reached quorum, at any time — the hand-applied
+  `promoted` label or the closing comment is the record. (RM-0212)
+- `research-candidate` issues are outside the loop's work: they wait
+  for the monthly sweep, where the maintainer refiles keepers into this
+  repository as research issues (the #715 pattern) and closes the rest.
+  (RM-0213)
 
 ## When a docs wave runs
 
 A docs wave is a commissioned case like any other — cadence is the
 maintainer's
 ([internal/process/review.md](../internal/process/review.md)). The
-agent PROPOSES one when the backlog crosses a threshold: 5+ open
-`Docs:` issues, or the oldest open one predates the last release. A
-proposal is a chat paragraph (issues + proposed wave cut), never a
+agent PROPOSES one when the trigger crosses:
+
+- The trigger counts PROMOTED issues, never open ones: 5+ promoted
+  issues pending, or the oldest promoted one predating the last
+  release. An unpromoted issue triggers nothing, however many are open
+  — volume below quorum is the intake working, not a backlog. (RM-0214)
+
+A proposal is a chat paragraph (issues + proposed wave cut), never a
 self-started wave.
+
+## Counting sessions — the trigger check
+
+The check is one `gh issue view` per open reflection issue: the count
+is the number of distinct session ids in the body plus the comments.
+Run it and read the `#number [labels] sessions=N` lines:
+
+```sh
+REPO=steffenmaechtel/opk-agent-feedback
+if ! issues=$(gh issue list -R "$REPO" --state open --label from-reflection --limit 300 \
+        --json number,labels \
+        -q '.[] | select(([.labels[].name] | index("promoted")) | not)
+             | "\(.number) \([.labels[].name] | join(","))"'); then
+    echo "TRIGGER CHECK FAILED: the issue list could not be read — no count was taken" >&2
+elif [ -z "$issues" ]; then
+    echo "no unpromoted reflection issue is open"
+else
+    printf '%s\n' "$issues" | while read -r n labels; do
+        body=$(gh issue view -R "$REPO" "$n" --json body,comments \
+            -q '[.body] + [.comments[].body] | .[]') ||
+            { echo "#$n: FETCH FAILED — not counted" >&2; continue; }
+        ids=$(printf '%s\n' "$body" |
+            sed -n 's/^[[:space:]]*Session:[[:space:]]*\(ses_[A-Za-z0-9]\+\).*/\1/p' | sort -u)
+        printf '#%s [%s] sessions=%s\n' "$n" "$labels" "$(printf '%s\n' "$ids" | grep -c .)"
+    done
+fi
+```
+
+Both failure paths say so instead of printing a result: a list that
+cannot be read, an issue that cannot be fetched. The count includes the
+filer (the body's own `Session:` line), so 1 means no other session has
+hit the topic. Promote what reaches three, and every `prio:high` issue
+whatever its count; `research-candidate` issues are not listed — they
+never count toward a wave. A promotion is recorded, not just observed:
+`gh issue edit -R … --add-label promoted`, plus the ledger comment
+naming the count and the session ids.
 
 ## Triage — every item gets a disposition class
 
-A `Docs:` issue is a bundle of items, not one change (#535 alone
-carries three items across two rule files). Before the first wave opens,
-one triage pass decomposes every open `Docs:` issue into items and
-classifies each:
+Promotion is the filter for the feedback repository's topics: triage
+runs at wave time, on the commissioned PROMOTED issues only — nothing
+below quorum is read, classified or closed before then. The v1 open
+tail is the one backlog that never passes the gate: those bundles were
+filed in THIS repository before the cutover, carry no `Session:` lines,
+and are commissioned by number — the same pass decomposes them. A
+promoted issue is one topic, but it may decompose
+into items (a rule-text item and a code item for the same mechanism);
+the v1 bundles decomposed the same way (#535 alone carried three items
+across two rule files). One triage pass decomposes every commissioned
+issue into items and classifies each:
 
 | Class   | Meaning |
 |---------|---------|
@@ -46,12 +122,15 @@ maintainer comment posted after filing is triage input (class
 override or added demand): the 2026-11-18 batch triaged #620 from
 its body and missed the overnight item-1 reject plus the issue-detail
 demand, both sitting in comments (disclosed in PR #622's amendment).
+An extracted work order lands in THIS repository and cites its topic
+as `opk-agent-feedback#N`.
 
 The ledger posts as one append-only comment per issue BEFORE waves
 open, so the maintainer can veto class assignments cheaply. An issue
 closes only when every item has a final disposition (the `Closes`/
 `Ref` discipline is the birth-PR rule, review.md — the agent-side
-bullet lives in review-concept, "Round typing and tiering").
+bullet lives in review-concept, "Round typing and tiering"; a feedback
+issue is referenced in the cross-repo form, the closure bullet below).
 
 ## Batching — the commission names the batch, or the wave infers and discloses
 
@@ -73,8 +152,8 @@ into one coherent diff:
 - docs-only diffs are non-shipped track: autonomous mode default,
   tier by size (review.md).
 
-The founding backlog — the seven issues above, joined by #540 and
-#546 while the loop already ran — was worked in two pilot sessions
+The founding backlog — #523, #524, #528, #530, #534, #535 and #538,
+joined by #540 and #546 while the loop already ran — was worked in two pilot sessions
 (2026-11-15, PRs #544, #545, #547 and #548): four and five issues,
 two PRs each, loop wall times 27+8 and ~45+~7 minutes, triage gated
 before the waves. Calibrated: the review loop dominates wall time,
@@ -180,10 +259,62 @@ sessions, one per PR).
   while the multi-word grep sat empty and the sweep record claimed
   the re-check, #669). (RM-0183)
 
+- A landed topic's feedback issue closes through the wave, across
+  repositories: the birth-PR body names every landed issue in the
+  cross-repo form GitHub documents (`Closes
+  steffenmaechtel/opk-agent-feedback#N`), and the wave does not rely on
+  it — before the merge it posts the disposition comment on the issue
+  (class, landing PR), and the next trigger check closes whatever that
+  PR left open (`gh issue close -R … --reason completed`). A closing
+  keyword across two repositories is platform behavior, not a house
+  rule: treat it as unverified until a merge was observed closing the
+  issue — the cutover PR's check issue in the feedback repo is that
+  observation. (RM-0215)
+
+## Hygiene — the monthly sweep
+
+The sweep shares its commission with the monthly metrics snapshot —
+the maintainer's, like a wave
+([internal/process/review.md](../internal/process/review.md)).
+Candidates are every open issue without `promoted` — reflection topics
+for the stale-close, `research-candidate` ones for the keep-or-close
+decision, anything else for a disposition — with the date of their last
+confirming comment, the last one carrying a `Session:` line (the
+issue's creation when there is none):
+
+```sh
+gh issue list -R steffenmaechtel/opk-agent-feedback --state open --limit 300 \
+    --json number,createdAt,comments,labels \
+    -q '.[] | select(([.labels[].name] | index("promoted")) | not)
+      | ([.comments[] | select(.body | test("(?m)^[[:space:]]*Session:[[:space:]]*ses_[A-Za-z0-9]+"))]
+         | last.createdAt) as $last
+      | "#\(.number) [\([.labels[].name] | join(","))] filed \(.createdAt) last-session \($last // .createdAt)"' ||
+    echo "SWEEP FAILED: the candidate list could not be read" >&2
+```
+
+- Stale-close is a recorded disposition, never a silent rot: an
+  unpromoted issue without a new confirming session for three months is
+  closed as not planned (`gh issue close -R … --reason "not planned"`)
+  with a ledger comment carrying its session count and the date of the
+  last confirmation. The sweep's summary lists every issue it promoted
+  or closed. Promoted issues are never stale-closed — they wait for a
+  wave. (RM-0216)
+
+## Metrics — measured, not assumed
+
+Whether the loop helps is measured: the definitions (M1 boot context,
+M2 corpus size, M3 review efficiency, M4 recurrence), the honesty
+caveats and the cadence live with the snapshots in the feedback repo
+(`steffenmaechtel/opk-agent-feedback`, `metrics/README.md`) — process
+memory about the intake stays with the intake. The M1/M2 snapshot
+script is `scripts/docs-loop-metrics.py` here: it reads this tree and
+the local opencode.db and prints the snapshot's tables.
+
 ## Closure — and the next cycle
 
 The loop stops by the ordinary stop rule; the closing summary lists
-every item of every covered issue with its class and landing place.
-The session still ends with the `opk-improve-docs` ask — doc waves are
-sessions too: a wave whose own rules prove wrong becomes the next
-`Docs:` issue, and the loop corrects itself.
+every item of every covered issue with its class and landing place, and
+each covered feedback issue carries its disposition comment before the
+merge. The session still ends with the `opk-improve-docs` ask — doc
+waves are sessions too: a wave whose own rules prove wrong becomes the
+next reflection topic, and the loop corrects itself.

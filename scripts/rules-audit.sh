@@ -142,6 +142,10 @@ ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#suites-are-the-standin
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#parallel-reviewer-agents"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#release-gate"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/docs-loop.md#what-doc-waves-owe-beyond-the-ordinary-loop"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/docs-loop.md#promotion-recurrence-is-the-gate"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/docs-loop.md#when-a-docs-wave-runs"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/docs-loop.md#hygiene-the-monthly-sweep"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#referencing-reflection-topics"
 
 WORK=$(mktemp -d /tmp/rules-audit.XXXXXX) || exit 1
 trap 'rm -rf "$WORK"' EXIT

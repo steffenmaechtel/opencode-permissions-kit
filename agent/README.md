@@ -9,7 +9,7 @@ root) is the router; these pages are the rules themselves.
 | [learnings.md](learnings.md) | the L1–L7 checklist from every review wave 0.0.38–0.0.46 — run before committing and again before done |
 | [test-fidelity.md](test-fidelity.md) | why bugs pass unit/e2e but still hit real terminals; the patterns that close the gap |
 | [review-concept.md](review-concept.md) | the PR-native review process: loop, tiering, stop rule, reviewer mechanics |
-| [docs-loop.md](docs-loop.md) | consuming `Docs:` reflection issues — triage, waves, closure |
+| [docs-loop.md](docs-loop.md) | consuming reflection topics from the feedback repo — quorum, triage, waves, closure |
 
 The review corpus archive lives in
 [internal/reviews/README.md](../internal/reviews/README.md) (tag

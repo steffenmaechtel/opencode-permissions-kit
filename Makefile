@@ -63,6 +63,7 @@
     test-pages \
     test-agents-host-notes \
     test-rules-index-parity \
+    test-docs-loop \
     test-rider-lint \
     test-stdin-anchor \
     test-harness \
@@ -199,6 +200,7 @@ help:
 	@echo "  make test-project-paths  Run project path policy tests"
 	@echo "  make test-workflows Run CI workflow consistency tests"
 	@echo "  make test-docs     Run docs link check"
+	@echo "  make test-docs-loop  Run docs-loop pins: AGENTS.md byte cap + metrics script (issue #755)"
 	@echo "  make test-pages    Run pages site tests"
 	@echo "  make test-agents-host-notes  Run agent host notes tests"
 	@echo "  make test-install-args  Run install.sh arg-parsing tests"
@@ -254,6 +256,7 @@ help:
 test: lint \
       test-line-length \
       test-docs \
+      test-docs-loop \
       test-rules-revisit \
       test-sandbox-policy \
       test-skills-lint \
@@ -620,6 +623,10 @@ test-workflows:
 test-docs:
 	@echo "=== Docs Link Check ==="
 	@./tests/unit/test-docs.sh
+
+test-docs-loop:
+	@echo "=== Docs-Loop Pins (AGENTS.md byte cap + metrics script, issue #755) ==="
+	@./tests/unit/test-docs-loop.sh
 
 test-line-length:
 	@echo "=== Line Length Ratchet ==="
