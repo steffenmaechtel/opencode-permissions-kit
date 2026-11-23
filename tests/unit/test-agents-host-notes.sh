@@ -182,9 +182,11 @@ echo "-- 3. the notes carry every failure-mode -> workaround pair --"
 
 # Docs-pin shape (agent/conventions.md "Source-counting pins"): raw
 # greps over markdown, each literal a single-line fragment chosen
-# against the file's wrap. Every pair pins its symptom and each of its
-# workaround sentences, in file order; the two standing instructions
-# (the safety line, the scope line) ride the same list (#770 b F1).
+# against the file's wrap. The list is the notes' content contract, in
+# file order: every symptom and each workaround sentence of the three
+# failure pairs, plus the safety line, the scope line, the first stop
+# and the fallback command. Other instruction sentences -- the report
+# line, the push note -- are not pinned (#770 b F1, c G1 G3).
 for _lit in \
     'never reach for' \
     'whoami' \
