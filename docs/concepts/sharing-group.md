@@ -32,8 +32,11 @@ semantics):
 
 One entry class is skipped: a [git-protection](../how-to/git-protection.md)
 pointer (`.git` as a sealed pointer file) carries `chattr +i`, which refuses
-`chgrp`/`chmod` even for root — and the kit writes it `<developer>:opencode
-664` before sealing, so the baseline's target state already holds there.
+`chgrp`/`chmod` even for root — and the kit writes it `<developer>:<group>
+664` before sealing, so the baseline's target state already holds on the
+pointers it sealed itself. A pointer re-nailed by hand (or sealed by an
+older kit) keeps its drifted state silently: the seal blocks `chgrp`/
+`chmod` for everyone, so refreshes skip it either way.
 
 First runs over large trees (hundreds of repos) take minutes per pass; the
 helper prints a live per-pass entry counter.

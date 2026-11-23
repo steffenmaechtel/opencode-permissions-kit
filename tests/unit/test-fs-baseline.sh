@@ -751,6 +751,37 @@ assert_eq "7d: regular files still shared (600 -> 660)" "660" \
     "$(stat -c %a "$GP7D/proj/file.txt")"
 assert_eq "7d: classic .git dir with the same marker is NOT skipped (2770+sticky)" "3770" \
     "$(stat -c %a "$GP7D/classic/.git")"
+# Companion drive (#760 a C1): the INERT arm — a failing or absent
+# lsattr leaves the pointer a normal operand. The stub fails rc 1
+# with no stdout (the empty-_lsv shape a missing or failing lsattr
+# produces; the not-found variant differs only in how the emptiness
+# arises — both suppress through the 2>/dev/null and match no *i*).
+# §7d above left proj/.git at 600 (the skip arm ran); this drive must
+# EXECUTE the operand and land 660 — a regressed gate (e.g. one that
+# defaults the empty field, ${_lsv:-i}) would keep 600 and red here.
+GP7DNO="$WORK/gp7dno"
+mkdir -p "$GP7DNO"
+cat >"$GP7DNO/lsattr" <<'EOS'
+#!/bin/sh
+# failing lsattr: no stdout, rc 1 (unsupported fs / absent-tool shape)
+exit 1
+EOS
+chmod 755 "$GP7DNO/lsattr"
+GP7DNOUT="$(PATH="$GP7DNO:$PATH" FS_SUDO="" \
+    sh -c '. "$1" && fs_baseline_root "$2" "$3" && echo BASELINE-RC0' \
+    _ "$LIB" "$GP7D" "$GRP" 2>&1)"
+if printf '%s\n' "$GP7DNOUT" | grep -qF 'BASELINE-RC0'; then
+    pass "7d: failing lsattr keeps the baseline green (inert arm)"
+else
+    fail "7d: failing lsattr aborted the baseline (out: $GP7DNOUT)"
+fi
+if printf '%s\n' "$GP7DNOUT" | grep -qF 'hit errors'; then
+    fail "7d: pass-failure warn under failing lsattr (out: $GP7DNOUT)"
+else
+    pass "7d: no pass-failure warn under failing lsattr"
+fi
+assert_eq "7d: failing lsattr runs the pointer operand (600 -> 660, inert arm)" "660" \
+    "$(stat -c %a "$GP7D/proj/.git")"
 
 # --- 8. Makefile + CI wiring -----------------------------------------------------------
 # Chain membership via the wrapped test: span (issue #464): a bare grep
