@@ -1176,9 +1176,11 @@ _gp_q() {
 # The path in a command goes through _gp_q, and a path the migration
 # form gate refuses (whitespace, glob character, dot segment —
 # `_gp_pform_ok`) gets NO command: `adopt` would refuse it, so the row
-# names the rename instead (#765 a S3). These no-command rows render
-# their KEY through _gp_disp: they are the rows that know the path may
-# carry a control byte (#765 b F1).
+# names the rename instead (#765 a S3). A no-command row whose path
+# carries a CONTROL byte renders its key through _gp_disp — that byte
+# must not reach the terminal raw (#765 b F1); a merely whitespace-
+# bearing path keeps its key as is (a UTF-8 name must not turn into
+# question marks).
 # Two or more classic rows under `adopt` add the all-at-once hint
 # (`on` migrates every project in one run — the better fit there).
 # _gp_rows_actionable is the callers' counter (1 when a classic or
@@ -1202,7 +1204,9 @@ _gp_rows() {
                     [ "$3" = adopt ] && _gprl_msg="$_gprl_msg $_gprl_q"
                     ui_kv_bad "$_gprl_proj" "$_gprl_msg"
                 else
-                    ui_kv_bad "$(_gp_disp "$_gprl_proj")" "classic .git (unprotected -- the mv .git arm) -- no command""\
+                    _gprl_key=$_gprl_proj
+                    case "$_gprl_key" in *[[:cntrl:]]*) _gprl_key=$(_gp_disp "$_gprl_key") ;; esac
+                    ui_kv_bad "$_gprl_key" "classic .git (unprotected -- the mv .git arm) -- no command""\
  for this path"
                     ui_detail "the path fails a migration gate or cannot be pasted safely (whitespace, glob"
                     ui_detail "character, dot segment or control byte) -- rename the folder, then adopt it"
@@ -1215,7 +1219,8 @@ _gp_rows() {
                 if [ -n "$_gprl_q" ]; then
                     ui_kv_warn "$_gprl_proj" "pointer, NOT nailed (run: sudo opk git-protection nail $_gprl_q)"
                 else
-                    ui_kv_warn "$(_gp_disp "$_gprl_proj")" "pointer, NOT nailed -- no command for this path"
+                    _gprl_key=$(_gp_disp "$_gprl_proj")
+                    ui_kv_warn "$_gprl_key" "pointer, NOT nailed -- no command for this path"
                     ui_detail "the path carries a control byte -- rename the folder, then nail it"
                 fi
                 _gp_rows_actionable=1

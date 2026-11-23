@@ -1221,9 +1221,10 @@ printf 'ref: x\n' >"$_s3/sub dir/p/.git/HEAD"
 printf 'ref: x\n' >"$_s3/a;b/.git/HEAD"
 printf 'ref: x\n' >"$_s3/a\$(id)b/.git/HEAD"
 _q_tab=$(printf '\t')
-mkdir -p "$_s3/a${_q_tab}b" "$_s3/c${_q_tab}d/.git/objects"
+mkdir -p "$_s3/a${_q_tab}b" "$_s3/c${_q_tab}d/.git/objects" "$_s3/büro x/.git/objects"
 printf 'gitdir: %s\n' "$WORK/storage/u1.git" >"$_s3/a${_q_tab}b/.git"
 printf 'ref: x\n' >"$_s3/c${_q_tab}d/.git/HEAD"
+printf 'ref: x\n' >"$_s3/büro x/.git/HEAD"
 printf '%s\n' "$WORK/roots/r6" >"$CONF"
 printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\nGITDIR_STORAGE=%s\n' \
     "$(id -un)" "$(id -un)" "$(id -gn)" "$WORK/storage" >"$IC"
@@ -1243,6 +1244,11 @@ if [ "$_rc" = 1 ] &&
     grep -qF "kv-bad: $_s3/c?d classic .git (unprotected -- the mv .git arm) -- no command for this path" &&
     ! printf '%s' "$_out" | grep -qF "a${_q_tab}b" &&
     ! printf '%s' "$_out" | grep -qF "c${_q_tab}d" &&
+    # a whitespace path with a UTF-8 name keeps its key readable — the
+    # sanitizer is for control bytes only, not for non-ASCII letters
+    printf '%s' "$_out" |
+    grep -qF "kv-bad: $_s3/büro x classic .git (unprotected -- the mv .git arm) -- no command for this path" &&
+    ! printf '%s' "$_out" | grep -qF 'b??ro' &&
     ! printf '%s' "$_out" | grep -qF "adopt $_s3/a;b" &&
     ! printf '%s' "$_out" | grep -qF "adopt $_s3/sub dir/p" &&
     printf '%s' "$_out" | grep -qF 'rename the folder, then adopt it'; then
