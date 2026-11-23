@@ -1119,6 +1119,11 @@ if [ "$_rc" = 1 ] &&
     printf '%s' "$_out" |
     grep -qF 'error: git-protection is declined on this host (GITDIR_STORAGE=none) and no default' &&
     printf '%s' "$_out" | grep -qF 'replace that line with an absolute storage path' &&
+    # the declined-specific refusal is the one that STOPS the run —
+    # the generic "no storage path derivable" arm must not follow
+    # (sabotage c22: without the arm's own exit the message still
+    # prints and the pin stayed green).
+    ! printf '%s' "$_out" | grep -qF 'no storage path derivable' &&
     [ "$(sed -n 's/^GITDIR_STORAGE=//p' "$IC")" = none ]; then
     pass "on: declined with no derivable default refuses loud, names the line, keeps the marker (#764)"
 else
