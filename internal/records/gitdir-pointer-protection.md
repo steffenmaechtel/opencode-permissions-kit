@@ -84,6 +84,14 @@ worktree fresh form, root-migrated agent-owned form).
   push in all states; tooling smoke (npm, rev-parse, project-top mv
   with an immutable file inside — parent rename is NOT blocked —
   absolute pointer keeps working) green.
+- **Prototype soak (maintainer host, `feature/tmp-git-protection`):** a
+  few days of real workload on both actors, no showstoppers reported —
+  the verdict that greenlit the implementation wave (PR #754). Its one
+  carried friction: hosts that had run the early `on` kept sealed
+  worktree pointers, which block `worktree repair` until a one-time
+  `sudo chattr -i`; the wave excludes worktree pointers from its nail
+  sweep and documents that legacy case in
+  [the how-to](../../docs/how-to/git-protection.md) (PR #754, review b D1).
 
 ## 4. Findings beyond the questions (each rule-conform, all PASS)
 

@@ -126,6 +126,12 @@ developer: the #644 impact returns), **W2** project-dir swap at depth,
 the soft model's existing content overwrite; real loss surface is
 dev-owned untracked files).
 
+**Successor (implemented):** W1 is closed by the nailed-pointer layout —
+[gitdir-pointer-protection.md](gitdir-pointer-protection.md) (status
+IMPLEMENTED, PR #754; follow-ups #760/#761/#765). W2 (project-dir swap
+at depth) stays out of scope. Shipped behavior:
+[the how-to](../../docs/how-to/git-protection.md).
+
 Compensations: the §5 detection row (catches W1/W2 after the fact — a
 swap necessarily leaves an agent-owned `.git`); documented dead ends so
 nobody "fixes" them that way — a global `core.hooksPath` does NOT defend
@@ -136,7 +142,7 @@ The only complete closure remains a separate agent-owned clone — the
 upstream commenter's conclusion, unchanged, workflow change, out of
 scope. Per-entry alternatives researched in #702: bind-mount pin
 (EBUSY), pointer-file layout + `chattr +i` on the pointer + sticky
-external gitdir storage (exploration tracked separately), BPF-LSM guard
+external gitdir storage (now the successor record above), BPF-LSM guard
 (kernel supports it here but securityfs is not mounted on this WSL2
 host — practically unverifiable).
 
