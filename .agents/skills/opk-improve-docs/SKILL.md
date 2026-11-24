@@ -87,7 +87,7 @@ confirms, taken from the session's own context (the system prompt's
 `# Your Model` block — `GLM-5.3`, `GLM-5.3-Flash`, `GLM-5.4`). A
 session that cannot determine its own model asks the maintainer, who
 can see it, instead of guessing. The line is informational — triage
-and metrics read it; the count never does.
+reads it now and later metrics may; the count never does.
 
 ## Labels
 

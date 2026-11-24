@@ -271,7 +271,7 @@ sessions, one per PR).
   PR left open (`gh issue close -R … --reason completed`). A closing
   keyword across two repositories is platform behavior — observed
   once, and it worked: the cutover PR #769's merge (2026-11-23T23:36:04Z)
-  closed its check issue opk-agent-feedback#1 four seconds later, by
+  closed its check issue opk-agent-feedback#1 seconds later, by
   the merge itself; the backstop above stays for any merge that does
   not. (RM-0215)
 
