@@ -1204,7 +1204,7 @@ for _q_c in "a${_q_nl}b" "$(printf 'a\tb')" "$(printf 'a\033b')"; do
         _q_bad="$_q_bad accepted"
     fi
 done
-if [ -z "$_q_fail" ] && [ -n "$_q_nl" ]; then
+if [ -z "$_q_bad" ] && [ -n "$_q_nl" ]; then
     pass "_gp_q: a control byte (newline, tab, escape) is refused, nothing printed (#765 a S3)"
 else
     fail "_gp_q control-byte arms:$_q_bad"
@@ -1250,10 +1250,10 @@ _out=$(
         GP_INSTALL_CONF="$IC" GP_ALLOW_NONROOT=1 GP_CONF_RELAX=1 \
         /bin/sh -c '. "$1"; _gp_projects' _ "$CORE" 2>&1
 ) || _rc=$?
-if [ "$_rc" = 1 ] &&
+if [ "$_rc" = 2 ] &&
     printf '%s' "$_out" | grep -qF 'python3 unavailable' &&
-    ! printf '%s' "$_out" | grep -qF '^classic '; then
-    pass "enumeration: no python3 on the host refuses the sweep loud, nothing authorized (#756 A8)"
+    ! printf '%s' "$_out" | grep -q '^classic '; then
+    pass "enumeration: no python3 on the host refuses the sweep loud, nothing authorized (#756 A8, #775 a S1)"
 else
     fail "enumeration python3-less arm (rc=$_rc out=$_out)"
 fi
@@ -1270,9 +1270,9 @@ _out=$(
     export PATH
     _core_run '_gp_projects'
 ) || _rc=$?
-if [ "$_rc" = 1 ] &&
+if [ "$_rc" = 2 ] &&
     printf '%s' "$_out" | grep -qF 'the NUL reader failed' &&
-    ! printf '%s' "$_out" | grep -qF '^classic '; then
+    ! printf '%s' "$_out" | grep -q '^classic '; then
     pass "enumeration: a failing python3 refuses the sweep under the reader's own name (#756 A8)"
 else
     fail "enumeration broken-python3 arm (rc=$_rc out=$_out)"
@@ -1289,12 +1289,101 @@ _out=$(
     _core_run '_gp_projects'
 ) || _rc=$?
 chmod 755 "$WORK/ro-tmp"
-if [ "$_rc" = 1 ] &&
+if [ "$_rc" = 2 ] &&
     printf '%s' "$_out" | grep -qF 'mktemp failed' &&
-    ! printf '%s' "$_out" | grep -qF '^classic '; then
+    ! printf '%s' "$_out" | grep -q '^classic '; then
     pass "enumeration: a failed staging mktemp refuses the sweep loud (#756 A8)"
 else
     fail "enumeration mktemp arm (rc=$_rc out=$_out)"
+fi
+
+# S1 (#775 a): a refused enumeration (rc 2) must read as FAILURE at
+# every sweep caller — never a success banner, never a config drop.
+# The broken-python3 stub drives the refusal end-to-end through the
+# CLI entry; the authorization side (empty stdout) is asserted by the
+# still-classic .git dir.
+mkdir -p "$WORK/badpy2"
+printf '#!/bin/sh\nexit 1\n' >"$WORK/badpy2/python3"
+chmod 755 "$WORK/badpy2/python3"
+mkdir -p "$WORK/s1/storage/s1p.git" "$WORK/s1/roots/r10/s1p"
+printf 'gitdir: %s\n' "$WORK/s1/storage/s1p.git" >"$WORK/s1/roots/r10/s1p/.git"
+printf '%s\n' "$WORK/s1/roots/r10" >"$CONF"
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\nGITDIR_STORAGE=%s\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" "$WORK/s1/storage" >"$IC"
+_s1_fail=""
+for _s1_cmd in status on nail off; do
+    _s1_rc=0
+    _s1_out=$(
+        PATH="$WORK/badpy2:$PATH"
+        export PATH
+        _core_run "git_protection_cli $_s1_cmd"
+    ) || _s1_rc=$?
+    if [ "$_s1_rc" -eq 0 ]; then
+        _s1_fail="$_s1_fail $_s1_cmd:rc0"
+    elif ! printf '%s' "$_s1_out" | grep -qF 'the project enumeration refused'; then
+        _s1_fail="$_s1_fail $_s1_cmd:no-error-line"
+    elif printf '%s' "$_s1_out" | grep -qF 'migration complete'; then
+        _s1_fail="$_s1_fail $_s1_cmd:success-banner"
+    fi
+done
+if [ -z "$_s1_fail" ] &&
+    [ -f "$WORK/s1/roots/r10/s1p/.git" ] &&
+    grep -q '^GITDIR_STORAGE=' "$IC"; then
+    pass "S1: a refused enumeration fails status/on/nail/off loud — no banner, config kept, pointer untouched (#775 a S1)"
+else
+    fail "S1 caller arms ($_s1_fail)"
+fi
+# rc 1 (absent conf) stays the benign fold — the overload must not
+# have leaked fatal semantics into the nothing-to-classify case.
+_rc=0
+_out=$(_core_run 'GP_CONF="$WORK/absent.conf"; git_protection_cli status') || _rc=$?
+if [ "$_rc" = 0 ]; then
+    pass "S1: an absent projects.conf still classifies nothing, rc 0 (#775 a S1)"
+else
+    fail "S1 absent-conf arm (rc=$_rc out=$_out)"
+fi
+
+# S2 (#775 a): a staging file truncated mid-entry (no trailing NUL on
+# the last fragment) drops the fragment — one missing row, never one
+# row for a path that does not exist. Driven through the real reader
+# via a find stub whose -print0 stream lacks the final NUL.
+mkdir -p "$WORK/trfind/complete/.git/objects" "$WORK/stubfind"
+printf 'ref: x\n' >"$WORK/trfind/complete/.git/HEAD"
+printf '%s\n' "$WORK/trfind" >"$CONF"
+cat >"$WORK/stubfind/find" <<STUBEOF
+#!/bin/sh
+# one complete NUL-terminated entry, then a truncated fragment
+printf '$WORK/trfind/complete/.git\0$WORK/trfind/trunc'
+STUBEOF
+chmod 755 "$WORK/stubfind/find"
+_rc=0
+_out=$(
+    PATH="$WORK/stubfind:$PATH"
+    export PATH
+    _core_run '_gp_projects'
+) || _rc=$?
+if [ "$_rc" = 0 ] &&
+    printf '%s' "$_out" | grep -qF "classic $WORK/trfind/complete" &&
+    ! printf '%s' "$_out" | grep -qF 'trunc'; then
+    pass "S2: a truncated staged tail is dropped — no row for a nonexistent path (#775 a S2)"
+else
+    fail "S2 truncation arm (rc=$_rc out=$_out)"
+fi
+
+# A4 (#775 a): orphan keys render through _gp_rowkey — a control byte
+# masks, a UTF-8 name stays readable (the wave's own key contract).
+mkdir -p "$WORK/orph/storage/o${_a8_tab}d.git" "$WORK/orph/storage/büro.git" "$WORK/orph/roots/r9"
+printf '%s\n' "$WORK/orph/roots/r9" >"$CONF"
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\nGITDIR_STORAGE=%s\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" "$WORK/orph/storage" >"$IC"
+_rc=0
+_out=$(_core_run ': >"$WORK/orph/ref"; _gp_orphan_rows "$WORK/orph/storage" "$WORK/orph/ref"') || _rc=$?
+if printf '%s' "$_out" | grep -qF "kv: $WORK/orph/storage/o?d.git unreferenced storage entry" &&
+    printf '%s' "$_out" | grep -qF "kv: $WORK/orph/storage/büro.git unreferenced storage entry" &&
+    ! printf '%s' "$_out" | grep -qF "o${_a8_tab}d"; then
+    pass "A4: orphan keys mask control bytes and keep UTF-8 readable (#775 a A4)"
+else
+    fail "A4 orphan key arms (rc=$_rc out=$_out)"
 fi
 
 # WO-2 (#756, the #765 b F1 class): the row keys of the arms #765 did

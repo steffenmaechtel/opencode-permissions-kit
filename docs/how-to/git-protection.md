@@ -66,7 +66,9 @@ under a path containing a newline is skipped with a loud stderr note
 the path anyway) — it never yields a garbage row, and it never
 blocks enumeration of the other projects. The sweep requires
 `python3` for this (the NUL-separated reader); a host without it
-refuses to enumerate at all rather than degrade silently.
+refuses to enumerate at all rather than degrade silently (on
+`opk status --short` that note is muted with every other detail
+line — run the full `opk git-protection status` to see it).
 
 ### Unreferenced storage entries
 

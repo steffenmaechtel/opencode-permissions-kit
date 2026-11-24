@@ -1039,6 +1039,14 @@ _gp_revert_one() {
 # collapsed): kit-written and git-repaired pointers are canonical, and
 # an unusual spelling can only ever produce an INFO row, never a root
 # operation.
+# rc contract (#775 a S1): 0 = enumerated (rows on stdout); 1 = absent
+# projects.conf — nothing to classify, benign by design since #704;
+# 2 = REFUSED (python3 missing or broken, staging mktemp failed, the
+# NUL reader failed) — a loud failure whose stdout stays empty, and
+# every sweep caller MUST treat it as failure: never a success banner,
+# never a config drop over an unenumerated tree (the #754 a B2
+# honesty gate counts pointers through this enumeration — a refused
+# run reads as zero and must not authorize `off`'s drop).
 _gp_projects() {
     _gpp_ref="${1:-}"
     _gpp_conf=$(_gp_conf_path)
@@ -1059,25 +1067,27 @@ _gp_projects() {
     # fs-baseline.sh). Other control bytes (a tab) keep flowing: their
     # rows render through _gp_rowkey/_gp_disp at REPORT time (#765
     # b F1, #756). The git-heal sweeps keep the newline idiom
-    # DELIBERATELY — their split fragments die as counted errors or
-    # heal attacker-planted garbage in-tree, fail-loud (the documented
-    # rationale, #655 b Q3) — while this enumerator's rows drive
-    # migrations: the two damage profiles differ, hence split idioms
-    # by risk class. python3 missing or the reader failing refuses
+    # DELIBERATELY — in their ON-sweep the split fragments die as
+    # counted errors or heal attacker-planted garbage in-tree,
+    # fail-loud (the documented rationale, #655 b Q3; their status
+    # twin is softer: a fragment's stat fails and its row is dropped
+    # silently, pre-existing) — while this enumerator's rows drive
+    # migrations: the damage profiles differ, hence split idioms by
+    # risk class (#775 a A5 scopes this claim). python3 missing or the reader failing refuses
     # the WHOLE enumeration: authorize nothing, say why (the
     # reader-gate doctrine) — never a silent newline downgrade.
     if ! command -v python3 >/dev/null 2>&1; then
         printf 'git-protection: python3 unavailable — cannot enumerate .git entries safely (nothing authorized)\n' >&2
-        return 1
+        return 2
     fi
     _gpp_nul=$(mktemp) || {
-        printf 'git-protection: mktemp failed — cannot enumerate .git entries safely (nothing authorized)\n' >&2
-        return 1
+        printf 'git-protection: mktemp failed (is $TMPDIR writable?) — no enumeration, nothing authorized\n' >&2
+        return 2
     }
     _gpp_txt=$(mktemp) || {
-        printf 'git-protection: mktemp failed — cannot enumerate .git entries safely (nothing authorized)\n' >&2
+        printf 'git-protection: mktemp failed (is $TMPDIR writable?) — no enumeration, nothing authorized\n' >&2
         rm -f "$_gpp_nul"
-        return 1
+        return 2
     }
     while IFS= read -r _gpp_root; do
         case "$_gpp_root" in '' | '#'*) continue ;; esac
@@ -1104,7 +1114,13 @@ _gp_projects() {
 import sys
 with open(sys.argv[1], "rb") as f:
     data = f.read()
-for path in data.split(b"\0"):
+paths = data.split(b"\0")
+# find -print0 NUL-terminates EVERY entry: a tail without its NUL is a
+# truncated write (SIGKILL/ENOSPC mid-staging) — drop it, one missing
+# row beats one row for a path that does not exist (#775 a S2).
+if data and not data.endswith(b"\0"):
+    paths = paths[:-1]
+for path in paths:
     if not path:
         continue
     if b"\n" in path:
@@ -1117,7 +1133,7 @@ for path in data.split(b"\0"):
 ' "$_gpp_nul" >"$_gpp_txt"; then
         printf 'git-protection: the NUL reader failed — cannot enumerate .git entries safely (nothing authorized)\n' >&2
         rm -f "$_gpp_nul" "$_gpp_txt"
-        return 1
+        return 2
     fi
     rm -f "$_gpp_nul"
     while IFS= read -r _gpp_g; do
@@ -1343,7 +1359,9 @@ _gp_rowkey() {
 # this list. Three safety properties, all because the storage is
 # AGENT-WRITABLE (mode 3770):
 #   - names are enumerated by glob, never line-split (a newline in a
-#     name cannot forge a second row) and rendered through _gp_disp;
+#     name cannot forge a second row) and rendered through _gp_rowkey
+#     (a control byte masks, a non-ASCII name stays readable — #775
+#     a A4, the same key contract as project rows);
 #   - the removal hint prints the path through _gp_q (plain names
 #     bare, anything else single-quoted — never a raw shell
 #     metacharacter a developer would paste) and never with a trailing
@@ -1372,7 +1390,7 @@ _gp_orphan_rows() {
         grep -qxF -- "$_gpo_n" "$_gpo_ref" && continue
         _gpo_kind=""
         [ -L "$_gpo_e" ] && _gpo_kind=" (a symlink)"
-        ui_kv "$(_gp_disp "$_gpo_e")" "unreferenced storage entry$_gpo_kind -- no pointer under the""\
+        ui_kv "$(_gp_rowkey "$_gpo_e")" "unreferenced storage entry$_gpo_kind -- no pointer under the""\
  configured roots targets it"
         if _gpo_q=$(_gp_q "$_gpo_e"); then
             ui_detail "inspect, then remove: sudo rm -rf $_gpo_q"
@@ -1441,7 +1459,13 @@ _git_protection_status() {
     }
     # || true: an absent projects.conf (rc 1) means "nothing to
     # classify" — stderr (refused conf lines, scan notes) still flows.
-    _gp_projects "$_gpst_ref" >"$_gpst_list" || true
+    _gpst_prc=0
+    _gp_projects "$_gpst_ref" >"$_gpst_list" || _gpst_prc=$?
+    if [ "$_gpst_prc" -ge 2 ]; then
+        ui_error "the project enumeration refused — no rows, no health claim (see the note above)"
+        rm -f "$_gpst_ref" "$_gpst_list"
+        exit 1
+    fi
     _gp_rows "$_gpst_list" all "$_gpst_fix"
     _gpst_actionable=$_gp_rows_actionable
     [ "$_gpst_stor_rc" -eq 0 ] && _gp_orphan_rows "$_gpst_stor" "$_gpst_ref"
@@ -1488,7 +1512,13 @@ _git_protection_on() {
         ui_error "mktemp failed — cannot enumerate migration targets"
         exit 1
     }
-    _gp_projects >"$_gpon_list" || true
+    _gpon_prc=0
+    _gp_projects >"$_gpon_list" || _gpon_prc=$?
+    if [ "$_gpon_prc" -ge 2 ]; then
+        ui_error "the project enumeration refused — nothing migrated (see the note above)"
+        rm -f "$_gpon_list"
+        exit 1
+    fi
     _gpon_failed=0
     while IFS=' ' read -r _gpon_state _gpon_proj; do
         [ "$_gpon_state" = classic ] || continue
@@ -1559,7 +1589,13 @@ _git_protection_nail() {
         ui_error "mktemp failed — cannot enumerate nail targets"
         exit 1
     }
-    _gp_projects >"$_gpnl_list" || true
+    _gpnl_prc=0
+    _gp_projects >"$_gpnl_list" || _gpnl_prc=$?
+    if [ "$_gpnl_prc" -ge 2 ]; then
+        ui_error "the project enumeration refused — nothing nailed (see the note above)"
+        rm -f "$_gpnl_list"
+        exit 1
+    fi
     while IFS=' ' read -r _gpnl_state _gpnl_proj; do
         [ "$_gpnl_state" = unnailed ] || continue
         _gpnl_t=$(sed -n 's/^gitdir: //p' "$_gpnl_proj/.git" 2>/dev/null | head -n 1)
@@ -1584,7 +1620,13 @@ _gp_revert_all() {
         ui_error "mktemp failed — cannot enumerate revert targets"
         return 1
     }
-    _gp_projects >"$_gpra_list" || true
+    _gpra_prc=0
+    _gp_projects >"$_gpra_list" || _gpra_prc=$?
+    if [ "$_gpra_prc" -ge 2 ]; then
+        ui_error "the project enumeration refused — nothing reverted (see the note above)"
+        rm -f "$_gpra_list"
+        return 1
+    fi
     _gpra_failed=0
     _gpra_n=0
     _gpra_skip=0
@@ -1633,7 +1675,13 @@ _git_protection_off() {
         ui_error "mktemp failed — cannot enumerate pointers"
         exit 1
     }
-    _gp_projects >"$_gpof_list" || true
+    _gpof_prc=0
+    _gp_projects >"$_gpof_list" || _gpof_prc=$?
+    if [ "$_gpof_prc" -ge 2 ]; then
+        ui_error "the project enumeration refused — config NOT dropped, nothing reverted (see the note above)"
+        rm -f "$_gpof_list"
+        exit 1
+    fi
     _gpof_ptr=$(grep -cE '^(nailed|unnailed|foreign-pointer) ' "$_gpof_list" || true)
     if [ "$_gpof_stor_rc" -ne 0 ] && [ "${_gpof_ptr:-0}" -gt 0 ]; then
         ui_error "pointer projects exist ($_gpof_ptr) but the storage is not resolvable —"
