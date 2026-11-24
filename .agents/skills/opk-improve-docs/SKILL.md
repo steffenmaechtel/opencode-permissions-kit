@@ -10,7 +10,9 @@ Did you stumble over anything?
 
 If yes, every topic becomes its own issue in the feedback repo
 `steffenmaechtel/opk-agent-feedback` (`gh … -R`), never in this
-repository — the main tracker stays free of reflection volume. If the
+repository — the main tracker stays free of reflection volume. The
+one carve-out is the skill-origin check's global-skill branch:
+maintainer first, no issue. If the
 reflection finds nothing real, say exactly that in chat and create
 nothing.
 
@@ -32,6 +34,25 @@ gh issue list -R steffenmaechtel/opk-agent-feedback --state all --search "<keywo
   mechanism — file a new issue and link the old one (`Related: #N`).
 - A near match (same area, other mechanism) is a new issue too, linking
   its neighbor.
+
+## Skill-origin check
+
+Before filing, consider whether the problem came from a SKILL the
+session loaded (its instructions, its recipes, its blind spots):
+
+- A skill in THIS repository (`.agents/skills/`) is repo content —
+  file normally (`from-reflection` + priority label).
+- A GLOBAL skill (`~/.agents/skills/` — opencode-db, the ddev/typo3
+  procedures; their own versioned repository) is outside what a repo
+  wave can fix: raise it with the maintainer in the reflection ask
+  instead of filing — no feedback-repo issue first. The maintainer
+  decides how it lands: fixed in the skills repo right away, or
+  tracked where the maintainer chooses.
+- A session that cannot tell whether a skill was involved files
+  normally — the origin question is re-asked at triage
+  (agent/docs-loop.md): a topic discovered there to live in a global
+  skill is re-labeled `external-fix` — both loop labels come off —
+  and never rides a docs wave.
 
 ## Titles name the mechanism
 
@@ -99,6 +120,9 @@ reads it now and later metrics may; the count never does.
   label) — not about this repository's docs or rules (general tool
   behavior, another project): file it with that label alone. It never
   counts toward a docs wave, and the trigger check does not list it.
+  A topic from a LOADED skill is never research-candidate — the
+  skill-origin check governs it (global skill: maintainer, no issue;
+  repo skill: file normally).
 
 ## Before posting
 
