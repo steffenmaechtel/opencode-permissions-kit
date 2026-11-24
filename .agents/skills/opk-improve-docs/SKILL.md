@@ -10,7 +10,9 @@ Did you stumble over anything?
 
 If yes, every topic becomes its own issue in the feedback repo
 `steffenmaechtel/opk-agent-feedback` (`gh … -R`), never in this
-repository — the main tracker stays free of reflection volume. If the
+repository — the main tracker stays free of reflection volume. The
+one carve-out is the skill-origin check's global-skill branch:
+maintainer first, no issue. If the
 reflection finds nothing real, say exactly that in chat and create
 nothing.
 
@@ -48,8 +50,8 @@ session loaded (its instructions, its recipes, its blind spots):
   tracked where the maintainer chooses.
 - A session that cannot tell whether a skill was involved files
   normally — the origin question is re-asked at triage
-  (docs-loop.md): a topic discovered there to live in a global skill
-  is re-labeled `external-fix` and never rides a docs wave.
+  (agent/docs-loop.md): a topic discovered there to live in a global
+  skill is re-labeled `external-fix` and never rides a docs wave.
 
 ## Titles name the mechanism
 
@@ -117,6 +119,9 @@ reads it now and later metrics may; the count never does.
   label) — not about this repository's docs or rules (general tool
   behavior, another project): file it with that label alone. It never
   counts toward a docs wave, and the trigger check does not list it.
+  A topic from a LOADED skill is never research-candidate — the
+  skill-origin check governs it (global skill: maintainer, no issue;
+  repo skill: file normally).
 
 ## Before posting
 

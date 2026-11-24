@@ -121,6 +121,12 @@ issue into items and classifies each:
 | reject  | deliberately not adopted — rationale recorded |
 | external | the fix lives outside this repository (a global skill, user-level config) — re-label `external-fix` |
 
+An `external` re-label takes `promoted` off with it: the issue
+leaves the loop's counting — it never rides a wave and never feeds
+the trigger — and the monthly sweep dispositions it (close citing
+where the fix landed: a commit or issue in the skills' own
+repository; keep open with a note while it is worked there).
+
 Triage reads the issue's full TIMELINE, never only the body — a
 maintainer comment posted after filing is triage input (class
 override or added demand): the 2026-11-18 batch triaged #620 from
