@@ -590,9 +590,15 @@ status_section_git_protection() {
     # The core's stderr (refused conf lines, scan notes) is captured
     # and re-rendered as detail rows below: a raw line would print
     # under --short's one-line contract (ui_detail stays muted there).
-    # || true: an absent projects.conf (rc 1) classifies nothing.
-    _gp_projects "$_st_gp_td/ref" >"$_st_gp_td/list" 2>"$_st_gp_td/err" || true
-    if [ "$_st_gp_state" = ok ]; then
+    # || true: an absent projects.conf (rc 1) classifies nothing. rc 2
+    # (the enumeration REFUSED — #775 a S1) must not read as health:
+    # the OK-claim row is replaced by a counted warn; the notes below
+    # still name the cause.
+    _st_gp_prc=0
+    _gp_projects "$_st_gp_td/ref" >"$_st_gp_td/list" 2>"$_st_gp_td/err" || _st_gp_prc=$?
+    if [ "$_st_gp_prc" -ge 2 ] && [ "$_st_gp_state" = ok ]; then
+        ui_kv_warn "git-protection" "project rows unavailable — the enumeration refused (see the notes below)"
+    elif [ "$_st_gp_state" = ok ]; then
         _st_gp_n=$(grep -c '^nailed ' "$_st_gp_td/list" || true)
         if [ "${_st_gp_n:-0}" -gt 0 ]; then
             ui_kv_ok "git-protection" "ON — $_st_gp_n project(s) on the nailed pointer layout (storage $_st_gp_stor)"
@@ -600,8 +606,18 @@ status_section_git_protection() {
             ui_kv "git-protection" "ON — storage $_st_gp_stor; no project under the configured roots is nailed yet"
         fi
     fi
-    _gp_rows "$_st_gp_td/list" gaps "$_st_gp_fix"
-    _gp_orphan_rows "$_st_gp_stor" "$_st_gp_td/ref"
+    # B1 (#775 b): a refused enumeration leaves the reference list
+    # EMPTY — running the orphan pass over it would report every
+    # storage child as unreferenced, a positive claim over a tree the
+    # run could not enumerate. An empty ref on a HEALTHY no-pointer
+    # host is the CORRECT all-orphans report (#765 a M1), so the skip
+    # lives here at the caller, never in _gp_orphan_rows. The rows
+    # pass renders nothing either way (the list is empty); guarded
+    # with it to keep the two passes visibly one unit.
+    if [ "$_st_gp_prc" -lt 2 ]; then
+        _gp_rows "$_st_gp_td/list" gaps "$_st_gp_fix"
+        _gp_orphan_rows "$_st_gp_stor" "$_st_gp_td/ref"
+    fi
     while IFS= read -r _st_gp_note; do
         [ -n "$_st_gp_note" ] || continue
         # The core's own scan note already carries this prefix — strip

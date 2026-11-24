@@ -108,8 +108,43 @@ if [ "$_gp_storage" != "none" ] && [ "${GP_NO_HINT:-}" != "1" ]; then
     if [ -n "$_gp_top" ] && [ ! -L "$_gp_top/.git" ] && [ -d "$_gp_top/.git" ]; then
         printf '[opk git-protection %s] kit-managed tree with classic .git layout (unprotected)\n' \
             "${0##*/}" >&2
-        printf '[opk git-protection %s] run: sudo opk git-protection adopt %s\n' \
-            "${0##*/}" "$_gp_top" >&2
+        # Paste-safe adopt argument (#766): the printed line is data
+        # until the developer pastes it -- then it is shell structure.
+        # Folder names under the toplevel are agent-influenceable; a
+        # space would split the word, a metacharacter would execute at
+        # paste time. The hooks are standalone sh (no kit lib on
+        # PATH), so this carries its own copy of the _gp_q spelling
+        # (sh/git-protection-core.sh, #765 a S3): bare when plain,
+        # single-quoted with '\'' escaping otherwise, NO command for a
+        # control byte (rename the folder instead).
+        _gp_hint=""
+        case "$_gp_top" in
+            *[[:cntrl:]]*) ;;
+            -* | *[!A-Za-z0-9._/+-]*)
+                _gp_hint="'"
+                _gp_rest=$_gp_top
+                while :; do
+                    case "$_gp_rest" in
+                        *"'"*)
+                            _gp_hint="$_gp_hint${_gp_rest%%"'"*}'\\''"
+                            _gp_rest=${_gp_rest#*"'"}
+                            ;;
+                        *)
+                            _gp_hint="$_gp_hint$_gp_rest'"
+                            break
+                            ;;
+                    esac
+                done
+                ;;
+            *) _gp_hint=$_gp_top ;;
+        esac
+        if [ -n "$_gp_hint" ]; then
+            printf '[opk git-protection %s] run: sudo opk git-protection adopt %s\n' \
+                "${0##*/}" "$_gp_hint" >&2
+        else
+            printf '[opk git-protection %s] the toplevel path carries a control byte -- rename the folder, then adopt it\n' \
+                "${0##*/}" >&2
+        fi
     fi
 fi
 

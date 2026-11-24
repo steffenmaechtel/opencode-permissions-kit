@@ -833,6 +833,31 @@ else
     fail "git-protection section: declined arm (out=$_gpc_out)"
 fi
 
+# S1 (#775 a): a refused enumeration (rc 2) replaces the OK-claim row
+# with a counted warn — `opk status` never reports health over a sweep
+# that could not enumerate (the broken-python3 stub drives the
+# refusal; the notes rows below the warn name the cause).
+mkdir -p "$_gpc_work/badpy"
+printf '#!/bin/sh\nexit 1\n' >"$_gpc_work/badpy/python3"
+chmod 755 "$_gpc_work/badpy/python3"
+_gpc_out=$(_gpc_run real "$_gpc_work/install.conf" PATH="$_gpc_work/badpy:$PATH" || true)
+if [ "$(_gpc_tag kv-warn)" -ge 1 ] &&
+    printf '%s' "$_gpc_out" | grep -qF 'project rows unavailable — the enumeration refused' &&
+    ! printf '%s' "$_gpc_out" | grep -qF 'kv-ok: git-protection ON'; then
+    pass "git-protection section: a refused enumeration renders the counted warn, no OK claim (#775 a S1)"
+else
+    fail "git-protection section: refused-enum arm (out=$_gpc_out)"
+fi
+# B1 (#775 b): the refused enumeration must also skip the ORPHAN pass
+# — the reference list stayed empty, and running the pass would label
+# every storage child (the fixture has three) "unreferenced", a
+# positive claim over a tree the run could not enumerate.
+if ! printf '%s' "$_gpc_out" | grep -qF 'unreferenced storage entry'; then
+    pass "git-protection section: no orphan claims over a refused enumeration (#775 b B1)"
+else
+    fail "git-protection section: orphan rows over refused enumeration (out=$_gpc_out)"
+fi
+
 # c) enabled with deviations: the state row counts the protected
 # projects, classic rows are alerts and unnailed rows warnings — each
 # with its command and path — and no per-project green row, no

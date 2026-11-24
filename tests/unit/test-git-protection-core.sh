@@ -1210,6 +1210,264 @@ else
     fail "_gp_q control-byte arms:$_q_bad"
 fi
 
+# --- 8d. fix wave (#756): A8 newline-safe enumeration, WO-2 row keys,
+# F4 unnest pre-clear --------------------------------------------------------------
+
+_a8_tab=$(printf '\t')
+_a8_nl=$(printf 'a\nb')
+_a8_nl=${_a8_nl#a}
+_a8_nl=${_a8_nl%b}
+_a8="$WORK/roots/r7"
+mkdir -p "$_a8/pro${_a8_nl}ject/x/.git/objects" "$_a8/c${_a8_tab}d/.git/objects" "$_a8/plain/.git/objects"
+printf 'ref: x\n' >"$_a8/pro${_a8_nl}ject/x/.git/HEAD"
+printf 'ref: x\n' >"$_a8/c${_a8_tab}d/.git/HEAD"
+printf 'ref: x\n' >"$_a8/plain/.git/HEAD"
+printf '%s\n' "$_a8" >"$CONF"
+_rc=0
+_out=$(_core_run '_gp_projects') || _rc=$?
+if [ "$_rc" = 0 ] &&
+    [ "$(printf '%s\n' "$_out" | grep -c '^classic ')" = 2 ] &&
+    printf '%s' "$_out" | grep -qF "classic $_a8/c${_a8_tab}d" &&
+    printf '%s' "$_out" | grep -qF "classic $_a8/plain" &&
+    ! printf '%s' "$_out" | grep -qF 'worktree-reg' &&
+    printf '%s' "$_out" | grep -qF 'refusing a .git under a newline-bearing path' &&
+    printf '%s' "$_out" | grep -qF '\x0a'; then
+    pass "enumeration: a newline path is refused loud, no garbage row; tab and plain rows intact (#756 A8)"
+else
+    fail "enumeration A8 arms (rc=$_rc out=$_out)"
+fi
+
+# A8, python3-less arm: command -v python3 failing refuses the WHOLE
+# enumeration — authorize nothing, say why (the reader-gate
+# doctrine). A PATH without python3 (an empty dir, /bin/sh by
+# absolute path) is the simulated host; the sourcing and every helper
+# reached before the check are shell builtins, so the refusal is the
+# python3 check's own, not a collateral crash.
+mkdir -p "$WORK/nopy-bin"
+_rc=0
+_out=$(
+    env PATH="$WORK/nopy-bin" GP_STORAGE="$WORK/storage" GP_CONF="$CONF" \
+        GP_INSTALL_CONF="$IC" GP_ALLOW_NONROOT=1 GP_CONF_RELAX=1 \
+        /bin/sh -c '. "$1"; _gp_projects' _ "$CORE" 2>&1
+) || _rc=$?
+if [ "$_rc" = 2 ] &&
+    printf '%s' "$_out" | grep -qF 'python3 unavailable' &&
+    ! printf '%s' "$_out" | grep -q '^classic '; then
+    pass "enumeration: no python3 on the host refuses the sweep loud, nothing authorized (#756 A8, #775 a S1)"
+else
+    fail "enumeration python3-less arm (rc=$_rc out=$_out)"
+fi
+
+# A8, broken-interpreter arm: python3 PRESENT but failing refuses with
+# the reader's own named cause — never a silent empty sweep (L1: the
+# fail-soft spot executes its failure path).
+mkdir -p "$WORK/badpy"
+printf '#!/bin/sh\nexit 1\n' >"$WORK/badpy/python3"
+chmod 755 "$WORK/badpy/python3"
+_rc=0
+_out=$(
+    PATH="$WORK/badpy:$PATH"
+    export PATH
+    _core_run '_gp_projects'
+) || _rc=$?
+if [ "$_rc" = 2 ] &&
+    printf '%s' "$_out" | grep -qF 'the NUL reader failed' &&
+    ! printf '%s' "$_out" | grep -q '^classic '; then
+    pass "enumeration: a failing python3 refuses the sweep under the reader's own name (#756 A8)"
+else
+    fail "enumeration broken-python3 arm (rc=$_rc out=$_out)"
+fi
+
+# A8, mktemp arm: an unwritable TMPDIR refuses at the staging mktemp —
+# loud, named, nothing authorized (the 0.0.48b W2 class).
+mkdir -p "$WORK/ro-tmp"
+chmod 000 "$WORK/ro-tmp"
+_rc=0
+_out=$(
+    TMPDIR="$WORK/ro-tmp"
+    export TMPDIR
+    _core_run '_gp_projects'
+) || _rc=$?
+chmod 755 "$WORK/ro-tmp"
+if [ "$_rc" = 2 ] &&
+    printf '%s' "$_out" | grep -qF 'mktemp failed' &&
+    ! printf '%s' "$_out" | grep -q '^classic '; then
+    pass "enumeration: a failed staging mktemp refuses the sweep loud (#756 A8)"
+else
+    fail "enumeration mktemp arm (rc=$_rc out=$_out)"
+fi
+
+# S1 (#775 a): a refused enumeration (rc 2) must read as FAILURE at
+# every sweep caller — never a success banner, never a config drop.
+# The broken-python3 stub drives the refusal end-to-end through the
+# CLI entry; the authorization side (empty stdout) is asserted by the
+# still-classic .git dir.
+mkdir -p "$WORK/badpy2"
+printf '#!/bin/sh\nexit 1\n' >"$WORK/badpy2/python3"
+chmod 755 "$WORK/badpy2/python3"
+mkdir -p "$WORK/s1/storage/s1p.git" "$WORK/s1/roots/r10/s1p"
+printf 'gitdir: %s\n' "$WORK/s1/storage/s1p.git" >"$WORK/s1/roots/r10/s1p/.git"
+printf '%s\n' "$WORK/s1/roots/r10" >"$CONF"
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\nGITDIR_STORAGE=%s\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" "$WORK/s1/storage" >"$IC"
+_s1_fail=""
+for _s1_cmd in status on nail off; do
+    # B2 (#775 b) + C1 (#775 c): ONE universal banner negative — the
+    # ui stub prefixes every ui_success line with "success: ", so a
+    # single grep guards all four arms (a per-command text list left
+    # status/nail without any negative).
+    _s1_rc=0
+    _s1_out=$(
+        PATH="$WORK/badpy2:$PATH"
+        export PATH
+        _core_run "git_protection_cli $_s1_cmd"
+    ) || _s1_rc=$?
+    if [ "$_s1_rc" -eq 0 ]; then
+        _s1_fail="$_s1_fail $_s1_cmd:rc0"
+    elif ! printf '%s' "$_s1_out" | grep -qF 'the project enumeration refused'; then
+        _s1_fail="$_s1_fail $_s1_cmd:no-error-line"
+    elif printf '%s' "$_s1_out" | grep -q '^success: '; then
+        _s1_fail="$_s1_fail $_s1_cmd:success-banner"
+    fi
+done
+if [ -z "$_s1_fail" ] &&
+    [ -f "$WORK/s1/roots/r10/s1p/.git" ] &&
+    grep -q '^GITDIR_STORAGE=' "$IC"; then
+    pass "S1: a refused enumeration fails status/on/nail/off loud — no success line on any arm, config kept, pointer untouched (#775 a S1, b B2, c C1)"
+else
+    fail "S1 caller arms ($_s1_fail)"
+fi
+# rc 1 (absent conf) stays the benign fold — the overload must not
+# have leaked fatal semantics into the nothing-to-classify case.
+_rc=0
+_out=$(_core_run 'GP_CONF="$WORK/absent.conf"; git_protection_cli status') || _rc=$?
+if [ "$_rc" = 0 ]; then
+    pass "S1: an absent projects.conf still classifies nothing, rc 0 (#775 a S1)"
+else
+    fail "S1 absent-conf arm (rc=$_rc out=$_out)"
+fi
+
+# S2 (#775 a): a staging file truncated mid-entry (no trailing NUL on
+# the last fragment) drops the fragment — one missing row, never one
+# row for a path that does not exist. Driven through the real reader
+# via a find stub whose -print0 stream lacks the final NUL.
+mkdir -p "$WORK/trfind/complete/.git/objects" "$WORK/stubfind"
+printf 'ref: x\n' >"$WORK/trfind/complete/.git/HEAD"
+printf '%s\n' "$WORK/trfind" >"$CONF"
+cat >"$WORK/stubfind/find" <<STUBEOF
+#!/bin/sh
+# one complete NUL-terminated entry, then a truncated fragment
+printf '$WORK/trfind/complete/.git\0$WORK/trfind/trunc'
+STUBEOF
+chmod 755 "$WORK/stubfind/find"
+_rc=0
+_out=$(
+    PATH="$WORK/stubfind:$PATH"
+    export PATH
+    _core_run '_gp_projects'
+) || _rc=$?
+if [ "$_rc" = 0 ] &&
+    printf '%s' "$_out" | grep -qF "classic $WORK/trfind/complete" &&
+    ! printf '%s' "$_out" | grep -qF 'trunc'; then
+    pass "S2: a truncated staged tail is dropped — no row for a nonexistent path (#775 a S2)"
+else
+    fail "S2 truncation arm (rc=$_rc out=$_out)"
+fi
+
+# A4 (#775 a): orphan keys render through _gp_rowkey — a control byte
+# masks, a UTF-8 name stays readable (the wave's own key contract).
+mkdir -p "$WORK/orph/storage/o${_a8_tab}d.git" "$WORK/orph/storage/büro.git" "$WORK/orph/roots/r9"
+printf '%s\n' "$WORK/orph/roots/r9" >"$CONF"
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\nGITDIR_STORAGE=%s\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" "$WORK/orph/storage" >"$IC"
+_rc=0
+_out=$(_core_run ': >"$WORK/orph/ref"; _gp_orphan_rows "$WORK/orph/storage" "$WORK/orph/ref"') || _rc=$?
+if printf '%s' "$_out" | grep -qF "kv: $WORK/orph/storage/o?d.git unreferenced storage entry" &&
+    printf '%s' "$_out" | grep -qF "kv: $WORK/orph/storage/büro.git unreferenced storage entry" &&
+    ! printf '%s' "$_out" | grep -qF "o${_a8_tab}d"; then
+    pass "A4: orphan keys mask control bytes and keep UTF-8 readable (#775 a A4)"
+else
+    fail "A4 orphan key arms (rc=$_rc out=$_out)"
+fi
+
+# WO-2 (#756, the #765 b F1 class): the row keys of the arms #765 did
+# not cover — nailed, foreign-pointer, worktree-reg, and the nail
+# sweep's detail lines — render a CONTROL byte through _gp_rowkey
+# (the raw byte never reaches the terminal); a merely
+# whitespace-bearing path keeps its key readable (a space is not a
+# control byte, #765 round c G1).
+_w2="$WORK/rows-wo2"
+printf 'nailed %s/a%sb\nforeign-pointer %s/c%sd\nworktree-reg %s/e%sf\nnailed %s/büro x\n' \
+    "$_a8" "$_a8_tab" "$_a8" "$_a8_tab" "$_a8" "$_a8_tab" "$_a8" >"$_w2"
+_out=$(GP_W2="$_w2" _core_run '_gp_rows "$GP_W2" all adopt')
+if printf '%s' "$_out" | grep -qF "kv-ok: $_a8/a?b pointer + nailed" &&
+    printf '%s' "$_out" | grep -qF "kv: $_a8/c?d pointer outside storage (not managed)" &&
+    printf '%s' "$_out" | grep -qF "detail: worktree registration: $_a8/e?f" &&
+    printf '%s' "$_out" | grep -qF "kv-ok: $_a8/büro x pointer + nailed" &&
+    ! printf '%s' "$_out" | grep -qF "a${_a8_tab}b" &&
+    ! printf '%s' "$_out" | grep -qF 'b??ro'; then
+    pass "row keys: control bytes sanitize, whitespace keys stay readable on every remaining arm (#756 WO-2)"
+else
+    fail "row keys WO-2 arms (out=$_out)"
+fi
+# gaps mode (the `opk status` section) renders none of these arms —
+# the informational rows are all-mode only.
+_out=$(GP_W2="$_w2" _core_run '_gp_rows "$GP_W2" gaps adopt')
+if ! printf '%s' "$_out" | grep -qF 'pointer + nailed' &&
+    ! printf '%s' "$_out" | grep -qF 'pointer outside storage' &&
+    ! printf '%s' "$_out" | grep -qF 'worktree registration:'; then
+    pass "row keys: the informational arms stay gaps-mode silent (#756 WO-2)"
+else
+    fail "row keys gaps-mode leak (out=$_out)"
+fi
+
+# WO-2, the nail sweep's detail lines: an unnailed pointer with a tab
+# path names its project sanitized on BOTH arms — nailed (chattr stub
+# green) and left unnailed (GP_CHATTR_FAIL) — never the raw byte.
+mkdir -p "$WORK/nailsweep/a${_a8_tab}b" "$WORK/storage/ns.git"
+printf 'gitdir: %s\n' "$WORK/storage/ns.git" >"$WORK/nailsweep/a${_a8_tab}b/.git"
+printf '%s\n' "$WORK/nailsweep" >"$CONF"
+_rc=0
+_out=$(GP_STUB_LOG="$WORK/stub.log" GP_CHATTR_FAIL=1 _core_run '_git_protection_nail') || _rc=$?
+# the negative is scoped to the DETAIL lines: _gp_nail_one's warn
+# operands print the path raw by design (the #765 status quo — the
+# row keys are this wave's subject).
+if printf '%s' "$_out" | grep -qF 'detail: left unnailed: '"$WORK"'/nailsweep/a?b (see warnings above)' &&
+    ! printf '%s' "$_out" | grep '^detail:' | grep -qF "a${_a8_tab}b"; then
+    _rc=0
+    _out=$(GP_STUB_LOG="$WORK/stub.log" _core_run '_git_protection_nail') || _rc=$?
+    if printf '%s' "$_out" | grep -qF 'detail: nailed: '"$WORK"'/nailsweep/a?b' &&
+        ! printf '%s' "$_out" | grep '^detail:' | grep -qF "a${_a8_tab}b"; then
+        pass "nail sweep: both detail lines render the tab path sanitized (#756 WO-2)"
+    else
+        fail "nail sweep nailed arm (rc=$_rc out=$_out)"
+    fi
+else
+    fail "nail sweep left-unnailed arm (rc=$_rc out=$_out)"
+fi
+
+# F4 (#756): _gp_unnest's move-back carries the dir-aware pre-clear —
+# a non-empty DIRECTORY planted at the project's .git name in the
+# sub-second window is removed before the mv (the F2 invariant: the
+# gitdir was moved OUT, a non-symlink dir there is never legit data).
+# A plain mv would nest ours INSIDE the plant with rc 0 and claim
+# "classic layout restored".
+mkdir -p "$WORK/f4/p" "$WORK/f4/t/.git/objects" "$WORK/f4/p/.git/plant"
+printf 'ref: x\n' >"$WORK/f4/t/.git/HEAD"
+printf 'junk\n' >"$WORK/f4/p/.git/plant/j"
+_rc=0
+_out=$(GP_F4T="$WORK/f4/t" GP_F4P="$WORK/f4/p" _core_run '_gp_unnest "$GP_F4T" "$GP_F4P"') || _rc=$?
+if [ "$_rc" = 0 ] &&
+    [ -e "$WORK/f4/p/.git/HEAD" ] &&
+    [ -d "$WORK/f4/p/.git/objects" ] &&
+    [ ! -e "$WORK/f4/p/.git/.git" ] &&
+    [ ! -e "$WORK/f4/p/.git/plant" ] &&
+    [ ! -d "$WORK/f4/t" ]; then
+    pass "unnest: a planted directory at .git is cleared, ours lands flat, no nest (#756 F4)"
+else
+    fail "unnest pre-clear arm (rc=$_rc out=$_out)"
+fi
+
 # the rows (#765 a S3): a path the migration form gate refuses gets NO
 # command (adopt would refuse it) and names the rename; a path with a
 # shell metacharacter gets its command with the path single-quoted; a
