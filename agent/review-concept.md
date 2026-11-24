@@ -918,8 +918,9 @@ here.
 
 - The main agent runs a strong default model and owns the
   verification duty; every reviewer subagent runs the provider's
-  cheaper fast tier (house instance: GLM-5.3 + GLM-5.3-Flash —
-  substitute your provider's strong/fast pair). (RM-0080)
+  cheaper fast tier (house instance: GLM-5.3 or GLM-5.4 as the
+  strong main, GLM-5.3-Flash as the fast tier — substitute your
+  provider's strong/fast pair). (RM-0080)
 - Reviewer subagents get ad-hoc axis prompts per session (mechanical
   sweep, security, quality); the durable spec any reviewer prompt
   implements is the subagent output contract (the final-chat-answers

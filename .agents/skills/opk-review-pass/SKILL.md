@@ -102,15 +102,18 @@ BEFORE the fan-out launches.
 - The abstract rule: reviewer subagents run the provider's fast tier;
   the main session (this one) runs the strong tier and owns the audit
   duty (review-concept, "Parallel reviewer agents"). The CONCRETE map
-  for the house instance — commissions used to name it per case;
+  below is the house pair AT THE TIME OF WRITING (2026-11-24) — the
+  rule is the role-to-tier mapping, not the names: the models that
+  run are derived through the models lookup and recorded in the loop
+  status (section 8). Commissions used to name the pair per case;
   commission-less sessions read it HERE (substitute your provider's
   strong/fast pair on a foreign setup):
 
-  | Role | House model |
+  | Role | House model (2026-11-24) |
   |---|---|
-  | Main session (owns curation + the verification/audit duty) | GLM-5.3 — strong tier |
+  | Main session (owns curation + the verification/audit duty) | GLM-5.3/5.4 — strong tier |
   | Reviewer subagents | GLM-5.3-Flash — fast tier |
-  | Verifier subagents (section 6, owed by the sizing gate only) | GLM-5.3 — strong tier, fresh-context verification |
+  | Verifier subagents (section 6, owed by the sizing gate only) | GLM-5.3/5.4 — strong, fresh-context verification |
 
   Both directions are load-bearing: reviewers on the strong model
   burn the budget the fast tier exists to save, and verifiers on

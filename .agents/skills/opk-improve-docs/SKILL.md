@@ -63,6 +63,7 @@ Issue body:
 be able to re-derive the case without guessing (#620)>
 
 Session: <the value of $OPENCODE_SESSION_ID>
+Model: <the session's own model, e.g. GLM-5.4>
 Ref: <PR, branch or round, if any>
 ```
 
@@ -73,12 +74,20 @@ Confirmed — same mechanism.
 <how it manifested here, 2–5 sentences>
 
 Session: <the value of $OPENCODE_SESSION_ID>
+Model: <the session's own model, e.g. GLM-5.4>
 Ref: <PR, branch or round, if any>
 ```
 
 The `Session:` line is the counting unit: promotion counts DISTINCT
 session ids across an issue's body and comments, never its comment
 count — a session confirming twice is one session.
+
+The `Model:` line names the model of the session that files or
+confirms, taken from the session's own context (the system prompt's
+`# Your Model` block — `GLM-5.3`, `GLM-5.3-Flash`, `GLM-5.4`). A
+session that cannot determine its own model asks the maintainer, who
+can see it, instead of guessing. The line is informational — triage
+and metrics read it; the count never does.
 
 ## Labels
 

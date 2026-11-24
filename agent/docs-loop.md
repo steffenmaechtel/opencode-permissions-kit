@@ -88,7 +88,10 @@ fi
 Both failure paths say so instead of printing a result: a list that
 cannot be read, an issue that cannot be fetched. The count includes the
 filer (the body's own `Session:` line), so 1 means no other session has
-hit the topic. Promote what reaches three, and every `prio:high` issue
+hit the topic. A `Model:` line a body or comment may carry beside its
+`Session:` line (the session's own model, per the skill's template) is
+informational — triage and later metrics read it, the count never does.
+Promote what reaches three, and every `prio:high` issue
 whatever its count; `research-candidate` issues are not listed — they
 never count toward a wave. A promotion is recorded, not just observed:
 `gh issue edit -R … --add-label promoted`, plus the ledger comment
@@ -266,10 +269,11 @@ sessions, one per PR).
   it — before the merge it posts the disposition comment on the issue
   (class, landing PR), and the next trigger check closes whatever that
   PR left open (`gh issue close -R … --reason completed`). A closing
-  keyword across two repositories is platform behavior, not a house
-  rule: treat it as unverified until a merge was observed closing the
-  issue — the cutover PR's check issue in the feedback repo is that
-  observation. (RM-0215)
+  keyword across two repositories is platform behavior — observed
+  once, and it worked: the cutover PR #769's merge (2026-11-23T23:36:04Z)
+  closed its check issue opk-agent-feedback#1 four seconds later, by
+  the merge itself; the backstop above stays for any merge that does
+  not. (RM-0215)
 
 ## Hygiene — the monthly sweep
 
