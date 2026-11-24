@@ -1312,14 +1312,10 @@ printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\nGITDIR_STORAGE=%s\
     "$(id -un)" "$(id -un)" "$(id -gn)" "$WORK/s1/storage" >"$IC"
 _s1_fail=""
 for _s1_cmd in status on nail off; do
-    # B2 (#775 b): the banner negative is per-command — 'migration
-    # complete' exists only in `on`'s output; `off` carries its own
-    # success text; status/nail print none on this path.
-    case "$_s1_cmd" in
-        on) _s1_banner='migration complete' ;;
-        off) _s1_banner='every kit-managed project is back on the' ;;
-        *) _s1_banner='' ;;
-    esac
+    # B2 (#775 b) + C1 (#775 c): ONE universal banner negative — the
+    # ui stub prefixes every ui_success line with "success: ", so a
+    # single grep guards all four arms (a per-command text list left
+    # status/nail without any negative).
     _s1_rc=0
     _s1_out=$(
         PATH="$WORK/badpy2:$PATH"
@@ -1330,14 +1326,14 @@ for _s1_cmd in status on nail off; do
         _s1_fail="$_s1_fail $_s1_cmd:rc0"
     elif ! printf '%s' "$_s1_out" | grep -qF 'the project enumeration refused'; then
         _s1_fail="$_s1_fail $_s1_cmd:no-error-line"
-    elif [ -n "$_s1_banner" ] && printf '%s' "$_s1_out" | grep -qF "$_s1_banner"; then
+    elif printf '%s' "$_s1_out" | grep -q '^success: '; then
         _s1_fail="$_s1_fail $_s1_cmd:success-banner"
     fi
 done
 if [ -z "$_s1_fail" ] &&
     [ -f "$WORK/s1/roots/r10/s1p/.git" ] &&
     grep -q '^GITDIR_STORAGE=' "$IC"; then
-    pass "S1: a refused enumeration fails status/on/nail/off loud — no banner (on/off), config kept, pointer untouched (#775 a S1, b B2)"
+    pass "S1: a refused enumeration fails status/on/nail/off loud — no success line on any arm, config kept, pointer untouched (#775 a S1, b B2, c C1)"
 else
     fail "S1 caller arms ($_s1_fail)"
 fi

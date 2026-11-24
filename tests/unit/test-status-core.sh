@@ -850,7 +850,7 @@ else
 fi
 # B1 (#775 b): the refused enumeration must also skip the ORPHAN pass
 # — the reference list stayed empty, and running the pass would label
-# every storage child (the fixture has two) "unreferenced", a
+# every storage child (the fixture has three) "unreferenced", a
 # positive claim over a tree the run could not enumerate.
 if ! printf '%s' "$_gpc_out" | grep -qF 'unreferenced storage entry'; then
     pass "git-protection section: no orphan claims over a refused enumeration (#775 b B1)"
