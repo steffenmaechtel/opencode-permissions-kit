@@ -119,6 +119,7 @@ issue into items and classifies each:
 | extract | not documentation — refiled as its own work order with proper labels (`from-reflection` stays on) |
 | covered | existing text already says it — close citing the ref |
 | reject  | deliberately not adopted — rationale recorded |
+| external | the fix lives outside this repository (a global skill, user-level config) — re-label `external-fix` |
 
 Triage reads the issue's full TIMELINE, never only the body — a
 maintainer comment posted after filing is triage input (class

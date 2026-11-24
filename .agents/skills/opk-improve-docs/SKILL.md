@@ -33,6 +33,24 @@ gh issue list -R steffenmaechtel/opk-agent-feedback --state all --search "<keywo
 - A near match (same area, other mechanism) is a new issue too, linking
   its neighbor.
 
+## Skill-origin check
+
+Before filing, consider whether the problem came from a SKILL the
+session loaded (its instructions, its recipes, its blind spots):
+
+- A skill in THIS repository (`.agents/skills/`) is repo content —
+  file normally (`from-reflection` + priority label).
+- A GLOBAL skill (`~/.agents/skills/` — opencode-db, the ddev/typo3
+  procedures; their own versioned repository) is outside what a repo
+  wave can fix: raise it with the maintainer in the reflection ask
+  instead of filing — no feedback-repo issue first. The maintainer
+  decides how it lands: fixed in the skills repo right away, or
+  tracked where the maintainer chooses.
+- A session that cannot tell whether a skill was involved files
+  normally — the origin question is re-asked at triage
+  (docs-loop.md): a topic discovered there to live in a global skill
+  is re-labeled `external-fix` and never rides a docs wave.
+
 ## Titles name the mechanism
 
 Short and mechanism-named, without a `Docs:` prefix: the title is the
