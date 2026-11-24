@@ -51,7 +51,8 @@ session loaded (its instructions, its recipes, its blind spots):
 - A session that cannot tell whether a skill was involved files
   normally — the origin question is re-asked at triage
   (agent/docs-loop.md): a topic discovered there to live in a global
-  skill is re-labeled `external-fix` and never rides a docs wave.
+  skill is re-labeled `external-fix` — both loop labels come off —
+  and never rides a docs wave.
 
 ## Titles name the mechanism
 

@@ -121,11 +121,15 @@ issue into items and classifies each:
 | reject  | deliberately not adopted — rationale recorded |
 | external | the fix lives outside this repository (a global skill, user-level config) — re-label `external-fix` |
 
-An `external` re-label takes `promoted` off with it: the issue
-leaves the loop's counting — it never rides a wave and never feeds
-the trigger — and the monthly sweep dispositions it (close citing
-where the fix landed: a commit or issue in the skills' own
-repository; keep open with a note while it is worked there).
+An `external` re-label takes both loop labels off — `promoted` and
+`from-reflection` — leaving `external-fix` alone: the issue leaves
+the loop's counting and its listings (the trigger check filters
+`from-reflection`, the trigger count `promoted`), never rides a
+wave, and the monthly sweep dispositions it under its anything-else
+arm — never the reflection stale-close — closing it citing where
+the fix landed (a commit or issue in the skills' own repository, a
+config change, whatever carries the landing), or keeping it open
+with a note while it is worked there.
 
 Triage reads the issue's full TIMELINE, never only the body — a
 maintainer comment posted after filing is triage input (class
