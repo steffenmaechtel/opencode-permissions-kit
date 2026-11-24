@@ -1312,6 +1312,14 @@ printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\nGITDIR_STORAGE=%s\
     "$(id -un)" "$(id -un)" "$(id -gn)" "$WORK/s1/storage" >"$IC"
 _s1_fail=""
 for _s1_cmd in status on nail off; do
+    # B2 (#775 b): the banner negative is per-command — 'migration
+    # complete' exists only in `on`'s output; `off` carries its own
+    # success text; status/nail print none on this path.
+    case "$_s1_cmd" in
+        on) _s1_banner='migration complete' ;;
+        off) _s1_banner='every kit-managed project is back on the' ;;
+        *) _s1_banner='' ;;
+    esac
     _s1_rc=0
     _s1_out=$(
         PATH="$WORK/badpy2:$PATH"
@@ -1322,14 +1330,14 @@ for _s1_cmd in status on nail off; do
         _s1_fail="$_s1_fail $_s1_cmd:rc0"
     elif ! printf '%s' "$_s1_out" | grep -qF 'the project enumeration refused'; then
         _s1_fail="$_s1_fail $_s1_cmd:no-error-line"
-    elif printf '%s' "$_s1_out" | grep -qF 'migration complete'; then
+    elif [ -n "$_s1_banner" ] && printf '%s' "$_s1_out" | grep -qF "$_s1_banner"; then
         _s1_fail="$_s1_fail $_s1_cmd:success-banner"
     fi
 done
 if [ -z "$_s1_fail" ] &&
     [ -f "$WORK/s1/roots/r10/s1p/.git" ] &&
     grep -q '^GITDIR_STORAGE=' "$IC"; then
-    pass "S1: a refused enumeration fails status/on/nail/off loud — no banner, config kept, pointer untouched (#775 a S1)"
+    pass "S1: a refused enumeration fails status/on/nail/off loud — no banner (on/off), config kept, pointer untouched (#775 a S1, b B2)"
 else
     fail "S1 caller arms ($_s1_fail)"
 fi

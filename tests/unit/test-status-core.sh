@@ -848,6 +848,15 @@ if [ "$(_gpc_tag kv-warn)" -ge 1 ] &&
 else
     fail "git-protection section: refused-enum arm (out=$_gpc_out)"
 fi
+# B1 (#775 b): the refused enumeration must also skip the ORPHAN pass
+# — the reference list stayed empty, and running the pass would label
+# every storage child (the fixture has two) "unreferenced", a
+# positive claim over a tree the run could not enumerate.
+if ! printf '%s' "$_gpc_out" | grep -qF 'unreferenced storage entry'; then
+    pass "git-protection section: no orphan claims over a refused enumeration (#775 b B1)"
+else
+    fail "git-protection section: orphan rows over refused enumeration (out=$_gpc_out)"
+fi
 
 # c) enabled with deviations: the state row counts the protected
 # projects, classic rows are alerts and unnailed rows warnings — each

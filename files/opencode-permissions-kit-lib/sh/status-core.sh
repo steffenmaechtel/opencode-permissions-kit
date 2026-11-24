@@ -606,8 +606,18 @@ status_section_git_protection() {
             ui_kv "git-protection" "ON — storage $_st_gp_stor; no project under the configured roots is nailed yet"
         fi
     fi
-    _gp_rows "$_st_gp_td/list" gaps "$_st_gp_fix"
-    _gp_orphan_rows "$_st_gp_stor" "$_st_gp_td/ref"
+    # B1 (#775 b): a refused enumeration leaves the reference list
+    # EMPTY — running the orphan pass over it would report every
+    # storage child as unreferenced, a positive claim over a tree the
+    # run could not enumerate. An empty ref on a HEALTHY no-pointer
+    # host is the CORRECT all-orphans report (#765 a M1), so the skip
+    # lives here at the caller, never in _gp_orphan_rows. The rows
+    # pass renders nothing either way (the list is empty); guarded
+    # with it to keep the two passes visibly one unit.
+    if [ "$_st_gp_prc" -lt 2 ]; then
+        _gp_rows "$_st_gp_td/list" gaps "$_st_gp_fix"
+        _gp_orphan_rows "$_st_gp_stor" "$_st_gp_td/ref"
+    fi
     while IFS= read -r _st_gp_note; do
         [ -n "$_st_gp_note" ] || continue
         # The core's own scan note already carries this prefix — strip
