@@ -1111,6 +1111,90 @@ else
 fi
 printf '%s\n' "$WORK/zone/onroot" "# comment tolerated" >"$WORK/on-projects.conf"
 
+# --- 7a. #777: the sweeps see POINTER-FILE checkouts ------------------------------
+# The #704 O4 layout seals every kit-managed checkout as `gitdir:
+# <storage>/<name>.git` -- a FILE the sweeps' old `find -type d`
+# never matched, so `on` healed nothing and `status` showed no lockout
+# on a pointer-shaped host (the live incident: root-owned indexes
+# under /var/www/gitdirs, both sweeps green over them). Fixture: an
+# adopted-shape main checkout, a linked worktree whose pointer targets
+# <gitdir>/worktrees/<id>, a relative (submodule-form) pointer, a
+# garbage pointer file and a malformed absolute target.
+mkdir -p "$WORK/zone/ptzone" "$WORK/ptstor"
+git -C "$WORK/zone/ptzone" init -q -b main pmain
+git -C "$WORK/zone/ptzone/pmain" -c user.email=t@e -c user.name=t commit -q --allow-empty -m x
+mv "$WORK/zone/ptzone/pmain/.git" "$WORK/ptstor/main.git"
+printf 'gitdir: %s\n' "$WORK/ptstor/main.git" >"$WORK/zone/ptzone/pmain/.git"
+git --git-dir="$WORK/ptstor/main.git" worktree add -q "$WORK/zone/ptzone/pwt" -b ptwb 2>/dev/null
+mkdir -p "$WORK/zone/ptzone/psub" "$WORK/zone/ptzone/pjunk" "$WORK/zone/ptzone/pmal"
+printf 'gitdir: ../.git/modules/sub\n' >"$WORK/zone/ptzone/psub/.git"
+printf 'not a pointer\n' >"$WORK/zone/ptzone/pjunk/.git"
+printf 'gitdir: /tmp/has space/x.git\n' >"$WORK/zone/ptzone/pmal/.git"
+printf '%s\n' "$WORK/zone/ptzone" >"$WORK/pt-projects.conf"
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\n' "$(id -un)" "$(id -un)" >"$WORK/install.conf"
+
+# `on` heals the pointer checkout THROUGH its resolved storage gitdir
+# (GH_STORAGE must be exported: heal-index-head's allowlist honors the
+# storage root, and the unit scratch sits outside every conf root).
+rm -f "$LOG" && : >"$LOG"
+_hr_rc=0
+_out=$(
+    _core_run 'export GH_STORAGE="$WORK/ptstor"; SD_SUDO="" SD_VISUDO="$WORK/visudo" \
+        SD_CONF_DIR="$WORK/etc" SD_SUDOERS_D="$WORK/sdd" \
+        GH_PROJECTS_CONF="$WORK/pt-projects.conf" HOME="$WORK/devhome" _git_heal_on'
+) || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] &&
+    grep -qF "gitdir=$WORK/ptstor/main.git" "$LOG" &&
+    grep -qF 'healed index' "$LOG" &&
+    printf '%s' "$_out" | grep -qF "operand set re-pinned for $WORK/ptstor/main.git"; then
+    pass "core: on heals a pointer-file checkout through its resolved gitdir (#777)"
+else
+    fail "core: on pointer arm (rc=$_hr_rc log=$(cat "$LOG") out=$(printf '%s' "$_out" | grep -E 'pointer|re-pinned' | head -3)) (#777)"
+fi
+
+# Dedup: the worktree pointer and the main pointer name the SAME common
+# gitdir -- exactly one re-pin detail, exactly the common gitdir's own
+# operand audits (index + HEAD once each; the registration dir is
+# non-sticky by design and never a candidate).
+_repin_n=$(printf '%s' "$_out" | grep -cF "operand set re-pinned for $WORK/ptstor/main.git" || true)
+_log_n=$(grep -cF "gitdir=$WORK/ptstor/main.git " "$LOG" || true)
+if [ "$_repin_n" = 1 ] && [ "$_log_n" = 2 ] &&
+    ! printf '%s' "$_out" | grep -qF "operand heal skipped for $WORK/ptstor/main.git/worktrees"; then
+    pass "core: on dedups main and worktree pointers onto one common gitdir (#777)"
+else
+    fail "core: on pointer dedup (repin=$_repin_n audits=$_log_n — 1/2 expected) (#777)"
+fi
+
+# The relative (submodule-form) pointer is skipped LOUDLY and never
+# healed: .git/modules is developer-pinned by the fs baseline (#655
+# b Q4), healing into it would fight the baseline.
+if printf '%s' "$_out" | grep -qF 'skip (pointer): relative target (the submodule form' &&
+    printf '%s' "$_out" | grep -qF "never healed): $WORK/zone/ptzone/psub/.git" &&
+    ! grep -qF 'modules/sub' "$LOG"; then
+    pass "core: on skips the relative (submodule) pointer loudly, heals nothing (#777)"
+else
+    fail "core: on submodule-pointer arm (out=$(printf '%s' "$_out" | grep 'skip (pointer)' | head -2)) (#777)"
+fi
+
+# Garbage (no gitdir: line) and malformed absolute targets are skipped
+# with their own notes.
+if printf '%s' "$_out" | grep -qF "skip (pointer): no gitdir: line: $WORK/zone/ptzone/pjunk/.git" &&
+    printf '%s' "$_out" | grep -qF 'skip (pointer): malformed target (dot, empty segment,' &&
+    printf '%s' "$_out" | grep -qF "whitespace, or glob): $WORK/zone/ptzone/pmal/.git"; then
+    pass "core: on skips garbage and malformed pointer targets with named reasons (#777)"
+else
+    fail "core: on pointer-refusal arms (out=$(printf '%s' "$_out" | grep 'skip (pointer)' | head -3)) (#777)"
+fi
+
+# Claim audit for the extended layer-separation note: the sweep SAYS
+# where adopted checkouts' gitdir-level bits come from.
+if printf '%s' "$_out" | grep -qF 'for adopted' &&
+    printf '%s' "$_out" | grep -qF 'ride the git-protection migration heal instead'; then
+    pass "core: on names the pointer gitdir bits' owner (git-protection heal) (#777)"
+else
+    fail "core: on pointer caveat arm (out=$(printf '%s' "$_out" | grep 'operand sweep' | head -2)) (#777)"
+fi
+
 # `on` pieces gate: an incomplete lib refuses before touching anything.
 mv "$WORK/lib/git-heal/hooks/post-merge" "$WORK/pm-aside"
 _hr_rc=0
@@ -1236,5 +1320,40 @@ fi
 chmod 700 "$WORK/zone/scan/locked"
 rmdir "$WORK/zone/scan/locked"
 rm -f "${WORK:?}/devhome/.gitconfig"
+
+# --- 7b. #777: status sees pointer-file checkouts ----------------------------------
+# The lockout rows must name the RESOLVED gitdir (the operand's real
+# location under the storage) -- the diagnosis surface the live
+# incident needed. Same mismatch-agent trick as the classic arms: a
+# nonexistent OPENCODE_USER makes every present operand render.
+printf '%s\n' "$WORK/zone/ptzone" >"$CONF"
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=ghs-pt-agent\n' "$(id -un)" >"$WORK/install-pt.conf"
+_out=$(_core_run 'INSTALL_CONF="$WORK/install-pt.conf" _git_heal_status')
+if printf '%s' "$_out" | grep -qF "lockout risk: $WORK/ptstor/main.git/index" &&
+    printf '%s' "$_out" | grep -qF "lockout risk: $WORK/ptstor/main.git/HEAD" &&
+    ! printf '%s' "$_out" | grep -qF "$WORK/ptstor/main.git/worktrees/"; then
+    pass "status renderer: a pointer checkout's rows name the resolved storage gitdir (#777)"
+else
+    fail "status renderer: pointer rows (out=$(printf '%s' "$_out" | grep lockout | head -2)) (#777)"
+fi
+
+# Worktree + main pointer dedup in the status scan too: two entries,
+# one common gitdir -- one row per operand, not two.
+_ptrow_n=$(printf '%s' "$_out" | grep -cF "lockout risk: $WORK/ptstor/main.git/index" || true)
+if [ "$_ptrow_n" = 1 ]; then
+    pass "status renderer: main and worktree pointers render one deduped row set (#777)"
+else
+    fail "status renderer: pointer dedup (rows=$_ptrow_n for one operand — 1 expected) (#777)"
+fi
+
+# The refusals ride the status surface as well (display-only, but the
+# same resolver: the notes say why a checkout under the root has no
+# rows).
+if printf '%s' "$_out" | grep -qF 'skip (pointer): relative target (the submodule form' &&
+    printf '%s' "$_out" | grep -qF "skip (pointer): no gitdir: line: $WORK/zone/ptzone/pjunk/.git"; then
+    pass "status renderer: pointer refusals render their skip notes (#777)"
+else
+    fail "status renderer: pointer skip notes (out=$(printf '%s' "$_out" | grep 'skip (pointer)' | head -2)) (#777)"
+fi
 
 suite_done "git heal hooks (heal script + hook matrix + core)"

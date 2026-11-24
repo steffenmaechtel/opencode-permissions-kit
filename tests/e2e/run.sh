@@ -1943,6 +1943,29 @@ E 'sudo opk git-protection on >/tmp/gp-on-declined.log 2>&1' &&
     echo "  ${GREEN}OK${NC}  opk git-protection on over a declined marker completed"
 check "12q: on replaces a GITDIR_STORAGE=none marker and migrates (#764)" \
     E 'grep -qx "GITDIR_STORAGE=/var/www/gitdirs" /etc/opencode-permissions-kit/install.conf && grep -qF "this run enables it" /tmp/gp-on-declined.log && test -f /var/www/vhosts/perm-check/.git && grep -qF "gitdir: /var/www/gitdirs/perm-check.git" /var/www/vhosts/perm-check/.git'
+
+# --- 12q/#777: the git-heal sweeps see POINTER-FILE checkouts ---
+# The live incident this issue reports: on a fully adopted host both
+# sweeps matched only directory-shaped .git — `opk git-heal on` healed
+# nothing (fail-open success banner) and `status` rendered no lockout
+# while the agent was locked out of the storage gitdirs. perm-check is
+# adopted RIGHT NOW (the declined-marker `on` above re-migrated it) and
+# the heal hooks are on since 2c — the exact production shape. A fake
+# relative (submodule-form) pointer rides along: skipped loudly, never
+# healed into .git/modules (fs-baseline developer pin).
+E 'mkdir -p /var/www/vhosts/perm-check/pt-sub && printf "gitdir: ../.git/modules/sub\n" >/var/www/vhosts/perm-check/pt-sub/.git'
+E 'sudo chown root /var/www/gitdirs/perm-check.git/index'
+check "12q: the root-owned storage index is the #777 lockout state" \
+    E 'test "$(stat -c %U /var/www/gitdirs/perm-check.git/index)" = "root"'
+check "12q: #777 — git-heal on heals the pointer checkout's storage gitdir" \
+    E 'sudo opk git-heal on >/tmp/gh-pt-on.log 2>&1 && grep -qF "operand set re-pinned for /var/www/gitdirs/perm-check.git" /tmp/gh-pt-on.log && test "$(stat -c %U /var/www/gitdirs/perm-check.git/index)" = "opencode" && grep -qF "gitdir=/var/www/gitdirs/perm-check.git" /usr/local/lib/opencode-permissions-kit/git-heal/heal.log'
+check "12q: #777 — the relative (submodule-form) pointer is skipped loudly" \
+    E 'grep -qF "skip (pointer): relative target (the submodule form" /tmp/gh-pt-on.log && ! grep -q "heal.*modules/sub" /usr/local/lib/opencode-permissions-kit/git-heal/heal.log'
+check "12q: #777 — agent git is green through the healed pointer checkout" \
+    E 'sudo -u opencode -H git -C /var/www/vhosts/perm-check add existing-file.txt'
+check "12q: #777 — status names the resolved storage gitdir in its lockout rows" \
+    E 'sudo chown root /var/www/gitdirs/perm-check.git/index && sudo opk git-heal status >/tmp/gh-pt-st.log 2>&1 && grep -qF "heals it): /var/www/gitdirs/perm-check.git/index is root-owned" /tmp/gh-pt-st.log'
+E 'rm -rf /var/www/vhosts/perm-check/pt-sub /tmp/gh-pt-*.log'
 E 'rm -rf /tmp/gp-update-test /tmp/gp-*.log'
 
 echo ""
