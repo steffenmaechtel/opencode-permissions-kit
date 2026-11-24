@@ -317,8 +317,15 @@ _dgh_run() {
             GH_LIBDIR="$WORK/dgh/lib"
         . "$UI_LIB"
         . "$LIB"
+        # The entry's cross-lib sourcing (#777), mirrored: the pointer
+        # classification arm needs the resolver (DGH_NO_GHC=1 drives
+        # the degrade arm).
+        if [ "${DGH_NO_GHC:-}" != 1 ]; then
+            # shellcheck disable=SC1090
+            . "$_dgh_repo_lib/sh/git-heal-core.sh"
+        fi
         INSTALL_CONF="$WORK/dgh/install.conf"
-        DOCTOR_ROOT="$WORK/dgh/proj"
+        DOCTOR_ROOT="${1:-$WORK/dgh/proj}"
         DOCTOR_USER=opencode-dgh-agent
         doctor_git_heal
     ) 2>&1
@@ -339,6 +346,34 @@ if printf '%s' "$_out" | grep -q 'git-heal.*ON -- developer git ops re-pin' &&
     pass "doctor git-heal: ON state classifies dev-owned index as transient"
 else
     fail "doctor git-heal: ON rows broken (out=$(printf '%s' "$_out" | head -4))"
+fi
+
+# --- #777: a POINTER-FILE checkout classifies through the resolved
+# gitdir — before, doctor's per-project row rendered nothing at all
+# for an adopted project (the [ -d .git ] gate never fired). Fixture:
+# adopted-shape project, storage gitdir aside; hooksPath is ON (set
+# above), so dev-owned operands render the transient form.
+mkdir -p "$WORK/dgh/ptstor"
+git -C "$WORK/dgh" init -q -b main ptproj
+git -C "$WORK/dgh/ptproj" -c user.email=t@e -c user.name=t commit -q --allow-empty -m x
+mv "$WORK/dgh/ptproj/.git" "$WORK/dgh/ptstor/ptproj.git"
+printf 'gitdir: %s\n' "$WORK/dgh/ptstor/ptproj.git" >"$WORK/dgh/ptproj/.git"
+_out=$(_dgh_run "$WORK/dgh/ptproj" || true)
+if printf '%s' "$_out" | grep -q "git-heal-file.*$WORK/dgh/ptstor/ptproj.git/index is $(id -un)-owned (transient --" &&
+    printf '%s' "$_out" | grep -q "git-heal-file.*$WORK/dgh/ptstor/ptproj.git/HEAD is $(id -un)-owned (transient --"; then
+    pass "doctor git-heal: a pointer-file project classifies through the resolved gitdir (#777)"
+else
+    fail "doctor git-heal: pointer classification (out=$(printf '%s' "$_out" | grep -E 'git-heal' | head -3)) (#777)"
+fi
+# The degrade arm: resolver unavailable -> ONE counted warn row with
+# the fix hint, the state row still renders.
+_out=$(DGH_NO_GHC=1 _dgh_run "$WORK/dgh/ptproj" 2>&1 || true)
+if printf '%s' "$_out" | grep -qF "pointer-file checkout not classified -- kit file" &&
+    printf '%s' "$_out" | grep -qF "sh/git-heal-core.sh missing or outdated (fix: sudo opk update)" &&
+    printf '%s' "$_out" | grep -q "git-heal.*ON -- developer git ops re-pin"; then
+    pass "doctor git-heal: resolver unavailable degrades to a counted warn row (#777)"
+else
+    fail "doctor git-heal: resolver-degrade arm (out=$(printf '%s' "$_out" | grep -E 'git-heal' | head -3)) (#777)"
 fi
 
 # Wholesale-swap detection row (#653 family, #703): the doctor twin

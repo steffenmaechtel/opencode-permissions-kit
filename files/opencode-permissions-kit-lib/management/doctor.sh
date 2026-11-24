@@ -180,6 +180,18 @@ else
     ui_error "doctor: doctor-core.sh not found (expected it next to doctor.sh in a checkout, or in the kit library)"
     exit 1
 fi
+# git-heal-core.sh, cross-lib like the status.sh sourcing (#777): the
+# per-project git-heal row classifies POINTER-FILE checkouts through
+# the same resolver the `opk git-heal` sweeps use — a re-implemented
+# copy in doctor-core would drift. Sourced for _ghc_pt_target only
+# (definitions-only lib); fail-soft on a missing or outdated copy —
+# the call site degrades to a counted warn row.
+GIT_HEAL_CORE="$DR_CALL_DIR/../sh/git-heal-core.sh"
+[ -f "$GIT_HEAL_CORE" ] || GIT_HEAL_CORE="/usr/local/lib/opencode-permissions-kit/sh/git-heal-core.sh"
+if [ -f "$GIT_HEAL_CORE" ]; then
+    # shellcheck disable=SC1090
+    . "$GIT_HEAL_CORE"
+fi
 
 # Pairing guard (#413, the status.sh/update.sh pattern) -- LOAD-BEARING
 # here: doctor is deliberately fail-soft (set -u only, no -e; one

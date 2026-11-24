@@ -469,15 +469,64 @@ status_section_git_heal() {
         ui_kv_warn "git-heal" "lockout rows unavailable (mktemp failed)"
         return 0
     }
+    _st_gh_raw=$(mktemp) || {
+        ui_kv_warn "git-heal" "lockout rows unavailable (mktemp failed)"
+        rm -f "$_st_gh_list"
+        return 0
+    }
+    _st_gh_det=$(mktemp) || {
+        ui_kv_warn "git-heal" "lockout rows unavailable (mktemp failed)"
+        rm -f "$_st_gh_list" "$_st_gh_raw"
+        return 0
+    }
+    # Pointer-file resolution (#777, the `opk git-heal` sweeps' twin):
+    # the resolver is cross-lib (git-heal-core, sourced by the entry)
+    # and call-site-guarded — a missing or outdated copy degrades to
+    # the classic-dir scan with ONE counted warn row, never silently
+    # back to the pointer blindness. _ghc_pt_out is the resolver's
+    # out-param (assigned in git-heal-core on its rc-0 path).
+    _ghc_pt_out=""
+    _st_gh_pt=0
+    command -v _ghc_pt_target >/dev/null 2>&1 && _st_gh_pt=1
+    _st_gh_ptwarned=0
     while IFS= read -r _st_gh_root; do
         case "$_st_gh_root" in '' | '#'*) continue ;; esac
         [ -d "$_st_gh_root" ] || continue
         # Loud on partial failure (#674 c E4): an unreadable subtree
         # silently loses its lockout rows otherwise — one notice per
-        # affected root keeps the section honest.
-        find "$_st_gh_root" -type d -name .git >>"$_st_gh_list" 2>/dev/null ||
+        # affected root keeps the section honest. BOTH .git shapes
+        # (#777): classic directories and pointer FILES.
+        find "$_st_gh_root" -name .git \( -type d -o -type f \) >>"$_st_gh_raw" 2>/dev/null ||
             ui_detail "git-heal: lockout rows may be incomplete under $_st_gh_root (unreadable)"
     done <"$PROJECTS_CONF"
+    # Resolve in the MAIN shell (the on-sweep twin's shape). Dirs land
+    # in the lockout list AND the detection list; resolved pointer
+    # targets in the lockout list ONLY — the wholesale-swap detection
+    # row stays keyed to dir entries under the conf roots (a resolved
+    # storage gitdir's dirname is the storage, not a project; the
+    # pointer layout's swap detection is the nail + git-protection
+    # rows). Dedup: a worktree pointer and its main checkout's dir
+    # name the same common gitdir.
+    while IFS= read -r _st_gh_e; do
+        [ -n "$_st_gh_e" ] || continue
+        if [ -d "$_st_gh_e" ]; then
+            printf '%s\n' "$_st_gh_e" >>"$_st_gh_list"
+            printf '%s\n' "$_st_gh_e" >>"$_st_gh_det"
+            continue
+        fi
+        if [ "$_st_gh_pt" = 1 ]; then
+            if _ghc_pt_target "$_st_gh_e"; then
+                printf '%s\n' "$_ghc_pt_out" >>"$_st_gh_list"
+            fi
+        elif [ "$_st_gh_ptwarned" = 0 ]; then
+            _st_gh_ptwarned=1
+            ui_kv_warn "git-heal" "pointer-file checkouts not checked — kit file sh/git-heal-core.sh""\
+ missing or outdated (fix: sudo opk update)"
+        fi
+    done <"$_st_gh_raw"
+    rm -f "$_st_gh_raw"
+    LC_ALL=C sort -u -o "$_st_gh_list" "$_st_gh_list"
+    LC_ALL=C sort -u -o "$_st_gh_det" "$_st_gh_det"
     while IFS= read -r _st_gh_gd; do
         [ -n "$_st_gh_gd" ] || continue
         # Wholesale-swap detection row (#653 family, #702/#703): with
@@ -500,6 +549,13 @@ status_section_git_heal() {
             ui_detail "is $_st_gh_pown-owned — wholesale .git swap suspected (or an agent-"
             ui_detail "cloned repo); inspect before trusting git output"
         fi
+    done <"$_st_gh_det"
+    rm -f "$_st_gh_det"
+    while IFS= read -r _st_gh_gd; do
+        [ -n "$_st_gh_gd" ] || continue
+        # Lockout rows over BOTH populations (dirs and resolved pointer
+        # targets — #777): the row set mirrors heal-index-head's operand
+        # list (#678 widening; existence-gated).
         for _st_gh_f in index HEAD ORIG_HEAD REBASE_HEAD packed-refs \
             MERGE_HEAD MERGE_MSG MERGE_MODE AUTO_MERGE \
             CHERRY_PICK_HEAD REVERT_HEAD; do

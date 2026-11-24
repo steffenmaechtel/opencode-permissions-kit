@@ -138,6 +138,19 @@ if [ -f "$GIT_PROTECTION_CORE" ]; then
     # shellcheck disable=SC1090
     . "$GIT_PROTECTION_CORE"
 fi
+# git-heal-core.sh, the same cross-lib shape (#777): the git-heal
+# section's lockout scan must resolve POINTER-FILE checkouts exactly
+# like the `opk git-heal` sweeps do — a re-implemented resolver in
+# status-core would drift from the command's enumeration. Sourced for
+# _ghc_pt_target only (a definitions-only lib, no top-level side
+# effects); fail-soft on a missing or outdated copy — the call site
+# degrades to the classic-dir scan with a COUNTED warn row.
+GIT_HEAL_CORE="$ST_CALL_DIR/../sh/git-heal-core.sh"
+[ -f "$GIT_HEAL_CORE" ] || GIT_HEAL_CORE="$LIBDIR/sh/git-heal-core.sh"
+if [ -f "$GIT_HEAL_CORE" ]; then
+    # shellcheck disable=SC1090
+    . "$GIT_HEAL_CORE"
+fi
 
 VERSION="0.0.0"
 DEFAULT_USER=""

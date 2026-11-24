@@ -50,7 +50,11 @@ This is opt-in and idempotent; install and update never activate it.
    relative (submodule-form) pointer is skipped with a note:
    `.git/modules` is developer-pinned by the baseline and never
    healed. `opk git-heal status` scans the same universe for its
-   lockout rows.
+   lockout rows, and so do the `opk status` git-heal section and
+   `opk doctor`'s per-project row — they resolve pointer checkouts
+   through the same gate and name the resolved storage paths
+   (issue
+   [#777](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/777)).
 
 From then on four identical hooks — `post-merge`, `post-checkout`,
 `post-rewrite`, `post-index-change` — run after your git operations in

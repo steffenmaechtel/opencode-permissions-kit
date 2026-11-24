@@ -337,6 +337,8 @@ check "RL2c: #777 — git-heal on heals the pointer checkout's storage gitdir" \
     E 'sudo opk git-heal on >/tmp/gh-pt-on.log 2>&1 && grep -qF "operand set re-pinned for /var/www/gitdirs/rl-gh.git" /tmp/gh-pt-on.log && test "$(stat -c %U /var/www/gitdirs/rl-gh.git/index)" = "opencode" && grep -qF "gitdir=/var/www/gitdirs/rl-gh.git" /usr/local/lib/opencode-permissions-kit/git-heal/heal.log'
 check "RL2c: #777 — status names the resolved storage gitdir in its lockout rows" \
     E 'sudo chown root /var/www/gitdirs/rl-gh.git/index && sudo opk git-heal status >/tmp/gh-pt-st.log 2>&1 && grep -qF "heals it): /var/www/gitdirs/rl-gh.git/index is root-owned" /tmp/gh-pt-st.log'
+check "RL2c: #777 — opk status renders the same resolved-path lockout row" \
+    E 'opk status >/tmp/gh-pt-stsec.log 2>&1 && grep -qF "/var/www/gitdirs/rl-gh.git/index is root-owned (transient —" /tmp/gh-pt-stsec.log'
 E 'rm -f /tmp/gh-pt-*.log'
 E 'sudo opk git-protection revert --all >/tmp/gp-revert.log 2>&1' &&
     echo "  ${GREEN}OK${NC}  opk git-protection revert --all completed"
