@@ -801,6 +801,62 @@ fi
 # restore the conf the matrix expects
 printf '%s\n' "$WORK/zone" "# a comment line rides along (#660 M6)" "" >"$CONF"
 
+# --- 6c. hooks: the adopt hint's argument is a paste-safe word (#766) ---------------
+# The printed `sudo opk git-protection adopt <toplevel>` line is data
+# until pasted -- then it is shell structure. The toplevel path
+# (folder names under it are agent-influenceable, group-writable
+# trees) must arrive as ONE shell word: bare when plain, single-quoted
+# with '\'' escaping otherwise, NO command at all for a control byte
+# (a rename hint instead). The round trip parses the printed text as
+# SOURCE in a fresh shell of the same dialect -- the way a pasted line
+# is read; the shell is the authority, never a hand-rolled quote check
+# (the _gp_q matrix model, test-git-protection-core.sh).
+_hq_tab=$(printf '\t')
+_hq_nl=$(printf 'a\nb')
+_hq_fail=""
+_hq_n=0
+for _hq_name in "my proj" "a;b" "it's" "a \$(id) b" "b\`tick\`x" "hq-plain" "a${_hq_tab}b" "${_hq_nl}"; do
+    _hq_n=$((_hq_n + 1))
+    _hq_repo="$WORK/zone/$_hq_name"
+    git -C "$WORK/zone" init -q -b main "$_hq_name" 2>/dev/null || continue
+    git -C "$_hq_repo" -c user.email=t@e -c user.name=t commit -q --allow-empty -m x
+    git -C "$_hq_repo" config core.hooksPath "$WORK/lib/git-heal/hooks"
+    _hq_rc=0
+    _hq_out=$(env PATH="$WORK/sbin:$PATH" $(_gitenv) GP_STORAGE="$WORK/gpstor" \
+        env -u GP_NO_HINT git -C "$_hq_repo" checkout -q -b "hq-$_hq_n" 2>&1) || _hq_rc=$?
+    case "$_hq_name" in
+        *[[:cntrl:]]*)
+            # control byte: NO command line, the rename hint instead
+            if printf '%s' "$_hq_out" | grep -qF 'run: sudo opk git-protection adopt'; then
+                _hq_fail="$_hq_fail printed-a-command:[$_hq_name]"
+            elif ! printf '%s' "$_hq_out" |
+                grep -qF 'toplevel path carries a control byte -- rename the folder'; then
+                _hq_fail="$_hq_fail no-rename-hint:[$_hq_name]"
+            fi
+            ;;
+        *)
+            _hq_arg=$(printf '%s' "$_hq_out" |
+                sed -n 's/^.*run: sudo opk git-protection adopt //p' | head -n 1)
+            if [ -z "$_hq_arg" ]; then
+                _hq_fail="$_hq_fail no-command:[$_hq_name]"
+                continue
+            fi
+            for _hq_sh in dash bash; do
+                _hq_hrc=0
+                _hq_rt=$("$_hq_sh" -c 'eval "set -- $1"; printf "%s|%s" "$#" "$1"' _ "$_hq_arg") || _hq_hrc=$?
+                if [ "$_hq_hrc" != 0 ] || [ "$_hq_rt" != "1|$_hq_repo" ]; then
+                    _hq_fail="$_hq_fail $_hq_sh:[$_hq_name]->[$_hq_arg]"
+                fi
+            done
+            ;;
+    esac
+done
+if [ -z "$_hq_fail" ]; then
+    pass "hook hint: the adopt argument round-trips as one word through dash and bash; control bytes get no command (#766)"
+else
+    fail "hook hint paste-safety ($_hq_fail)"
+fi
+
 # --- 7. git-heal-core.sh: state machine + on/off/usage ------------------------------
 
 _purity_out=$(sh -c '. "$1"' _ "$CORE" 2>&1) || _purity_rc=$?

@@ -136,7 +136,13 @@ The same hooks carry the adopt hint for the
 [pointer layout](git-protection.md): a kit-managed tree whose `.git`
 is still a classic directory gets a two-line hint (`run: sudo opk
 git-protection adopt <toplevel>`) on checkout — echo only, never
-blocking, self-silencing once adopted or declined. And when a project
+blocking, self-silencing once adopted or declined. The toplevel path
+in that command is paste-safe: a path that is not plain (a space, a
+shell metacharacter) is single-quoted with `'\''` escaping — paste
+the line exactly as printed (#766). A toplevel carrying a control
+character gets no command at all, just the rename hint (no quoting
+makes such a byte safe on a pasted line).
+And when a project
 HAS been adopted, its common gitdir lives in the external storage,
 outside every `projects.conf` root — the hooks' fast path accepts
 gitdirs under the configured storage by plain prefix match (the root

@@ -1898,6 +1898,19 @@ E 'sudo opk git-protection adopt /var/www/vhosts/gp-nest/gp-nested >/tmp/gp-adop
     echo "  ${GREEN}OK${NC}  opk git-protection adopt (nested project) completed"
 check "12q: a nested project is stored as <parent>-<basename>.git (#764)" \
     E 'grep -qF "gitdir: /var/www/gitdirs/gp-nest-gp-nested.git" /var/www/vhosts/gp-nest/gp-nested/.git && git -C /var/www/vhosts/gp-nest/gp-nested status --porcelain >/dev/null'
+# #756 D4: the dev-drop's env HOME hop (#754 b D4). A HOME-preserving
+# sudo makes the dev-side git resolve ROOT's gitconfig; a 000-mode
+# /root/.gitconfig kills every such leg. Root itself bypasses mode
+# bits (CAP_DAC_OVERRIDE), so planting the file endangers ONLY the
+# dropped-user leg -- if the hop ever disappears from _gp_devgit,
+# adopt's verify leg dies here and the row reddens.
+E 'sudo sh -c "printf \"[core]\n\" >/root/.gitconfig && chmod 000 /root/.gitconfig"'
+E 'mkdir -p /var/www/vhosts/gp-home && git -C /var/www/vhosts/gp-home init -q && git -C /var/www/vhosts/gp-home -c user.email=t@e.st -c user.name=t commit -q --allow-empty -m c1'
+E 'sudo opk git-protection adopt /var/www/vhosts/gp-home >/tmp/gp-adopt-home.log 2>&1' &&
+    echo "  ${GREEN}OK${NC}  adopt through a 000 /root/.gitconfig completed"
+check "12q: adopt verifies through a 000 /root/.gitconfig (the env HOME hop, #756 D4)" \
+    E 'test -f /var/www/vhosts/gp-home/.git && grep -qF "gitdir: /var/www/gitdirs/gp-home.git" /var/www/vhosts/gp-home/.git && git -C /var/www/vhosts/gp-home status --porcelain >/dev/null'
+E 'sudo rm -f /root/.gitconfig'
 # The adopt hint (hooks are on since 2c): silent on the ADOPTED tree,
 # still advertising on a classic one.
 check "12q: no adopt hint on the adopted tree (self-silencing)" \

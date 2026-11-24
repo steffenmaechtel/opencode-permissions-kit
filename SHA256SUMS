@@ -11,10 +11,10 @@ c49b1ae4bafda33b445cb6fc80704ca94c2b26c121b6b5f6a9b5a04a10cab284  files/opencode
 72e2b48893c03886b5ba0680cf6b419d7185e84cf2cbe6b12df536652d25db1f  files/opencode-permissions-kit-lib/bin/socket-check
 9f21f5a57ff8c03d0aa913753530a53eb8bdbfd956371d941e6431a2a7dc2913  files/opencode-permissions-kit-lib/bin/xdg-open
 fab12366f11f087ec836e372efa39d1ecc91efdfdbe5f67aab174d392e8eb49a  files/opencode-permissions-kit-lib/git-heal/heal-index-head
-3cc79fc8058e9b8aa03223ebbdafb5dacb20f77f41832ab91350eb4afcfb4a74  files/opencode-permissions-kit-lib/git-heal/hooks/post-checkout
-3cc79fc8058e9b8aa03223ebbdafb5dacb20f77f41832ab91350eb4afcfb4a74  files/opencode-permissions-kit-lib/git-heal/hooks/post-index-change
-3cc79fc8058e9b8aa03223ebbdafb5dacb20f77f41832ab91350eb4afcfb4a74  files/opencode-permissions-kit-lib/git-heal/hooks/post-merge
-3cc79fc8058e9b8aa03223ebbdafb5dacb20f77f41832ab91350eb4afcfb4a74  files/opencode-permissions-kit-lib/git-heal/hooks/post-rewrite
+496d6e8db710b9574699df7165b462526becde986daaeb18a4a3d22327032d34  files/opencode-permissions-kit-lib/git-heal/hooks/post-checkout
+496d6e8db710b9574699df7165b462526becde986daaeb18a4a3d22327032d34  files/opencode-permissions-kit-lib/git-heal/hooks/post-index-change
+496d6e8db710b9574699df7165b462526becde986daaeb18a4a3d22327032d34  files/opencode-permissions-kit-lib/git-heal/hooks/post-merge
+496d6e8db710b9574699df7165b462526becde986daaeb18a4a3d22327032d34  files/opencode-permissions-kit-lib/git-heal/hooks/post-rewrite
 351e95d2979b051c1ee63c8fde739952444d55069d010ddb90d62a21b9da835f  files/opencode-permissions-kit-lib/management/config.sh
 f494db50a2fe6de42837d4eacb72b4cef79d0c934dc78df9d503be89d4a66213  files/opencode-permissions-kit-lib/management/doctor.sh
 6722f097aa33358f1f8eed37a78057b30a2b5d234711cf3b842ce6dfba4c0b6e  files/opencode-permissions-kit-lib/management/status.sh
@@ -33,7 +33,7 @@ db10fdee1914af11a158b46fa5dc39bd54c3b9e75969ebd2373bc5945680026c  files/opencode
 b137417664afbdc06ff757dd5785236112ffd05f4c85d358c558def543ac96f9  files/opencode-permissions-kit-lib/sh/fs-baseline.sh
 80579d6005c882c689086a3af913ccdf686059905451f43b496aa74005fd0b41  files/opencode-permissions-kit-lib/sh/git-check.sh
 d78f6d51f910142ab1b17c13b2c7a46160709a1b98f34bbc6e789eabc9ec5b2f  files/opencode-permissions-kit-lib/sh/git-heal-core.sh
-6b766e6d6f3529cb0a6d78b38a734dd349d7b1ce9014fcc873e05fd1e881332c  files/opencode-permissions-kit-lib/sh/git-protection-core.sh
+98ec99a0eba45ae3094eaaa6379e593b4f98d8a553fd2607f111072380421e9b  files/opencode-permissions-kit-lib/sh/git-protection-core.sh
 4ff157c60de6cddfc8f7af2a834aeb067bdad410f39756a9bbd92493de6cc9f7  files/opencode-permissions-kit-lib/sh/handover-core.sh
 2dae08bdf66e64c4362baa190490937519ba7e2e9e1de551401d673ea9e28c43  files/opencode-permissions-kit-lib/sh/install-core.sh
 575266d6e05f87e5b5444464538ab3c222931bf5d5753d44695308aac067c3bf  files/opencode-permissions-kit-lib/sh/log.sh

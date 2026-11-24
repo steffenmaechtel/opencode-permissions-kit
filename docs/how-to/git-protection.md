@@ -56,6 +56,17 @@ remaining row kinds are informational: `foreign-pointer` (a
 pointer to somewhere else — every linked worktree of a not-yet-migrated
 project shows this shape) and `worktree-reg` (a `.git` directory
 without the gitdir payload — a worktree registration or similar).
+A project path carrying a control character renders its row key with
+that byte masked (`a?b`) on every row kind — the raw byte never
+reaches the terminal (#756).
+
+The project enumeration itself is newline-safe (#756): a `.git`
+under a path containing a newline is skipped with a loud stderr note
+(its row could not be represented, and the form gates would refuse
+the path anyway) — it never yields a garbage row, and it never
+blocks enumeration of the other projects. The sweep requires
+`python3` for this (the NUL-separated reader); a host without it
+refuses to enumerate at all rather than degrade silently.
 
 ### Unreferenced storage entries
 
