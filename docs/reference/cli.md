@@ -688,7 +688,8 @@ wholesale-swap detection: a `.git owner` warn row per repository whose
 `.git` directory owner differs from its project directory's owner, plus
 the #653 wave-1 integrity rows — a `heal drift` warn per gitdir whose
 healed state diverged (sticky bit missing on the gitdir, `config`/`hooks`
-not developer-owned, group-writable or carrying extended ACLs; re-apply
+not developer-owned, group-writable or carrying extended ACLs, or a
+symlinked `config`/`hooks` entry; re-apply
 via `sudo opk update --refresh`, storage gitdirs re-heal on every
 `sudo opk update`) and a `planted` warn for non-`.sample` entries in
 `.git/hooks` (all display-only — inspect before trusting git output; see
