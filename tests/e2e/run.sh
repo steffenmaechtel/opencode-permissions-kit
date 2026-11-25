@@ -2024,8 +2024,13 @@ check "12q: #653 W2 — a swapped worktree pointer renders the back-reference ro
 E 'git -C /var/www/vhosts/perm-check worktree remove --force e2ewt >/dev/null 2>&1'
 # The classic side: a fresh repo + worktree, healed to the classic
 # contract, quiet first — then a group-writable registration pointer.
+# The heal mirrors the real baseline's FULL pin sequence incl.
+# setfacl -b (#785 a C2): the container's /var/www/vhosts carries
+# default ACLs, and a plain git init inherits them on config/hooks and
+# the registration files — without the strip the strict ACL leg
+# (correctly) fires and the quiet arm reddens.
 E 'mkdir -p /var/www/vhosts/wt2-cl && git -C /var/www/vhosts/wt2-cl init -q -b main && git -C /var/www/vhosts/wt2-cl -c user.email=t@e -c user.name=t commit -q --allow-empty -m x && git -C /var/www/vhosts/wt2-cl worktree add -q wt -b clwb'
-E 'chmod 3770 /var/www/vhosts/wt2-cl/.git && chmod 644 /var/www/vhosts/wt2-cl/.git/config && chmod 755 /var/www/vhosts/wt2-cl/.git/hooks && chmod 3770 /var/www/vhosts/wt2-cl/.git/worktrees && chmod 644 /var/www/vhosts/wt2-cl/.git/worktrees/wt/commondir /var/www/vhosts/wt2-cl/.git/worktrees/wt/gitdir'
+E 'chmod 3770 /var/www/vhosts/wt2-cl/.git && chmod 644 /var/www/vhosts/wt2-cl/.git/config && chmod 755 /var/www/vhosts/wt2-cl/.git/hooks && chmod 3770 /var/www/vhosts/wt2-cl/.git/worktrees && chmod 644 /var/www/vhosts/wt2-cl/.git/worktrees/wt/commondir /var/www/vhosts/wt2-cl/.git/worktrees/wt/gitdir && setfacl -b /var/www/vhosts/wt2-cl/.git/config /var/www/vhosts/wt2-cl/.git/hooks /var/www/vhosts/wt2-cl/.git/worktrees/wt/commondir /var/www/vhosts/wt2-cl/.git/worktrees/wt/gitdir'
 check "12q: #653 W2 — a classic worktree at the healed contract stays quiet" \
     E 'opk status >/tmp/gh-w2-cl.log 2>&1; ! grep -qF "/var/www/vhosts/wt2-cl/.git/worktrees/wt" /tmp/gh-w2-cl.log'
 check "12q: #653 W2 — a classic registration pointer renders its drift row" \
