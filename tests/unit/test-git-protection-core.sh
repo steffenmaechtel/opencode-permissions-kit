@@ -806,18 +806,19 @@ fi
 
 # The sanity arm: the storage itself failing the use-time check skips
 # the sweep LOUD — and the skip COUNTS as a pass failure (#783 a A1:
-# the counted half was unpinned; the flag rides the eval like the
-# failure-count leg's).
+# the counted half was unpinned; #783 b B1: the flag printf masked the
+# eval's rc — both now print, both asserted; the count is the failure
+# channel, rc 0 the no-abort contract).
 mkdir -p "$WORK/rhs-real"
 ln -s "$WORK/rhs-real" "$WORK/rhs-sym"
 _rc=0
-_out=$(_core_run '_gp_reheal_storage "$WORK/rhs-sym"; printf "flag=%s\n" "$_gprs_failed"') || _rc=$?
-if [ "$_rc" = 0 ] &&
-    printf '%s' "$_out" | grep -qF 'storage reheal skipped: the use-time sanity check failed' &&
-    printf '%s' "$_out" | grep -qF 'flag=1'; then
-    pass "reheal: an insane storage skips loud AND fails the pass counter (#779, #783 a A1)"
+_out=$(_core_run '_gp_reheal_storage "$WORK/rhs-sym"; _r=$?; printf "flag=%s\n" "$_gprs_failed"; printf "rc=%s\n" "$_r"') || _rc=$?
+if printf '%s' "$_out" | grep -qF 'storage reheal skipped: the use-time sanity check failed' &&
+    printf '%s' "$_out" | grep -qF 'flag=1' &&
+    printf '%s' "$_out" | grep -qF 'rc=0'; then
+    pass "reheal: an insane storage skips loud AND fails the pass counter (#779, #783 a A1, b B1)"
 else
-    fail "reheal: sanity arm (rc=$_rc out=$_out) (#783 a A1)"
+    fail "reheal: sanity arm (rc=$_rc out=$_out) (#783 a A1, b B1)"
 fi
 
 # A missing storage is a clean no-op (the first `on` just made one).
@@ -830,20 +831,23 @@ else
 fi
 
 # Failure counting: a broken group makes the heal's chown -R fail —
-# the entry is named, the count reaches the caller (flag=1).
+# the entry is named, the count reaches the caller (flag=1), and the
+# function still returns 0 (the count is the failure channel, never
+# an rc abort under update.sh's set -e — pinned since #783 b B1).
 printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=nosuchgroup-779\n' \
     "$(id -un)" "$(id -un)" >"$IC.tmp"
 mv "$IC.tmp" "$IC"
 _rc=0
-_out=$(_core_run '_gp_reheal_storage "$WORK/rhs"; printf "flag=%s\n" "$_gprs_failed"') || _rc=$?
+_out=$(_core_run '_gp_reheal_storage "$WORK/rhs"; _r=$?; printf "flag=%s\n" "$_gprs_failed"; printf "rc=%s\n" "$_r"') || _rc=$?
 printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
     "$(id -un)" "$(id -un)" "$(id -gn)" >"$IC"
 if printf '%s' "$_out" | grep -qF 'flag=1' &&
+    printf '%s' "$_out" | grep -qF 'rc=0' &&
     printf '%s' "$_out" | grep -qF 'storage reheal failed on' &&
     printf '%s' "$_out" | grep -qF 'chown -R failed'; then
-    pass "reheal: a failed heal counts into _gprs_failed (#779)"
+    pass "reheal: a failed heal counts into _gprs_failed (#779, b B1)"
 else
-    fail "reheal: failure-count arm (out=$_out)"
+    fail "reheal: failure-count arm (rc=$_rc out=$_out)"
 fi
 
 # On-pass wiring, happy path: the full `on` heals an EXISTING drifted

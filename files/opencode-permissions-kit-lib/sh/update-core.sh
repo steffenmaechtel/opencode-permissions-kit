@@ -737,7 +737,7 @@ gid=$(id -g "$DEFAULT_USER" 2>/dev/null || echo '<gid>'),dmask=027,fmask=037\""
 # 2026-11-21): `opk update` asks before configuring the git-protection
 # storage the FIRST time (kit convention: nothing silent on user
 # trees), and — once the feature is enabled (GITDIR_STORAGE set to a
-# path) — every update runs the reheal+migrate+nail pass as root:
+# path) — every update runs the reheal+adopt+nail pass as root:
 # every EXISTING storage entry walks through the current gitdir heal
 # contract again, new classic .git layouts under the conf roots are
 # adopted, pending pointers get their nail (#779 — the re-application

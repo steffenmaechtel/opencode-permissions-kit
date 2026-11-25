@@ -1917,7 +1917,7 @@ check "12q: no adopt hint on the adopted tree (self-silencing)" \
     E 'cd /var/www/vhosts/perm-check && git checkout -q -b gp-post 2>/tmp/gp-hint.log && ! grep -q "opk git-protection" /tmp/gp-hint.log'
 E 'git -C /var/www/vhosts/perm-check checkout -q main 2>/dev/null || git -C /var/www/vhosts/perm-check checkout -q master 2>/dev/null || true'
 # The update consent: with the feature enabled, a full update runs the
-# recurring adopt+reheal+nail pass inside its phases (checkout-shaped
+# recurring reheal+adopt+nail pass inside its phases (checkout-shaped
 # copy of the repo files, the section-11 discipline). #779: the
 # adopted storage entry arrives DRIFTED (root-owned group-writable
 # config, sticky bit gone) — the pass must walk it back through the
@@ -1926,7 +1926,7 @@ E 'sudo chown root /var/www/gitdirs/perm-check.git/config && sudo chmod 666 /var
 E 'rm -rf /tmp/gp-update-test && mkdir -p /tmp/gp-update-test/files && cp -r /home/dev/repo/files/* /tmp/gp-update-test/files/ && echo "9.9.9" >/tmp/gp-update-test/VERSION'
 E 'sudo bash /tmp/gp-update-test/files/opencode-permissions-kit-lib/management/update.sh --yes >/tmp/gp-update.log 2>&1' &&
     echo "  ${GREEN}OK${NC}  update with git-protection enabled completed"
-check "12q: the enabled update runs the adopt+reheal+nail pass" \
+check "12q: the enabled update runs the reheal+adopt+nail pass" \
     E 'grep -qF "git-protection: enabled — running the reheal + adopt + nail pass" /tmp/gp-update.log'
 check "12q: GITDIR_STORAGE survives the update's install.conf re-stamp" \
     E 'grep -qx "GITDIR_STORAGE=/var/www/gitdirs" /etc/opencode-permissions-kit/install.conf'

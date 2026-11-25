@@ -1104,7 +1104,7 @@ if [ -f "$WORK/ucroots/r1/proj2/.git" ] &&
     printf '%s' "$_uc_out" | grep -qF 'storage reheal' &&
     printf '%s' "$_uc_out" | grep -qF 'running the reheal + adopt + nail pass' &&
     ! printf '%s' "$_uc_out" | grep -qF 'confirm:'; then
-    pass "consent: enabled conf runs the adopt + reheal pass without asking (#704, #779)"
+    pass "consent: enabled conf runs the reheal + adopt pass without asking (#704, #779)"
 else
     fail "consent: enabled arm (out=$_uc_out)"
 fi
