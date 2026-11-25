@@ -85,12 +85,15 @@ its audience and is loaded on demand:
 - **Run the L1–L7 checklist before committing and again before declaring
   the work done** — every new feature is a new instance of a known error
   class; `agent/learnings.md` is authoritative. (RM-0105)
-- **`AGENTS.md` does not grow past its byte cap** — 27 KiB, pinned by
+- **`AGENTS.md` does not grow past its byte cap** — 14 KiB, pinned by
   `tests/unit/test-docs-loop.sh`: every session pays this file up
-  front, and the docs-loop pilot grew it by half in a week. New detail
-  routes into an `agent/` on-demand file; overflow means compress or
-  move. The cap is a first stop, not the target — the size question
-  beyond it is tracked in #768. (RM-0218)
+  front, and the docs-loop pilot grew it by half in a week. The 2026
+  surface split (#768) took the file from 27,351 to ~12.8 KB (detail
+  to `agent/gates.md` and `tests/AGENTS.md`) and the cap followed the
+  rewrite. New detail routes into an on-demand file; overflow means
+  compress or move. The cap is a first stop, not the target — the
+  compression question lives in
+  `internal/records/agents-md-surface-plan.md`. (RM-0218)
 
 ## What this repo is
 
