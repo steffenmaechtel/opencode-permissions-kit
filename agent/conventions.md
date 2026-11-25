@@ -567,7 +567,7 @@ waves (#496 a B1, #498, #519: `_rule2_batch`, `_rule1_batch`,
   an arm that pins the message only stays green through an rc
   regression (#496 b D3), and the redirection ORDER is load-bearing
   (swap it and the arm goes vacuous, #523 §1). Sabotage cycles follow
-  AGENTS.md Testing (secured tree, content-verified restore). (RM-0148)
+  agent/gates.md (secured tree, content-verified restore). (RM-0148)
 - The empty-scan-set leg fails loud too: zero scanned files is not a
   clean verdict — `trap_detect`'s "no files given" rc 1 is the
   reference shape. (RM-0149)

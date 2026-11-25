@@ -846,7 +846,7 @@ Four places carry review knowledge, each with exactly one job:
   secured by the unconditional pre-restore copy out of the tree, with
   recovery re-applying only the fix hunks from that copy (recurrence
   2026-11-16: PR #568 round c Z3; #577 option 2.a). Why: PR #441 round
-  b D1. The full rule and incident chain: AGENTS.md Testing;
+  b D1. The full rule and incident chain: agent/gates.md;
   [learnings.md](learnings.md) L4. (RM-0139)
 
 ## Suites are the standing review

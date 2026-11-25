@@ -173,7 +173,7 @@ one lookup ahead of the fix commit would have pre-empted the round;
 rank 2 (tests remain the least-verified code: `tests-unit` is hotspot #1 in
 both corpora).*
 
-Sabotage-verify (AGENTS.md, Testing) covers green-when-broken — keep it for
+Sabotage-verify (agent/gates.md) covers green-when-broken — keep it for
 every pin, including pins for wave mechanisms themselves — and run it only
 against secured work, re-checked before EVERY cycle (PR #441 round b D1
 lost a fix in the SECOND cycle): the restore resets to the index and wipes
@@ -320,7 +320,7 @@ empty-match greps (`grep … || true` where empty output is rc 1), `IFS= read
   same) — no `| tail`, no `;`, `set -o pipefail` when wrapping; and
   resolution rows checked ≤ 120 BEFORE the commit, with the
   `<SHA>`-fill's +2 bytes per row budgeted (issue #237; the rule
-  itself lives in the review README — AGENTS.md Testing owns the
+  itself lives in the review README — agent/gates.md owns the
   chain mechanics, including its post-rebase exception where the
   chain ends in `make test` after the manifest's own commit); and
   a diff touching `files/` owes `make sums`
@@ -520,7 +520,7 @@ the sabotaged file, a state where commit and stash cannot secure), and
 the 2026-11-18 escalation changed the process shape instead of
 sharpening the demand again: a sanctioned securing move (the
 unconditional pre-restore copy) so the safe path is also the cheap one
-(#577 option 2.a, AGENTS.md Testing). Incidents outside the round
+(#577 option 2.a, agent/gates.md). Incidents outside the round
 comments belong in AGENTS.md — restated in the pages the working
 session reads, not one page alone.
 
@@ -533,9 +533,9 @@ session reads, not one page alone.
   line-length ratchet RED at a committed HEAD, `pr-00208 b W1`); two
   more ratchet-commission instances went live on 2026-10-25 outside
   snapshots (piped gate, `;` separator — the chain-mechanics rule
-  lives in AGENTS.md Testing, the checklist pointer in "Keep doing");
-  sabotage-vs-uncommitted-tree produced zero corpus findings (AGENTS.md
-  Testing owns it; its 2026-11 recurrence — PR #441 round b D1 — is
+  lives in agent/gates.md, the checklist pointer in "Keep doing");
+  sabotage-vs-uncommitted-tree produced zero corpus findings (agent/gates.md
+  owns it; its 2026-11 recurrence — PR #441 round b D1 — is
   post-corpus: rule sharpened 2026-11-10, per-cycle invariant +
   content-based restore verification, restated in review-concept.md
   "Verification duty" and L4/Keep doing above).
