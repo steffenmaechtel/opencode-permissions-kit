@@ -1305,14 +1305,16 @@ else
 fi
 
 # Claim audit for the extended layer-separation note: the sweep SAYS
-# where adopted checkouts' gitdir-level bits come from — and that no
-# update-time re-application exists for them (review a Q4 wording).
+# where adopted checkouts' gitdir-level bits come from — the
+# git-protection heal at adoption, re-applied by that heal's own pass
+# on every update / on run since #779 (the pre-#779 wording asserted
+# the gap; the storage reheal sweep closed it).
 if printf '%s' "$_out" | grep -qF 'for adopted' &&
-    printf '%s' "$_out" | grep -qF 'set by the git-protection migration heal at adoption' &&
-    printf '%s' "$_out" | grep -qF 'no update-time re-application exists for them yet'; then
-    pass "core: on names the pointer gitdir bits' owner (git-protection heal) (#777)"
+    printf '%s' "$_out" | grep -qF 'the git-protection heal sets them at adoption time' &&
+    printf '%s' "$_out" | grep -qF 'the storage reheal sweep, issue #779'; then
+    pass "core: on names the pointer gitdir bits' owner and re-application (#777, #779)"
 else
-    fail "core: on pointer caveat arm (out=$(printf '%s' "$_out" | grep 'operand sweep' | head -2)) (#777)"
+    fail "core: on pointer caveat arm (out=$(printf '%s' "$_out" | grep 'operand sweep' | head -2)) (#777, #779)"
 fi
 
 # `on` pieces gate: an incomplete lib refuses before touching anything.

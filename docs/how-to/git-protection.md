@@ -32,6 +32,7 @@ on the maintainer host lives this way).
 
 ```bash
 sudo opk git-protection on      # storage init + persist + migrate ALL + nail
+                                 #   + re-heal every storage entry (#779)
 opk git-protection status       # per project: classic | nailed | unnailed |
                                 #   foreign-pointer | worktree-reg, plus INFO
                                 #   rows for unreferenced storage entries
@@ -96,10 +97,17 @@ updates skip the question with a hint; set `KIT_GITDIR_STORAGE=none`
 in the environment to silence that too, or to an absolute path to
 configure non-interactively.
 
-Once enabled, every `sudo opk update` runs the adopt + nail pass as
-root: new classic `.git` layouts under your roots are migrated,
-pending pointers get their nail. That recurring pass is the point —
-the protection rides the update, no extra command.
+Once enabled, every `sudo opk update` runs the adopt + heal + nail
+pass as root: new classic `.git` layouts under your roots are
+migrated, pending pointers get their nail, and every EXISTING storage
+entry is walked through the current gitdir heal contract again —
+idempotent, so a later change to that heal's semantics reaches
+adopted checkouts through the next update, not through a manual
+`revert` + `on` (issue
+[#779](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/779);
+the walk re-runs the full heal, so large storages add walk time to
+the update). That recurring pass is the point — the protection rides
+the update, no extra command.
 
 ### Where the storage lives
 
@@ -131,7 +139,10 @@ rewrites it in place, and an agent-pinned one blocks the developer
 commit under `fs.protected_regular=2`), the pointer file is written
 and nailed, registered worktrees follow via `git worktree repair`,
 and the result is verified (`git status`) before the next project
-starts. A failed project rolls back to the classic layout and the
+starts. That heal is not one-shot: every `on` / `opk update` pass
+re-applies it over every existing storage entry (idempotent, issue
+[#779](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/779)).
+A failed project rolls back to the classic layout and the
 run continues; nothing is ever half-migrated.
 
 New clones: git runs no hook at clone time, so the kit's
@@ -219,8 +230,10 @@ the kit — it is plain git).
 ## Limits
 
 - The agent can still plant additional directories inside the storage
-  (harmless — nothing follows them: the kit walks pointers, not the
-  storage). Both report surfaces list such entries as unreferenced
+  (harmless — nothing follows them: the #779 reheal sweep gates on
+  dev-owned entries and never heals a plant, and the kit's other
+  walks go by pointers). Both report surfaces list such entries as
+  unreferenced
   (`opk git-protection status` and the `opk status` section).
 - Filesystems without `chattr` support degrade loudly: migrations
   succeed, the nail warns and `status` reports `unnailed` — degraded,

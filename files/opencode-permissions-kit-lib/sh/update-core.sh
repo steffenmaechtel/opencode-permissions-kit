@@ -737,9 +737,12 @@ gid=$(id -g "$DEFAULT_USER" 2>/dev/null || echo '<gid>'),dmask=027,fmask=037\""
 # 2026-11-21): `opk update` asks before configuring the git-protection
 # storage the FIRST time (kit convention: nothing silent on user
 # trees), and — once the feature is enabled (GITDIR_STORAGE set to a
-# path) — every update runs the migrate+nail pass as root: new classic
-# .git layouts under the conf roots are adopted, pending pointers get
-# their nail. That IS the security gain: the conversion rides the
+# path) — every update runs the migrate+reheal+nail pass as root: new
+# classic .git layouts under the conf roots are adopted, pending
+# pointers get their nail, and every EXISTING storage entry walks
+# through the current gitdir heal contract again (#779 — idempotent,
+# so a heal-semantics change reaches adopted entries through the
+# update). That IS the security gain: the conversion rides the
 # update, no extra command. The operand heal stays the separate opt-in
 # (`opk git-heal on`) it is today — no coupling in either direction.
 # States, in order:
@@ -806,7 +809,7 @@ update_git_protection_consent() {
     if [ -n "$_gpc_conf" ]; then
         # Enabled: the recurring pass. No question — consent was given
         # when the storage was configured.
-        ui_info "git-protection: enabled — running the adopt + nail pass"
+        ui_info "git-protection: enabled — running the adopt + reheal + nail pass"
         (_git_protection_on) ||
             ui_warn "git-protection pass had failures — re-run: sudo opk git-protection on"
         return 0

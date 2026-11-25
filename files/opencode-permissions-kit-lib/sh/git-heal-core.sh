@@ -574,14 +574,17 @@ _git_heal_on() {
         # read as "this .git is healed now" while only the operand set
         # was re-pinned): name what the sweep did NOT do, and where
         # those bits come from — the fs baseline, which a plain
-        # `opk update` re-applies when its semantics change (issue #696).
+        # `opk update` re-applies when its semantics change (issue #696),
+        # and for adopted checkouts the git-protection heal, whose own
+        # pass re-applies them since #779 (the storage reheal sweep).
         if [ -s "$_ghc_on_list" ]; then
             ui_detail "operand sweep only: the gitdir-level bits (sticky .git,"
             ui_detail "dev-owned config/hooks) ride the group baseline — 'sudo opk"
             ui_detail "update' re-applies it when its semantics change; for adopted"
             ui_detail "(pointer-file) checkouts those bits live on the storage"
-            ui_detail "gitdir, set by the git-protection migration heal at adoption"
-            ui_detail "time — no update-time re-application exists for them yet"
+            ui_detail "gitdir — the git-protection heal sets them at adoption time"
+            ui_detail "and re-applies them on every 'sudo opk update' / 'opk"
+            ui_detail "git-protection on' (the storage reheal sweep, issue #779)"
         fi
         rm -f "$_ghc_on_list"
     fi
