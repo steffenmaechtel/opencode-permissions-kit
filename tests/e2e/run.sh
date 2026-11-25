@@ -1966,7 +1966,7 @@ check "12q: #777 — agent git is green through the healed pointer checkout" \
 check "12q: #777 — status names the resolved storage gitdir in its lockout rows" \
     E 'sudo chown root /var/www/gitdirs/perm-check.git/index && sudo opk git-heal status >/tmp/gh-pt-st.log 2>&1 && grep -qF "heals it): /var/www/gitdirs/perm-check.git/index is root-owned" /tmp/gh-pt-st.log'
 check "12q: #777 — opk status renders the same resolved-path lockout row" \
-    E 'opk status >/tmp/gh-pt-stsec.log 2>&1 && grep -qF "/var/www/gitdirs/perm-check.git/index is root-owned (transient —" /tmp/gh-pt-stsec.log'
+    E 'opk status >/tmp/gh-pt-stsec.log 2>&1; grep -qF "/var/www/gitdirs/perm-check.git/index is root-owned (transient —" /tmp/gh-pt-stsec.log'
 check "12q: #777 — opk doctor classifies the pointer checkout through the storage gitdir" \
     E 'opk doctor /var/www/vhosts/perm-check >/tmp/gh-pt-dr.log 2>&1; grep -qF "/var/www/gitdirs/perm-check.git/index is root-owned (transient --" /tmp/gh-pt-dr.log'
 E 'rm -rf /var/www/vhosts/perm-check/pt-sub /tmp/gh-pt-*.log'
