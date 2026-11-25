@@ -1217,12 +1217,16 @@ fi
 # AND the legit-looking ptstor pointer would heal. Everything
 # pointer-shaped is refused (the .git-named class still passes, none
 # lives in this fixture); the sweep stays green and heals nothing.
-# The eval UNSETS GH_STORAGE (review c C1): the subshell would
-# inherit an ambient export from the invoking shell, and an empty
-# assignment would not clear this seam — the resolver's ${GH_STORAGE:-…}
-# falls back on empty as well as unset (the :- trap documented in
-# agent/conventions.md, "Test sandbox (unit suites)"), so only
-# the unset pins the no-storage class.
+# The eval UNSETS GH_STORAGE (review c C1, rationale corrected per
+# round d D1): the subshell would inherit an ambient export from the
+# invoking shell — an empty assignment ALSO masks that export for
+# the children (verified in bash and dash), and the resolver's
+# ${GH_STORAGE:-…} treats empty and unset alike, so either spelling
+# resolves the no-storage class HERE. The unset is the explicit-
+# absence spelling: the pin's no-storage class rests on the fixture
+# install.conf carrying no GITDIR_STORAGE line, and the unset states
+# that independence from the invoking environment directly (a future
+# ${GH_STORAGE+x}-style check would distinguish it from empty).
 : >"$LOG"
 _hr_rc=0
 _b1_out=$(
