@@ -98,7 +98,9 @@ sudo opk git-heal status   # state, kit pieces, per-root lockout risks
 
 `opk status` reports the same state as a `Git heal hooks` section, and
 `opk doctor` shows a per-project `git-heal` row classifying the current
-lockout risk. `opk uninstall` unsets the kit-owned `core.hooksPath`
+lockout risk; both also carry the #653 heal-drift and planted-hook
+integrity rows ([the security model](../concepts/security-model.md)
+describes them). `opk uninstall` unsets the kit-owned `core.hooksPath`
 before removing the library (a dangling path would break your git).
 
 ## What the root heal may and may not do

@@ -66,7 +66,9 @@ developer git operation, via a narrow root heal behind a sudoers grant
 global `core.hooksPath` to the kit's root-owned hook dir (repo hooks
 stop executing for you — the `core.hooksPath /dev/null` trade plus the
 heal), re-renders sudoers and heals kit-managed main checkouts once.
-`off` unsets the value again — only if it holds the kit's path; a
+`status` closes with a single fix-all hint (`sudo opk git-heal on`)
+whenever lockout rows rendered. `off` unsets the value again — only if
+it holds the kit's path; a
 foreign value is never touched. Explicit consent: install/update never
 activate the hooks. `opk uninstall` unsets the kit-owned value before
 removing the library. Manual steps and limits:
@@ -178,7 +180,11 @@ filesystem root is the stop. The doctor report includes the #703
 wholesale-swap detection row: a `.git owner` warn when this project's
 `.git` directory owner differs from the project root's owner
 (`opk status` carries the install-wide twin across every registered
-root — display-only either way). A marker is an existing regular file (a
+root), and the #653 wave-1 twin of the status integrity rows — `heal
+drift` warns for this project's gitdir (sticky bit, developer-owned
+`config`/`hooks`, no group write or extended ACLs) and a `planted` warn
+for non-`.sample` hook content (display-only either way). A marker is an
+existing regular file (a
 symlink to one counts; a dangling symlink or a directory named
 `opk.json` does not — discovery continues to the next ancestor, and
 that ancestor's policy governs). The header reports the root it used:
@@ -679,8 +685,13 @@ root-equivalent-access audit, and the leak scan — followed by management
 hints and the one-line verdict (the **Summary** row: *All green* or the
 alert/warning tally). The git-heal section also carries the #703
 wholesale-swap detection: a `.git owner` warn row per repository whose
-`.git` directory owner differs from its project directory's owner
-(display-only — inspect before trusting git output; see
+`.git` directory owner differs from its project directory's owner, plus
+the #653 wave-1 integrity rows — a `heal drift` warn per gitdir whose
+healed state diverged (sticky bit missing on the gitdir, `config`/`hooks`
+not developer-owned, group-writable or carrying extended ACLs; re-apply
+via `sudo opk update --refresh`, storage gitdirs re-heal on every
+`sudo opk update`) and a `planted` warn for non-`.sample` entries in
+`.git/hooks` (all display-only — inspect before trusting git output; see
 [the security model](../concepts/security-model.md)). The
 `Git protection` section reports the
 [nailed pointer layout](../how-to/git-protection.md) — its rows and

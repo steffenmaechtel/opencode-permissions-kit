@@ -345,10 +345,14 @@ check "RL2c: #779 — on re-applies the gitdir heal to existing storage entries"
 E 'sudo chown root /var/www/gitdirs/rl-gh.git/index'
 check "RL2c: #777 — git-heal on heals the pointer checkout's storage gitdir" \
     E 'sudo opk git-heal on >/tmp/gh-pt-on.log 2>&1 && grep -qF "operand set re-pinned for /var/www/gitdirs/rl-gh.git" /tmp/gh-pt-on.log && test "$(stat -c %U /var/www/gitdirs/rl-gh.git/index)" = "opencode" && grep -qF "gitdir=/var/www/gitdirs/rl-gh.git" /usr/local/lib/opencode-permissions-kit/git-heal/heal.log'
-check "RL2c: #777 — status names the resolved storage gitdir in its lockout rows" \
-    E 'sudo chown root /var/www/gitdirs/rl-gh.git/index && sudo opk git-heal status >/tmp/gh-pt-st.log 2>&1 && grep -qF "heals it): /var/www/gitdirs/rl-gh.git/index is root-owned" /tmp/gh-pt-st.log'
+check "RL2c: #777/#782 — status names the resolved storage gitdir in its lockout rows" \
+    E 'sudo chown root /var/www/gitdirs/rl-gh.git/index && sudo opk git-heal status >/tmp/gh-pt-st.log 2>&1 && grep -qF "lockout (transient — the next developer git operation heals it):" /tmp/gh-pt-st.log && grep -qF "/var/www/gitdirs/rl-gh.git/index is root-owned" /tmp/gh-pt-st.log && grep -qF "git-heal: fix all lockouts with:" /tmp/gh-pt-st.log'
 check "RL2c: #777 — opk status renders the same resolved-path lockout row" \
     E 'opk status >/tmp/gh-pt-stsec.log 2>&1; grep -qF "/var/www/gitdirs/rl-gh.git/index is root-owned (transient —" /tmp/gh-pt-stsec.log'
+# #653 W1: the drift row on the resolved storage gitdir (plant →
+# observe → restore in one E arm; opk status exits 2 on the warning).
+check "RL2c: #653 W1 — status reports heal drift on the resolved storage gitdir" \
+    E 'sudo chmod -t /var/www/gitdirs/rl-gh.git && opk status >/tmp/gh-pt-drift.log 2>&1; grep -qF "/var/www/gitdirs/rl-gh.git — sticky bit missing on the gitdir" /tmp/gh-pt-drift.log; _rc=$?; sudo chmod +t /var/www/gitdirs/rl-gh.git; test $_rc -eq 0'
 E 'rm -f /tmp/gh-pt-*.log'
 E 'sudo opk git-protection revert --all >/tmp/gp-revert.log 2>&1' &&
     echo "  ${GREEN}OK${NC}  opk git-protection revert --all completed"

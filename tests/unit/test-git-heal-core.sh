@@ -961,7 +961,7 @@ fi
 # #695: the sweep must SAY it is operand-only — the old wording read as
 # "this .git is healed now" while the gitdir bits ride the fs baseline.
 if printf '%s' "$_out" | grep -qF 'operand sweep only: the gitdir-level bits (sticky .git,' &&
-    printf '%s' "$_out" | grep -qF "update' re-applies it when its semantics change"; then
+    printf '%s' "$_out" | grep -qF "by 'sudo opk update' when its semantics change"; then
     pass "core: on separates the operand sweep from the fs-baseline bits (#695)"
 else
     fail "core: on must separate operand sweep and fs-baseline bits (#695)"
@@ -1311,7 +1311,7 @@ fi
 # the gap; the storage reheal sweep closed it).
 if printf '%s' "$_out" | grep -qF 'for adopted' &&
     printf '%s' "$_out" | grep -qF 'the git-protection heal sets them at adoption time' &&
-    printf '%s' "$_out" | grep -qF 'the storage reheal sweep, issue #779'; then
+    printf '%s' "$_out" | grep -qF '(the storage reheal sweep)'; then
     pass "core: on names the pointer gitdir bits' owner and re-application (#777, #779)"
 else
     fail "core: on pointer caveat arm (out=$(printf '%s' "$_out" | grep 'operand sweep' | head -2)) (#777, #779)"
@@ -1421,11 +1421,24 @@ fi
 # git operation heals them), matching the opk status / doctor rows.
 git config --file "$WORK/devhome/.gitconfig" core.hooksPath "$WORK/lib/git-heal/hooks"
 _out=$(_core_run 'INSTALL_CONF="$WORK/install-render.conf" _git_heal_status')
-if printf '%s' "$_out" | grep -qF 'lockout (transient — the next developer git operation' &&
-    printf '%s' "$_out" | grep -qF "heals it): $WORK/zone/scan/nested/repo/.git/index"; then
+# #782: the label line stays whole, the operand line carries path +
+# owner — both fragments pinned separately (the wrap discipline).
+if printf '%s' "$_out" | grep -qF 'lockout (transient — the next developer git operation heals it):' &&
+    printf '%s' "$_out" | grep -qF "$WORK/zone/scan/nested/repo/.git/index is $(id -un)-owned"; then
     pass "status renderer: ON classifies the same lockout as transient"
 else
     fail "status renderer: transient classification (out=$(printf '%s' "$_out" | grep -i lockout | head -2))"
+fi
+
+# #782: ONE fix-all hint after the row set (blank line + label row +
+# detail row). Discrimination: in THIS run the state is ON (the state
+# row carries no command text) and the transient lockout arm names no
+# command either — 'sudo opk git-heal on' can only come from the hint.
+if printf '%s' "$_out" | grep -qF 'git-heal: fix all lockouts with:' &&
+    printf '%s' "$_out" | grep -qF 'sudo opk git-heal on'; then
+    pass "status renderer: the fix-all hint renders once lockouts exist (#782)"
+else
+    fail "status renderer: fix-all hint missing (#782; out=$(printf '%s' "$_out" | tail -4))"
 fi
 
 # The mktemp failure path EXECUTES (#674 b D3): a dead TMPDIR drops
@@ -1438,6 +1451,18 @@ if printf '%s' "$_out" | grep -qF 'git-heal: lockout rows unavailable (mktemp fa
     pass "status renderer: mktemp failure is loud and non-fatal"
 else
     fail "status renderer: mktemp arm (out=$(printf '%s' "$_out" | head -3))"
+fi
+# #782 negative arm: NO lockouts (every operand matches the agent
+# user) renders NO hint — the row set is the hint's only trigger.
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\n' "$(id -un)" "$(id -un)" \
+    >"$WORK/install-noagent.conf"
+_out=$(_core_run 'INSTALL_CONF="$WORK/install-noagent.conf" _git_heal_status')
+if printf '%s' "$_out" | grep -qF 'git-heal: ON — heal hooks active' &&
+    ! printf '%s' "$_out" | grep -qF 'fix all lockouts' &&
+    ! printf '%s' "$_out" | grep -qE 'lockout \(transient|lockout risk'; then
+    pass "status renderer: no lockouts renders no fix-all hint (#782)"
+else
+    fail "status renderer: hint must ride the rows only (out=$(printf '%s' "$_out" | tail -3)) (#782)"
 fi
 chmod 700 "$WORK/zone/scan/locked"
 rmdir "$WORK/zone/scan/locked"

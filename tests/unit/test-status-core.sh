@@ -330,6 +330,180 @@ else
     pass "git-heal section: equal owners render no detection row (#703 control)"
 fi
 
+# --- #653 wave 1: heal-drift and planted-content rows -----------------------------
+# The drift checks walk the SAME population as the lockout rows (dirs +
+# resolved pointer targets) and report divergence from the healed
+# contract: sticky gitdir, dev-owned config/hooks, no group write, no
+# extended ACLs. Arms below use a DEDICATED fixture repo (the shared
+# ghs/root would couple arms) with explicit modes — the ambient umask
+# decides git's defaults (002 here, 022 on CI), so every asserted state
+# is chmod'd, never inherited. The healed control probes ACL-freedom
+# of the scratch itself (measured 2026-11-25: clean, no default ACLs
+# ride work_new dirs).
+mkdir -p "$WORK/ghs/drift/clone"
+git -C "$WORK/ghs/drift/clone" init -q -b main
+_ghd_reset() {
+    # Healed shape: sticky gitdir, 644 config, 755 hooks, clean content.
+    chmod +t "$WORK/ghs/drift/clone/.git"
+    chmod 644 "$WORK/ghs/drift/clone/.git/config"
+    chmod 755 "$WORK/ghs/drift/clone/.git/hooks"
+    rm -f "${WORK:?}/ghs/drift/clone/.git/hooks/pre-commit"
+}
+printf '%s\n' "$WORK/ghs/drift" >"$WORK/ghs/projects.conf"
+# Fresh-clone arm: git init leaves no sticky bit — the row must name
+# the gitdir and the re-apply path.
+_out=$(_ghs_run || true)
+if printf '%s' "$_out" | grep -qF "$WORK/ghs/drift/clone/.git — sticky bit missing on the gitdir" &&
+    printf '%s' "$_out" | grep -qF "'sudo opk update --refresh' / 'opk config projects refresh'"; then
+    pass "git-heal section: fresh clone renders the sticky-drift row (#653 W1)"
+else
+    fail "git-heal section: sticky-drift row missing (#653 W1; out=$(printf '%s' "$_out" | grep -F 'heal drift' | head -2))"
+fi
+_ghd_reset
+_out=$(_ghs_run || true)
+if printf '%s' "$_out" | grep -qF "sticky bit missing"; then
+    fail "git-heal section: healed gitdir renders no sticky row (#653 W1 control)"
+else
+    pass "git-heal section: healed gitdir renders no sticky row (#653 W1 control)"
+fi
+# Group-write arms: config 664 / hooks 775 re-grant what the heal pins
+# away — one row per entry, the reason inline.
+chmod 664 "$WORK/ghs/drift/clone/.git/config"
+chmod 775 "$WORK/ghs/drift/clone/.git/hooks"
+_out=$(_ghs_run || true)
+if printf '%s' "$_out" | grep -qF "$WORK/ghs/drift/clone/.git/config — group-writable" &&
+    printf '%s' "$_out" | grep -qF "$WORK/ghs/drift/clone/.git/hooks — group-writable"; then
+    pass "git-heal section: group-writable config/hooks render drift rows (#653 W1)"
+else
+    fail "git-heal section: group-write rows missing (#653 W1; out=$(printf '%s' "$_out" | grep -E 'config —|hooks —' | head -2))"
+fi
+# Planted-content arm: one non-sample entry in hooks (the hookwarn
+# semantics — entries, not executables).
+_ghd_reset
+: >"$WORK/ghs/drift/clone/.git/hooks/pre-commit"
+_out=$(_ghs_run || true)
+if printf '%s' "$_out" | grep -qF "1 non-sample entries in $WORK/ghs/drift/clone/.git/hooks" &&
+    printf '%s' "$_out" | grep -qF "git-heal hooks are off — inspect and remove manually"; then
+    pass "git-heal section: planted non-sample hook renders its row (#653 W1)"
+else
+    fail "git-heal section: planted row missing (#653 W1; out=$(printf '%s' "$_out" | grep -F 'non-sample' | head -2))"
+fi
+# Healed control (full): sticky, pinned modes, clean content — none of
+# the row texts render. Absence greps the three row texts, not the
+# 'heal drift' key: the getfacl DEGRADE row shares the key and would
+# false-red the control on hosts without the acl tools.
+_ghd_reset
+_out=$(_ghs_run || true)
+if ! printf '%s' "$_out" | grep -qF 'sticky bit missing' &&
+    ! printf '%s' "$_out" | grep -qF 'non-sample entries' &&
+    ! printf '%s' "$_out" | grep -qE '\.git/(config|hooks) — '; then
+    pass "git-heal section: the fully-healed fixture renders no drift/planted rows (#653 W1 control)"
+else
+    fail "git-heal section: healed control fired (#653 W1; out=$(printf '%s' "$_out" | grep -E 'heal drift|planted' | head -3))"
+fi
+# Owner-mismatch arm: a FORMAT-AWARE stat stub (the detstub twin keys
+# on the last arg only and would corrupt the %A legs). %A on the
+# gitdir reports the healed sticky shape (the sticky row stays quiet —
+# the owner row is the arm), %U on config a foreign owner, everything
+# else the real user (lockout rows keep rendering; the wholesale-swap
+# row stays quiet — both owners read as the invoking user).
+mkdir -p "$WORK/ghs/driftstub"
+cat >"$WORK/ghs/driftstub/stat" <<'EOF'
+#!/bin/sh
+case "$2" in
+%A)
+    case "$3" in
+    */.git) printf 'drwxrws--T\n' ;;
+    *) printf -- '---\n' ;;
+    esac
+    ;;
+%U)
+    case "$3" in
+    */.git/config) printf 'rogue\n' ;;
+    *) printf '%s\n' "$(id -un)" ;;
+    esac
+    ;;
+esac
+EOF
+chmod +x "$WORK/ghs/driftstub/stat"
+_out=$(
+    (
+        PATH="$WORK/ghs/driftstub:$STUB:$PATH"
+        export PATH NO_COLOR=1 GH_GITCONFIG="$WORK/ghs/devhome/.gitconfig"
+        . "$UI_LIB"
+        . "$LIB"
+        # shellcheck disable=SC1090
+        . "$GH_CORE"
+        DEFAULT_USER="$(id -un)"
+        OPENCODE_USER=opencode-ghs-agent
+        LIBDIR="$WORK/ghs/lib"
+        PROJECTS_CONF="$WORK/ghs/projects.conf"
+        status_section_git_heal
+    ) 2>&1 || true
+)
+if printf '%s' "$_out" | grep -qF "$WORK/ghs/drift/clone/.git/config — rogue-owned (not $(id -un))" &&
+    ! printf '%s' "$_out" | grep -qF 'sticky bit missing'; then
+    pass "git-heal section: foreign config owner renders the drift row, sticky stays quiet (#653 W1)"
+else
+    fail "git-heal section: owner arm (out=$(printf '%s' "$_out" | grep -E 'heal drift' | head -2)) (#653 W1)"
+fi
+# ACL arm (tool-gated): a named ACL entry on config is the re-grant
+# the heal strips. setfacl's mask makes the group-write leg fire TOO
+# (the mask IS the effective group perms in %A) — the pin asserts the
+# ACL fragment; the combined row is the honest report.
+if command -v setfacl >/dev/null 2>&1 && command -v getfacl >/dev/null 2>&1; then
+    _ghd_reset
+    setfacl -m "u:$(id -un):rw" "$WORK/ghs/drift/clone/.git/config"
+    _out=$(_ghs_run || true)
+    if printf '%s' "$_out" | grep -qF "$WORK/ghs/drift/clone/.git/config — group-writable, extended ACLs present"; then
+        pass "git-heal section: an extended ACL on config renders its drift fragment (#653 W1)"
+    else
+        fail "git-heal section: ACL arm (out=$(printf '%s' "$_out" | grep -F 'config —' | head -1)) (#653 W1)"
+    fi
+    setfacl -b "$WORK/ghs/drift/clone/.git/config"
+else
+    echo "skip: acl tools unavailable — the #653 W1 ACL arm did not run"
+fi
+# getfacl-missing degrade arm (restricted PATH, the controlled-PATH
+# rule): the ACL leg degrades to ONE counted warn row while the other
+# checks keep rendering — never a silently skipped check.
+mkdir -p "$WORK/ghs/nogfacl"
+for _ghd_b in stat find git getent cut grep wc mktemp sort; do
+    ln -s "$(command -v "$_ghd_b")" "$WORK/ghs/nogfacl/$_ghd_b"
+done
+chmod -t "$WORK/ghs/drift/clone/.git"
+_out=$(
+    (
+        PATH="$WORK/ghs/nogfacl:$STUB"
+        export PATH NO_COLOR=1 GH_GITCONFIG="$WORK/ghs/devhome/.gitconfig"
+        . "$UI_LIB"
+        . "$LIB"
+        # shellcheck disable=SC1090
+        . "$GH_CORE"
+        DEFAULT_USER="$(id -un)"
+        OPENCODE_USER=opencode-ghs-agent
+        LIBDIR="$WORK/ghs/lib"
+        PROJECTS_CONF="$WORK/ghs/projects.conf"
+        status_section_git_heal
+    ) 2>&1 || true
+)
+if printf '%s' "$_out" | grep -qF 'heal drift ACLs not checked — getfacl unavailable' &&
+    printf '%s' "$_out" | grep -qF 'sticky bit missing'; then
+    pass "git-heal section: missing getfacl degrades the ACL leg loudly, checks survive (#653 W1)"
+else
+    fail "git-heal section: getfacl-degrade arm (out=$(printf '%s' "$_out" | head -3)) (#653 W1)"
+fi
+# Pointer-target arm: drift rows name the RESOLVED storage gitdir (the
+# #777 twin — before it, adopted hosts showed state and nothing else).
+printf '%s\n' "$WORK/ghs/scan" >"$WORK/ghs/projects.conf"
+_out=$(_ghs_run || true)
+if printf '%s' "$_out" | grep -qF "$WORK/ghs/ptstor/ptmain.git — sticky bit missing on the gitdir"; then
+    pass "git-heal section: a pointer checkout's drift rows name the resolved gitdir (#653 W1)"
+else
+    fail "git-heal section: pointer drift rows (out=$(printf '%s' "$_out" | grep -F 'heal drift' | head -2)) (#653 W1)"
+fi
+printf '%s\n' "$WORK/ghs/root" >"$WORK/ghs/projects.conf"
+
 # The mktemp failure path EXECUTES for the status-core twin too
 # (#674 b D3): a dead TMPDIR drops the lockout rows with a loud warn,
 # never silently — and the state row above still renders.

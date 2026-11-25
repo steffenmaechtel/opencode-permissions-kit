@@ -578,13 +578,18 @@ _git_heal_on() {
         # and for adopted checkouts the git-protection heal, whose own
         # pass re-applies them since #779 (the storage reheal sweep).
         if [ -s "$_ghc_on_list" ]; then
+            # Wrap discipline (#782): quoted commands never break across
+            # output lines — "'sudo opk / update'" read as two commands.
+            # The "issue #779" tail is gone with this re-wrap: #695's
+            # no-issue-IDs-in-user-facing-output sweep missed this site
+            # (it shipped after that sweep); the row names the thing.
             ui_detail "operand sweep only: the gitdir-level bits (sticky .git,"
-            ui_detail "dev-owned config/hooks) ride the group baseline — 'sudo opk"
-            ui_detail "update' re-applies it when its semantics change; for adopted"
+            ui_detail "dev-owned config/hooks) ride the group baseline — re-applied"
+            ui_detail "by 'sudo opk update' when its semantics change; for adopted"
             ui_detail "(pointer-file) checkouts those bits live on the storage"
             ui_detail "gitdir — the git-protection heal sets them at adoption time"
-            ui_detail "and re-applies them on every 'sudo opk update' / 'opk"
-            ui_detail "git-protection on' (the storage reheal sweep, issue #779)"
+            ui_detail "and re-applies them on every 'sudo opk update' /"
+            ui_detail "'opk git-protection on' (the storage reheal sweep)"
         fi
         rm -f "$_ghc_on_list"
     fi
@@ -677,6 +682,15 @@ _git_heal_status() {
         rm -f "$_ghc_stt_list"
         return 0
     }
+    # Fix-all-hint counter (#782): the lockout loop prints inside the
+    # tee's pipeline FORK, so a main-shell counter variable would die
+    # with the fork (the pipeline-tally class, conventions.md "Script
+    # output style") — findings ride this temp file back instead. A
+    # failed mktemp drops only the hint (loud), never the rows.
+    _ghc_stt_cnt=$(mktemp) || {
+        ui_detail "git-heal: fix-all hint unavailable (mktemp failed)"
+        _ghc_stt_cnt=""
+    }
     ui_detail "git-heal: scanning conf roots for .git entries (dirs and pointer"
     ui_detail "files — large trees: this can take a while) ..."
     # Main-shell pre-probe (#710 b D2): the lockout row loop's tee is a
@@ -719,16 +733,36 @@ _git_heal_status() {
                 _ghc_stt_own=$(stat -c %U "$_ghc_stt_gd/$_ghc_stt_f" 2>/dev/null) || continue
                 if [ "$_ghc_stt_own" != "$_ghc_stt_agent" ]; then
                     if [ "$_ghc_stt_state" = on ]; then
-                        ui_detail "lockout (transient — the next developer git operation"
-                        ui_detail "heals it): $_ghc_stt_gd/$_ghc_stt_f is $_ghc_stt_own-owned"
+                        # #782: the label line stays whole, the operand
+                        # line carries path + owner — the old wrap broke
+                        # the sentence mid-verb ("operation / heals it):").
+                        ui_detail "lockout (transient — the next developer git operation heals it):"
+                        ui_detail "$_ghc_stt_gd/$_ghc_stt_f is $_ghc_stt_own-owned"
                     else
                         ui_detail "lockout risk: $_ghc_stt_gd/$_ghc_stt_f is $_ghc_stt_own-owned —"
                         ui_detail "'sudo opk git-heal on' heals and keeps it healed"
+                    fi
+                    # Hint counter (the temp file above): one mark per
+                    # rendered row; a write failure past a successful
+                    # mktemp is an accepted residual (disk full between
+                    # the two) — the rows above are the finding, the
+                    # hint is a nicety.
+                    if [ -n "$_ghc_stt_cnt" ]; then
+                        printf 'x\n' >>"$_ghc_stt_cnt" 2>/dev/null || true
                     fi
                 fi
             done
         done
     rm -f "$_ghc_stt_list"
+    # #782: ONE fix-all hint for the whole row set (blank line + two
+    # rows), rendered only when lockout rows did — the state row above
+    # already names the command when nothing is locked out.
+    if [ -n "$_ghc_stt_cnt" ] && [ -s "$_ghc_stt_cnt" ]; then
+        [ "${UI_SILENT:-0}" = 1 ] || printf '\n'
+        ui_info "git-heal: fix all lockouts with:"
+        ui_detail "sudo opk git-heal on"
+    fi
+    [ -n "$_ghc_stt_cnt" ] && rm -f "$_ghc_stt_cnt"
 }
 
 git_heal_cli() {
