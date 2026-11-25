@@ -643,7 +643,11 @@ doctor_opk_dispatcher() {
 # twin row shares GH_GITCONFIG).
 doctor_git_heal() {
     _dgh_lib="${GH_LIBDIR:-/usr/local/lib/opencode-permissions-kit}"
-    _dgh_dev=$(sed -n 's/^DEFAULT_USER=//p' "$INSTALL_CONF" 2>/dev/null | tail -n 1)
+    # Quote-strip like the DOCTOR_USER extraction below (#785 a B5): a
+    # hand-quoted DEFAULT_USER would otherwise keep its quotes through
+    # the owner-leg compare and fire a drift row for every owner (and
+    # the state leg's getent lookup misses the name too).
+    _dgh_dev=$(sed -n 's/^DEFAULT_USER=//p' "$INSTALL_CONF" 2>/dev/null | tail -n 1 | sed 's/^"//;s/"$//')
     # Kit pieces: heal script + four hooks under the library.
     _dgh_ok=1
     [ -f "$_dgh_lib/git-heal/heal-index-head" ] || _dgh_ok=0
@@ -734,6 +738,91 @@ doctor_git_heal() {
         fi
     fi
     if [ "$_dgh_skip" = 0 ]; then
+        # Heal-drift and planted-content rows (#653 wave 1, checks 1+2;
+        # the status-core twin enumerates every conf-root gitdir): the
+        # healed state is the norm -- fs-baseline.sh's contract for
+        # classic trees and git-protection's storage-gitdir heal for the
+        # resolved pointer both carry sticky gitdir, developer-owned
+        # config/hooks with no group write, no extended ACLs. These rows
+        # report drift between heal passes (fresh clones, partial
+        # applies, tampering); report-only -- healing and removal stay
+        # human decisions. getfacl gate probed once: a missing tool
+        # degrades the ACL leg to ONE counted warn row, never a silent
+        # skip (the #165 class).
+        _dgh_acl=1
+        command -v getfacl >/dev/null 2>&1 || _dgh_acl=0
+        [ "$_dgh_acl" = 1 ] ||
+            ui_kv_warn "git-heal" "heal drift ACLs not checked -- getfacl unavailable"
+        # Sticky: %A's last position, 't' OR 'T' -- the shared-tree
+        # model's gitdirs carry o=0 (mode 3770 renders "drwxrws--T").
+        _dgh_perm=$(stat -c %A "$_dgh_gd" 2>/dev/null) || _dgh_perm=""
+        case "$_dgh_perm" in
+            "")
+                ;;
+            ?????????[tT]) ;;
+            *)
+                ui_kv_warn "heal drift" "$_dgh_gd -- sticky bit missing on the gitdir"
+                ui_detail "(a fresh clone or a partial heal; the baseline heal re-applies"
+                ui_detail "it -- 'sudo opk update --refresh' / 'opk config refresh')"
+                ;;
+        esac
+        for _dgh_ent in config hooks; do
+            _dgh_p="$_dgh_gd/$_dgh_ent"
+            # A symlinked entry is its own drift: the heal pins regular
+            # entries only (its skip rule), and stat would report the
+            # LINK TARGET's state through the link, not the link.
+            if [ -L "$_dgh_p" ]; then
+                ui_kv_warn "heal drift" "$_dgh_p is a symlink (the heal pins regular"
+                ui_detail "entries only) -- inspect before trusting git output"
+                continue
+            fi
+            _dgh_own=$(stat -c %U "$_dgh_p" 2>/dev/null) || continue
+            _dgh_why=""
+            # Owner leg gated on a readable DEFAULT_USER: an empty dev
+            # name (broken/absent install.conf) would fire the row for
+            # EVERY owner — the state row above already carries the
+            # "unknown" signal for that conf state.
+            if [ -n "$_dgh_dev" ] && [ "$_dgh_own" != "$_dgh_dev" ]; then
+                _dgh_why="$_dgh_own-owned (not $_dgh_dev)"
+            fi
+            _dgh_mode=$(stat -c %A "$_dgh_p" 2>/dev/null) || continue
+            case "$_dgh_mode" in
+                ?????w*) _dgh_why="${_dgh_why:+$_dgh_why, }group-writable" ;;
+            esac
+            if [ "$_dgh_acl" = 1 ]; then
+                # Extended-ACL probe: anything beyond the base
+                # user::/group::/other:: triple is a re-grant the heal
+                # stripped (setfacl -b) -- a named entry (user:x:,
+                # group:x:) or a mask::/default:: line.
+                if getfacl --omit-header -p "$_dgh_p" 2>/dev/null |
+                    grep -qE '^(user|group):[^:]|^mask::|^default:'; then
+                    _dgh_why="${_dgh_why:+$_dgh_why, }extended ACLs present"
+                fi
+            fi
+            [ -n "$_dgh_why" ] || continue
+            ui_kv_warn "heal drift" "$_dgh_p -- $_dgh_why"
+            ui_detail "(the heal pins $_dgh_ent developer-owned with no group write or"
+            ui_detail "ACLs; re-apply: 'sudo opk update --refresh' -- storage gitdirs"
+            ui_detail "re-heal on every 'sudo opk update')"
+        done
+        # Planted-content row (#653 check 2, the _fsb_heal_hookwarn
+        # twin): the heal pins metadata only -- content planted before
+        # it survives. Entries, not executables, matching the heal-scan
+        # warn's semantics; the gate mirrors it (dir, not symlink).
+        # The count prints one TYPE line per entry (#785 a A1), never
+        # the name -- a newline inside a planted entry's name cannot
+        # inflate it (the -print form counted one such file as 2).
+        _dgh_hk="$_dgh_gd/hooks"
+        if [ -d "$_dgh_hk" ] && [ ! -L "$_dgh_hk" ]; then
+            _dgh_ns=$(find "$_dgh_hk" -mindepth 1 -maxdepth 1 \
+                ! -name '*.sample' -printf '%y\n' 2>/dev/null | wc -l 2>/dev/null || printf '0')
+            if [ "${_dgh_ns:-0}" -gt 0 ] 2>/dev/null; then
+                ui_kv_warn "planted" "$_dgh_ns non-sample entries in $_dgh_hk"
+                ui_detail "(planted content survives the heal -- it runs only if the"
+                ui_detail "entry is executable and that git call uses .git/hooks;"
+                ui_detail "inspect and remove manually)"
+            fi
+        fi
         for _dgh_f in index HEAD ORIG_HEAD REBASE_HEAD packed-refs \
             MERGE_HEAD MERGE_MSG MERGE_MODE AUTO_MERGE \
             CHERRY_PICK_HEAD REVERT_HEAD; do

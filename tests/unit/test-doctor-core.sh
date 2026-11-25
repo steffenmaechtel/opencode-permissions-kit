@@ -437,6 +437,171 @@ else
     pass "doctor git-heal: equal owners render no detection row (#703 control)"
 fi
 
+# --- #653 wave 1: heal-drift and planted-content rows (the status-core twin) -------
+# Same contract, doctor's per-project shape and ASCII dash vocabulary.
+# Explicit modes per arm — the ambient umask decides git's defaults.
+# _dgh_run defaults DOCTOR_ROOT to dgh/proj (unhealed classic repo).
+_ddr_reset() {
+    chmod +t "$WORK/dgh/proj/.git"
+    chmod 644 "$WORK/dgh/proj/.git/config"
+    chmod 755 "$WORK/dgh/proj/.git/hooks"
+    rm -f "${WORK:?}/dgh/proj/.git/hooks/pre-commit"
+}
+_out=$(_dgh_run || true)
+if printf '%s' "$_out" | grep -qF "$WORK/dgh/proj/.git -- sticky bit missing on the gitdir" &&
+    printf '%s' "$_out" | grep -qF "sudo opk update --refresh' / 'opk config refresh"; then
+    pass "doctor git-heal: fresh clone renders the sticky-drift row (#653 W1)"
+else
+    fail "doctor git-heal: sticky-drift row missing (#653 W1; out=$(printf '%s' "$_out" | grep -F 'heal drift' | head -2))"
+fi
+_ddr_reset
+_out=$(_dgh_run || true)
+if printf '%s' "$_out" | grep -qF "sticky bit missing"; then
+    fail "doctor git-heal: healed gitdir renders no sticky row (#653 W1 control)"
+else
+    pass "doctor git-heal: healed gitdir renders no sticky row (#653 W1 control)"
+fi
+chmod 664 "$WORK/dgh/proj/.git/config"
+chmod 775 "$WORK/dgh/proj/.git/hooks"
+_out=$(_dgh_run || true)
+if printf '%s' "$_out" | grep -qF "$WORK/dgh/proj/.git/config -- group-writable" &&
+    printf '%s' "$_out" | grep -qF "$WORK/dgh/proj/.git/hooks -- group-writable"; then
+    pass "doctor git-heal: group-writable config/hooks render drift rows (#653 W1)"
+else
+    fail "doctor git-heal: group-write rows missing (#653 W1; out=$(printf '%s' "$_out" | grep -E 'config --|hooks --' | head -2))"
+fi
+_ddr_reset
+: >"$WORK/dgh/proj/.git/hooks/pre-commit"
+_out=$(_dgh_run || true)
+if printf '%s' "$_out" | grep -qF "1 non-sample entries in $WORK/dgh/proj/.git/hooks" &&
+    printf '%s' "$_out" | grep -qF 'that git call uses .git/hooks;' &&
+    printf '%s' "$_out" | grep -qF 'survives the heal'; then
+    pass "doctor git-heal: planted non-sample hook renders its row (#653 W1)"
+else
+    fail "doctor git-heal: planted row missing (#653 W1; out=$(printf '%s' "$_out" | grep -F 'non-sample' | head -2))"
+fi
+# Healed control: absence greps the row texts, not the key — the
+# getfacl DEGRADE row shares the key and would false-red the control
+# on hosts without the acl tools.
+_ddr_reset
+_out=$(_dgh_run || true)
+if ! printf '%s' "$_out" | grep -qF 'sticky bit missing' &&
+    ! printf '%s' "$_out" | grep -qF 'non-sample entries' &&
+    ! printf '%s' "$_out" | grep -qE '\.git/(config|hooks) -- '; then
+    pass "doctor git-heal: the fully-healed fixture renders no drift/planted rows (#653 W1 control)"
+else
+    fail "doctor git-heal: healed control fired (#653 W1; out=$(printf '%s' "$_out" | grep -E 'heal drift|planted' | head -3))"
+fi
+# Owner-mismatch arm: FORMAT-AWARE stat stub (a last-arg-keyed stub
+# would corrupt the %A legs). %A on the gitdir reports the healed
+# sticky shape, %U on config a foreign owner, everything else the real
+# user — the lockout rows keep rendering.
+mkdir -p "$WORK/dgh/driftstub"
+cat >"$WORK/dgh/driftstub/stat" <<'EOF'
+#!/bin/sh
+case "$2" in
+%A)
+    case "$3" in
+    */.git) printf 'drwxrws--T\n' ;;
+    *) printf -- '---\n' ;;
+    esac
+    ;;
+%U)
+    case "$3" in
+    */.git/config) printf 'rogue\n' ;;
+    *) printf '%s\n' "$(id -un)" ;;
+    esac
+    ;;
+esac
+EOF
+chmod +x "$WORK/dgh/driftstub/stat"
+_out=$(
+    (
+        PATH="$WORK/dgh/driftstub:$STUB:$PATH"
+        export PATH NO_COLOR=1 GH_GITCONFIG="$WORK/dgh/devhome/.gitconfig" \
+            GH_LIBDIR="$WORK/dgh/lib"
+        . "$UI_LIB"
+        . "$LIB"
+        INSTALL_CONF="$WORK/dgh/install.conf"
+        DOCTOR_ROOT="$WORK/dgh/proj"
+        DOCTOR_USER=opencode-dgh-agent
+        doctor_git_heal
+    ) 2>&1 || true
+)
+if printf '%s' "$_out" | grep -qF "$WORK/dgh/proj/.git/config -- rogue-owned (not $(id -un))" &&
+    ! printf '%s' "$_out" | grep -qF 'sticky bit missing'; then
+    pass "doctor git-heal: foreign config owner renders the drift row, sticky stays quiet (#653 W1)"
+else
+    fail "doctor git-heal: owner arm (out=$(printf '%s' "$_out" | grep -F 'heal drift' | head -2)) (#653 W1)"
+fi
+# ACL arm (tool-gated): a named entry re-grants what the heal strips;
+# setfacl's mask fires the group-write leg too (the honest combined
+# row).
+if command -v setfacl >/dev/null 2>&1 && command -v getfacl >/dev/null 2>&1; then
+    _ddr_reset
+    setfacl -m "u:$(id -un):rw" "$WORK/dgh/proj/.git/config"
+    _out=$(_dgh_run || true)
+    if printf '%s' "$_out" | grep -qF "$WORK/dgh/proj/.git/config -- group-writable, extended ACLs present"; then
+        pass "doctor git-heal: an extended ACL on config renders its drift fragment (#653 W1)"
+    else
+        fail "doctor git-heal: ACL arm (out=$(printf '%s' "$_out" | grep -F 'config --' | head -1)) (#653 W1)"
+    fi
+    setfacl -b "$WORK/dgh/proj/.git/config"
+else
+    echo "skip: acl tools unavailable -- the #653 W1 ACL arm did not run"
+fi
+# getfacl-missing degrade arm (restricted PATH): the ACL leg degrades
+# to ONE counted warn row while the other checks keep rendering.
+mkdir -p "$WORK/dgh/nogfacl"
+for _ddr_b in stat find git getent cut grep wc sed; do
+    ln -s "$(command -v "$_ddr_b")" "$WORK/dgh/nogfacl/$_ddr_b"
+done
+chmod -t "$WORK/dgh/proj/.git"
+_out=$(
+    (
+        PATH="$WORK/dgh/nogfacl:$STUB"
+        export PATH NO_COLOR=1 GH_GITCONFIG="$WORK/dgh/devhome/.gitconfig" \
+            GH_LIBDIR="$WORK/dgh/lib"
+        . "$UI_LIB"
+        . "$LIB"
+        INSTALL_CONF="$WORK/dgh/install.conf"
+        DOCTOR_ROOT="$WORK/dgh/proj"
+        DOCTOR_USER=opencode-dgh-agent
+        doctor_git_heal
+    ) 2>&1 || true
+)
+if printf '%s' "$_out" | grep -qF 'heal drift ACLs not checked -- getfacl unavailable' &&
+    printf '%s' "$_out" | grep -qF 'sticky bit missing'; then
+    pass "doctor git-heal: missing getfacl degrades the ACL leg loudly, checks survive (#653 W1)"
+else
+    fail "doctor git-heal: getfacl-degrade arm (out=$(printf '%s' "$_out" | head -3)) (#653 W1)"
+fi
+# Pointer-target arm: drift rows name the RESOLVED storage gitdir (the
+# #777 twin — the ptproj fixture from the pointer classification arm).
+_out=$(_dgh_run "$WORK/dgh/ptproj" || true)
+if printf '%s' "$_out" | grep -qF "$WORK/dgh/ptstor/ptproj.git -- sticky bit missing on the gitdir"; then
+    pass "doctor git-heal: a pointer project's drift rows name the resolved gitdir (#653 W1)"
+else
+    fail "doctor git-heal: pointer drift rows (out=$(printf '%s' "$_out" | grep -F 'heal drift' | head -2)) (#653 W1)"
+fi
+# a B5: a hand-QUOTED DEFAULT_USER must not fire the owner drift row —
+# the extraction strips quotes like the DOCTOR_USER sibling idiom, and
+# the state leg heals with it (getent sees the stripped name, so the
+# state row is not "unknown"). The fixture is otherwise healed
+# (_ddr_reset: the getfacl arm above left the sticky stripped).
+printf 'DEFAULT_USER="%s"\nOPENCODE_USER=opencode-dgh-agent\n' "$(id -un)" \
+    >"$WORK/dgh/install.conf"
+_ddr_reset
+_out=$(_dgh_run || true)
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=opencode-dgh-agent\n' "$(id -un)" \
+    >"$WORK/dgh/install.conf"
+if ! printf '%s' "$_out" | grep -qE '\.git/(config|hooks) -- ' &&
+    ! printf '%s' "$_out" | grep -q "git-heal.*unknown"; then
+    pass "doctor git-heal: a quoted DEFAULT_USER compares stripped, state resolves (#785 a B5)"
+else
+    fail "doctor git-heal: quoted-conf arm (out=$(printf '%s' "$_out" | grep -E 'heal drift|git-heal' | head -3)) (#785 a B5)"
+fi
+
 # --- sweep floor: doctor-core's python3 sites run -I (#249) ------------------------
 # Comment-strip rider per conventions.md ("Source-counting pins") -- a
 # commented-out site must not count. Four sites: cntrl_bad,

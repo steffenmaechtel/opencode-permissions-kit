@@ -352,6 +352,24 @@ else
     fail "handover me --dry-run without a path refused (rc=$_e2_rc got: $errout) (#370 a E2)"
 fi
 
+# b A1 (PR #785 round b): the conf extraction strips quotes — a
+# hand-quoted DEFAULT_USER would otherwise die at the id-gate on the
+# quoted name (loud refusal, the same class the wave fixed at doctor
+# and the git-heal/git-protection helpers). A real path is required:
+# the arity gate refuses the pathless form BEFORE the conf is ever
+# read — this pin's first cut (pathless, like the #370 a E2 pin beside
+# it) never reached _ho_getconf and its sabotage cycle caught it.
+printf 'DEFAULT_USER="%s"\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\nVERSION=9.9.9\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" >"$WORK/install-quoted.conf"
+mkdir -p "$WORK/ho-quoted-tree"
+_qrc=0
+out="$(OPK_INSTALL_CONF="$WORK/install-quoted.conf" "$BIN/opk" handover me --dry-run "$WORK/ho-quoted-tree" 2>&1)" || _qrc=$?
+if [ "$_qrc" -eq 0 ] && ! printf '%s' "$out" | grep -qF "user '"; then
+    pass "handover: a quoted conf value reads back stripped (#785 b A1)"
+else
+    fail "handover: quoted conf died at the id-gate (rc=$_qrc got: $out) (#785 b A1)"
+fi
+
 # unknown target -> usage error naming the choices (hermetic: explicit
 # install.conf — CI runners have no /etc/opencode-permissions-kit)
 errout="$(OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opk" handover nobody "$WORK/ho-tree" 2>&1 >/dev/null || true)"

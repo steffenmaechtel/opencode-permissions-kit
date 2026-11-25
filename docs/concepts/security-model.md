@@ -297,9 +297,10 @@ Operational notes:
   - an **agent-owned tree as a whole** (a root the agent created):
     the heal pins to the tree's owner — it buys nothing there.
   - **state created between heal runs:** the heal re-runs with the
-    group baseline (install, `opk config projects add`/`refresh`/
-    `handover`, `opk update --refresh`, and every stamp-invalidated
-    plain `opk update`) — a worktree registration created after
+    group baseline (install, `opk config projects add`, `opk config
+    refresh`, `opk config handover`, `opk update --refresh`, and every
+    stamp-invalidated plain `opk update`) — a worktree registration
+    created after
     the last run keeps agent-owned `gitdir`/`commondir` pointer files
     until the next. The git heal hooks do not close this either:
     they re-pin only the measured operand set inside a validated
@@ -315,10 +316,16 @@ Operational notes:
   diff-driver bullet above). Issue
   [#653](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/653)
   tracks report-only detection (heal drift, planted hooks) for `opk
-  status`/`opk doctor`; the first row of that surface shipped with
-  #703 — both commands flag a project whose `.git` directory owner
-  differs from the project directory's owner (the cheap
-  wholesale-swap detector, see below).
+  status`/`opk doctor`; its first wave shipped alongside the #703
+  wholesale-swap row (owner `.git` vs owner project dir): both commands
+  report heal drift per gitdir — sticky bit missing, `config`/`hooks`
+  not developer-owned or group-writable, re-granting extended ACLs, or
+  a symlinked `config`/`hooks` entry — and non-`.sample` entries in
+  `.git/hooks` as a planted-hook warning
+  (a missing `getfacl` degrades the ACL leg to one warn row; removal
+  stays a human decision). The issue's remaining scope: suspicious
+  repo-config keys (`core.fsmonitor` class) and the worktree pointer
+  arms.
 - **Wholesale swap of `.git` or a whole project dir (W1/W2 — the
   #703 trade):** with the top-folder sticky bits removed (decision
   [#702](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/702)),

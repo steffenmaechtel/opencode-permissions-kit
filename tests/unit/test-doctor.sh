@@ -1796,6 +1796,13 @@ detproj() { # git repo: ignored build/ with outputs, tracked src/
     rm -rf "$PROJ"
     mkdir -p "$PROJ"
     git init -q "$PROJ"
+    # #653 W1: the git-heal section's drift rows are counted warns, so
+    # the fixture's .git carries the healed shape (sticky bit, 644
+    # config, 755 hooks) — a kit-managed project's repo is healed, and
+    # the detect legs below keep their no-findings rc-0 semantics.
+    chmod +t "$PROJ/.git"
+    chmod 644 "$PROJ/.git/config"
+    chmod 755 "$PROJ/.git/hooks"
     printf 'build/\n' >"$PROJ/.gitignore"
     mkdir -p "$PROJ/build/out" "$PROJ/src"
     echo out >"$PROJ/build/out/app.min.css"
@@ -1963,6 +1970,10 @@ rm -rf "$PROJ"
 mkdir -p "$PROJ/src"
 echo s >"$PROJ/src/a.php"
 git init -q "$PROJ"
+# #653 W1: healed .git shape — see detproj's comment.
+chmod +t "$PROJ/.git"
+chmod 644 "$PROJ/.git/config"
+chmod 755 "$PROJ/.git/hooks"
 rd2() { # detect run with the daemon=me fixture
     _rd_rc=0
     _rd_out="$(OPK_INSTALL_CONF="$CONF_ME" OPK_DOCTOR_PROC_ROOT="$PROCFIX" OPK_DOCTOR_OPK="" \

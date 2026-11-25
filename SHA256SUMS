@@ -29,12 +29,12 @@ d9b85097bf72668e8122b2623cb8fe62c27ff0feb741ccaf36738d508b1b73c3  files/opencode
 a6f317ab7f4589bdc244db55296119a882c27f855bc14442cedf301dd06ca7e4  files/opencode-permissions-kit-lib/sh/ddev-migrate.sh
 47d414945a1f7c4bc00047afc4321fd6b647bff990f109e985d905b3df651ca1  files/opencode-permissions-kit-lib/sh/ddev-terminal.sh
 9b39876de8ca322f7e83e995a1eb7c5da3f5f9645fd37bb0244b388db017d9de  files/opencode-permissions-kit-lib/sh/deploy-lib.sh
-aa33f0d1a3e4fae7d626124ff7a2e3e473bfc49cbcb7f087fab40b9f5d9d54ca  files/opencode-permissions-kit-lib/sh/doctor-core.sh
-b137417664afbdc06ff757dd5785236112ffd05f4c85d358c558def543ac96f9  files/opencode-permissions-kit-lib/sh/fs-baseline.sh
+73d4022f69543ef28f47f077272722c36734b9cbc2465d228980562734f2f8b2  files/opencode-permissions-kit-lib/sh/doctor-core.sh
+a8807cc8e35b0ee6d436373372ff24fefad4041926a415bde2fa5e1c0b771707  files/opencode-permissions-kit-lib/sh/fs-baseline.sh
 80579d6005c882c689086a3af913ccdf686059905451f43b496aa74005fd0b41  files/opencode-permissions-kit-lib/sh/git-check.sh
-bffdfc0cc4253b88d69626b225b11d591d30a0f2b8788b84c4853f6da98d5b28  files/opencode-permissions-kit-lib/sh/git-heal-core.sh
-2f152320c8ba14d16098063cd5c9ebc2bf97725f36e8e095bb4f557c2733b123  files/opencode-permissions-kit-lib/sh/git-protection-core.sh
-4ff157c60de6cddfc8f7af2a834aeb067bdad410f39756a9bbd92493de6cc9f7  files/opencode-permissions-kit-lib/sh/handover-core.sh
+1e7f42a6c4f189e759b0112105f58cdb589fa945bb3bb9a1b19ca859a8d5b831  files/opencode-permissions-kit-lib/sh/git-heal-core.sh
+e98f08fce0ec59ec1d9a21f5df2f69192f5f073034545e07896fad8d35f109ca  files/opencode-permissions-kit-lib/sh/git-protection-core.sh
+f4a02616ef74c2d037ae7837b7ea67ed5769b2ac97d63c0a7f2109b15aed6689  files/opencode-permissions-kit-lib/sh/handover-core.sh
 9f0ac114120992e1e1bea5c3e0353583a2dc5667cfe37c681fdaf624b8c1b5e1  files/opencode-permissions-kit-lib/sh/install-core.sh
 575266d6e05f87e5b5444464538ab3c222931bf5d5753d44695308aac067c3bf  files/opencode-permissions-kit-lib/sh/log.sh
 590d0a5899e7a902c3c4a1e4cf3254dfef7d4fc63cfc6f530cb6002630a8eee2  files/opencode-permissions-kit-lib/sh/openchamber-core.sh
@@ -43,7 +43,7 @@ b2b21462d2352dfb1def2676c4d4946b17bf76b6957980876b9286d95a18a967  files/opencode
 c555d74f4799dd63dbe6e4ea92086df68a5df83691d337a89ab59cfffe9ca123  files/opencode-permissions-kit-lib/sh/secure-binary.sh
 ab6f9f1e32ed3dfffa7280764a3fd006823295b0e49cc09a13f0ca9347778a8a  files/opencode-permissions-kit-lib/sh/shell-warn.sh
 b5202dfb69c75c672e6bf0dfa3bdde1516766f21b172f23862f1c2f545c24110  files/opencode-permissions-kit-lib/sh/staged-write.sh
-07509f428fe4d19d843a5b9a9d518823357baea3938a362cce3860af04df39e2  files/opencode-permissions-kit-lib/sh/status-core.sh
+a88ad742670dfa3cbcaf9af9ba8073e2f8b9581bdd4bda387b811eb397e19cd6  files/opencode-permissions-kit-lib/sh/status-core.sh
 b6e8c715cb2881c4c4193b8d8772b9076f0a5f304952eb6a0a9a78cb7f720c81  files/opencode-permissions-kit-lib/sh/sudoers-deploy.sh
 5e5bdac5e5dc8b14a15d5f61a8980f3f850fe0baf869f70c3c76b4a7235e2e10  files/opencode-permissions-kit-lib/sh/tui-plugin.sh
 fc51c07b906b60867ec0eadddefc296111ec208a87d4e8e020b8cc8757415e5e  files/opencode-permissions-kit-lib/sh/ui.sh

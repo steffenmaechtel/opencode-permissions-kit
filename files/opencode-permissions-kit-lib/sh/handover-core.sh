@@ -287,7 +287,9 @@ handover_core() {
         *) _ho_err "handover: unknown target '$_ho_target' (me or opencode)" ;;
     esac
     [ -f "$INSTALL_CONF" ] || _ho_err "handover: $INSTALL_CONF not found — is the kit installed?"
-    _ho_getconf() { sed -n "s/^$1=//p" "$INSTALL_CONF" 2>/dev/null | tail -1; }
+    # Quote-strip like the DOCTOR_USER idiom (#785 b A1): a hand-quoted
+    # value would fail the id-gate below on the quoted name.
+    _ho_getconf() { sed -n "s/^$1=//p" "$INSTALL_CONF" 2>/dev/null | tail -1 | sed 's/^"//;s/"$//'; }
     _ho_group=$(_ho_getconf OPENCODE_GROUP)
     [ -n "$_ho_group" ] || _ho_err "handover: install.conf has no OPENCODE_GROUP"
     case "$_ho_target" in

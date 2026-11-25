@@ -104,10 +104,12 @@ _gp_libdir() {
 }
 
 # _gp_var <name>: one KEY=VALUE line from install.conf (doctor-style
-# sed read, never a source of a root-owned file).
+# sed read, never a source of a root-owned file). Quote-strip like the
+# DOCTOR_USER idiom (#785 b A1): a hand-quoted value would fail every
+# dev-owner gate — silent storage-reheal skips, wrong-reason refusals.
 _gp_var() {
     _gpv_ic="${GP_INSTALL_CONF:-${INSTALL_CONF:-/etc/opencode-permissions-kit/install.conf}}"
-    sed -n "s/^$1=//p" "$_gpv_ic" 2>/dev/null | tail -n 1
+    sed -n "s/^$1=//p" "$_gpv_ic" 2>/dev/null | tail -n 1 | sed 's/^"//;s/"$//'
 }
 
 # _gp_devuser: the developer username; loud empty on a missing key

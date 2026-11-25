@@ -1788,6 +1788,17 @@ echo "--- 12n. opk doctor detect + handover-me warning (issue #352 / #313 phase 
 # the #312 note. The unit suite pins the S arm and orchestration with
 # fixture uid_maps; the mixed class needs real second-owner files.
 E 'mkdir -p /var/www/vhosts/doctor-det/public/scss /var/www/vhosts/doctor-det/src && cd /var/www/vhosts/doctor-det && git init -q . && printf "public/deps.js\n" >.gitignore && echo body >public/scss/main.scss && echo app >public/deps.js && echo idx >src/index.php'
+# #653 W1: the git-heal section's drift rows are counted warns — carry
+# the healed .git shape (sticky, 644 config, 755 hooks, no extended
+# ACLs) so the detect legs below keep their no-findings rc-0 semantics
+# (the consent flow is what they pin, not git-heal findings). The
+# container's /var/www/vhosts carries default ACLs (full kit install),
+# and a plain git init INHERITS them on config/hooks — the fixture
+# must mirror the real heal's full pin sequence, setfacl -b included:
+# without it the ACL drift row (correctly) fires, doctor exits 2, and
+# the rc-0 legs redden deterministically (#785 a C2).
+E 'cd /var/www/vhosts/doctor-det && chmod +t .git && chmod 644 .git/config && chmod 755 .git/hooks'
+E 'cd /var/www/vhosts/doctor-det && setfacl -b .git/config .git/hooks'
 E 'sudo chown opencode /var/www/vhosts/doctor-det/public/deps.js'
 check "12n: detect proposes the mixed boundary (ignored artifact + human sources)" \
     E 'cd /var/www/vhosts/doctor-det && opk doctor detect </dev/null >/tmp/ddet-eof.log 2>&1; test $? -eq 1 && grep -q "candidate      public --" /tmp/ddet-eof.log && grep -q "mixed with human-owned files" /tmp/ddet-eof.log && grep -q "one owner for both" /tmp/ddet-eof.log'
@@ -1795,10 +1806,14 @@ check "12n: declined detect prints the paste snippet, writes nothing" \
     E 'test ! -e /var/www/vhosts/doctor-det/opk.json && grep -qF "{\"path\": \"public\"," /tmp/ddet-eof.log'
 check "12n: tracked dev-only dirs are no candidates" \
     E '! grep -q "candidate      src --" /tmp/ddet-eof.log'
+# #785 a C2: the dump arms keep their evidence value but no longer own
+# the exit — a bare `cat` tail returned rc 0 and turned a failing
+# assertion into a PASS (the pre-push e2e runs 3/4 were exactly that
+# false green; the archived logs show the marker twice each).
 check "12n: consented detect writes a valid opk.json (rc 0)" \
-    E 'cd /var/www/vhosts/doctor-det && printf "y\n" | opk doctor detect >/tmp/ddet-y.log 2>&1; test $? -eq 0 && python3 -m json.tool /var/www/vhosts/doctor-det/opk.json >/dev/null && grep -qF "\"path\": \"public\"" /var/www/vhosts/doctor-det/opk.json'
+    E 'cd /var/www/vhosts/doctor-det && printf "y\n" | opk doctor detect >/tmp/ddet-y.log 2>&1; test $? -eq 0 && python3 -m json.tool /var/www/vhosts/doctor-det/opk.json >/dev/null && grep -qF "\"path\": \"public\"" /var/www/vhosts/doctor-det/opk.json || { echo "----- 12n consented-detect output (failure evidence):"; cat /tmp/ddet-y.log; false; }'
 check "12n: re-detect sees the tree declared, proposes nothing new (rc 0)" \
-    E 'cd /var/www/vhosts/doctor-det && opk doctor detect </dev/null >/tmp/ddet-again.log 2>&1; test $? -eq 0 && grep -q "already declared (via public)" /tmp/ddet-again.log'
+    E 'cd /var/www/vhosts/doctor-det && opk doctor detect </dev/null >/tmp/ddet-again.log 2>&1; test $? -eq 0 && grep -q "already declared (via public)" /tmp/ddet-again.log || { echo "----- 12n re-detect output (failure evidence):"; cat /tmp/ddet-again.log; false; }'
 check "12n: the scan now reports the declared tree at-risk with the guided remedy hint" \
     E 'cd /var/www/vhosts/doctor-det && opk doctor >/tmp/ddet-scan.log 2>&1; test $? -eq 1 && grep -q "entries at-risk" /tmp/ddet-scan.log && grep -qF "fix: opk doctor fix" /tmp/ddet-scan.log'
 check "12n: handover me on the declared tree warns before acting (dry run previews it)" \
@@ -1969,12 +1984,21 @@ check "12q: #777 — the relative (submodule-form) pointer is skipped loudly" \
     E 'grep -qF "skip (pointer): relative target (submodule form" /tmp/gh-pt-on.log && ! grep -q "heal.*modules/sub" /usr/local/lib/opencode-permissions-kit/git-heal/heal.log'
 check "12q: #777 — agent git is green through the healed pointer checkout" \
     E 'sudo -u opencode -H git -C /var/www/vhosts/perm-check add existing-file.txt'
-check "12q: #777 — status names the resolved storage gitdir in its lockout rows" \
-    E 'sudo chown root /var/www/gitdirs/perm-check.git/index && sudo opk git-heal status >/tmp/gh-pt-st.log 2>&1 && grep -qF "heals it): /var/www/gitdirs/perm-check.git/index is root-owned" /tmp/gh-pt-st.log'
+check "12q: #777/#782 — status names the resolved storage gitdir in its lockout rows" \
+    E 'sudo chown root /var/www/gitdirs/perm-check.git/index && sudo opk git-heal status >/tmp/gh-pt-st.log 2>&1 && grep -qF "lockout (transient — the next developer git operation heals it):" /tmp/gh-pt-st.log && grep -qF "/var/www/gitdirs/perm-check.git/index is root-owned" /tmp/gh-pt-st.log && grep -qF "git-heal: fix all lockouts with:" /tmp/gh-pt-st.log && grep -qF "sudo opk git-heal on" /tmp/gh-pt-st.log'
 check "12q: #777 — opk status renders the same resolved-path lockout row" \
     E 'opk status >/tmp/gh-pt-stsec.log 2>&1; grep -qF "/var/www/gitdirs/perm-check.git/index is root-owned (transient —" /tmp/gh-pt-stsec.log'
 check "12q: #777 — opk doctor classifies the pointer checkout through the storage gitdir" \
     E 'opk doctor /var/www/vhosts/perm-check >/tmp/gh-pt-dr.log 2>&1; grep -qF "/var/www/gitdirs/perm-check.git/index is root-owned (transient --" /tmp/gh-pt-dr.log'
+# #653 W1: heal-drift and planted-content rows on the RESOLVED storage
+# gitdir (plant → observe → restore inside one E arm; opk status exits
+# 2 on the warning rows, so the check observes grep's rc, not status's).
+check "12q: #653 W1 — status reports heal drift on the resolved storage gitdir" \
+    E 'sudo chmod -t /var/www/gitdirs/perm-check.git && opk status >/tmp/gh-pt-drift.log 2>&1; grep -qF "/var/www/gitdirs/perm-check.git — sticky bit missing on the gitdir" /tmp/gh-pt-drift.log; _rc=$?; sudo chmod +t /var/www/gitdirs/perm-check.git; test $_rc -eq 0'
+check "12q: #653 W1 — doctor reports the same drift row for the pointer project" \
+    E 'sudo chmod -t /var/www/gitdirs/perm-check.git && opk doctor /var/www/vhosts/perm-check >/tmp/gh-pt-ddrift.log 2>&1; grep -qF "/var/www/gitdirs/perm-check.git -- sticky bit missing on the gitdir" /tmp/gh-pt-ddrift.log; _rc=$?; sudo chmod +t /var/www/gitdirs/perm-check.git; test $_rc -eq 0'
+check "12q: #653 W1 — status reports planted non-sample hook content" \
+    E 'sudo touch /var/www/gitdirs/perm-check.git/hooks/planted && opk status >/tmp/gh-pt-plant.log 2>&1; grep -qF "non-sample entries in /var/www/gitdirs/perm-check.git/hooks" /tmp/gh-pt-plant.log; _rc=$?; sudo rm -f /var/www/gitdirs/perm-check.git/hooks/planted; test $_rc -eq 0'
 E 'rm -rf /var/www/vhosts/perm-check/pt-sub /tmp/gh-pt-*.log'
 E 'rm -rf /tmp/gp-update-test /tmp/gp-*.log'
 
