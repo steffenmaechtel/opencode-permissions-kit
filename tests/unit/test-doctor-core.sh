@@ -854,15 +854,18 @@ if printf '%s' "$_out" | grep -qF 'suspicious repo-config keys in' &&
 else
     fail "doctor git-heal: hooksPath tolower arm (out=$(printf '%s' "$_out" | grep -F 'repo keys' | head -1)) (#787 a C5)"
 fi
-# a B3: the mismatch row strips the 8-bit C1 byte from pointer content.
+# b A1 (the round-a B3 arm reworked): UTF-8 pointer content must
+# SURVIVE into the row text (the status twin's comment carries the
+# trade).
 _dwt_reset
-printf 'gitdir: %s\233\n' "$WORK/dgh/wt2/repo/.git" >"$WORK/dgh/wt2/awt/.git"
+_en=$(printf '\342\200\223')
+printf 'gitdir: %s%s\n' "$WORK/dgh/wt2/repo/.git" "$_en" >"$WORK/dgh/wt2/awt/.git"
 _out=$(_dgh_run "$WORK/dgh/wt2/repo" || true)
 if printf '%s' "$_out" | grep -qF "its worktree's .git does not" &&
-    ! printf '%s' "$_out" | grep -qF "$(printf '\233')"; then
-    pass "doctor git-heal: the swap row strips the 8-bit C1 byte from pointer content (#787 a B3)"
+    printf '%s' "$_out" | grep -qF "$_en"; then
+    pass "doctor git-heal: the swap row preserves UTF-8 pointer content (#787 b A1)"
 else
-    fail "doctor git-heal: C1 strip arm (out=$(printf '%s' "$_out" | grep -F 'worktree' | head -2)) (#787 a B3)"
+    fail "doctor git-heal: UTF-8 preservation arm (out=$(printf '%s' "$_out" | grep -F 'worktree' | head -2)) (#787 b A1)"
 fi
 printf 'gitdir: %s\n' "$WORK/dgh/wt2/repo/.git/worktrees/awt" >"$WORK/dgh/wt2/awt/.git"
 # a B4: the traversability notice.

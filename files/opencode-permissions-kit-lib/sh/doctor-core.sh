@@ -957,13 +957,13 @@ doctor_git_heal() {
                 esac
                 [ -e "$_dgh_w" ] || [ -L "$_dgh_w" ] || continue
                 if [ -L "$_dgh_w" ]; then
-                    _dgh_wkey=$(printf '%s\n' "$_dgh_w" | tr -d '\000-\037\177\200-\237')
+                    _dgh_wkey=$(printf '%s\n' "$_dgh_w" | tr -d '\000-\037\177')
                     ui_kv_warn "worktree" "$_dgh_wkey is a symlink (the heal walks regular"
                     ui_detail "registrations only) -- inspect before trusting git output"
                     continue
                 fi
                 [ -d "$_dgh_w" ] || continue
-                _dgh_wkey=$(printf '%s\n' "$_dgh_w" | tr -d '\000-\037\177\200-\237')
+                _dgh_wkey=$(printf '%s\n' "$_dgh_w" | tr -d '\000-\037\177')
                 for _dgh_pf in commondir gitdir; do
                     _dgh_pp="$_dgh_w/$_dgh_pf"
                     if [ -L "$_dgh_pp" ]; then
@@ -1012,7 +1012,10 @@ doctor_git_heal() {
                 # name); storage: group-writable outright, only
                 # inconsistent swaps surface (documented residual).
                 # Untrusted content: the resolver's form gates run
-                # before any row names it.
+                # before any row names it, and the row texts print it
+                # through the safe control-byte strip (the 8-bit C1
+                # introducers stay the #787 b A1 accepted residual --
+                # their byte range is UTF-8 continuation space).
                 _dgh_bg="$_dgh_w/gitdir"
                 if [ -f "$_dgh_bg" ] && [ ! -L "$_dgh_bg" ]; then
                     _dgh_bref=$(head -n 1 "$_dgh_bg" 2>/dev/null)
@@ -1076,8 +1079,8 @@ doctor_git_heal() {
                                 _dgh_trp=$(realpath -m -- "$_dgh_btgt" 2>/dev/null) || _dgh_trp=""
                                 _dgh_rrp=$(realpath -m -- "$_dgh_w" 2>/dev/null) || _dgh_rrp=""
                                 if [ -z "$_dgh_trp" ] || [ "$_dgh_trp" != "$_dgh_rrp" ]; then
-                                    _dgh_btshow=$(printf '%s\n' "$_dgh_btgt" | tr -d '\000-\037\177\200-\237')
-                                    _dgh_bfshow=$(printf '%s\n' "$_dgh_bref" | tr -d '\000-\037\177\200-\237')
+                                    _dgh_btshow=$(printf '%s\n' "$_dgh_btgt" | tr -d '\000-\037\177')
+                                    _dgh_bfshow=$(printf '%s\n' "$_dgh_bref" | tr -d '\000-\037\177')
                                     ui_kv_warn "worktree" "$_dgh_wkey -- its worktree's .git does not"
                                     ui_detail "point back (it says $_dgh_btshow; the registration's"
                                     ui_detail "gitdir file names $_dgh_bfshow) -- swapped pointer;"

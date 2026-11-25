@@ -829,17 +829,20 @@ if printf '%s' "$_out" | grep -qF 'suspicious repo-config keys in' &&
 else
     fail "git-heal section: hooksPath tolower arm (out=$(printf '%s' "$_out" | grep -F 'repo keys' | head -1)) (#787 a C5)"
 fi
-# a B3: the mismatch row's untrusted fields print through the extended
-# control-byte strip (incl. the 8-bit C1 range 0x80-0x9F, probe class
-# of the round scratch).
+# b A1 (the round-a B3 arm reworked): the row strip keeps the safe
+# 0x00-0x1F/0x7F range -- UTF-8 continuation bytes must SURVIVE into
+# the row text (legit non-ASCII worktree names render intact); the
+# 8-bit C1 class stays the named accepted residual (the #787 b A1
+# trade: same byte range).
 _wt2_reset
-printf 'gitdir: %s\233\n' "$WORK/ghs/wt2/repo/.git" >"$WORK/ghs/wt2/awt/.git"
+_en=$(printf '\342\200\223')
+printf 'gitdir: %s%s\n' "$WORK/ghs/wt2/repo/.git" "$_en" >"$WORK/ghs/wt2/awt/.git"
 _out=$(_ghs_run || true)
 if printf '%s' "$_out" | grep -qF "its worktree's .git does not" &&
-    ! printf '%s' "$_out" | grep -qF "$(printf '\233')"; then
-    pass "git-heal section: the swap row strips the 8-bit C1 byte from pointer content (#787 a B3)"
+    printf '%s' "$_out" | grep -qF "$_en"; then
+    pass "git-heal section: the swap row preserves UTF-8 pointer content (#787 b A1)"
 else
-    fail "git-heal section: C1 strip arm (out=$(printf '%s' "$_out" | grep -F 'worktree' | head -2)) (#787 a B3)"
+    fail "git-heal section: UTF-8 preservation arm (out=$(printf '%s' "$_out" | grep -F 'worktree' | head -2)) (#787 b A1)"
 fi
 printf 'gitdir: %s\n' "$WORK/ghs/wt2/repo/.git/worktrees/awt" >"$WORK/ghs/wt2/awt/.git"
 # a B4: a non-traversable gitdir (no execute for anyone -- the 1700

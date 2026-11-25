@@ -809,13 +809,13 @@ status_section_git_heal() {
                 esac
                 [ -e "$_st_gh_w" ] || [ -L "$_st_gh_w" ] || continue
                 if [ -L "$_st_gh_w" ]; then
-                    _st_gh_wkey=$(printf '%s\n' "$_st_gh_w" | tr -d '\000-\037\177\200-\237')
+                    _st_gh_wkey=$(printf '%s\n' "$_st_gh_w" | tr -d '\000-\037\177')
                     ui_kv_warn "worktree" "$_st_gh_wkey is a symlink (the heal walks regular"
                     ui_detail "registrations only) — inspect before trusting git output"
                     continue
                 fi
                 [ -d "$_st_gh_w" ] || continue
-                _st_gh_wkey=$(printf '%s\n' "$_st_gh_w" | tr -d '\000-\037\177\200-\237')
+                _st_gh_wkey=$(printf '%s\n' "$_st_gh_w" | tr -d '\000-\037\177')
                 for _st_gh_pf in commondir gitdir; do
                     _st_gh_pp="$_st_gh_w/$_st_gh_pf"
                     # A symlinked entry is its own drift (the heal's pin
@@ -873,8 +873,12 @@ status_section_git_heal() {
                 # either way: the reference runs the same form gates as
                 # the pointer resolver before any row names it, and the
                 # row texts print it through the control-byte strip
-                # (#787 a B3: the strip range covers the 8-bit C1
-                # introducers 0x80-0x9F too).
+                # (the safe 0x00-0x1F/0x7F range — the 8-bit C1
+                # introducers 0x80-0x9F stay a NAMED accepted residual:
+                # the same bytes are UTF-8 continuation bytes, so
+                # stripping them mangles legit non-ASCII paths in the
+                # rows — the #787 b A1 trade; ESC-class sequences stay
+                # closed).
                 _st_gh_bg="$_st_gh_w/gitdir"
                 if [ -f "$_st_gh_bg" ] && [ ! -L "$_st_gh_bg" ]; then
                     _st_gh_bref=$(head -n 1 "$_st_gh_bg" 2>/dev/null)
@@ -939,8 +943,8 @@ status_section_git_heal() {
                                 _st_gh_trp=$(realpath -m -- "$_st_gh_btgt" 2>/dev/null) || _st_gh_trp=""
                                 _st_gh_rrp=$(realpath -m -- "$_st_gh_w" 2>/dev/null) || _st_gh_rrp=""
                                 if [ -z "$_st_gh_trp" ] || [ "$_st_gh_trp" != "$_st_gh_rrp" ]; then
-                                    _st_gh_btshow=$(printf '%s\n' "$_st_gh_btgt" | tr -d '\000-\037\177\200-\237')
-                                    _st_gh_bfshow=$(printf '%s\n' "$_st_gh_bref" | tr -d '\000-\037\177\200-\237')
+                                    _st_gh_btshow=$(printf '%s\n' "$_st_gh_btgt" | tr -d '\000-\037\177')
+                                    _st_gh_bfshow=$(printf '%s\n' "$_st_gh_bref" | tr -d '\000-\037\177')
                                     ui_kv_warn "worktree" "$_st_gh_wkey — its worktree's .git does not"
                                     ui_detail "point back (it says $_st_gh_btshow; the registration's"
                                     ui_detail "gitdir file names $_st_gh_bfshow) — swapped pointer;"
