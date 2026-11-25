@@ -823,7 +823,10 @@ printf '# no storage key here\n' >"$WORK/dgh/install-nostor.conf"
 _out=$(
     (
         GH_STORAGE="$WORK/dgh/wt2"
-        export GH_STORAGE NO_COLOR=1 GH_GITCONFIG="$WORK/dgh/devhome/.gitconfig" \
+        # GH_CONF_RELAX: the simulated attack value must PASS the
+        # reader-side validation (wrong-mechanism trap, the status
+        # twin's comment).
+        export GH_STORAGE GH_CONF_RELAX=1 NO_COLOR=1 GH_GITCONFIG="$WORK/dgh/devhome/.gitconfig" \
             GH_LIBDIR="$WORK/dgh/lib"
         PATH="$STUB:$PATH"
         . "$UI_LIB"

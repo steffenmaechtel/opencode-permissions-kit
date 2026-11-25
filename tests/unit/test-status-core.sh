@@ -794,7 +794,11 @@ printf '# no storage key here\n' >"$WORK/ghs/install-nostor.conf"
 _out=$(
     (
         GH_STORAGE="$WORK/ghs/wt2"
-        export GH_STORAGE NO_COLOR=1 GH_GITCONFIG="$WORK/ghs/devhome/.gitconfig"
+        # GH_CONF_RELAX: the simulated attack value must PASS the
+        # reader-side validation (a blocklisted value would be refused
+        # and the pin would green over the refusal, not the precedence
+        # -- the L4 wrong-mechanism trap this arm first shipped with).
+        export GH_STORAGE GH_CONF_RELAX=1 NO_COLOR=1 GH_GITCONFIG="$WORK/ghs/devhome/.gitconfig"
         PATH="$STUB:$PATH"
         . "$UI_LIB"
         . "$LIB"
