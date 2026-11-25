@@ -23,7 +23,9 @@ The round you want is the comment titled `## Review <wave> — …` (wave
 letter matches your assignment) carrying an HTML comment marker
 `<!-- opk-review {"case":"pr-XXXXX","wave":"<letter>", …} -->` — the
 marker JSON may wrap over several lines. IGNORE: other waves' comments,
-closing summaries (`wave":"close"` or `state":"closed"`), provenance
+closing summaries — dedicated closing comments in every era spelling
+(`wave":"z"`, `wave":"closing"`, `wave":"close"`, or `state":"closed"`
+— the same rule as data/normalize.py, #780 a B4) — and provenance
 corrections. If you cannot find the round comment, record a
 process_note and continue.
 

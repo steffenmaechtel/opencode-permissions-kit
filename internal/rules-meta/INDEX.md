@@ -8,12 +8,12 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**218 metas · 215 active · 3 retired · 47 review-pending · next due 2026-11-20**
+**218 metas · 215 active · 3 retired · 49 review-pending · next due 2026-11-20**
 
 ## Actionable
 
 - **Review pending:** RM-0190, RM-0191, RM-0192, RM-0193, RM-0194, RM-0195, RM-0196, RM-0197, RM-0198, RM-0199, RM-0200, RM-0201, RM-0202, RM-0203, RM-0204, RM-0205, RM-0206, RM-0207, RM-0208, RM-0209, RM-0210, RM-0211, RM-0212, RM-0213, RM-0214, RM-0215, RM-0216, RM-0217, RM-0218
-- **Amended — pending:** RM-0133 (2026-11-21), RM-0078 (2026-11-22), RM-0135 (2026-11-22), RM-0136 (2026-11-22), RM-0154 (2026-11-22), RM-0182 (2026-11-22), RM-0003 (2026-11-25), RM-0014 (2026-11-25), RM-0015 (2026-11-25), RM-0016 (2026-11-25), RM-0017 (2026-11-25), RM-0042 (2026-11-25), RM-0043 (2026-11-25), RM-0044 (2026-11-25), RM-0137 (2026-11-25), RM-0151 (2026-11-25), RM-0173 (2026-11-25), RM-0179 (2026-11-25)
+- **Amended — pending:** RM-0133 (2026-11-21), RM-0078 (2026-11-22), RM-0135 (2026-11-22), RM-0136 (2026-11-22), RM-0154 (2026-11-22), RM-0182 (2026-11-22), RM-0003 (2026-11-25), RM-0014 (2026-11-25), RM-0015 (2026-11-25), RM-0016 (2026-11-25), RM-0017 (2026-11-25), RM-0042 (2026-11-25), RM-0043 (2026-11-25), RM-0044 (2026-11-25), RM-0111 (2026-11-25), RM-0117 (2026-11-25), RM-0137 (2026-11-25), RM-0151 (2026-11-25), RM-0173 (2026-11-25), RM-0179 (2026-11-25)
 
 ## AGENTS.md
 
@@ -304,7 +304,7 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0071](0/0/7/RM-0071.md) | The disposition ledger in | active | approved | 1m | 2026-11-28 |
-| [RM-0117](0/1/1/RM-0117.md) | Bookkeeping edits to in-scope files | retired | approved | 1m | 2026-11-24 |
+| [RM-0117](0/1/1/RM-0117.md) | Bookkeeping edits to in-scope files | retired | **amended — pending** | 1m | 2026-11-24 |
 
 ### Finding provenance
 
@@ -361,7 +361,7 @@
 | [RM-0090](0/0/9/RM-0090.md) | Final chat answers are | active | approved | 1m | 2026-11-28 |
 | [RM-0092](0/0/9/RM-0092.md) | Checkpoint files timestamp every subagent | active | approved | 6m | 2027-05-20 |
 | [RM-0108](0/1/0/RM-0108.md) | Fan-out is staged, never launched | active | approved | 1m | 2026-11-22 |
-| [RM-0111](0/1/1/RM-0111.md) | Sabotage spot-checks mutate the | active | approved | 1m | 2026-11-22 |
+| [RM-0111](0/1/1/RM-0111.md) | Sabotage spot-checks mutate the | active | **amended — pending** | 1m | 2026-11-22 |
 | [RM-0114](0/1/1/RM-0114.md) | Agents stamp with their own | active | approved | 1m | 2026-11-22 |
 | [RM-0172](0/1/7/RM-0172.md) | A shipped code block is | active | approved | 1m | 2026-12-17 |
 | [RM-0186](0/1/8/RM-0186.md) | A session close (window, terminal, host) | active | approved | 1m | 2026-12-20 |
