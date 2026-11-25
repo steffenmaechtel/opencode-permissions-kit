@@ -326,9 +326,15 @@ _ghc_root_ok() {
 # <name>.git` -- a FILE the sweeps' old -type d find never matched --
 # and plain linked worktrees carry the same shape pointing at
 # <gitdir>/worktrees/<id>). rc 0: candidate in _ghc_pt_out. rc 1:
-# refused, the skip note rides ui_detail. Semantics:
-#   - a REGULAR file only (review a C2): the read must never block on
-#     an entry swapped to a FIFO in the find->resolve window;
+# refused -- every arm except the regular-file gate rides a ui_detail
+# skip note. Semantics:
+#   - a REGULAR file only (review a C2): an entry swapped to a FIFO
+#     in the find->resolve window is refused without a read -- the
+#     one SILENT refusal class (a vanished or swapped entry is
+#     attacker noise, no row -- the git-protection doctrine), and the
+#     check->open window stays bounded, not eliminated (the pin
+#     covers the pre-gate case; the race itself is the L5
+#     accepted-window class);
 #   - the first `gitdir: ` line wins (git writes exactly one);
 #   - targets are ABSOLUTE, carry no control byte (a crafted target
 #     must not reach report rows raw -- the _gp_rowkey class,
@@ -352,8 +358,9 @@ _ghc_root_ok() {
 #     plant one) and `.git`-named gitdirs (which the find already
 #     enumerates as directories under the conf roots -- no widening).
 #     Storage resolves like heal-index-head's own allowlist leg
-#     (GH_STORAGE seam, then GITDIR_STORAGE from install.conf;
-#     trailing slashes stripped, #765 a M2);
+#     (GH_STORAGE seam, then GITDIR_STORAGE from install.conf,
+#     reader-side validated through _ghc_root_ok with its
+#     trailing-slash normalization -- review b B1/B2);
 #   - a worktree registration target collapses to its COMMON gitdir
 #     first (the hooks' --git-common-dir parity); a registration whose
 #     common dir the pattern cannot recognize (a bare repo not named
@@ -413,18 +420,32 @@ _ghc_pt_target() {
             ;;
     esac
     _ghc_pt_stor="${GH_STORAGE:-$(_ghc_key GITDIR_STORAGE)}"
-    while :; do
-        case "$_ghc_pt_stor" in
-            ?*/) _ghc_pt_stor="${_ghc_pt_stor%/}" ;;
-            *) break ;;
+    # Storage validation — heal-index-head's own leg's parity (review
+    # b B1/B2): the value is reader-side re-validated through
+    # _ghc_root_ok (absolute, form-clean, no system path or agent
+    # home — the #674 a A1 reader mirror; _ghc_root_norm carries the
+    # trailing-slash strip, #765 a M2). An empty (missing key — the
+    # DEFAULT, non-adopted host), relative, `none`-marked or refused
+    # storage DISABLES the storage arm entirely: an unvalidated empty
+    # pattern would degenerate to `/*` and accept EVERY absolute
+    # target (review b B1), and a hand-edited value would steer the
+    # read-only report surfaces (B2). `.git`-named targets stay the
+    # only accepted class without a storage.
+    _ghc_pt_stor_ok=0
+    _ghc_pt_rk=0
+    _ghc_root_ok "$_ghc_pt_stor" || _ghc_pt_rk=$?
+    if [ "$_ghc_pt_rk" -eq 0 ] && [ -n "$_ghc_root_norm" ]; then
+        _ghc_pt_stor="$_ghc_root_norm"
+        _ghc_pt_stor_ok=1
+    fi
+    if [ "$_ghc_pt_stor_ok" = 1 ]; then
+        case "$_ghc_pt_t" in
+            "$_ghc_pt_stor"/*)
+                _ghc_pt_out="$_ghc_pt_t"
+                return 0
+                ;;
         esac
-    done
-    case "$_ghc_pt_t" in
-        "$_ghc_pt_stor"/*)
-            _ghc_pt_out="$_ghc_pt_t"
-            return 0
-            ;;
-    esac
+    fi
     ui_detail "skip (pointer): target outside the storage root and not a .git dir (foreign or planted): $_ghc_pt_file"
     return 1
 }

@@ -188,9 +188,12 @@ _ghs_run() {
             # shellcheck disable=SC1090
             . "$GH_CORE"
             # The resolver's nomination gate (#777 review a C1) reads
-            # the storage root through the documented seam; the e2e
-            # arms exercise the install.conf leg end to end.
-            export GH_STORAGE="$WORK/ghs/ptstor"
+            # the storage root through the documented seam, and the
+            # storage value runs through _ghc_root_ok's reader mirror
+            # (review b B1/B2) -- the relax seam is the documented
+            # unit override for /tmp scratch zones; the e2e arms
+            # exercise the real install.conf leg unrelaxed.
+            export GH_STORAGE="$WORK/ghs/ptstor" GH_CONF_RELAX=1
         fi
         DEFAULT_USER="$(id -un)"
         OPENCODE_USER=opencode-ghs-agent

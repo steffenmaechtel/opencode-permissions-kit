@@ -1067,10 +1067,12 @@ _gp_projects() {
     # fs-baseline.sh). Other control bytes (a tab) keep flowing: their
     # rows render through _gp_rowkey/_gp_disp at REPORT time (#765
     # b F1, #756). The git-heal sweeps keep the newline idiom
-    # DELIBERATELY — in their ON-sweep a split fragment reaches the
-    # pointer resolver (#777) and renders an uncounted skip note
-    # ("no gitdir: line: <fragment>"), never a heal attempt; their
-    # status twin renders the same note — pre-#777 the on-sweep
+    # DELIBERATELY — in their ON-sweep a split fragment usually
+    # vanishes at the pointer resolver's regular-file gate (#777,
+    # silently — attacker noise gets no row); when a fragment happens
+    # to name an existing regular file it renders an uncounted skip
+    # note ("no gitdir: line: <fragment>") — either way, never a heal
+    # attempt; pre-#777 the on-sweep
     # healed attacker-planted garbage in-tree and the status twin
     # dropped the fragment's rows silently — while this enumerator's rows drive
     # migrations: the damage profiles differ, hence split idioms by

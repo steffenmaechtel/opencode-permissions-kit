@@ -1210,6 +1210,53 @@ else
     fail "core: on nomination gate (out=$(printf '%s' "$_out" | grep 'outside the storage' | head -2) log=$(grep -c 'gitdir=' "$LOG" || true) healed) (review a C1)"
 fi
 
+# Review-b B1 (HIGH): the DEFAULT host — no storage configured at all
+# (no GITDIR_STORAGE in install.conf, no GH_STORAGE export). The
+# storage arm must be DISABLED: an unvalidated empty pattern would
+# degenerate to `/*` and accept every absolute target — the mirror
+# AND the legit-looking ptstor pointer would heal. Everything
+# pointer-shaped is refused (the .git-named class still passes, none
+# lives in this fixture); the sweep stays green and heals nothing.
+: >"$LOG"
+_hr_rc=0
+_b1_out=$(
+    _core_run 'SD_SUDO="" SD_VISUDO="$WORK/visudo" \
+        SD_CONF_DIR="$WORK/etc" SD_SUDOERS_D="$WORK/sdd" \
+        GH_PROJECTS_CONF="$WORK/pt-projects.conf" HOME="$WORK/devhome" _git_heal_on'
+) || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] &&
+    [ "$(grep -c 'gitdir=' "$LOG" 2>/dev/null || true)" = 0 ] &&
+    printf '%s' "$_b1_out" | grep -qF 'skip (pointer): target outside the storage root and not a .git dir' &&
+    printf '%s' "$_b1_out" | grep -qF 'success: git heal hooks active'; then
+    pass "core: on with NO storage configured refuses every pointer target (B1, review b)"
+else
+    fail "core: on empty-storage arm (rc=$_hr_rc healed=$(grep -c 'gitdir=' "$LOG" 2>/dev/null || true)) (review b B1)"
+fi
+
+# Review-b B2: a hand-edited storage value (system path) never steers
+# the resolver — the reader-side validation disables the storage arm
+# and the target gets the loud foreign refusal instead of rows/heals.
+# Resolver-direct, NO relax (the production posture of the reader
+# mirror).
+mkdir -p "$WORK/zone/ptzone/pb2"
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nGITDIR_STORAGE=/etc/gitdirs\n' "$(id -un)" "$(id -un)" \
+    >"$WORK/install-b2.conf"
+printf 'gitdir: /etc/gitdirs/evil.git\n' >"$WORK/zone/ptzone/pb2/.git"
+_hr_rc=0
+_b2_out=$(sh -c '
+    ui_detail() { echo "detail: $*"; }
+    . "$1"
+    INSTALL_CONF="$2"
+    if _ghc_pt_target "$3"; then echo "ACCEPTED"; fi
+' _ "$CORE" "$WORK/install-b2.conf" "$WORK/zone/ptzone/pb2/.git" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] &&
+    ! printf '%s' "$_b2_out" | grep -qF 'ACCEPTED' &&
+    printf '%s' "$_b2_out" | grep -qF 'skip (pointer): target outside the storage root and not a .git dir'; then
+    pass "core: a system-path storage value disables the storage arm (B2, review b)"
+else
+    fail "core: bogus-storage arm (rc=$_hr_rc out=$_b2_out) (review b B2)"
+fi
+
 # Review-a C3: control bytes never reach the report rows raw.
 if printf '%s' "$_out" | grep -qF 'skip (pointer): target carries a control byte: ' &&
     printf '%s' "$_out" | grep -qF "$WORK/zone/ptzone/pctl/.git" &&
@@ -1391,7 +1438,7 @@ rm -f "${WORK:?}/devhome/.gitconfig"
 # nonexistent OPENCODE_USER makes every present operand render.
 printf '%s\n' "$WORK/zone/ptzone" >"$CONF"
 printf 'DEFAULT_USER=%s\nOPENCODE_USER=ghs-pt-agent\n' "$(id -un)" >"$WORK/install-pt.conf"
-_out=$(_core_run 'INSTALL_CONF="$WORK/install-pt.conf" _git_heal_status')
+_out=$(_core_run 'export GH_STORAGE="$WORK/ptstor"; INSTALL_CONF="$WORK/install-pt.conf" _git_heal_status')
 if printf '%s' "$_out" | grep -qF "lockout risk: $WORK/ptstor/main.git/index" &&
     printf '%s' "$_out" | grep -qF "lockout risk: $WORK/ptstor/main.git/HEAD" &&
     ! printf '%s' "$_out" | grep -qF "$WORK/ptstor/main.git/worktrees/"; then

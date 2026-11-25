@@ -324,8 +324,11 @@ _dgh_run() {
             # shellcheck disable=SC1090
             . "$_dgh_repo_lib/sh/git-heal-core.sh"
             # The resolver's nomination gate (#777 review a C1) reads
-            # the storage root through the documented seam.
-            export GH_STORAGE="$WORK/dgh/ptstor"
+            # the storage root through the documented seam; the value
+            # runs through _ghc_root_ok's reader mirror (review b
+            # B1/B2) -- GH_CONF_RELAX is the documented unit override
+            # for /tmp scratch zones.
+            export GH_STORAGE="$WORK/dgh/ptstor" GH_CONF_RELAX=1
         fi
         INSTALL_CONF="$WORK/dgh/install.conf"
         DOCTOR_ROOT="${1:-$WORK/dgh/proj}"
