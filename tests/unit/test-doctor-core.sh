@@ -323,6 +323,9 @@ _dgh_run() {
         if [ "${DGH_NO_GHC:-}" != 1 ]; then
             # shellcheck disable=SC1090
             . "$_dgh_repo_lib/sh/git-heal-core.sh"
+            # The resolver's nomination gate (#777 review a C1) reads
+            # the storage root through the documented seam.
+            export GH_STORAGE="$WORK/dgh/ptstor"
         fi
         INSTALL_CONF="$WORK/dgh/install.conf"
         DOCTOR_ROOT="${1:-$WORK/dgh/proj}"
@@ -374,6 +377,20 @@ if printf '%s' "$_out" | grep -qF "pointer-file checkout not classified -- kit f
     pass "doctor git-heal: resolver unavailable degrades to a counted warn row (#777)"
 else
     fail "doctor git-heal: resolver-degrade arm (out=$(printf '%s' "$_out" | grep -E 'git-heal' | head -3)) (#777)"
+fi
+# Review-a S4: a REFUSED pointer (garbage content) through doctor —
+# the resolver's own skip note renders through doctor's ui set, no
+# classification rows fire, and the degrade warn does NOT (the kit is
+# not outdated; the pointer is unclassifiable by design).
+mkdir -p "$WORK/dgh/ptgarbage"
+printf 'not a pointer\n' >"$WORK/dgh/ptgarbage/.git"
+_out=$(_dgh_run "$WORK/dgh/ptgarbage" || true)
+if printf '%s' "$_out" | grep -qF "skip (pointer): no gitdir: line: $WORK/dgh/ptgarbage/.git" &&
+    ! printf '%s' "$_out" | grep -qF 'git-heal-file' &&
+    ! printf '%s' "$_out" | grep -qF 'not classified'; then
+    pass "doctor git-heal: a refused pointer renders the resolver note, classifies nothing (S4, review a)"
+else
+    fail "doctor git-heal: refusal arm (out=$(printf '%s' "$_out" | grep -E 'git-heal|skip' | head -2)) (review a S4)"
 fi
 
 # Wholesale-swap detection row (#653 family, #703): the doctor twin

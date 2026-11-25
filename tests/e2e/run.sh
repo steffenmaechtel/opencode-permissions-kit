@@ -1960,7 +1960,7 @@ check "12q: the root-owned storage index is the #777 lockout state" \
 check "12q: #777 — git-heal on heals the pointer checkout's storage gitdir" \
     E 'sudo opk git-heal on >/tmp/gh-pt-on.log 2>&1 && grep -qF "operand set re-pinned for /var/www/gitdirs/perm-check.git" /tmp/gh-pt-on.log && test "$(stat -c %U /var/www/gitdirs/perm-check.git/index)" = "opencode" && grep -qF "gitdir=/var/www/gitdirs/perm-check.git" /usr/local/lib/opencode-permissions-kit/git-heal/heal.log'
 check "12q: #777 — the relative (submodule-form) pointer is skipped loudly" \
-    E 'grep -qF "skip (pointer): relative target (the submodule form" /tmp/gh-pt-on.log && ! grep -q "heal.*modules/sub" /usr/local/lib/opencode-permissions-kit/git-heal/heal.log'
+    E 'grep -qF "skip (pointer): relative target (submodule form" /tmp/gh-pt-on.log && ! grep -q "heal.*modules/sub" /usr/local/lib/opencode-permissions-kit/git-heal/heal.log'
 check "12q: #777 — agent git is green through the healed pointer checkout" \
     E 'sudo -u opencode -H git -C /var/www/vhosts/perm-check add existing-file.txt'
 check "12q: #777 — status names the resolved storage gitdir in its lockout rows" \

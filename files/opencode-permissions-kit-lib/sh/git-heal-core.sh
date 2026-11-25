@@ -37,11 +37,11 @@
 #      /var/www/vhosts, the config.sh parent-registration shape --
 #      depth-1 <root>/.git would find nothing), BOTH shapes -- the
 #      classic directory and the POINTER FILE the git-protection
-#      layout seals every kit-managed checkout into (#704 O4, issue
-#      #777: a -type d find never matched the pointer, so the sweep
-#      healed nothing on a pointer-shaped host); a pointer resolves
-#      through _ghc_pt_target before it reaches the heal list --
-#      after re-validating every conf line reader-side (the files.md
+#      layout seals adopted checkouts into (#704 O4, issue #777: a
+#      -type d find never matched the pointer, so the sweep healed
+#      nothing on a pointer-shaped host); a pointer resolves through
+#      _ghc_pt_target before it reaches the heal list -- after
+#      re-validating every conf line reader-side (the files.md
 #      root-op contract, #674 a A1: the uninstall-core reader mirror
 #      -- a hand-edited system/scratch/agent-home line never steers
 #      the root sweep).
@@ -327,25 +327,44 @@ _ghc_root_ok() {
 # and plain linked worktrees carry the same shape pointing at
 # <gitdir>/worktrees/<id>). rc 0: candidate in _ghc_pt_out. rc 1:
 # refused, the skip note rides ui_detail. Semantics:
+#   - a REGULAR file only (review a C2): the read must never block on
+#     an entry swapped to a FIFO in the find->resolve window;
 #   - the first `gitdir: ` line wins (git writes exactly one);
-#   - a worktree registration target collapses to its COMMON gitdir --
-#     the same dir the developer-side hooks resolve through
-#     --git-common-dir; the registration dir itself is non-sticky by
-#     heal design (fs-baseline: only .git/worktrees' own container
-#     carries +t) and rejected by heal-index-head's shape gate, so it
-#     is never a candidate;
-#   - targets are ABSOLUTE only: the relative spelling is the
-#     submodule form (gitdir: ../.git/modules/<name>), and .git/modules
-#     is developer-pinned with no group write by the fs baseline
-#     (#655 b Q4) -- healing into it would fight the baseline, so the
-#     submodule class is out of the sweep's scope by design;
-#   - the target's FORM is gated (the _ghc_root_ok arms: dot/empty
-#     segment, whitespace, glob character) -- enumeration hygiene
-#     only: heal-index-head re-validates allowlist (conf roots plus
-#     the #704 storage), realpath and gitdir shape on every candidate
-#     that reaches it, so nothing here authorizes a heal.
+#   - targets are ABSOLUTE, carry no control byte (a crafted target
+#     must not reach report rows raw -- the _gp_rowkey class,
+#     git-protection-core) and are form-gated after trailing-slash
+#     normalization (the _ghc_root_ok arms, parity made true);
+#   - the relative spelling is the submodule form (gitdir: ../.git/
+#     modules/<name>), and .git/modules is developer-pinned with no
+#     group write by the fs baseline (#655 b Q4) -- healing into it
+#     would fight the baseline, so the submodule class is out of the
+#     sweep's scope by design;
+#   - a NOMINATION restriction (review a C1): the resolved target
+#     must be a child of the git-protection storage root or a
+#     `.git`-named directory. Pointer files sit in agent-writable
+#     trees, and heal-index-head's gates pass ANY HEAD+objects-shaped
+#     directory under an allowlisted root -- without this restriction
+#     a planted pointer could nominate, say, a developer's bare
+#     `mirror.git` for a root chown of its operand set, a target the
+#     pre-#777 -type d walk could never reach. The two accepted
+#     classes are exactly the ones the kit itself deploys: storage
+#     children (the sticky, dev-owned storage -- the agent cannot
+#     plant one) and `.git`-named gitdirs (which the find already
+#     enumerates as directories under the conf roots -- no widening).
+#     Storage resolves like heal-index-head's own allowlist leg
+#     (GH_STORAGE seam, then GITDIR_STORAGE from install.conf;
+#     trailing slashes stripped, #765 a M2);
+#   - a worktree registration target collapses to its COMMON gitdir
+#     first (the hooks' --git-common-dir parity); a registration whose
+#     common dir the pattern cannot recognize (a bare repo not named
+#     *.git) is a foreign nomination and refused here, not by the
+#     downstream shape gate;
+#   - everything downstream (allowlist, realpath, shape) stays
+#     heal-index-head's own gate: this is enumeration hygiene only --
+#     nothing here authorizes a heal.
 _ghc_pt_target() {
     _ghc_pt_file=$1
+    [ -f "$_ghc_pt_file" ] || return 1
     _ghc_pt_t=$(sed -n 's/^gitdir: //p' "$_ghc_pt_file" 2>/dev/null | head -n 1)
     case "$_ghc_pt_t" in
         '')
@@ -356,25 +375,58 @@ _ghc_pt_target() {
     case "$_ghc_pt_t" in
         /*) ;;
         *)
-            ui_detail "skip (pointer): relative target (the submodule form --"
-            ui_detail "  .git/modules is developer-pinned by the fs baseline,"
-            ui_detail "  never healed): $_ghc_pt_file"
+            ui_detail "skip (pointer): relative target (submodule form -- .git/modules is developer-pinned,""\
+ never healed): $_ghc_pt_file"
             return 1
             ;;
     esac
     case "$_ghc_pt_t" in
-        *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]* | *[\*\?\[]*)
-            ui_detail "skip (pointer): malformed target (dot, empty segment,"
-            ui_detail "  whitespace, or glob): $_ghc_pt_file"
+        *[[:cntrl:]]*)
+            ui_detail "skip (pointer): target carries a control byte: $_ghc_pt_file"
             return 1
             ;;
     esac
-    _ghc_pt_c="$_ghc_pt_t"
-    case "$_ghc_pt_c" in
-        *.git/worktrees/*) _ghc_pt_c="${_ghc_pt_c%/worktrees/*}" ;;
+    while :; do
+        case "$_ghc_pt_t" in
+            ?*/) _ghc_pt_t="${_ghc_pt_t%/}" ;;
+            *) break ;;
+        esac
+    done
+    [ -n "$_ghc_pt_t" ] || {
+        ui_detail "skip (pointer): target is the filesystem root: $_ghc_pt_file"
+        return 1
+    }
+    case "$_ghc_pt_t" in
+        *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]* | *[\*\?\[]*)
+            ui_detail "skip (pointer): malformed target (dot, empty segment, whitespace, or glob): $_ghc_pt_file"
+            return 1
+            ;;
     esac
-    _ghc_pt_out="$_ghc_pt_c"
-    return 0
+    case "$_ghc_pt_t" in
+        *.git/worktrees/*) _ghc_pt_t="${_ghc_pt_t%/worktrees/*}" ;;
+    esac
+    # nomination gate (review a C1): storage child or `.git`-named.
+    case "${_ghc_pt_t##*/}" in
+        .git)
+            _ghc_pt_out="$_ghc_pt_t"
+            return 0
+            ;;
+    esac
+    _ghc_pt_stor="${GH_STORAGE:-$(_ghc_key GITDIR_STORAGE)}"
+    while :; do
+        case "$_ghc_pt_stor" in
+            ?*/) _ghc_pt_stor="${_ghc_pt_stor%/}" ;;
+            *) break ;;
+        esac
+    done
+    case "$_ghc_pt_t" in
+        "$_ghc_pt_stor"/*)
+            _ghc_pt_out="$_ghc_pt_t"
+            return 0
+            ;;
+    esac
+    ui_detail "skip (pointer): target outside the storage root and not a .git dir (foreign or planted): $_ghc_pt_file"
+    return 1
 }
 
 _git_heal_on() {
@@ -482,7 +534,8 @@ _git_heal_on() {
             fi
         done <"$_ghc_on_raw"
         rm -f "$_ghc_on_raw"
-        LC_ALL=C sort -u -o "$_ghc_on_list" "$_ghc_on_list"
+        LC_ALL=C sort -u -o "$_ghc_on_list" "$_ghc_on_list" 2>/dev/null ||
+            ui_detail "git-heal: dedup sort failed — duplicate candidates may heal twice"
         _ghc_progress_tee "re-pinning operands" <"$_ghc_on_list" |
             while IFS= read -r _ghc_on_gd; do
                 if _ghc_heal_once "$_ghc_on_gd"; then
@@ -506,7 +559,8 @@ _git_heal_on() {
             ui_detail "dev-owned config/hooks) ride the group baseline — 'sudo opk"
             ui_detail "update' re-applies it when its semantics change; for adopted"
             ui_detail "(pointer-file) checkouts those bits live on the storage"
-            ui_detail "gitdir and ride the git-protection migration heal instead"
+            ui_detail "gitdir, set by the git-protection migration heal at adoption"
+            ui_detail "time — no update-time re-application exists for them yet"
         fi
         rm -f "$_ghc_on_list"
     fi
@@ -630,7 +684,8 @@ _git_heal_status() {
         fi
     done <"$_ghc_stt_raw"
     rm -f "$_ghc_stt_raw"
-    LC_ALL=C sort -u -o "$_ghc_stt_list" "$_ghc_stt_list"
+    LC_ALL=C sort -u -o "$_ghc_stt_list" "$_ghc_stt_list" 2>/dev/null ||
+        ui_detail "git-heal: dedup sort failed — rows may render duplicated"
     _ghc_progress_tee "checking lockouts" <"$_ghc_stt_list" |
         while IFS= read -r _ghc_stt_gd; do
             [ -n "$_ghc_stt_gd" ] || continue

@@ -1130,6 +1130,15 @@ mkdir -p "$WORK/zone/ptzone/psub" "$WORK/zone/ptzone/pjunk" "$WORK/zone/ptzone/p
 printf 'gitdir: ../.git/modules/sub\n' >"$WORK/zone/ptzone/psub/.git"
 printf 'not a pointer\n' >"$WORK/zone/ptzone/pjunk/.git"
 printf 'gitdir: /tmp/has space/x.git\n' >"$WORK/zone/ptzone/pmal/.git"
+# Review-a hardening fixtures: a planted pointer nominating a
+# gitdir-shaped dir OUTSIDE the storage (C1 — a bare repo, HEAD+
+# objects present, would pass every heal gate), a control-byte target
+# (C3) and a trailing-slash alias of the legit target (C4).
+mkdir -p "$WORK/zone/ptzone/patk" "$WORK/zone/ptzone/pctl" "$WORK/zone/ptzone/pslash"
+git -C "$WORK/zone/ptzone" init -q --bare ptmirror.git
+printf 'gitdir: %s\n' "$WORK/zone/ptzone/ptmirror.git" >"$WORK/zone/ptzone/patk/.git"
+printf 'gitdir: /tmp/ctl-%sx.git\n' "$(printf '\033')" >"$WORK/zone/ptzone/pctl/.git"
+printf 'gitdir: %s/\n' "$WORK/ptstor/main.git" >"$WORK/zone/ptzone/pslash/.git"
 printf '%s\n' "$WORK/zone/ptzone" >"$WORK/pt-projects.conf"
 printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\n' "$(id -un)" "$(id -un)" >"$WORK/install.conf"
 
@@ -1168,7 +1177,7 @@ fi
 # The relative (submodule-form) pointer is skipped LOUDLY and never
 # healed: .git/modules is developer-pinned by the fs baseline (#655
 # b Q4), healing into it would fight the baseline.
-if printf '%s' "$_out" | grep -qF 'skip (pointer): relative target (the submodule form' &&
+if printf '%s' "$_out" | grep -qF 'skip (pointer): relative target (submodule form' &&
     printf '%s' "$_out" | grep -qF "never healed): $WORK/zone/ptzone/psub/.git" &&
     ! grep -qF 'modules/sub' "$LOG"; then
     pass "core: on skips the relative (submodule) pointer loudly, heals nothing (#777)"
@@ -1186,10 +1195,64 @@ else
     fail "core: on pointer-refusal arms (out=$(printf '%s' "$_out" | grep 'skip (pointer)' | head -3)) (#777)"
 fi
 
+# Review-a C1 (MED): the nomination gate. A planted pointer naming a
+# gitdir-shaped directory OUTSIDE the storage (this bare repo carries
+# HEAD+objects and sits under the conf root — heal-index-head's
+# allowlist and shape gates pass it by construction) must be refused
+# loudly and heal NOTHING: without the gate the sweep's nomination
+# universe widens to any such directory, which the pre-#777 -type d
+# walk could never reach.
+if printf '%s' "$_out" | grep -qF 'skip (pointer): target outside the storage root and not a .git dir' &&
+    printf '%s' "$_out" | grep -qF "foreign or planted): $WORK/zone/ptzone/patk/.git" &&
+    ! grep -qF "gitdir=$WORK/zone/ptzone/ptmirror.git" "$LOG"; then
+    pass "core: on refuses a pointer nominating an out-of-storage gitdir (C1 gate, review a)"
+else
+    fail "core: on nomination gate (out=$(printf '%s' "$_out" | grep 'outside the storage' | head -2) log=$(grep -c 'gitdir=' "$LOG" || true) healed) (review a C1)"
+fi
+
+# Review-a C3: control bytes never reach the report rows raw.
+if printf '%s' "$_out" | grep -qF 'skip (pointer): target carries a control byte: ' &&
+    printf '%s' "$_out" | grep -qF "$WORK/zone/ptzone/pctl/.git" &&
+    ! printf '%s' "$_out" | grep -qF "$(printf '\033')"; then
+    pass "core: on refuses a control-byte target before any row renders it (C3, review a)"
+else
+    fail "core: on control-byte gate (out=$(printf '%s' "$_out" | grep -c 'control byte' || true) hits) (review a C3)"
+fi
+
+# Review-a C4: a trailing-slash alias of the legit target normalizes
+# onto the same candidate (no note, no duplicate heal — the dedup
+# counts above stay 1/2).
+if ! printf '%s' "$_out" | grep -qF 'pslash'; then
+    pass "core: on normalizes a trailing-slash target into the deduped candidate (C4, review a)"
+else
+    fail "core: on trailing-slash arm (out=$(printf '%s' "$_out" | grep pslash | head -1)) (review a C4)"
+fi
+
+# Review-a C2: the resolver refuses a FIFO swapped onto a .git name
+# BEFORE any read — timeout-wrapped (the test-doctor no-hang idiom):
+# without the [ -f ] gate the sed open blocks forever and the run
+# dies rc 124.
+mkdir -p "$WORK/zone/ptzone/pfifo"
+mkfifo "$WORK/zone/ptzone/pfifo/.git"
+_hr_rc=0
+_fifo_out=$(timeout 10 sh -c '
+    ui_detail() { echo "detail: $*"; }
+    . "$1"
+    INSTALL_CONF="$2"
+    if _ghc_pt_target "$3"; then echo "ACCEPTED"; fi
+' _ "$CORE" "$WORK/install.conf" "$WORK/zone/ptzone/pfifo/.git" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] && ! printf '%s' "$_fifo_out" | grep -qF 'ACCEPTED'; then
+    pass "core: the resolver refuses a FIFO .git without reading it (C2, review a)"
+else
+    fail "core: FIFO gate (rc=$_hr_rc out=$_fifo_out) (review a C2)"
+fi
+
 # Claim audit for the extended layer-separation note: the sweep SAYS
-# where adopted checkouts' gitdir-level bits come from.
+# where adopted checkouts' gitdir-level bits come from — and that no
+# update-time re-application exists for them (review a Q4 wording).
 if printf '%s' "$_out" | grep -qF 'for adopted' &&
-    printf '%s' "$_out" | grep -qF 'ride the git-protection migration heal instead'; then
+    printf '%s' "$_out" | grep -qF 'set by the git-protection migration heal at adoption' &&
+    printf '%s' "$_out" | grep -qF 'no update-time re-application exists for them yet'; then
     pass "core: on names the pointer gitdir bits' owner (git-protection heal) (#777)"
 else
     fail "core: on pointer caveat arm (out=$(printf '%s' "$_out" | grep 'operand sweep' | head -2)) (#777)"
@@ -1349,7 +1412,7 @@ fi
 # The refusals ride the status surface as well (display-only, but the
 # same resolver: the notes say why a checkout under the root has no
 # rows).
-if printf '%s' "$_out" | grep -qF 'skip (pointer): relative target (the submodule form' &&
+if printf '%s' "$_out" | grep -qF 'skip (pointer): relative target (submodule form' &&
     printf '%s' "$_out" | grep -qF "skip (pointer): no gitdir: line: $WORK/zone/ptzone/pjunk/.git"; then
     pass "status renderer: pointer refusals render their skip notes (#777)"
 else

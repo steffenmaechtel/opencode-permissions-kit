@@ -49,7 +49,12 @@ This is opt-in and idempotent; install and update never activate it.
    to its common gitdir (the same target the hooks resolve), and a
    relative (submodule-form) pointer is skipped with a note:
    `.git/modules` is developer-pinned by the baseline and never
-   healed. `opk git-heal status` scans the same universe for its
+   healed. A resolved target is only accepted when it sits under the
+   git-protection storage root or is itself a `.git`-named directory —
+   the two classes the kit deploys; anything else (a foreign
+   `--separate-git-dir` layout, or a pointer planted to nominate an
+   arbitrary repository for the root heal) is skipped with a note.
+   `opk git-heal status` scans the same universe for its
    lockout rows, and so do the `opk status` git-heal section and
    `opk doctor`'s per-project row — they resolve pointer checkouts
    through the same gate and name the resolved storage paths

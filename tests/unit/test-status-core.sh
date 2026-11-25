@@ -187,6 +187,10 @@ _ghs_run() {
         if [ "${GHS_NO_GHC:-}" != 1 ]; then
             # shellcheck disable=SC1090
             . "$GH_CORE"
+            # The resolver's nomination gate (#777 review a C1) reads
+            # the storage root through the documented seam; the e2e
+            # arms exercise the install.conf leg end to end.
+            export GH_STORAGE="$WORK/ghs/ptstor"
         fi
         DEFAULT_USER="$(id -un)"
         OPENCODE_USER=opencode-ghs-agent
@@ -234,6 +238,16 @@ git -C "$WORK/ghs/scan/ptmain" -c user.email=t@e -c user.name=t commit -q --allo
 mv "$WORK/ghs/scan/ptmain/.git" "$WORK/ghs/ptstor/ptmain.git"
 printf 'gitdir: %s\n' "$WORK/ghs/ptstor/ptmain.git" >"$WORK/ghs/scan/ptmain/.git"
 git --git-dir="$WORK/ghs/ptstor/ptmain.git" worktree add -q "$WORK/ghs/scan/ptwt" -b ptwb 2>/dev/null
+# The .git-named leg (review a C1's accepted second class): a worktree
+# of a fresh CLASSIC repo under the scan root collapses onto its main
+# .git DIR — accepted with no storage involved (the find already
+# lists that dir; the pointer's contribution dedups onto it). The
+# deep/repo fixture cannot serve here: its .git/HEAD is truncated on
+# purpose (the nested-repo arm's row fixture) and no git op runs
+# against it.
+git -C "$WORK/ghs/scan" init -q -b main clsmain
+git -C "$WORK/ghs/scan/clsmain" -c user.email=t@e -c user.name=t commit -q --allow-empty -m x
+git -C "$WORK/ghs/scan/clsmain" worktree add -q "$WORK/ghs/scan/clswt" -b cwb 2>/dev/null
 printf '%s\n' "$WORK/ghs/scan" >"$WORK/ghs/projects.conf"
 _out=$(_ghs_run || true)
 if printf '%s' "$_out" | grep -q "lockout.*$WORK/ghs/ptstor/ptmain.git/index is $(id -un)-owned — agent git" &&
@@ -247,6 +261,14 @@ if [ "$_ptr_n" = 1 ]; then
     pass "git-heal section: main and worktree pointers render one deduped row set (#777)"
 else
     fail "git-heal section: pointer dedup (rows=$_ptr_n for one operand — 1 expected) (#777)"
+fi
+# The .git-named leg (review a C1): the classic repo's worktree
+# pointer collapses onto the main .git DIR and dedups onto its rows.
+_deep_n=$(printf '%s' "$_out" | grep -c "lockout.*$WORK/ghs/scan/clsmain/.git/index is" || true)
+if [ "$_deep_n" = 1 ]; then
+    pass "git-heal section: a classic worktree pointer dedups onto the main .git dir (review a)"
+else
+    fail "git-heal section: .git-named leg (rows=$_deep_n for one operand — 1 expected) (review a)"
 fi
 # The degrade arm: resolver unavailable (entry's sourcing failed) —
 # ONE counted warn row names it, the classic rows still render, and

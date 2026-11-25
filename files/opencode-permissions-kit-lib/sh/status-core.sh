@@ -520,13 +520,18 @@ status_section_git_heal() {
             fi
         elif [ "$_st_gh_ptwarned" = 0 ]; then
             _st_gh_ptwarned=1
-            ui_kv_warn "git-heal" "pointer-file checkouts not checked — kit file sh/git-heal-core.sh""\
- missing or outdated (fix: sudo opk update)"
+            # Wrap discipline: the `kit file sh/<name>.sh missing`
+            # fragment stays contiguous — the #165 census in
+            # test-status.sh greps it raw.
+            ui_kv_warn "git-heal" "pointer-file checkouts not checked —""\
+ kit file sh/git-heal-core.sh missing or outdated (fix: sudo opk update)"
         fi
     done <"$_st_gh_raw"
     rm -f "$_st_gh_raw"
-    LC_ALL=C sort -u -o "$_st_gh_list" "$_st_gh_list"
-    LC_ALL=C sort -u -o "$_st_gh_det" "$_st_gh_det"
+    LC_ALL=C sort -u -o "$_st_gh_list" "$_st_gh_list" 2>/dev/null ||
+        ui_kv_warn "git-heal" "lockout rows may render duplicated (dedup sort failed)"
+    LC_ALL=C sort -u -o "$_st_gh_det" "$_st_gh_det" 2>/dev/null ||
+        ui_detail "git-heal: detection rows may render duplicated (dedup sort failed)"
     while IFS= read -r _st_gh_gd; do
         [ -n "$_st_gh_gd" ] || continue
         # Wholesale-swap detection row (#653 family, #702/#703): with
