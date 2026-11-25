@@ -2137,7 +2137,7 @@ do_deploy_phase() {
                 # `:?` guard (rm -rf census, #571): an empty _opk_src
                 # must abort loud, never degenerate the rm -rf operand.
                 # Deliberate strengthening beyond tests/AGENTS.md
-                # "Test sandbox" item 3 (rm suffix guard):
+                # "Test sandbox" (the rm suffix guard, bullet 5):
                 # that rule mandates :? for literal-suffix operands and
                 # exempts pure variables — the old bare "$_opk_src" was
                 # compliant; the census tightens it anyway (#606 a Q5).

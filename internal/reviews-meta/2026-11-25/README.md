@@ -85,6 +85,10 @@ MED, 21 HIGH.
 | 2026-W47 | 62 | 129 | 756 | 2.08 | 5.86 |
 | 2026-W48 | 8 | 23 | 118 | 2.88 | 5.13 |
 
+Weeks are attributed by the PR's `mergedAt` (ISO week); attributing by
+the round's own comment date shifts the W45/W46 rows slightly (#780 b
+D2).
+
 W48 is the cutover week and incomplete; W46→W47 is the docs-loop pilot
 week (AGENTS.md +8,974 bytes in the same span — the co-movement is the
 observation, not a verdict; the same caveat as the M1 reading).
@@ -135,6 +139,9 @@ Honesty caveats:
 - The draw rode the pre-fix rounds table (5 closing summaries among
   the 25); the next M3 snapshot re-draws over the corrected table —
   recorded as the #781 follow-up's first step.
+- The share basis counts every extracted finding, the 4 retracted
+  ones included (a reported-only basis would be 50/64 = 78.1 %)
+  (#780 b D3).
 
 ## Why no learnings.md update
 
