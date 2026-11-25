@@ -8,7 +8,10 @@
 #     persist + drop on a scratch install.conf, project
 #     classification (classic / nailed / unnailed / foreign-pointer /
 #     worktree-reg), the atomic migrate (happy path, skip arms,
-#     collision suffix, worktree repair, rollback), the storage entry
+#     collision suffix, worktree repair, rollback), the #779 storage
+#     reheal sweep (drift heal, the symlink/foreign/junk skip gates,
+#     the failure count, the on-pass wiring and its failure
+#     propagation), the storage entry
 #     naming rule (#764: <parent>-<basename>, its fallbacks), nail gating
 #     (storage prefix, dev ownership, chattr failure, lsattr verify),
 #     revert (kit-owned only, happy path), status rc semantics, the
@@ -144,7 +147,7 @@ _defs="_gp_libdir _gp_var _gp_devuser _gp_agentuser _gp_group _gp_root_ok
 _gp_conf_path _gp_storage _gp_storage_derive _gp_enabled _gp_nosym _gp_storage_init
 _gp_persist_storage
 _gp_drop_storage _gp_has_i _gp_devgit _gp_verify _gp_rollback _gp_worktrees
-_gp_heal_gitdir _gp_pform_ok _gp_storage_sane _gp_unnest _gp_conf_root_p
+_gp_heal_gitdir _gp_reheal_storage _gp_pform_ok _gp_storage_sane _gp_unnest _gp_conf_root_p
 _gp_entry_name _gp_migrate_one _gp_nail_one _gp_revert_one _gp_projects _gp_rows
 _gp_disp _gp_q _gp_orphan_rows _gp_declined_rows _gp_revert_all
 _git_protection_status _git_protection_on _git_protection_adopt
@@ -710,6 +713,235 @@ if [ "$_rc" = 0 ] && [ -f "$WORK/roots/r1/noimm/.git" ] &&
     pass "migrate: chattr failure degrades loud, layout stays"
 else
     fail "migrate: nail-degrade arm (rc=$_rc out=$_out)"
+fi
+
+# --- 6b. the #779 reheal sweep (update-time re-application) ------------------------
+# Every gate of _gp_reheal_storage plus its wiring into
+# _git_protection_on. Mode classes are the discriminator (the B11
+# note: ownership legs are vacuous when dev==agent==runner). The
+# sweep's own scratch storages (rhs*) never touch $WORK/storage, so
+# the 8b orphan fixtures cannot see these legs.
+
+# The adoption-era shape: a hand-moved gitdir in a dedicated storage,
+# drifted (group-writable config, 777 hooks, no sticky, FETCH_HEAD).
+mkdir -p "$WORK/rhs"
+_mkrepo "$WORK/roots/r1/rhproj"
+mv "$WORK/roots/r1/rhproj/.git" "$WORK/rhs/rhproj.git"
+chmod 666 "$WORK/rhs/rhproj.git/config"
+chmod 777 "$WORK/rhs/rhproj.git/hooks"
+chmod -t "$WORK/rhs/rhproj.git"
+touch "$WORK/rhs/rhproj.git/FETCH_HEAD"
+
+_rc=0
+_out=$(_core_run '_gp_reheal_storage "$WORK/rhs"') || _rc=$?
+_mode_cfg=$(stat -c %a "$WORK/rhs/rhproj.git/config")
+_mode_hooks=$(stat -c %a "$WORK/rhs/rhproj.git/hooks")
+_hooks_ok=0
+case "$_mode_hooks" in
+    755 | 2755) _hooks_ok=1 ;;
+esac
+if [ "$_rc" = 0 ] && [ "$_mode_cfg" = 644 ] && [ "$_hooks_ok" = 1 ] &&
+    [ -k "$WORK/rhs/rhproj.git" ] && [ -g "$WORK/rhs/rhproj.git" ] &&
+    [ ! -e "$WORK/rhs/rhproj.git/FETCH_HEAD" ] &&
+    printf '%s' "$_out" | grep -qF 'storage reheal: existing storage entries' &&
+    printf '%s' "$_out" | grep -qF 'operand set — #779): 1'; then
+    pass "reheal: a drifted storage entry walks back through the contract (#779)"
+else
+    fail "reheal: drift arm (rc=$_rc cfg=$_mode_cfg hooks=$_mode_hooks out=$_out)"
+fi
+
+# Idempotent: a second sweep keeps the contract and stays green.
+_rc=0
+_out=$(_core_run '_gp_reheal_storage "$WORK/rhs"') || _rc=$?
+if [ "$_rc" = 0 ] && [ "$(stat -c %a "$WORK/rhs/rhproj.git/config")" = 644 ] &&
+    [ -k "$WORK/rhs/rhproj.git" ] && [ -g "$WORK/rhs/rhproj.git" ]; then
+    pass "reheal: the sweep is idempotent (#779)"
+else
+    fail "reheal: idempotence arm (rc=$_rc out=$_out)"
+fi
+
+# L5: a symlinked storage child is never healed THROUGH — the target
+# keeps its drift and gains no sticky bit.
+_mkrepo "$WORK/rh-outside"
+chmod 666 "$WORK/rh-outside/.git/config"
+ln -s "$WORK/rh-outside/.git" "$WORK/rhs/link.git"
+_rc=0
+_out=$(_core_run '_gp_reheal_storage "$WORK/rhs"') || _rc=$?
+if [ "$_rc" = 0 ] &&
+    [ "$(stat -c %a "$WORK/rh-outside/.git/config")" = 666 ] &&
+    [ ! -k "$WORK/rh-outside/.git" ] &&
+    ! printf '%s' "$_out" | grep -qF 'storage reheal failed'; then
+    pass "reheal: a symlinked entry is skipped, never followed (L5, #779)"
+else
+    fail "reheal: symlink arm (rc=$_rc out=$_out)"
+fi
+
+# A6 parity: a non-dev-owned child is not kit-owned, never healed.
+printf 'DEFAULT_USER=root\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
+    "$(id -un)" "$(id -gn)" >"$IC.tmp"
+mv "$IC.tmp" "$IC"
+chmod 666 "$WORK/rhs/rhproj.git/config"
+_out=$(_core_run '_gp_reheal_storage "$WORK/rhs"')
+if [ "$(stat -c %a "$WORK/rhs/rhproj.git/config")" = 666 ] &&
+    ! printf '%s' "$_out" | grep -qF 'storage reheal failed'; then
+    pass "reheal: a foreign-owned entry is skipped (A6 parity, #779)"
+else
+    fail "reheal: ownership arm (out=$_out)"
+fi
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" >"$IC"
+
+# Non-operand shapes: a plain file and a non-gitdir directory heal
+# nothing, fail nothing.
+touch "$WORK/rhs/junk-file"
+mkdir -p "$WORK/rhs/junk-dir.git"
+_rc=0
+_out=$(_core_run '_gp_reheal_storage "$WORK/rhs"') || _rc=$?
+if [ "$_rc" = 0 ] && [ ! -k "$WORK/rhs/junk-dir.git" ] &&
+    ! printf '%s' "$_out" | grep -qF 'storage reheal failed'; then
+    pass "reheal: files and non-gitdir children are no-ops (#779)"
+else
+    fail "reheal: junk arm (rc=$_rc out=$_out)"
+fi
+
+# The sanity arm: the storage itself failing the use-time check skips
+# the sweep LOUD — and the skip COUNTS as a pass failure (#783 a A1:
+# the counted half was unpinned; b B1 + c C1: the eval prints BOTH
+# observables now and asserts both — the old [ rc ] leg discriminated
+# only through the suite's set -e abort (a nonzero return dies the
+# eval before the printf); the positive rc=0 grep pins the no-abort
+# contract directly, the no-errexit reading included).
+mkdir -p "$WORK/rhs-real"
+ln -s "$WORK/rhs-real" "$WORK/rhs-sym"
+_rc=0
+_out=$(_core_run '_gp_reheal_storage "$WORK/rhs-sym"; _r=$?; printf "flag=%s\n" "$_gprs_failed"; printf "rc=%s\n" "$_r"') || _rc=$?
+if printf '%s' "$_out" | grep -qF 'storage reheal skipped: the use-time sanity check failed' &&
+    printf '%s' "$_out" | grep -qF 'flag=1' &&
+    printf '%s' "$_out" | grep -qF 'rc=0'; then
+    pass "reheal: an insane storage skips loud AND fails the pass counter (#779, #783 a A1, b B1)"
+else
+    fail "reheal: sanity arm (rc=$_rc out=$_out) (#783 a A1, b B1)"
+fi
+
+# A missing storage is a clean no-op (the first `on` just made one).
+_rc=0
+_out=$(_core_run '_gp_reheal_storage "$WORK/rhs-missing"') || _rc=$?
+if [ "$_rc" = 0 ] && [ -z "$_out" ]; then
+    pass "reheal: a missing storage is a clean no-op (#779)"
+else
+    fail "reheal: missing-storage arm (rc=$_rc out=$_out)"
+fi
+
+# Failure counting: a broken group makes the heal's chown -R fail —
+# the entry is named, the count reaches the caller (flag=1), and the
+# function still returns 0 (the count is the failure channel, never
+# an rc abort under update.sh's set -e — pinned since #783 b B1).
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=nosuchgroup-779\n' \
+    "$(id -un)" "$(id -un)" >"$IC.tmp"
+mv "$IC.tmp" "$IC"
+_rc=0
+_out=$(_core_run '_gp_reheal_storage "$WORK/rhs"; _r=$?; printf "flag=%s\n" "$_gprs_failed"; printf "rc=%s\n" "$_r"') || _rc=$?
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" >"$IC"
+if printf '%s' "$_out" | grep -qF 'flag=1' &&
+    printf '%s' "$_out" | grep -qF 'rc=0' &&
+    printf '%s' "$_out" | grep -qF 'storage reheal failed on' &&
+    printf '%s' "$_out" | grep -qF 'chown -R failed'; then
+    pass "reheal: a failed heal counts into _gprs_failed (#779, b B1)"
+else
+    fail "reheal: failure-count arm (rc=$_rc out=$_out)"
+fi
+
+# On-pass wiring, happy path: the full `on` heals an EXISTING drifted
+# entry before migrating a new classic project (sweep first, each
+# entry healed exactly once — the summary counts 1, not 2). A
+# DEDICATED conf root: the shared roots/r1 fixtures (rb must stay
+# classic for section 8) are not this leg's to migrate.
+mkdir -p "$WORK/rhs2" "$WORK/rr2-roots"
+_mkrepo "$WORK/rr2-roots/rhnew"
+printf '%s\n' "$WORK/rr2-roots" >"$CONF"
+_mkrepo "$WORK/roots/r1/rhold"
+mv "$WORK/roots/r1/rhold/.git" "$WORK/rhs2/rhold.git"
+chmod 666 "$WORK/rhs2/rhold.git/config"
+chmod -t "$WORK/rhs2/rhold.git"
+_rc=0
+_out=$(_core_run 'GP_STORAGE="$WORK/rhs2"; export GP_STORAGE; _git_protection_on') || _rc=$?
+printf '%s\n' "$WORK/roots/r1" >"$CONF"
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" >"$IC"
+if [ "$_rc" = 0 ] &&
+    [ "$(stat -c %a "$WORK/rhs2/rhold.git/config")" = 644 ] &&
+    [ -k "$WORK/rhs2/rhold.git" ] &&
+    [ -f "$WORK/rr2-roots/rhnew/.git" ] &&
+    [ -d "$WORK/rhs2/rhnew.git" ] &&
+    printf '%s' "$_out" | grep -qF 'storage reheal: existing storage entries' &&
+    printf '%s' "$_out" | grep -qF 'operand set — #779): 1'; then
+    pass "reheal: the on-pass heals existing entries before migrating (#779)"
+else
+    fail "reheal: on-pass wiring (rc=$_rc out=$_out)"
+fi
+
+# On-pass failure propagation: a chown stub failing ONLY the -R form
+# (storage init's plain chown stays real) over an EMPTY conf root (no
+# migration can fail the pass) — the reheal failure alone must exit 1.
+REAL_CHOWN=$(command -v chown)
+mkdir -p "$WORK/binchown"
+cat >"$WORK/binchown/chown" <<EOF
+#!/bin/sh
+case "\$1" in
+    -R)
+        echo "chown: recursive form refused (stub)" >&2
+        exit 1
+        ;;
+esac
+exec $REAL_CHOWN "\$@"
+EOF
+chmod 755 "$WORK/binchown/chown"
+mkdir -p "$WORK/rhs3" "$WORK/rr-roots"
+printf '%s\n' "$WORK/rr-roots" >"$CONF"
+_mkrepo "$WORK/rh-fail"
+mv "$WORK/rh-fail/.git" "$WORK/rhs3/rhfail.git"
+_rc=0
+_out=$(_core_run 'PATH="$WORK/binchown:$WORK/bin:/usr/bin:/bin"; export PATH; GP_STORAGE="$WORK/rhs3"; export GP_STORAGE; _git_protection_on') || _rc=$?
+printf '%s\n' "$WORK/roots/r1" >"$CONF"
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" >"$IC"
+if [ "$_rc" = 1 ] &&
+    printf '%s' "$_out" | grep -qF 'storage reheal failed on' &&
+    printf '%s' "$_out" | grep -qF 'pass had failures (migration or storage reheal' &&
+    printf '%s' "$_out" | grep -qF 're-run: opk git-protection on'; then
+    pass "reheal: a failed sweep fails the on-pass (propagation, #779)"
+else
+    fail "reheal: propagation arm (rc=$_rc out=$_out)"
+fi
+
+# The sticky-failure arm (#783 a A6: the "(chown, sticky)" claim was
+# pinned on the chown leg alone): a chmod stub failing ONLY `+t` on
+# the sweep's one target — the heal's second return-1 path, with the
+# chown -R and the find-walk chmods staying real.
+REAL_CHMOD=$(command -v chmod)
+mkdir -p "$WORK/binchmod"
+cat >"$WORK/binchmod/chmod" <<EOF
+#!/bin/sh
+if [ "\$1" = "+t" ] && [ "\$2" = "$WORK/rhs3/rhfail.git" ]; then
+    echo "chmod: sticky form refused (stub)" >&2
+    exit 1
+fi
+exec $REAL_CHMOD "\$@"
+EOF
+chmod 755 "$WORK/binchmod/chmod"
+printf '%s\n' "$WORK/rr-roots" >"$CONF"
+_rc=0
+_out=$(_core_run 'PATH="$WORK/binchmod:$WORK/bin:/usr/bin:/bin"; export PATH; GP_STORAGE="$WORK/rhs3"; export GP_STORAGE; _git_protection_on') || _rc=$?
+printf '%s\n' "$WORK/roots/r1" >"$CONF"
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" >"$IC"
+if [ "$_rc" = 1 ] &&
+    printf '%s' "$_out" | grep -qF 'storage reheal failed on' &&
+    printf '%s' "$_out" | grep -qF 'cannot set the sticky bit'; then
+    pass "reheal: a sticky-failure heal fails the pass too (A6, #783 a)"
+else
+    fail "reheal: sticky-failure arm (rc=$_rc out=$_out) (#783 a A6)"
 fi
 
 # --- 7. nail gating -------------------------------------------------------------------

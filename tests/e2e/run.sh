@@ -1917,15 +1917,21 @@ check "12q: no adopt hint on the adopted tree (self-silencing)" \
     E 'cd /var/www/vhosts/perm-check && git checkout -q -b gp-post 2>/tmp/gp-hint.log && ! grep -q "opk git-protection" /tmp/gp-hint.log'
 E 'git -C /var/www/vhosts/perm-check checkout -q main 2>/dev/null || git -C /var/www/vhosts/perm-check checkout -q master 2>/dev/null || true'
 # The update consent: with the feature enabled, a full update runs the
-# recurring adopt+nail pass inside its phases (checkout-shaped copy of
-# the repo files, the section-11 discipline).
+# recurring reheal+adopt+nail pass inside its phases (checkout-shaped
+# copy of the repo files, the section-11 discipline). #779: the
+# adopted storage entry arrives DRIFTED (root-owned group-writable
+# config, sticky bit gone) — the pass must walk it back through the
+# current heal contract.
+E 'sudo chown root /var/www/gitdirs/perm-check.git/config && sudo chmod 666 /var/www/gitdirs/perm-check.git/config && sudo chmod -t /var/www/gitdirs/perm-check.git && sudo chown root /var/www/gitdirs/perm-check.git/index'
 E 'rm -rf /tmp/gp-update-test && mkdir -p /tmp/gp-update-test/files && cp -r /home/dev/repo/files/* /tmp/gp-update-test/files/ && echo "9.9.9" >/tmp/gp-update-test/VERSION'
 E 'sudo bash /tmp/gp-update-test/files/opencode-permissions-kit-lib/management/update.sh --yes >/tmp/gp-update.log 2>&1' &&
     echo "  ${GREEN}OK${NC}  update with git-protection enabled completed"
-check "12q: the enabled update runs the adopt+nail pass" \
-    E 'grep -qF "git-protection: enabled" /tmp/gp-update.log'
+check "12q: the enabled update runs the reheal+adopt+nail pass" \
+    E 'grep -qF "git-protection: enabled — running the reheal + adopt + nail pass" /tmp/gp-update.log'
 check "12q: GITDIR_STORAGE survives the update's install.conf re-stamp" \
     E 'grep -qx "GITDIR_STORAGE=/var/www/gitdirs" /etc/opencode-permissions-kit/install.conf'
+check "12q: #779 — the enabled update re-applies the gitdir heal to existing storage entries" \
+    E 'test "$(stat -c %U /var/www/gitdirs/perm-check.git/config)" = "dev" && test "$(stat -c %a /var/www/gitdirs/perm-check.git/config)" = "644" && test -k /var/www/gitdirs/perm-check.git && test "$(stat -c %U /var/www/gitdirs/perm-check.git/index)" = "opencode"'
 # The manual walk-back for one project; the blanket revert rides the
 # uninstall below (its --yes accepts the default-yes offer).
 E 'sudo opk git-protection revert /var/www/vhosts/perm-check >/tmp/gp-revert.log 2>&1' &&

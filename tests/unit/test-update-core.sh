@@ -1074,8 +1074,14 @@ else
     fail "consent: accept arm (out=$_uc_out ic=$(cat "$UC_IC"))"
 fi
 
-# state 6: already enabled (conf path) — the recurring pass, no question.
+# state 6: already enabled (conf path) — the recurring pass, no
+# question. The pre-existing storage entry arrives DRIFTED (#779:
+# adoption-era bits — group-writable config, sticky bit gone): the
+# pass must walk it back through the current heal contract while it
+# adopts the new classic project.
 _uc_mkrepo "$WORK/ucroots/r1/proj2"
+chmod 666 "$WORK/ucstorage/proj.git/config"
+chmod -t "$WORK/ucstorage/proj.git"
 _uc_out=$(
     GIT_PROTECTION_CORE="$GPCORE" INSTALL_CONF="$UC_IC" \
         GP_CONF="$UC_CONF" GP_INSTALL_CONF="$UC_IC" GP_STORAGE="$WORK/ucstorage" \
@@ -1093,8 +1099,12 @@ _uc_out=$(
 )
 if [ -f "$WORK/ucroots/r1/proj2/.git" ] &&
     [ -d "$WORK/ucstorage/proj2.git" ] &&
+    [ "$(stat -c %a "$WORK/ucstorage/proj.git/config")" = 644 ] &&
+    [ -k "$WORK/ucstorage/proj.git" ] &&
+    printf '%s' "$_uc_out" | grep -qF 'storage reheal' &&
+    printf '%s' "$_uc_out" | grep -qF 'running the reheal + adopt + nail pass' &&
     ! printf '%s' "$_uc_out" | grep -qF 'confirm:'; then
-    pass "consent: enabled conf runs the adopt pass without asking (#704)"
+    pass "consent: enabled conf runs the reheal + adopt pass without asking (#704, #779)"
 else
     fail "consent: enabled arm (out=$_uc_out)"
 fi
