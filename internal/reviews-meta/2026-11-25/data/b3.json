@@ -1,0 +1,352 @@
+{
+  "batch": "b3",
+  "snapshots": [
+    {
+      "stem": "pr-00625a",
+      "file": "pr-625/timeline",
+      "date": "2026-11-18",
+      "scope": "wave",
+      "reviewer": "GLM-5.3-Flash (quality)",
+      "subject": "docs-loop closure wave over #623: amended metas, docs parity",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 0, "INFO": 0 },
+      "findings": [],
+      "process_notes": [
+        "raw 0 -> curated 0; clean-pass round, no findings table; loop closes on round comment (stop rule holds)"
+      ]
+    },
+    {
+      "stem": "pr-00655e",
+      "file": "pr-655/timeline",
+      "date": "2026-11-19",
+      "scope": "wave",
+      "reviewer": "GLM-5.3-Flash (mechanical sweep)",
+      "subject": ".git heal fix wave d re-review: unit pins, idiom, belt coverage",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 0, "MED": 1, "LOW": 1, "INFO": 1 },
+      "findings": [
+        {
+          "id": "S1",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "HG11 sidecar count pin flakes: bare mktemp name can match the l-suffix pattern (~6%/run)",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        },
+        {
+          "id": "S2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "sibling-sweep",
+          "secondary_class": "silent-failure",
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "|| true guards HG11 but not sibling HG10; inconsistent idiom, same failure aborts suite at HG10",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        },
+        {
+          "id": "S3",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "shell-semantics",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "pre-existing",
+          "summary": "Belt rejects whitespace/dot/empty root segments but not glob characters; unreachable via wave constructs",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        }
+      ],
+      "process_notes": [
+        "raw 3 = extracted 3",
+        "S3 flagged as work-order candidate (belt glob coverage, path-sane owner); loop at cap, fix wave e / round f sanction pending"
+      ]
+    },
+    {
+      "stem": "pr-00680c",
+      "file": "pr-680/timeline",
+      "date": "2026-11-19",
+      "scope": "wave",
+      "reviewer": "glm-5.3-flash (fix-diff sweep)",
+      "subject": "uninstall fix wave b re-review: comment claim precision",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 1, "INFO": 0 },
+      "findings": [
+        {
+          "id": "cC1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": "sibling-sweep",
+          "area": "sh-lib",
+          "provenance": "fix-induced",
+          "summary": "bB2 reword claims 'every $SYSTEM_BIN probe' but omits three root probes of the earlier-fetched binary",
+          "cross_refs": ["pr-00680 b B2"],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "cross-ref"
+        }
+      ],
+      "process_notes": [
+        "raw 1 = extracted 1",
+        "cC1 refines same-case round-b finding bB2; disposition comment-only, stop rule holds after it"
+      ]
+    },
+    {
+      "stem": "pr-00706b",
+      "file": "pr-706/timeline",
+      "date": "2026-11-20",
+      "scope": "wave",
+      "reviewer": "GLM-5.3-Flash (axis B fix-diff sweep)",
+      "subject": "#703 fix wave a re-review: update.sh comment, doc claims, sweep",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 0, "MED": 1, "LOW": 2, "INFO": 0 },
+      "findings": [
+        {
+          "id": "B1",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "update.sh",
+          "provenance": "fix-induced",
+          "summary": "fix-wave a comment re-drifts S1 claim: notice stops after refresh ran; no once-state exists",
+          "cross_refs": ["pr-00706 a S1"],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "cross-ref"
+        },
+        {
+          "id": "B2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": "perm-model",
+          "area": "docs",
+          "provenance": "fix-induced",
+          "summary": "security-model.md absolute 'necessarily owned by the swapper' falsified by ownership-preserving cross-project rename",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        },
+        {
+          "id": "B3",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "sibling-sweep",
+          "secondary_class": "claim-drift",
+          "area": "sh-lib",
+          "provenance": "pre-existing",
+          "summary": "docs fix unswept: 'necessarily owned by swapper' survives unqualified in status-core/doctor-core comments",
+          "cross_refs": ["pr-00706 a Q1"],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "cross-ref"
+        }
+      ],
+      "process_notes": [
+        "raw 3 = extracted 3",
+        "round typing BUILDING (2 of 3 fix-introduced); B2's severity comparison cites 'canonical W1' without a PR stem, left out of cross_refs; fix wave b comment-only, loop closed after it"
+      ]
+    },
+    {
+      "stem": "pr-00761a",
+      "file": "pr-761/timeline",
+      "date": "2026-11-23",
+      "scope": "wave",
+      "reviewer": "3 x glm-5.3-flash (S perm-model, M shell-semantics, Q claim-drift)",
+      "subject": "handover sealed-pointer skip (#759): new walks, claims, pins",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 0, "MED": 4, "LOW": 4, "INFO": 3 },
+      "findings": [
+        {
+          "id": "C1",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "fix-regression",
+          "secondary_class": "claim-drift",
+          "area": "sh-lib",
+          "provenance": "wave-introduced",
+          "summary": "new walk workers skip symlinks; old chown -R -h re-owned them; comments claim old semantics",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        },
+        {
+          "id": "C2",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "race-toctou",
+          "secondary_class": "claim-drift",
+          "area": "sh-lib",
+          "provenance": "wave-introduced",
+          "summary": "leaf-only exec-time recheck misses parent/scan-root swap mid-walk; comment claims #211 F1 window closed",
+          "cross_refs": ["pr-00211 a F1"],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "cross-ref"
+        },
+        {
+          "id": "C3",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "test-gap",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "headlined exec-time [ -L ] recheck has no pin; deleting it stays green",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        },
+        {
+          "id": "C4",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "test-gap",
+          "secondary_class": "silent-failure",
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "'wholesale 2>/dev/null is gone' claim unpinned: no failing-entry drive or stderr assertion",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        },
+        {
+          "id": "C5",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-gap",
+          "secondary_class": "silent-failure",
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "_ho_sealed_note fail-soft arms (mktemp guard, find || true) never execute failure path in suite",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        },
+        {
+          "id": "C6",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "silent-failure",
+          "secondary_class": "ux-output",
+          "area": "sh-lib",
+          "provenance": "wave-introduced",
+          "summary": "slashed .git operand silently skipped with success line; bare form fails EPERM",
+          "cross_refs": ["#759"],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        },
+        {
+          "id": "C7",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "wave-introduced",
+          "summary": "gwalk header credits chmod for non-dereference; the skip prevents it",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        },
+        {
+          "id": "C8",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": "ux-output",
+          "area": "sh-lib",
+          "provenance": "wave-introduced",
+          "summary": "refuse messages still name chown -R/chmod -R executors the wave removed; hazard real, names stale",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        },
+        {
+          "id": "C9",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "shell-semantics",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "wave-introduced",
+          "summary": "note helper undercounts .git names containing newlines (find -print plus line-read split); preview-only",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        },
+        {
+          "id": "C10",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "sibling-sweep",
+          "secondary_class": "silent-failure",
+          "area": "sh-lib",
+          "provenance": "pre-existing",
+          "summary": "ddev-handover .ddev walks share sealed-pointer class on paper; unreachable, recorded as sweep result",
+          "cross_refs": ["#759"],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "cross-ref"
+        },
+        {
+          "id": "C11",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "other",
+          "secondary_class": "process",
+          "area": "sh-lib",
+          "provenance": "wave-introduced",
+          "summary": "flags-field idiom drifted from house awk field-1 expression (probe: no defect); briefs mis-cited #758 sibling",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        },
+        {
+          "id": "M1",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "shell-semantics",
+          "secondary_class": "silent-failure",
+          "area": "sh-lib",
+          "provenance": "wave-introduced",
+          "summary": "claimed ${_v%% *} mis-isolates lsattr flags on spaced paths, silent over-skip; refuted by executed probe",
+          "cross_refs": [],
+          "status": "retracted",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        }
+      ],
+      "process_notes": [
+        "raw 16 -> curated 12 posted: S1+M2+Q1+Q2 merged into C1 (4 raw -> 1), M5 dropped (clean-sweep record, not a finding); 12 entries extracted incl. retracted M1",
+        "stated_counts follows the verdict line's standing findings (retracted M1 counted separately in-round)",
+        "C2 provenance compound in-round ('mechanism pre-existing, claim delta-introduced'); recorded wave-introduced; C8 'delta-made-stale' recorded wave-introduced",
+        "C6/C10 cross-ref '#759' is the case's GitHub issue, not an earlier review finding; basis kept pre-existing-rule for C6, cross-ref for C10 (explicit class tie)"
+      ]
+    }
+  ],
+  "resolutions": []
+}

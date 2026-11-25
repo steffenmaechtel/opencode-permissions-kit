@@ -1,0 +1,1321 @@
+{
+ "totals": {
+  "batch_files": 5,
+  "snapshots": 25,
+  "resolutions": 0,
+  "findings_all": 124,
+  "reported": 119,
+  "retracted": 5,
+  "rejected": 0,
+  "downgraded": 0
+ },
+ "severity": {
+  "LOW": 53,
+  "INFO": 43,
+  "MED": 23
+ },
+ "provenance": {
+  "wave-introduced": 71,
+  "pre-existing": 29,
+  "fix-induced": 19
+ },
+ "scope": {
+  "wave": 20,
+  "other": 5
+ },
+ "classes": {
+  "claim-drift": {
+   "n": 36,
+   "sev": {
+    "LOW": 25,
+    "INFO": 7,
+    "MED": 4
+   },
+   "vgroups": [
+    "pr-00617",
+    "pr-00622",
+    "pr-00633",
+    "pr-00634",
+    "pr-00640",
+    "pr-00654",
+    "pr-00670",
+    "pr-00674",
+    "pr-00675",
+    "pr-00680",
+    "pr-00694",
+    "pr-00705",
+    "pr-00706",
+    "pr-00746",
+    "pr-00760",
+    "pr-00761",
+    "pr-00770"
+   ],
+   "n_vgroups": 17,
+   "provenance": {
+    "wave-introduced": 25,
+    "fix-induced": 8,
+    "pre-existing": 3
+   },
+   "hm": 4
+  },
+  "test-gap": {
+   "n": 15,
+   "sev": {
+    "INFO": 4,
+    "LOW": 4,
+    "MED": 7
+   },
+   "vgroups": [
+    "pr-00670",
+    "pr-00674",
+    "pr-00705",
+    "pr-00746",
+    "pr-00760",
+    "pr-00761",
+    "pr-00770"
+   ],
+   "n_vgroups": 7,
+   "provenance": {
+    "wave-introduced": 11,
+    "fix-induced": 3,
+    "pre-existing": 1
+   },
+   "hm": 7
+  },
+  "test-vacuous": {
+   "n": 14,
+   "sev": {
+    "MED": 2,
+    "LOW": 6,
+    "INFO": 6
+   },
+   "vgroups": [
+    "pr-00655",
+    "pr-00670",
+    "pr-00698",
+    "pr-00705",
+    "pr-00760",
+    "pr-00761",
+    "pr-00770"
+   ],
+   "n_vgroups": 7,
+   "provenance": {
+    "wave-introduced": 12,
+    "fix-induced": 2
+   },
+   "hm": 2
+  },
+  "sibling-sweep": {
+   "n": 11,
+   "sev": {
+    "INFO": 3,
+    "LOW": 7,
+    "MED": 1
+   },
+   "vgroups": [
+    "pr-00617",
+    "pr-00633",
+    "pr-00640",
+    "pr-00655",
+    "pr-00670",
+    "pr-00706",
+    "pr-00746",
+    "pr-00760",
+    "pr-00761"
+   ],
+   "n_vgroups": 9,
+   "provenance": {
+    "wave-introduced": 4,
+    "pre-existing": 7
+   },
+   "hm": 1
+  },
+  "shell-semantics": {
+   "n": 7,
+   "sev": {
+    "INFO": 4,
+    "MED": 1,
+    "LOW": 2
+   },
+   "vgroups": [
+    "pr-00655",
+    "pr-00670",
+    "pr-00674",
+    "pr-00761"
+   ],
+   "n_vgroups": 4,
+   "provenance": {
+    "pre-existing": 3,
+    "fix-induced": 1,
+    "wave-introduced": 3
+   },
+   "hm": 1
+  },
+  "silent-failure": {
+   "n": 7,
+   "sev": {
+    "LOW": 4,
+    "MED": 2,
+    "INFO": 1
+   },
+   "vgroups": [
+    "pr-00674",
+    "pr-00705",
+    "pr-00724",
+    "pr-00760",
+    "pr-00761"
+   ],
+   "n_vgroups": 5,
+   "provenance": {
+    "wave-introduced": 6,
+    "fix-induced": 1
+   },
+   "hm": 2
+  },
+  "process": {
+   "n": 7,
+   "sev": {
+    "LOW": 3,
+    "INFO": 4
+   },
+   "vgroups": [
+    "pr-00694",
+    "pr-00705"
+   ],
+   "n_vgroups": 2,
+   "provenance": {
+    "pre-existing": 3,
+    "wave-introduced": 4
+   },
+   "hm": 0
+  },
+  "ux-output": {
+   "n": 5,
+   "sev": {
+    "INFO": 3,
+    "MED": 1,
+    "LOW": 1
+   },
+   "vgroups": [
+    "pr-00633",
+    "pr-00670"
+   ],
+   "n_vgroups": 2,
+   "provenance": {
+    "pre-existing": 4,
+    "fix-induced": 1
+   },
+   "hm": 1
+  },
+  "other": {
+   "n": 5,
+   "sev": {
+    "INFO": 5
+   },
+   "vgroups": [
+    "pr-00674",
+    "pr-00705",
+    "pr-00746",
+    "pr-00761"
+   ],
+   "n_vgroups": 4,
+   "provenance": {
+    "fix-induced": 2,
+    "wave-introduced": 3
+   },
+   "hm": 0
+  },
+  "perm-model": {
+   "n": 3,
+   "sev": {
+    "INFO": 3
+   },
+   "vgroups": [
+    "pr-00633",
+    "pr-00670",
+    "pr-00761"
+   ],
+   "n_vgroups": 3,
+   "provenance": {
+    "pre-existing": 3
+   },
+   "hm": 0
+  },
+  "docs-policy": {
+   "n": 3,
+   "sev": {
+    "INFO": 2,
+    "MED": 1
+   },
+   "vgroups": [
+    "pr-00670",
+    "pr-00694",
+    "pr-00761"
+   ],
+   "n_vgroups": 3,
+   "provenance": {
+    "pre-existing": 3
+   },
+   "hm": 1
+  },
+  "fix-regression": {
+   "n": 3,
+   "sev": {
+    "MED": 2,
+    "LOW": 1
+   },
+   "vgroups": [
+    "pr-00761"
+   ],
+   "n_vgroups": 1,
+   "provenance": {
+    "wave-introduced": 2,
+    "fix-induced": 1
+   },
+   "hm": 2
+  },
+  "race-toctou": {
+   "n": 2,
+   "sev": {
+    "MED": 2
+   },
+   "vgroups": [
+    "pr-00761"
+   ],
+   "n_vgroups": 1,
+   "provenance": {
+    "wave-introduced": 1,
+    "pre-existing": 1
+   },
+   "hm": 2
+  },
+  "hardcoded-env": {
+   "n": 1,
+   "sev": {
+    "INFO": 1
+   },
+   "vgroups": [
+    "pr-00760"
+   ],
+   "n_vgroups": 1,
+   "provenance": {
+    "pre-existing": 1
+   },
+   "hm": 0
+  }
+ },
+ "class_x_vgroup": {
+  "claim-drift": {
+   "pr-00617": 1,
+   "pr-00622": 1,
+   "pr-00625": 0,
+   "pr-00633": 3,
+   "pr-00634": 1,
+   "pr-00640": 2,
+   "pr-00654": 3,
+   "pr-00655": 0,
+   "pr-00670": 1,
+   "pr-00674": 1,
+   "pr-00675": 1,
+   "pr-00680": 1,
+   "pr-00694": 2,
+   "pr-00698": 0,
+   "pr-00705": 9,
+   "pr-00706": 2,
+   "pr-00724": 0,
+   "pr-00746": 1,
+   "pr-00760": 1,
+   "pr-00761": 5,
+   "pr-00770": 1
+  },
+  "sibling-sweep": {
+   "pr-00617": 1,
+   "pr-00622": 0,
+   "pr-00625": 0,
+   "pr-00633": 1,
+   "pr-00634": 0,
+   "pr-00640": 1,
+   "pr-00654": 0,
+   "pr-00655": 1,
+   "pr-00670": 1,
+   "pr-00674": 0,
+   "pr-00675": 0,
+   "pr-00680": 0,
+   "pr-00694": 0,
+   "pr-00698": 0,
+   "pr-00705": 0,
+   "pr-00706": 1,
+   "pr-00724": 0,
+   "pr-00746": 1,
+   "pr-00760": 2,
+   "pr-00761": 2,
+   "pr-00770": 0
+  },
+  "ux-output": {
+   "pr-00617": 0,
+   "pr-00622": 0,
+   "pr-00625": 0,
+   "pr-00633": 1,
+   "pr-00634": 0,
+   "pr-00640": 0,
+   "pr-00654": 0,
+   "pr-00655": 0,
+   "pr-00670": 4,
+   "pr-00674": 0,
+   "pr-00675": 0,
+   "pr-00680": 0,
+   "pr-00694": 0,
+   "pr-00698": 0,
+   "pr-00705": 0,
+   "pr-00706": 0,
+   "pr-00724": 0,
+   "pr-00746": 0,
+   "pr-00760": 0,
+   "pr-00761": 0,
+   "pr-00770": 0
+  },
+  "perm-model": {
+   "pr-00617": 0,
+   "pr-00622": 0,
+   "pr-00625": 0,
+   "pr-00633": 1,
+   "pr-00634": 0,
+   "pr-00640": 0,
+   "pr-00654": 0,
+   "pr-00655": 0,
+   "pr-00670": 1,
+   "pr-00674": 0,
+   "pr-00675": 0,
+   "pr-00680": 0,
+   "pr-00694": 0,
+   "pr-00698": 0,
+   "pr-00705": 0,
+   "pr-00706": 0,
+   "pr-00724": 0,
+   "pr-00746": 0,
+   "pr-00760": 0,
+   "pr-00761": 1,
+   "pr-00770": 0
+  },
+  "test-vacuous": {
+   "pr-00617": 0,
+   "pr-00622": 0,
+   "pr-00625": 0,
+   "pr-00633": 0,
+   "pr-00634": 0,
+   "pr-00640": 0,
+   "pr-00654": 0,
+   "pr-00655": 1,
+   "pr-00670": 2,
+   "pr-00674": 0,
+   "pr-00675": 0,
+   "pr-00680": 0,
+   "pr-00694": 0,
+   "pr-00698": 2,
+   "pr-00705": 6,
+   "pr-00706": 0,
+   "pr-00724": 0,
+   "pr-00746": 0,
+   "pr-00760": 1,
+   "pr-00761": 1,
+   "pr-00770": 1
+  },
+  "shell-semantics": {
+   "pr-00617": 0,
+   "pr-00622": 0,
+   "pr-00625": 0,
+   "pr-00633": 0,
+   "pr-00634": 0,
+   "pr-00640": 0,
+   "pr-00654": 0,
+   "pr-00655": 1,
+   "pr-00670": 2,
+   "pr-00674": 1,
+   "pr-00675": 0,
+   "pr-00680": 0,
+   "pr-00694": 0,
+   "pr-00698": 0,
+   "pr-00705": 0,
+   "pr-00706": 0,
+   "pr-00724": 0,
+   "pr-00746": 0,
+   "pr-00760": 0,
+   "pr-00761": 3,
+   "pr-00770": 0
+  },
+  "test-gap": {
+   "pr-00617": 0,
+   "pr-00622": 0,
+   "pr-00625": 0,
+   "pr-00633": 0,
+   "pr-00634": 0,
+   "pr-00640": 0,
+   "pr-00654": 0,
+   "pr-00655": 0,
+   "pr-00670": 1,
+   "pr-00674": 1,
+   "pr-00675": 0,
+   "pr-00680": 0,
+   "pr-00694": 0,
+   "pr-00698": 0,
+   "pr-00705": 2,
+   "pr-00706": 0,
+   "pr-00724": 0,
+   "pr-00746": 1,
+   "pr-00760": 1,
+   "pr-00761": 8,
+   "pr-00770": 1
+  },
+  "docs-policy": {
+   "pr-00617": 0,
+   "pr-00622": 0,
+   "pr-00625": 0,
+   "pr-00633": 0,
+   "pr-00634": 0,
+   "pr-00640": 0,
+   "pr-00654": 0,
+   "pr-00655": 0,
+   "pr-00670": 1,
+   "pr-00674": 0,
+   "pr-00675": 0,
+   "pr-00680": 0,
+   "pr-00694": 1,
+   "pr-00698": 0,
+   "pr-00705": 0,
+   "pr-00706": 0,
+   "pr-00724": 0,
+   "pr-00746": 0,
+   "pr-00760": 0,
+   "pr-00761": 1,
+   "pr-00770": 0
+  },
+  "silent-failure": {
+   "pr-00617": 0,
+   "pr-00622": 0,
+   "pr-00625": 0,
+   "pr-00633": 0,
+   "pr-00634": 0,
+   "pr-00640": 0,
+   "pr-00654": 0,
+   "pr-00655": 0,
+   "pr-00670": 0,
+   "pr-00674": 2,
+   "pr-00675": 0,
+   "pr-00680": 0,
+   "pr-00694": 0,
+   "pr-00698": 0,
+   "pr-00705": 2,
+   "pr-00706": 0,
+   "pr-00724": 1,
+   "pr-00746": 0,
+   "pr-00760": 1,
+   "pr-00761": 1,
+   "pr-00770": 0
+  },
+  "other": {
+   "pr-00617": 0,
+   "pr-00622": 0,
+   "pr-00625": 0,
+   "pr-00633": 0,
+   "pr-00634": 0,
+   "pr-00640": 0,
+   "pr-00654": 0,
+   "pr-00655": 0,
+   "pr-00670": 0,
+   "pr-00674": 1,
+   "pr-00675": 0,
+   "pr-00680": 0,
+   "pr-00694": 0,
+   "pr-00698": 0,
+   "pr-00705": 2,
+   "pr-00706": 0,
+   "pr-00724": 0,
+   "pr-00746": 1,
+   "pr-00760": 0,
+   "pr-00761": 1,
+   "pr-00770": 0
+  },
+  "process": {
+   "pr-00617": 0,
+   "pr-00622": 0,
+   "pr-00625": 0,
+   "pr-00633": 0,
+   "pr-00634": 0,
+   "pr-00640": 0,
+   "pr-00654": 0,
+   "pr-00655": 0,
+   "pr-00670": 0,
+   "pr-00674": 0,
+   "pr-00675": 0,
+   "pr-00680": 0,
+   "pr-00694": 2,
+   "pr-00698": 0,
+   "pr-00705": 5,
+   "pr-00706": 0,
+   "pr-00724": 0,
+   "pr-00746": 0,
+   "pr-00760": 0,
+   "pr-00761": 0,
+   "pr-00770": 0
+  },
+  "hardcoded-env": {
+   "pr-00617": 0,
+   "pr-00622": 0,
+   "pr-00625": 0,
+   "pr-00633": 0,
+   "pr-00634": 0,
+   "pr-00640": 0,
+   "pr-00654": 0,
+   "pr-00655": 0,
+   "pr-00670": 0,
+   "pr-00674": 0,
+   "pr-00675": 0,
+   "pr-00680": 0,
+   "pr-00694": 0,
+   "pr-00698": 0,
+   "pr-00705": 0,
+   "pr-00706": 0,
+   "pr-00724": 0,
+   "pr-00746": 0,
+   "pr-00760": 1,
+   "pr-00761": 0,
+   "pr-00770": 0
+  },
+  "fix-regression": {
+   "pr-00617": 0,
+   "pr-00622": 0,
+   "pr-00625": 0,
+   "pr-00633": 0,
+   "pr-00634": 0,
+   "pr-00640": 0,
+   "pr-00654": 0,
+   "pr-00655": 0,
+   "pr-00670": 0,
+   "pr-00674": 0,
+   "pr-00675": 0,
+   "pr-00680": 0,
+   "pr-00694": 0,
+   "pr-00698": 0,
+   "pr-00705": 0,
+   "pr-00706": 0,
+   "pr-00724": 0,
+   "pr-00746": 0,
+   "pr-00760": 0,
+   "pr-00761": 3,
+   "pr-00770": 0
+  },
+  "race-toctou": {
+   "pr-00617": 0,
+   "pr-00622": 0,
+   "pr-00625": 0,
+   "pr-00633": 0,
+   "pr-00634": 0,
+   "pr-00640": 0,
+   "pr-00654": 0,
+   "pr-00655": 0,
+   "pr-00670": 0,
+   "pr-00674": 0,
+   "pr-00675": 0,
+   "pr-00680": 0,
+   "pr-00694": 0,
+   "pr-00698": 0,
+   "pr-00705": 0,
+   "pr-00706": 0,
+   "pr-00724": 0,
+   "pr-00746": 0,
+   "pr-00760": 0,
+   "pr-00761": 2,
+   "pr-00770": 0
+  }
+ },
+ "vgroup_order": [
+  "pr-00617",
+  "pr-00622",
+  "pr-00625",
+  "pr-00633",
+  "pr-00634",
+  "pr-00640",
+  "pr-00654",
+  "pr-00655",
+  "pr-00670",
+  "pr-00674",
+  "pr-00675",
+  "pr-00680",
+  "pr-00694",
+  "pr-00698",
+  "pr-00705",
+  "pr-00706",
+  "pr-00724",
+  "pr-00746",
+  "pr-00760",
+  "pr-00761",
+  "pr-00770"
+ ],
+ "per_vgroup": {
+  "pr-00617": {
+   "snapshots": 1,
+   "stop_met": 0,
+   "stop_not_met": 0,
+   "scopes": {
+    "wave": 1
+   },
+   "dates": "2026-11-18",
+   "severity": {
+    "LOW": 1,
+    "INFO": 1
+   }
+  },
+  "pr-00622": {
+   "snapshots": 1,
+   "stop_met": 0,
+   "stop_not_met": 0,
+   "scopes": {
+    "wave": 1
+   },
+   "dates": "2026-11-18",
+   "severity": {
+    "LOW": 1
+   }
+  },
+  "pr-00625": {
+   "snapshots": 1,
+   "stop_met": 1,
+   "stop_not_met": 0,
+   "scopes": {
+    "wave": 1
+   },
+   "dates": "2026-11-18",
+   "severity": {}
+  },
+  "pr-00633": {
+   "snapshots": 1,
+   "stop_met": 1,
+   "stop_not_met": 0,
+   "scopes": {
+    "other": 1
+   },
+   "dates": "2026-11-18",
+   "severity": {
+    "LOW": 3,
+    "INFO": 3
+   }
+  },
+  "pr-00634": {
+   "snapshots": 1,
+   "stop_met": 0,
+   "stop_not_met": 0,
+   "scopes": {
+    "wave": 1
+   },
+   "dates": "2026-11-18",
+   "severity": {
+    "LOW": 1
+   }
+  },
+  "pr-00640": {
+   "snapshots": 1,
+   "stop_met": 0,
+   "stop_not_met": 0,
+   "scopes": {
+    "wave": 1
+   },
+   "dates": "2026-11-18",
+   "severity": {
+    "MED": 2,
+    "LOW": 1
+   }
+  },
+  "pr-00654": {
+   "snapshots": 1,
+   "stop_met": 0,
+   "stop_not_met": 0,
+   "scopes": {
+    "wave": 1
+   },
+   "dates": "2026-11-18",
+   "severity": {
+    "LOW": 2,
+    "INFO": 1
+   }
+  },
+  "pr-00655": {
+   "snapshots": 1,
+   "stop_met": 0,
+   "stop_not_met": 1,
+   "scopes": {
+    "wave": 1
+   },
+   "dates": "2026-11-19",
+   "severity": {
+    "MED": 1,
+    "LOW": 1,
+    "INFO": 1
+   }
+  },
+  "pr-00670": {
+   "snapshots": 1,
+   "stop_met": 1,
+   "stop_not_met": 0,
+   "scopes": {
+    "other": 1
+   },
+   "dates": "2026-11-19",
+   "severity": {
+    "MED": 3,
+    "LOW": 5,
+    "INFO": 5
+   }
+  },
+  "pr-00674": {
+   "snapshots": 2,
+   "stop_met": 1,
+   "stop_not_met": 0,
+   "scopes": {
+    "wave": 2
+   },
+   "dates": "2026-11-19",
+   "severity": {
+    "LOW": 4,
+    "INFO": 2
+   }
+  },
+  "pr-00675": {
+   "snapshots": 1,
+   "stop_met": 0,
+   "stop_not_met": 0,
+   "scopes": {
+    "wave": 1
+   },
+   "dates": "2026-11-19",
+   "severity": {
+    "INFO": 1
+   }
+  },
+  "pr-00680": {
+   "snapshots": 1,
+   "stop_met": 1,
+   "stop_not_met": 0,
+   "scopes": {
+    "wave": 1
+   },
+   "dates": "2026-11-19",
+   "severity": {
+    "LOW": 1
+   }
+  },
+  "pr-00694": {
+   "snapshots": 1,
+   "stop_met": 1,
+   "stop_not_met": 0,
+   "scopes": {
+    "other": 1
+   },
+   "dates": "2026-11-20",
+   "severity": {
+    "MED": 1,
+    "LOW": 3,
+    "INFO": 1
+   }
+  },
+  "pr-00698": {
+   "snapshots": 1,
+   "stop_met": 1,
+   "stop_not_met": 0,
+   "scopes": {
+    "wave": 1
+   },
+   "dates": "2026-11-20",
+   "severity": {
+    "LOW": 1,
+    "INFO": 1
+   }
+  },
+  "pr-00705": {
+   "snapshots": 2,
+   "stop_met": 1,
+   "stop_not_met": 0,
+   "scopes": {
+    "wave": 1,
+    "other": 1
+   },
+   "dates": "2026-11-20",
+   "severity": {
+    "MED": 6,
+    "LOW": 11,
+    "INFO": 9
+   }
+  },
+  "pr-00706": {
+   "snapshots": 1,
+   "stop_met": 0,
+   "stop_not_met": 1,
+   "scopes": {
+    "wave": 1
+   },
+   "dates": "2026-11-20",
+   "severity": {
+    "MED": 1,
+    "LOW": 2
+   }
+  },
+  "pr-00724": {
+   "snapshots": 1,
+   "stop_met": 1,
+   "stop_not_met": 0,
+   "scopes": {
+    "wave": 1
+   },
+   "dates": "2026-11-21",
+   "severity": {
+    "INFO": 1
+   }
+  },
+  "pr-00746": {
+   "snapshots": 1,
+   "stop_met": 1,
+   "stop_not_met": 0,
+   "scopes": {
+    "wave": 1
+   },
+   "dates": "2026-11-22",
+   "severity": {
+    "LOW": 2,
+    "INFO": 2
+   }
+  },
+  "pr-00760": {
+   "snapshots": 2,
+   "stop_met": 0,
+   "stop_not_met": 0,
+   "scopes": {
+    "wave": 2
+   },
+   "dates": "2026-11-23",
+   "severity": {
+    "MED": 1,
+    "LOW": 3,
+    "INFO": 3
+   }
+  },
+  "pr-00761": {
+   "snapshots": 2,
+   "stop_met": 1,
+   "stop_not_met": 1,
+   "scopes": {
+    "wave": 1,
+    "other": 1
+   },
+   "dates": "2026-11-23",
+   "severity": {
+    "MED": 8,
+    "LOW": 10,
+    "INFO": 10
+   }
+  },
+  "pr-00770": {
+   "snapshots": 1,
+   "stop_met": 1,
+   "stop_not_met": 0,
+   "scopes": {
+    "wave": 1
+   },
+   "dates": "2026-11-23",
+   "severity": {
+    "INFO": 2,
+    "LOW": 1
+   }
+  }
+ },
+ "areas": {
+  "sh-lib": 38,
+  "tests-unit": 26,
+  "docs": 24,
+  "internal": 16,
+  "multiple": 6,
+  "bin-wrappers": 4,
+  "tests-e2e": 2,
+  "py": 1,
+  "update.sh": 1,
+  "other": 1
+ },
+ "crossref_edges": [
+  {
+   "from": "pr-00640a Q1",
+   "from_group": "pr-00640",
+   "to_group": "pr-00634",
+   "ref": "pr-00634 a A1"
+  },
+  {
+   "from": "pr-00670z a-I1",
+   "from_group": "pr-00670",
+   "to_group": "pr-00670",
+   "ref": "pr-00670 a M2"
+  },
+  {
+   "from": "pr-00670z b-D2",
+   "from_group": "pr-00670",
+   "to_group": "pr-00670",
+   "ref": "pr-00670 a M2"
+  },
+  {
+   "from": "pr-00674d F1",
+   "from_group": "pr-00674",
+   "to_group": "pr-00674",
+   "ref": "pr-00674 c E1"
+  },
+  {
+   "from": "pr-00674d F2",
+   "from_group": "pr-00674",
+   "to_group": "pr-00674",
+   "ref": "pr-00674 c E4"
+  },
+  {
+   "from": "pr-00675b B1",
+   "from_group": "pr-00675",
+   "to_group": "pr-00675",
+   "ref": "pr-00675 a Q6"
+  },
+  {
+   "from": "pr-00680c cC1",
+   "from_group": "pr-00680",
+   "to_group": "pr-00680",
+   "ref": "pr-00680 b B2"
+  },
+  {
+   "from": "pr-00706b B1",
+   "from_group": "pr-00706",
+   "to_group": "pr-00706",
+   "ref": "pr-00706 a S1"
+  },
+  {
+   "from": "pr-00706b B3",
+   "from_group": "pr-00706",
+   "to_group": "pr-00706",
+   "ref": "pr-00706 a Q1"
+  },
+  {
+   "from": "pr-00724c A1",
+   "from_group": "pr-00724",
+   "to_group": "pr-00724",
+   "ref": "pr-00724 a A1"
+  },
+  {
+   "from": "pr-00760b D1",
+   "from_group": "pr-00760",
+   "to_group": "pr-00760",
+   "ref": "pr-00760 a C3"
+  },
+  {
+   "from": "pr-00761a C2",
+   "from_group": "pr-00761",
+   "to_group": "pr-00211",
+   "ref": "pr-00211 a F1"
+  },
+  {
+   "from": "pr-00761z a-C2",
+   "from_group": "pr-00761",
+   "to_group": "pr-00211",
+   "ref": "pr-00211 a F1"
+  },
+  {
+   "from": "pr-00761z a-C2",
+   "from_group": "pr-00761",
+   "to_group": "pr-00421",
+   "ref": "pr-00421"
+  },
+  {
+   "from": "pr-00761z b-B1",
+   "from_group": "pr-00761",
+   "to_group": "pr-00761",
+   "ref": "pr-00761 a C6"
+  },
+  {
+   "from": "pr-00761z b-B2",
+   "from_group": "pr-00761",
+   "to_group": "pr-00761",
+   "ref": "pr-00761 a C6"
+  },
+  {
+   "from": "pr-00761z c-C1",
+   "from_group": "pr-00761",
+   "to_group": "pr-00761",
+   "ref": "pr-00761 a C6"
+  }
+ ],
+ "crossref_by_target": {
+  "pr-00634": 1,
+  "pr-00670": 2,
+  "pr-00674": 2,
+  "pr-00675": 1,
+  "pr-00680": 1,
+  "pr-00706": 2,
+  "pr-00724": 1,
+  "pr-00760": 1,
+  "pr-00211": 2,
+  "pr-00421": 1,
+  "pr-00761": 3
+ },
+ "issue_refs": {
+  "#616": 1,
+  "#612": 1,
+  "#632": 1,
+  "#637": 1,
+  "#650": 1,
+  "#645": 1,
+  "#647": 1,
+  "#693": 1,
+  "#686": 11,
+  "#678": 2,
+  "#687": 2,
+  "#483": 4,
+  "#472": 2,
+  "#690": 2,
+  "#759": 4,
+  "#758": 1
+ },
+ "crossref_backward": [
+  {
+   "from": "pr-00640a Q1",
+   "from_group": "pr-00640",
+   "to_group": "pr-00634",
+   "ref": "pr-00634 a A1"
+  },
+  {
+   "from": "pr-00761a C2",
+   "from_group": "pr-00761",
+   "to_group": "pr-00211",
+   "ref": "pr-00211 a F1"
+  },
+  {
+   "from": "pr-00761z a-C2",
+   "from_group": "pr-00761",
+   "to_group": "pr-00211",
+   "ref": "pr-00211 a F1"
+  },
+  {
+   "from": "pr-00761z a-C2",
+   "from_group": "pr-00761",
+   "to_group": "pr-00421",
+   "ref": "pr-00421"
+  }
+ ],
+ "reviewer_groups": {
+  "GLM-5.3-Flash": {
+   "snapshots": 21,
+   "findings": 82,
+   "retracted": 4,
+   "rejected": 0,
+   "downgraded": 0
+  },
+  "other/unknown": {
+   "snapshots": 4,
+   "findings": 42,
+   "retracted": 1,
+   "rejected": 0,
+   "downgraded": 0
+  }
+ },
+ "resolution_summary": [],
+ "trend": [
+  {
+   "stem": "pr-00617a",
+   "date": "2026-11-18",
+   "scope": "wave",
+   "n": 2,
+   "hm": 0,
+   "stop": "n/a"
+  },
+  {
+   "stem": "pr-00622a",
+   "date": "2026-11-18",
+   "scope": "wave",
+   "n": 1,
+   "hm": 0,
+   "stop": "n/a"
+  },
+  {
+   "stem": "pr-00625a",
+   "date": "2026-11-18",
+   "scope": "wave",
+   "n": 0,
+   "hm": 0,
+   "stop": "met"
+  },
+  {
+   "stem": "pr-00633z",
+   "date": "2026-11-18",
+   "scope": "other",
+   "n": 6,
+   "hm": 0,
+   "stop": "met"
+  },
+  {
+   "stem": "pr-00634a",
+   "date": "2026-11-18",
+   "scope": "wave",
+   "n": 1,
+   "hm": 0,
+   "stop": "n/a"
+  },
+  {
+   "stem": "pr-00640a",
+   "date": "2026-11-18",
+   "scope": "wave",
+   "n": 3,
+   "hm": 2,
+   "stop": "n/a"
+  },
+  {
+   "stem": "pr-00654a",
+   "date": "2026-11-18",
+   "scope": "wave",
+   "n": 3,
+   "hm": 0,
+   "stop": "n/a"
+  },
+  {
+   "stem": "pr-00655e",
+   "date": "2026-11-19",
+   "scope": "wave",
+   "n": 3,
+   "hm": 1,
+   "stop": "not_met"
+  },
+  {
+   "stem": "pr-00670z",
+   "date": "2026-11-19",
+   "scope": "other",
+   "n": 13,
+   "hm": 3,
+   "stop": "met"
+  },
+  {
+   "stem": "pr-00674b",
+   "date": "2026-11-19",
+   "scope": "wave",
+   "n": 4,
+   "hm": 0,
+   "stop": "n/a"
+  },
+  {
+   "stem": "pr-00674d",
+   "date": "2026-11-19",
+   "scope": "wave",
+   "n": 2,
+   "hm": 0,
+   "stop": "met"
+  },
+  {
+   "stem": "pr-00675b",
+   "date": "2026-11-19",
+   "scope": "wave",
+   "n": 1,
+   "hm": 0,
+   "stop": "n/a"
+  },
+  {
+   "stem": "pr-00680c",
+   "date": "2026-11-19",
+   "scope": "wave",
+   "n": 1,
+   "hm": 0,
+   "stop": "met"
+  },
+  {
+   "stem": "pr-00694z",
+   "date": "2026-11-20",
+   "scope": "other",
+   "n": 5,
+   "hm": 1,
+   "stop": "met"
+  },
+  {
+   "stem": "pr-00698c",
+   "date": "2026-11-20",
+   "scope": "wave",
+   "n": 2,
+   "hm": 0,
+   "stop": "met"
+  },
+  {
+   "stem": "pr-00705a",
+   "date": "2026-11-20",
+   "scope": "wave",
+   "n": 12,
+   "hm": 3,
+   "stop": "n/a"
+  },
+  {
+   "stem": "pr-00705z",
+   "date": "2026-11-20",
+   "scope": "other",
+   "n": 14,
+   "hm": 3,
+   "stop": "met"
+  },
+  {
+   "stem": "pr-00706b",
+   "date": "2026-11-20",
+   "scope": "wave",
+   "n": 3,
+   "hm": 1,
+   "stop": "not_met"
+  },
+  {
+   "stem": "pr-00724c",
+   "date": "2026-11-21",
+   "scope": "wave",
+   "n": 1,
+   "hm": 0,
+   "stop": "met"
+  },
+  {
+   "stem": "pr-00746c",
+   "date": "2026-11-22",
+   "scope": "wave",
+   "n": 4,
+   "hm": 0,
+   "stop": "met"
+  },
+  {
+   "stem": "pr-00760a",
+   "date": "2026-11-23",
+   "scope": "wave",
+   "n": 5,
+   "hm": 1,
+   "stop": "n/a"
+  },
+  {
+   "stem": "pr-00760b",
+   "date": "2026-11-23",
+   "scope": "wave",
+   "n": 2,
+   "hm": 0,
+   "stop": "n/a"
+  },
+  {
+   "stem": "pr-00761a",
+   "date": "2026-11-23",
+   "scope": "wave",
+   "n": 11,
+   "hm": 4,
+   "stop": "not_met"
+  },
+  {
+   "stem": "pr-00761z",
+   "date": "2026-11-23",
+   "scope": "other",
+   "n": 17,
+   "hm": 4,
+   "stop": "met"
+  },
+  {
+   "stem": "pr-00770c",
+   "date": "2026-11-23",
+   "scope": "wave",
+   "n": 3,
+   "hm": 0,
+   "stop": "met"
+  }
+ ]
+}
