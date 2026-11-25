@@ -915,7 +915,7 @@ else
 fi
 # rm -rf census (#571): the move-mode source removal carries the `:?`
 # empty-variable guard — a deliberate strengthening of the shipped-code
-# standard in agent/conventions.md "Test sandbox" item 3 (the rm suffix
+# standard in tests/AGENTS.md "Test sandbox" item 3 (the rm suffix
 # guard: :? for literal-suffix operands, pure variables exempt).
 # Unreachable through the helper's own contract (the [ -d ] gate
 # returns first on an empty path), pure defense against future

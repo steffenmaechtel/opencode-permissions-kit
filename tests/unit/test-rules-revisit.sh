@@ -523,8 +523,9 @@ fi
 #      line pairs with nothing, invariant 9 stays silent)
 GSCRATCH=$WORK/green$$
 mkdir -p "$GSCRATCH/scripts" "$GSCRATCH/agent" "$GSCRATCH/internal/records" \
-    "$GSCRATCH/internal/rules-meta"
+    "$GSCRATCH/internal/rules-meta" "$GSCRATCH/tests"
 cp "$REPO_ROOT/scripts/gen-rules-index.py" "$GSCRATCH/scripts/"
+: >"$GSCRATCH/tests/AGENTS.md"
 cat >"$GSCRATCH/agent/conventions.md" <<'EOF'
 # Conventions
 
@@ -730,8 +731,9 @@ fi
 #      and the audit blocks the malformed line (inv 9).
 BSCRATCH=$WORK/bare$$
 mkdir -p "$BSCRATCH/scripts" "$BSCRATCH/agent" "$BSCRATCH/internal/records" \
-    "$BSCRATCH/internal/rules-meta"
+    "$BSCRATCH/internal/rules-meta" "$BSCRATCH/tests"
 cp "$REPO_ROOT/scripts/gen-rules-index.py" "$BSCRATCH/scripts/"
+: >"$BSCRATCH/tests/AGENTS.md"
 cat >"$BSCRATCH/agent/conventions.md" <<'EOF'
 # Conventions
 
@@ -792,8 +794,9 @@ fi
 #      the bare date and stays approved everywhere.
 QSCRATCH=$WORK/quoted$$
 mkdir -p "$QSCRATCH/scripts" "$QSCRATCH/agent" "$QSCRATCH/internal/records" \
-    "$QSCRATCH/internal/rules-meta"
+    "$QSCRATCH/internal/rules-meta" "$QSCRATCH/tests"
 cp "$REPO_ROOT/scripts/gen-rules-index.py" "$QSCRATCH/scripts/"
+: >"$QSCRATCH/tests/AGENTS.md"
 cat >"$QSCRATCH/agent/conventions.md" <<'EOF'
 # Conventions
 
@@ -974,8 +977,9 @@ fi
 #      queue; a never-approved meta lists unmarked.
 ASCRATCH=$WORK/amended$$
 mkdir -p "$ASCRATCH/scripts" "$ASCRATCH/agent" "$ASCRATCH/internal/records" \
-    "$ASCRATCH/internal/rules-meta"
+    "$ASCRATCH/internal/rules-meta" "$ASCRATCH/tests"
 cp "$REPO_ROOT/scripts/gen-rules-index.py" "$ASCRATCH/scripts/"
+: >"$ASCRATCH/tests/AGENTS.md"
 cat >"$ASCRATCH/agent/conventions.md" <<'EOF'
 # Conventions
 

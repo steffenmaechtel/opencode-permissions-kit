@@ -1193,7 +1193,7 @@ rm -f "$W23PROBE"
 # --- 11b. python3 absent entirely (restricted PATH, no shim) ---------------------------
 # "missing" and "broken" are different probe outcomes: a PATH without
 # any python3 must take the same bare fallback. Controlled PATH per the
-# sandbox rules (conventions "Test sandbox"): symlinks to the few
+# sandbox rules (tests/AGENTS.md "Test sandbox"): symlinks to the few
 # externals the baseline needs, python3 deliberately absent.
 W23NP="$WORK/issue223-nopy"
 W23NPBIN="$WORK/issue223-nopy-bin"

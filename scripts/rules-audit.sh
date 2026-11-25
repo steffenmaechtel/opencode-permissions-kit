@@ -101,12 +101,12 @@ fi
 TODAY=${FORCE_TODAY:-$(date +%F)}
 METAS=internal/rules-meta
 
-SCOPE_FILES="AGENTS.md agent/conventions.md agent/test-fidelity.md agent/review-concept.md agent/docs-loop.md internal/records/rules-meta.md"
+SCOPE_FILES="AGENTS.md agent/conventions.md agent/test-fidelity.md agent/review-concept.md agent/docs-loop.md internal/records/rules-meta.md tests/AGENTS.md"
 ACTIVE_SECTIONS="AGENTS.md#rules"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#interactive-prompts-yn"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#script-output-style"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#shell-security-untrusted-input"
-ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#test-sandbox-unit-suites"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS tests/AGENTS.md#test-sandbox-unit-suites"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#never-write-pins-unit-suites"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#referencing-review-findings"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#referencing-house-rules-rm-keys"

@@ -30,7 +30,7 @@ DOCTOR_ENTRY="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/do
 . "$SCRIPT_DIR/lib/harness.sh"
 WORK="$(work_new)"
 
-# Controlled PATH (agent/conventions.md, "Test sandbox (unit suites)"):
+# Controlled PATH (tests/AGENTS.md, "Test sandbox (unit suites)"):
 # a scratch bin with the called functions' externals only. Sourcing the
 # lib needs none (definitions only), python3/awk serve the called legs.
 # sh itself is resolved ONCE from the host PATH before the prefix --

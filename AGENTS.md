@@ -172,7 +172,8 @@ make e2e-rootless        # docker-rootless e2e (skips without systemd-in-contain
   only inside their own scratch and `/tmp`, `/var/tmp` — never in real
   project or system trees, not even in teardown. Enforced by
   `tests/unit/test-sandbox-policy.sh`; the rule lives in
-  `agent/conventions.md` ("Test sandbox (unit suites)").
+  `tests/AGENTS.md` ("Test sandbox (unit suites)" — auto-loads on
+  reads under `tests/`).
 - **gh auth:** where the context may lack gh auth (e2e containers, foreign
   hosts), probe `gh auth status` before gh-dependent steps; for read-only
   lookups, `curl` against api.github.com replaces failing gh calls.
