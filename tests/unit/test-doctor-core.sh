@@ -449,7 +449,7 @@ _ddr_reset() {
 }
 _out=$(_dgh_run || true)
 if printf '%s' "$_out" | grep -qF "$WORK/dgh/proj/.git -- sticky bit missing on the gitdir" &&
-    printf '%s' "$_out" | grep -qF "sudo opk update --refresh' / 'opk config projects refresh"; then
+    printf '%s' "$_out" | grep -qF "sudo opk update --refresh' / 'opk config refresh"; then
     pass "doctor git-heal: fresh clone renders the sticky-drift row (#653 W1)"
 else
     fail "doctor git-heal: sticky-drift row missing (#653 W1; out=$(printf '%s' "$_out" | grep -F 'heal drift' | head -2))"
@@ -474,7 +474,8 @@ _ddr_reset
 : >"$WORK/dgh/proj/.git/hooks/pre-commit"
 _out=$(_dgh_run || true)
 if printf '%s' "$_out" | grep -qF "1 non-sample entries in $WORK/dgh/proj/.git/hooks" &&
-    printf '%s' "$_out" | grep -qF "git-heal hooks are off -- inspect and remove manually"; then
+    printf '%s' "$_out" | grep -qF 'that git call uses .git/hooks;' &&
+    printf '%s' "$_out" | grep -qF 'survives the heal'; then
     pass "doctor git-heal: planted non-sample hook renders its row (#653 W1)"
 else
     fail "doctor git-heal: planted row missing (#653 W1; out=$(printf '%s' "$_out" | grep -F 'non-sample' | head -2))"
@@ -582,6 +583,23 @@ if printf '%s' "$_out" | grep -qF "$WORK/dgh/ptstor/ptproj.git -- sticky bit mis
     pass "doctor git-heal: a pointer project's drift rows name the resolved gitdir (#653 W1)"
 else
     fail "doctor git-heal: pointer drift rows (out=$(printf '%s' "$_out" | grep -F 'heal drift' | head -2)) (#653 W1)"
+fi
+# a B5: a hand-QUOTED DEFAULT_USER must not fire the owner drift row —
+# the extraction strips quotes like the DOCTOR_USER sibling idiom, and
+# the state leg heals with it (getent sees the stripped name, so the
+# state row is not "unknown"). The fixture is otherwise healed
+# (_ddr_reset: the getfacl arm above left the sticky stripped).
+printf 'DEFAULT_USER="%s"\nOPENCODE_USER=opencode-dgh-agent\n' "$(id -un)" \
+    >"$WORK/dgh/install.conf"
+_ddr_reset
+_out=$(_dgh_run || true)
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=opencode-dgh-agent\n' "$(id -un)" \
+    >"$WORK/dgh/install.conf"
+if ! printf '%s' "$_out" | grep -qE '\.git/(config|hooks) -- ' &&
+    ! printf '%s' "$_out" | grep -q "git-heal.*unknown"; then
+    pass "doctor git-heal: a quoted DEFAULT_USER compares stripped, state resolves (#785 a B5)"
+else
+    fail "doctor git-heal: quoted-conf arm (out=$(printf '%s' "$_out" | grep -E 'heal drift|git-heal' | head -3)) (#785 a B5)"
 fi
 
 # --- sweep floor: doctor-core's python3 sites run -I (#249) ------------------------

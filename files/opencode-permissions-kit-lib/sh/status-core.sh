@@ -568,10 +568,17 @@ status_section_git_heal() {
     # (the loop below is redirect-fed, but the discipline holds anyway):
     # a missing tool degrades the ACL leg to ONE counted warn row, never
     # a silently skipped check (the #165 class).
+    # Degrade row over a POPULATION only (#785 a A3): an empty-but-present
+    # projects.conf (or roots with no .git) leaves nothing the ACL leg
+    # could check — the doctor twin gates the same row on a gitdir
+    # existing (_dgh_skip); a getfacl-less host must not carry a
+    # permanent counted warn (status exit 2) for checks that never ran.
     _st_gh_acl=1
-    command -v getfacl >/dev/null 2>&1 || _st_gh_acl=0
-    [ "$_st_gh_acl" = 1 ] ||
-        ui_kv_warn "git-heal" "heal drift ACLs not checked — getfacl unavailable"
+    if [ -s "$_st_gh_list" ]; then
+        command -v getfacl >/dev/null 2>&1 || _st_gh_acl=0
+        [ "$_st_gh_acl" = 1 ] ||
+            ui_kv_warn "git-heal" "heal drift ACLs not checked — getfacl unavailable"
+    fi
     while IFS= read -r _st_gh_gd; do
         [ -n "$_st_gh_gd" ] || continue
         # Sticky: %A's last position, 't' OR 'T' — the shared-tree model's
@@ -583,7 +590,7 @@ status_section_git_heal() {
             *)
                 ui_kv_warn "heal drift" "$_st_gh_gd — sticky bit missing on the gitdir"
                 ui_detail "(a fresh clone or a partial heal; the baseline heal re-applies"
-                ui_detail "it — 'sudo opk update --refresh' / 'opk config projects refresh')"
+                ui_detail "it — 'sudo opk update --refresh' / 'opk config refresh')"
                 ;;
         esac
         for _st_gh_ent in config hooks; do
@@ -629,14 +636,18 @@ status_section_git_heal() {
         # twin): the heal pins metadata only — content planted before it
         # survives. Entries, not executables, matching the heal-scan
         # warn's semantics; the gate mirrors it (dir, not symlink).
+        # The count prints one TYPE line per entry (#785 a A1), never
+        # the name — a newline inside a planted entry's name cannot
+        # inflate it (the -print form counted one such file as 2).
         _st_gh_hk="$_st_gh_gd/hooks"
         if [ -d "$_st_gh_hk" ] && [ ! -L "$_st_gh_hk" ]; then
             _st_gh_ns=$(find "$_st_gh_hk" -mindepth 1 -maxdepth 1 \
-                ! -name '*.sample' -print 2>/dev/null | wc -l 2>/dev/null || printf '0')
+                ! -name '*.sample' -printf '%y\n' 2>/dev/null | wc -l 2>/dev/null || printf '0')
             if [ "${_st_gh_ns:-0}" -gt 0 ] 2>/dev/null; then
                 ui_kv_warn "planted" "$_st_gh_ns non-sample entries in $_st_gh_hk"
-                ui_detail "(planted hook content runs as the developer while the"
-                ui_detail "git-heal hooks are off — inspect and remove manually)"
+                ui_detail "(planted content survives the heal — it runs only if the"
+                ui_detail "entry is executable and that git call uses .git/hooks;"
+                ui_detail "inspect and remove manually)"
             fi
         fi
     done <"$_st_gh_list"

@@ -643,7 +643,11 @@ doctor_opk_dispatcher() {
 # twin row shares GH_GITCONFIG).
 doctor_git_heal() {
     _dgh_lib="${GH_LIBDIR:-/usr/local/lib/opencode-permissions-kit}"
-    _dgh_dev=$(sed -n 's/^DEFAULT_USER=//p' "$INSTALL_CONF" 2>/dev/null | tail -n 1)
+    # Quote-strip like the DOCTOR_USER extraction below (#785 a B5): a
+    # hand-quoted DEFAULT_USER would otherwise keep its quotes through
+    # the owner-leg compare and fire a drift row for every owner (and
+    # the state leg's getent lookup misses the name too).
+    _dgh_dev=$(sed -n 's/^DEFAULT_USER=//p' "$INSTALL_CONF" 2>/dev/null | tail -n 1 | sed 's/^"//;s/"$//')
     # Kit pieces: heal script + four hooks under the library.
     _dgh_ok=1
     [ -f "$_dgh_lib/git-heal/heal-index-head" ] || _dgh_ok=0
@@ -759,7 +763,7 @@ doctor_git_heal() {
             *)
                 ui_kv_warn "heal drift" "$_dgh_gd -- sticky bit missing on the gitdir"
                 ui_detail "(a fresh clone or a partial heal; the baseline heal re-applies"
-                ui_detail "it -- 'sudo opk update --refresh' / 'opk config projects refresh')"
+                ui_detail "it -- 'sudo opk update --refresh' / 'opk config refresh')"
                 ;;
         esac
         for _dgh_ent in config hooks; do
@@ -805,14 +809,18 @@ doctor_git_heal() {
         # twin): the heal pins metadata only -- content planted before
         # it survives. Entries, not executables, matching the heal-scan
         # warn's semantics; the gate mirrors it (dir, not symlink).
+        # The count prints one TYPE line per entry (#785 a A1), never
+        # the name -- a newline inside a planted entry's name cannot
+        # inflate it (the -print form counted one such file as 2).
         _dgh_hk="$_dgh_gd/hooks"
         if [ -d "$_dgh_hk" ] && [ ! -L "$_dgh_hk" ]; then
             _dgh_ns=$(find "$_dgh_hk" -mindepth 1 -maxdepth 1 \
-                ! -name '*.sample' -print 2>/dev/null | wc -l 2>/dev/null || printf '0')
+                ! -name '*.sample' -printf '%y\n' 2>/dev/null | wc -l 2>/dev/null || printf '0')
             if [ "${_dgh_ns:-0}" -gt 0 ] 2>/dev/null; then
                 ui_kv_warn "planted" "$_dgh_ns non-sample entries in $_dgh_hk"
-                ui_detail "(planted hook content runs as the developer while the"
-                ui_detail "git-heal hooks are off -- inspect and remove manually)"
+                ui_detail "(planted content survives the heal -- it runs only if the"
+                ui_detail "entry is executable and that git call uses .git/hooks;"
+                ui_detail "inspect and remove manually)"
             fi
         fi
         for _dgh_f in index HEAD ORIG_HEAD REBASE_HEAD packed-refs \

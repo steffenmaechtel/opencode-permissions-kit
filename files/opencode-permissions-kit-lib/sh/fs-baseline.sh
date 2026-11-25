@@ -697,8 +697,10 @@ _fsb_heal_pin() {
 _fsb_heal_hookwarn() {
     _fshw_gd=$1
     [ -d "$_fshw_gd/hooks" ] && [ ! -L "$_fshw_gd/hooks" ] || return 0
+    # One TYPE line per entry (#785 a A1 sweep, the status/doctor twins'
+    # class): a newline inside an entry's name cannot inflate the count.
     _fshw_ns=$(_fsb_sudo find "$_fshw_gd/hooks" -mindepth 1 -maxdepth 1 \
-        ! -name '*.sample' -print 2>/dev/null | wc -l 2>/dev/null || printf '0')
+        ! -name '*.sample' -printf '%y\n' 2>/dev/null | wc -l 2>/dev/null || printf '0')
     if [ "${_fshw_ns:-0}" -gt 0 ] 2>/dev/null; then
         printf '  warn: git heal: %s non-sample entries in %s/hooks — remove manually (issue #644)\n' \
             "$_fshw_ns" "$_fshw_gd" >&2

@@ -1464,6 +1464,31 @@ if printf '%s' "$_out" | grep -qF 'git-heal: ON — heal hooks active' &&
 else
     fail "status renderer: hint must ride the rows only (out=$(printf '%s' "$_out" | tail -3)) (#782)"
 fi
+# a A2: the fix-all-hint COUNTER's mktemp failing (the third mktemp —
+# list, raw, counter) drops only the hint and must leave the rc at 0:
+# an AND-list tail returned 1 there and the display command inherited
+# it. A dead TMPDIR cannot reach the path (the FIRST mktemp dies and
+# returns early) — a stateful mktemp stub failing from call 3 on does.
+mkdir -p "$WORK/cntstub"
+cat >"$WORK/cntstub/mktemp" <<EOF
+#!/bin/sh
+_c=\$(cat "\$CNT_STATE" 2>/dev/null || printf '0')
+_c=\$((_c + 1))
+printf '%s' "\$_c" >"\$CNT_STATE"
+[ "\$_c" -ge 3 ] && exit 1
+exec $(command -v mktemp) "\$@"
+EOF
+chmod +x "$WORK/cntstub/mktemp"
+: >"$WORK/cntstub/state"
+_a2rc=0
+_out=$(_core_run 'PATH="$WORK/cntstub:$PATH" CNT_STATE="$WORK/cntstub/state"; export PATH CNT_STATE; INSTALL_CONF="$WORK/install-noagent.conf" _git_heal_status') ||
+    _a2rc=$?
+if [ "$_a2rc" -eq 0 ] &&
+    printf '%s' "$_out" | grep -qF 'git-heal: fix-all hint unavailable (mktemp failed)'; then
+    pass "status renderer: counter-mktemp failure drops only the hint, rc 0 (#785 a A2)"
+else
+    fail "status renderer: counter-mktemp arm (rc=$_a2rc; out=$(printf '%s' "$_out" | grep -i 'mktemp' | head -2)) (#785 a A2)"
+fi
 chmod 700 "$WORK/zone/scan/locked"
 rmdir "$WORK/zone/scan/locked"
 rm -f "${WORK:?}/devhome/.gitconfig"

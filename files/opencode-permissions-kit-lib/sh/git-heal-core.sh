@@ -762,7 +762,12 @@ _git_heal_status() {
         ui_info "git-heal: fix all lockouts with:"
         ui_detail "sudo opk git-heal on"
     fi
-    [ -n "$_ghc_stt_cnt" ] && rm -f "$_ghc_stt_cnt"
+    # rc-neutral tail (#785 a A2): an AND-list here would return 1 when
+    # the counter mktemp failed -- and the display command's exit code
+    # would claim a failure its complete, loud report does not contain.
+    if [ -n "$_ghc_stt_cnt" ]; then
+        rm -f "$_ghc_stt_cnt"
+    fi
 }
 
 git_heal_cli() {

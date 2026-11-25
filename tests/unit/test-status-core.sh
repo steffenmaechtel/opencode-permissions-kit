@@ -354,7 +354,7 @@ printf '%s\n' "$WORK/ghs/drift" >"$WORK/ghs/projects.conf"
 # the gitdir and the re-apply path.
 _out=$(_ghs_run || true)
 if printf '%s' "$_out" | grep -qF "$WORK/ghs/drift/clone/.git — sticky bit missing on the gitdir" &&
-    printf '%s' "$_out" | grep -qF "'sudo opk update --refresh' / 'opk config projects refresh'"; then
+    printf '%s' "$_out" | grep -qF "'sudo opk update --refresh' / 'opk config refresh'"; then
     pass "git-heal section: fresh clone renders the sticky-drift row (#653 W1)"
 else
     fail "git-heal section: sticky-drift row missing (#653 W1; out=$(printf '%s' "$_out" | grep -F 'heal drift' | head -2))"
@@ -383,11 +383,34 @@ _ghd_reset
 : >"$WORK/ghs/drift/clone/.git/hooks/pre-commit"
 _out=$(_ghs_run || true)
 if printf '%s' "$_out" | grep -qF "1 non-sample entries in $WORK/ghs/drift/clone/.git/hooks" &&
-    printf '%s' "$_out" | grep -qF "git-heal hooks are off — inspect and remove manually"; then
+    printf '%s' "$_out" | grep -qF 'that git call uses .git/hooks;' &&
+    printf '%s' "$_out" | grep -qF 'survives the heal'; then
     pass "git-heal section: planted non-sample hook renders its row (#653 W1)"
 else
     fail "git-heal section: planted row missing (#653 W1; out=$(printf '%s' "$_out" | grep -F 'non-sample' | head -2))"
 fi
+# a A1: the count is TYPE-based (`-printf '%y\n'`) — a newline inside
+# a planted entry's NAME cannot inflate it (the -print form counted one
+# such file as 2, probed in round a). The newline is built via the
+# variable idiom (a bare $(printf '\n') is empty — command substitution
+# strips trailing newlines); the fixture self-check guards the
+# embedding, so the arm cannot pass vacuously on a broken newline.
+_ghd_reset
+_NL=$(printf '\nX')
+_NL=${_NL%X}
+: >"$WORK/ghs/drift/clone/.git/hooks/evil${_NL}hook"
+if [ -f "$WORK/ghs/drift/clone/.git/hooks/evil${_NL}hook" ] &&
+    [ ! -f "$WORK/ghs/drift/clone/.git/hooks/evilhook" ]; then
+    _out=$(_ghs_run || true)
+    if printf '%s' "$_out" | grep -qF "1 non-sample entries in $WORK/ghs/drift/clone/.git/hooks"; then
+        pass "git-heal section: a newline-named entry counts as one (#785 a A1)"
+    else
+        fail "git-heal section: newline-name count (out=$(printf '%s' "$_out" | grep -F 'non-sample' | head -1)) (#785 a A1)"
+    fi
+else
+    fail "git-heal section: newline fixture did not embed (#785 a A1)"
+fi
+rm -f "${WORK:?}/ghs/drift/clone/.git/hooks/evil${_NL}hook"
 # Healed control (full): sticky, pinned modes, clean content — none of
 # the row texts render. Absence greps the three row texts, not the
 # 'heal drift' key: the getfacl DEGRADE row shares the key and would
@@ -492,6 +515,31 @@ if printf '%s' "$_out" | grep -qF 'heal drift ACLs not checked — getfacl unava
     pass "git-heal section: missing getfacl degrades the ACL leg loudly, checks survive (#653 W1)"
 else
     fail "git-heal section: getfacl-degrade arm (out=$(printf '%s' "$_out" | head -3)) (#653 W1)"
+fi
+# a A3: the degrade row needs a POPULATION — a comment-only projects.conf
+# leaves nothing the ACL leg could check, and the row must not render
+# (the doctor twin gates the same row on a gitdir existing). Same
+# restricted PATH as the arm above; the conf is comment-only.
+printf '# no roots registered\n' >"$WORK/ghs/projects.conf"
+_out=$(
+    (
+        PATH="$WORK/ghs/nogfacl:$STUB"
+        export PATH NO_COLOR=1 GH_GITCONFIG="$WORK/ghs/devhome/.gitconfig"
+        . "$UI_LIB"
+        . "$LIB"
+        # shellcheck disable=SC1090
+        . "$GH_CORE"
+        DEFAULT_USER="$(id -un)"
+        OPENCODE_USER=opencode-ghs-agent
+        LIBDIR="$WORK/ghs/lib"
+        PROJECTS_CONF="$WORK/ghs/projects.conf"
+        status_section_git_heal
+    ) 2>&1 || true
+)
+if ! printf '%s' "$_out" | grep -qF 'heal drift ACLs not checked — getfacl unavailable'; then
+    pass "git-heal section: an empty population renders no getfacl-degrade row (#785 a A3)"
+else
+    fail "git-heal section: degrade row fired over an empty population (#785 a A3)"
 fi
 # Pointer-target arm: drift rows name the RESOLVED storage gitdir (the
 # #777 twin — before it, adopted hosts showed state and nothing else).
