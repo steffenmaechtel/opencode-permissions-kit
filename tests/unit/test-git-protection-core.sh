@@ -806,9 +806,11 @@ fi
 
 # The sanity arm: the storage itself failing the use-time check skips
 # the sweep LOUD — and the skip COUNTS as a pass failure (#783 a A1:
-# the counted half was unpinned; #783 b B1: the flag printf masked the
-# eval's rc — both now print, both asserted; the count is the failure
-# channel, rc 0 the no-abort contract).
+# the counted half was unpinned; b B1 + c C1: the eval prints BOTH
+# observables now and asserts both — the old [ rc ] leg discriminated
+# only through the suite's set -e abort (a nonzero return dies the
+# eval before the printf); the positive rc=0 grep pins the no-abort
+# contract directly, the no-errexit reading included).
 mkdir -p "$WORK/rhs-real"
 ln -s "$WORK/rhs-real" "$WORK/rhs-sym"
 _rc=0
