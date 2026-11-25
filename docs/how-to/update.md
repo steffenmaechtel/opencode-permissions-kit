@@ -116,11 +116,12 @@ returns, and `sudo opk git-protection on` stays one command away
 Unattended runs (`--yes`, no terminal) skip the question with a hint
 and persist nothing; `KIT_GITDIR_STORAGE=none` in the environment
 silences the hint, an absolute path configures without asking. Once
-enabled, every subsequent update runs the adopt + heal + nail pass as
-part of its phases — new clones under your roots are migrated by the
-update itself, and every existing storage entry is walked through the
-current gitdir heal contract again (idempotent, issue
-[#779](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/779)).
+enabled, every subsequent update runs the reheal + adopt + nail pass
+as part of its phases — every existing storage entry is walked
+through the current gitdir heal contract again (contract-idempotent,
+issue
+[#779](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/779)),
+and new clones under your roots are migrated by the update itself.
 
 ### Update integrity (SHA256SUMS)
 

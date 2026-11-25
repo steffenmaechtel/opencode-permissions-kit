@@ -78,8 +78,8 @@ Convert projects to the nailed pointer layout (sudo for everything
 except `status` — the command elevates itself):
 
 ```bash
-sudo opk git-protection on            # storage init + migrate all + nail
-                                       #   + re-heal storage entries (#779)
+sudo opk git-protection on            # storage init + re-heal storage entries
+                                       #   + migrate all + nail (#779)
 sudo opk git-protection adopt <path>  # migrate + nail one project
 sudo opk git-protection nail [<path>] # nail pending pointers
 sudo opk git-protection revert <path>|--all   # back to classic .git
@@ -107,9 +107,9 @@ set up). The `Git protection` section of `opk status` shows the same
 state and deviation rows. Consent: `opk
 update` asks once before configuring the storage — declining persists
 `GITDIR_STORAGE=none` (an explicit `sudo opk git-protection on`
-replaces the marker); once enabled, every update runs the adopt +
-heal + nail pass — every existing storage entry re-healed through
-the current gitdir contract (#779). The adopt hint
+replaces the marker); once enabled, every update runs the reheal +
+adopt + nail pass — every existing storage entry re-healed through
+the current gitdir contract first (#779). The adopt hint
 prints on your first checkout in a managed classic tree (needs `opk
 git-heal on` — git runs no hook at clone time). The measured friction
 (worktree remove dance, fstype limits, the `FETCH_HEAD` residual) and

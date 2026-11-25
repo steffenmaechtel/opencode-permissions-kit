@@ -31,8 +31,8 @@ Phase A measured green; the layout is native git — `repo-kasantra`
 on the maintainer host lives this way).
 
 ```bash
-sudo opk git-protection on      # storage init + persist + migrate ALL + nail
-                                 #   + re-heal every storage entry (#779)
+sudo opk git-protection on      # storage init + persist + re-heal entries
+                                 #   + migrate ALL + nail (#779)
 opk git-protection status       # per project: classic | nailed | unnailed |
                                 #   foreign-pointer | worktree-reg, plus INFO
                                 #   rows for unreferenced storage entries
@@ -97,17 +97,21 @@ updates skip the question with a hint; set `KIT_GITDIR_STORAGE=none`
 in the environment to silence that too, or to an absolute path to
 configure non-interactively.
 
-Once enabled, every `sudo opk update` runs the adopt + heal + nail
-pass as root: new classic `.git` layouts under your roots are
-migrated, pending pointers get their nail, and every EXISTING storage
-entry is walked through the current gitdir heal contract again —
-idempotent, so a later change to that heal's semantics reaches
-adopted checkouts through the next update, not through a manual
-`revert` + `on` (issue
-[#779](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/779);
-the walk re-runs the full heal, so large storages add walk time to
-the update). That recurring pass is the point — the protection rides
-the update, no extra command.
+Once enabled, every `sudo opk update` runs the reheal + adopt + nail
+pass as root: every EXISTING storage entry is walked through the
+current gitdir heal contract again, then new classic `.git` layouts
+under your roots are migrated and pending pointers get their nail.
+The re-application is contract-idempotent — the one recurring side
+effect is `FETCH_HEAD` (a transient git cache) being deleted again on
+every pass; git refetches it — so a later change to that heal's
+semantics reaches adopted checkouts through the next update, not
+through a manual `revert` + `on` (issue
+[#779](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/779)).
+The walk re-runs the full heal: large storages add walk time to the
+update, and an entry's size is agent-influenceable (healed subtrees
+stay group-writable) — a latency residual, not a permissions one.
+That recurring pass is the point — the protection rides the update,
+no extra command.
 
 ### Where the storage lives
 
@@ -140,7 +144,8 @@ commit under `fs.protected_regular=2`), the pointer file is written
 and nailed, registered worktrees follow via `git worktree repair`,
 and the result is verified (`git status`) before the next project
 starts. That heal is not one-shot: every `on` / `opk update` pass
-re-applies it over every existing storage entry (idempotent, issue
+re-applies it over every existing storage entry (contract-idempotent,
+issue
 [#779](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/779)).
 A failed project rolls back to the classic layout and the
 run continues; nothing is ever half-migrated.

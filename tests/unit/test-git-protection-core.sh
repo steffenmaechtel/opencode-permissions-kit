@@ -743,7 +743,8 @@ esac
 if [ "$_rc" = 0 ] && [ "$_mode_cfg" = 644 ] && [ "$_hooks_ok" = 1 ] &&
     [ -k "$WORK/rhs/rhproj.git" ] && [ -g "$WORK/rhs/rhproj.git" ] &&
     [ ! -e "$WORK/rhs/rhproj.git/FETCH_HEAD" ] &&
-    printf '%s' "$_out" | grep -qF 'storage reheal: 1 existing storage entries'; then
+    printf '%s' "$_out" | grep -qF 'storage reheal: existing storage entries' &&
+    printf '%s' "$_out" | grep -qF 'operand set — #779): 1'; then
     pass "reheal: a drifted storage entry walks back through the contract (#779)"
 else
     fail "reheal: drift arm (rc=$_rc cfg=$_mode_cfg hooks=$_mode_hooks out=$_out)"
@@ -804,16 +805,19 @@ else
 fi
 
 # The sanity arm: the storage itself failing the use-time check skips
-# the sweep LOUD (a counted failure, never a silent green).
+# the sweep LOUD — and the skip COUNTS as a pass failure (#783 a A1:
+# the counted half was unpinned; the flag rides the eval like the
+# failure-count leg's).
 mkdir -p "$WORK/rhs-real"
 ln -s "$WORK/rhs-real" "$WORK/rhs-sym"
 _rc=0
-_out=$(_core_run '_gp_reheal_storage "$WORK/rhs-sym"') || _rc=$?
+_out=$(_core_run '_gp_reheal_storage "$WORK/rhs-sym"; printf "flag=%s\n" "$_gprs_failed"') || _rc=$?
 if [ "$_rc" = 0 ] &&
-    printf '%s' "$_out" | grep -qF 'storage reheal skipped: the use-time sanity check failed'; then
-    pass "reheal: an insane storage skips loud (#779)"
+    printf '%s' "$_out" | grep -qF 'storage reheal skipped: the use-time sanity check failed' &&
+    printf '%s' "$_out" | grep -qF 'flag=1'; then
+    pass "reheal: an insane storage skips loud AND fails the pass counter (#779, #783 a A1)"
 else
-    fail "reheal: sanity arm (rc=$_rc out=$_out)"
+    fail "reheal: sanity arm (rc=$_rc out=$_out) (#783 a A1)"
 fi
 
 # A missing storage is a clean no-op (the first `on` just made one).
@@ -864,7 +868,8 @@ if [ "$_rc" = 0 ] &&
     [ -k "$WORK/rhs2/rhold.git" ] &&
     [ -f "$WORK/rr2-roots/rhnew/.git" ] &&
     [ -d "$WORK/rhs2/rhnew.git" ] &&
-    printf '%s' "$_out" | grep -qF 'storage reheal: 1 existing storage entries'; then
+    printf '%s' "$_out" | grep -qF 'storage reheal: existing storage entries' &&
+    printf '%s' "$_out" | grep -qF 'operand set — #779): 1'; then
     pass "reheal: the on-pass heals existing entries before migrating (#779)"
 else
     fail "reheal: on-pass wiring (rc=$_rc out=$_out)"
@@ -897,10 +902,40 @@ printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
     "$(id -un)" "$(id -un)" "$(id -gn)" >"$IC"
 if [ "$_rc" = 1 ] &&
     printf '%s' "$_out" | grep -qF 'storage reheal failed on' &&
+    printf '%s' "$_out" | grep -qF 'pass had failures (migration or storage reheal' &&
     printf '%s' "$_out" | grep -qF 're-run: opk git-protection on'; then
     pass "reheal: a failed sweep fails the on-pass (propagation, #779)"
 else
     fail "reheal: propagation arm (rc=$_rc out=$_out)"
+fi
+
+# The sticky-failure arm (#783 a A6: the "(chown, sticky)" claim was
+# pinned on the chown leg alone): a chmod stub failing ONLY `+t` on
+# the sweep's one target — the heal's second return-1 path, with the
+# chown -R and the find-walk chmods staying real.
+REAL_CHMOD=$(command -v chmod)
+mkdir -p "$WORK/binchmod"
+cat >"$WORK/binchmod/chmod" <<EOF
+#!/bin/sh
+if [ "\$1" = "+t" ] && [ "\$2" = "$WORK/rhs3/rhfail.git" ]; then
+    echo "chmod: sticky form refused (stub)" >&2
+    exit 1
+fi
+exec $REAL_CHMOD "\$@"
+EOF
+chmod 755 "$WORK/binchmod/chmod"
+printf '%s\n' "$WORK/rr-roots" >"$CONF"
+_rc=0
+_out=$(_core_run 'PATH="$WORK/binchmod:$WORK/bin:/usr/bin:/bin"; export PATH; GP_STORAGE="$WORK/rhs3"; export GP_STORAGE; _git_protection_on') || _rc=$?
+printf '%s\n' "$WORK/roots/r1" >"$CONF"
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" >"$IC"
+if [ "$_rc" = 1 ] &&
+    printf '%s' "$_out" | grep -qF 'storage reheal failed on' &&
+    printf '%s' "$_out" | grep -qF 'cannot set the sticky bit'; then
+    pass "reheal: a sticky-failure heal fails the pass too (A6, #783 a)"
+else
+    fail "reheal: sticky-failure arm (rc=$_rc out=$_out) (#783 a A6)"
 fi
 
 # --- 7. nail gating -------------------------------------------------------------------

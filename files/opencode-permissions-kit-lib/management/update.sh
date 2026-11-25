@@ -879,7 +879,7 @@ done
 
 # git-protection core (#704 O4): the update's consent phase
 # (update-core.sh, update_git_protection_consent) runs the layout's
-# adopt+nail pass as root. Checkout-first like every helper above; the
+# reheal+adopt+nail pass as root. Checkout-first like every helper above; the
 # file is definitions-only, so a no-op here stays safe — the phase
 # skips with a visible row when the lib is absent (a pre-#704 checkout
 # serving an older deployed lib) and refuses loud when present-but-

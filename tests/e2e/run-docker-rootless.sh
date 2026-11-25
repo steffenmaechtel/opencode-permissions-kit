@@ -330,11 +330,11 @@ check "RL2c: no adopt hint on the adopted tree (self-silencing)" \
 # walk it back through the current heal contract. rl-gp2 (classic,
 # created above) migrates in the same run — the sweep heals only the
 # pre-existing entry, before the migration loop.
-E 'sudo chown root /var/www/gitdirs/rl-gh.git/config && sudo chmod 666 /var/www/gitdirs/rl-gh.git/config && sudo chmod -t /var/www/gitdirs/rl-gh.git'
+E 'sudo chown root /var/www/gitdirs/rl-gh.git/config && sudo chmod 666 /var/www/gitdirs/rl-gh.git/config && sudo chmod -t /var/www/gitdirs/rl-gh.git && sudo chown root /var/www/gitdirs/rl-gh.git/index'
 E 'sudo opk git-protection on >/tmp/gp-reheal.log 2>&1' &&
     echo "  ${GREEN}OK${NC}  opk git-protection on (reheal) completed"
 check "RL2c: #779 — on re-applies the gitdir heal to existing storage entries" \
-    E 'test "$(stat -c %U /var/www/gitdirs/rl-gh.git/config)" = "dev" && test "$(stat -c %a /var/www/gitdirs/rl-gh.git/config)" = "644" && test -k /var/www/gitdirs/rl-gh.git && grep -qF "storage reheal:" /tmp/gp-reheal.log'
+    E 'test "$(stat -c %U /var/www/gitdirs/rl-gh.git/config)" = "dev" && test "$(stat -c %a /var/www/gitdirs/rl-gh.git/config)" = "644" && test -k /var/www/gitdirs/rl-gh.git && grep -qF "storage reheal:" /tmp/gp-reheal.log && test "$(stat -c %U /var/www/gitdirs/rl-gh.git/index)" = "opencode"'
 
 # --- RL2c/#777: the git-heal sweeps see POINTER-FILE checkouts ---
 # The run.sh 12q twin: rl-gh is adopted right now and the heal hooks

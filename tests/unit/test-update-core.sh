@@ -1102,6 +1102,7 @@ if [ -f "$WORK/ucroots/r1/proj2/.git" ] &&
     [ "$(stat -c %a "$WORK/ucstorage/proj.git/config")" = 644 ] &&
     [ -k "$WORK/ucstorage/proj.git" ] &&
     printf '%s' "$_uc_out" | grep -qF 'storage reheal' &&
+    printf '%s' "$_uc_out" | grep -qF 'running the reheal + adopt + nail pass' &&
     ! printf '%s' "$_uc_out" | grep -qF 'confirm:'; then
     pass "consent: enabled conf runs the adopt + reheal pass without asking (#704, #779)"
 else

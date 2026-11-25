@@ -32,10 +32,10 @@
 #                       (the verdict-in-rc rule, conventions.md
 #                       "Script output style"), rc 0 when
 #                       protected/idle
-#   on                  storage init + persist GITDIR_STORAGE +
-#                       migrate ALL classic projects + nail, plus the
+#   on                  storage init + persist GITDIR_STORAGE, the
 #                       #779 reheal sweep over existing storage
-#                       entries (root); an explicit `on` replaces a
+#                       entries, then migrate ALL classic projects +
+#                       nail (root); an explicit `on` replaces a
 #                       GITDIR_STORAGE=none decline marker (#764)
 #   adopt <path>        migrate + nail ONE project (root)
 #   nail [<path>]       nail pending pointers; with <path> only that
@@ -76,8 +76,10 @@
 #     cell) — documented residual, same class as the in-tree design.
 #   - Re-application (#779): every `on` / update pass re-runs this
 #     heal over every existing storage entry (_gp_reheal_storage) —
-#     idempotent, so a contract change reaches adopted gitdirs the
-#     way the baseline reaches classic ones.
+#     contract-idempotent, so a contract change reaches adopted
+#     gitdirs the way the baseline reaches classic ones. The one
+#     recurring side effect: FETCH_HEAD (a transient git cache) is
+#     re-deleted on every pass — git refetches it.
 #
 # Test overrides (unit suite only, never set in production — none of
 # them survives sudo's env_reset):
@@ -475,7 +477,9 @@ _gp_heal_gitdir() {
 # _gp_reheal_storage <stor>: issue #779's re-application sweep — every
 # EXISTING storage entry walks through the CURRENT _gp_heal_gitdir
 # contract, idempotently (the fs baseline's steady-state shape for
-# classic trees). Before #779 the migration heal ran exactly once per
+# classic trees; contract-idempotent, not a no-op — the FETCH_HEAD
+# leg re-deletes a fresh fetch's cache on every pass, git refetches).
+# Before #779 the migration heal ran exactly once per
 # entry, at adoption: a later change to the heal's semantics reached
 # classic gitdirs through the next baseline run but left every adopted
 # storage gitdir at its adoption-time state until a manual revert + on.
@@ -488,9 +492,12 @@ _gp_heal_gitdir() {
 #     only DEV-OWNED, gitdir-shaped REAL directories heal: the A6
 #     kit-owned discriminator the nail and revert gates carry too. An
 #     agent-planted entry stays the status orphan rows' business (the
-#     operator inspects and removes it), and the walk stays bounded to
-#     entries the kit itself healed — never agent-controlled tree
-#     sizes;
+#     operator inspects and removes it). The gate bounds the entry
+#     SET, not a healed entry's SIZE — subtrees stay group-writable by
+#     the heal's own contract, so the agent can grow one between
+#     passes and the next update walks it (latency/DoS only: chown -R
+#     over agent-created files REDUCES agent control, no symlink is
+#     traversed);
 #   - [ -L ] re-check on the entry immediately before its heal (L5:
 #     the glob->heal window spans the whole loop, so the operand is
 #     re-tested right before the root ops act on it).
@@ -527,13 +534,14 @@ _gp_reheal_storage() {
                 _gprs_n=$((_gprs_n + 1))
             else
                 _gprs_failed=$((_gprs_failed + 1))
-                ui_warn "storage reheal failed on $(_gp_rowkey "$_gprs_e") — the entry keeps its drifted bits"
+                ui_warn "storage reheal failed on $(_gp_rowkey "$_gprs_e") — the entry keeps its ownership/sticky"
+                ui_warn "drift (the perm walks already applied; see above)"
             fi
         fi
     done
     if [ "$_gprs_n" -gt 0 ]; then
-        ui_detail "storage reheal: $_gprs_n existing storage entries walked through the"
-        ui_detail "current gitdir heal contract (sticky, config/hooks pins, operand set — #779)"
+        ui_detail "storage reheal: existing storage entries walked through the current"
+        ui_detail "gitdir heal contract (sticky, config/hooks pins, operand set — #779): $_gprs_n"
     fi
     return 0
 }
@@ -1805,7 +1813,7 @@ git_protection_cli() {
             cat >&2 <<'EOF'
 usage: opk git-protection <command> (#704 O4 pointer layout)
   status              per-project layout state (no root needed)
-  on                  storage init + migrate all + nail + re-heal (root)
+  on                  storage init + re-heal entries + migrate all + nail (root)
   adopt <path>        migrate + nail one project (root)
   nail [<path>]       nail pending pointers (root)
   revert <path>|--all walk back to the classic layout (root)
