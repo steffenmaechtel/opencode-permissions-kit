@@ -743,13 +743,18 @@ doctor_git_heal() {
         # registrations carry dev-owned 644 pointer files under a
         # sticky collection, the storage re-heal (#779) leaves the
         # subtree group-writable by design. Same guarded, validated
-        # read as the resolver's own storage leg (GH_STORAGE is the
-        # unit seam); empty on a skewed lib or a declined/absent
-        # storage key -- every gitdir strict, which is right for the
-        # degraded pointer mode and the non-adopted host alike.
+        # read as the resolver's own storage leg, but from the
+        # root-owned install.conf ONLY (#787 a B2: no env precedence
+        # on report-only surfaces; the unit harness drives this leg
+        # through INSTALL_CONF); empty on a skewed lib or a
+        # declined/absent storage key -- every gitdir strict, which is
+        # right for the degraded pointer mode and the non-adopted
+        # host alike. The storage case below re-gates on non-empty
+        # (#787 a A1, probe P1: an empty prefix degenerates to /* and
+        # matches every gitdir -- the all-relaxed inversion).
         _dgh_stor=""
         if command -v _ghc_key >/dev/null 2>&1 && command -v _ghc_root_ok >/dev/null 2>&1; then
-            _dgh_stor="${GH_STORAGE:-$(_ghc_key GITDIR_STORAGE)}"
+            _dgh_stor=$(_ghc_key GITDIR_STORAGE)
             # Out-param pre-assigned (the _ghc_pt_out idiom).
             _ghc_root_norm=""
             if _ghc_root_ok "$_dgh_stor"; then
@@ -807,6 +812,12 @@ doctor_git_heal() {
                 ui_detail "update --refresh' / 'opk config refresh')"
                 ;;
         esac
+        # Traversability notice (#787 a B4): on a non-traversable gitdir
+        # (the 1700 tamper class) every CHILD-entry row below goes
+        # stat-EACCES-silent; the gitdir-level rows above still fired,
+        # so the tamper stays named. The status-core twin's idiom.
+        [ -x "$_dgh_gd" ] ||
+            ui_kv "git-heal" "entry rows under $_dgh_gd may be incomplete (not traversable)"
         for _dgh_ent in config hooks; do
             _dgh_p="$_dgh_gd/$_dgh_ent"
             # A symlinked entry is its own drift: the heal pins regular
@@ -860,7 +871,7 @@ doctor_git_heal() {
         _dgh_cfg="$_dgh_gd/config"
         if [ -f "$_dgh_cfg" ] && [ ! -L "$_dgh_cfg" ]; then
             _dgh_keys=$(git config -f "$_dgh_cfg" --list --name-only 2>/dev/null |
-                awk '$1 ~ /^core\.(fsmonitor|hooksPath|pager|editor)$/ {print $1}' |
+                awk 'tolower($1) ~ /^core\.(fsmonitor|hookspath|pager|editor)$/ {print tolower($1)}' |
                 paste -sd, -)
             if [ -n "$_dgh_keys" ]; then
                 ui_kv_warn "repo keys" "suspicious repo-config keys in $_dgh_gd/config:"
@@ -915,9 +926,11 @@ doctor_git_heal() {
             ui_detail "collections only) -- inspect before trusting git output"
         elif [ -d "$_dgh_wt" ]; then
             _dgh_wstrict=1
-            case "$_dgh_gd" in
-                "$_dgh_stor"/*) _dgh_wstrict=0 ;;
-            esac
+            if [ -n "$_dgh_stor" ]; then
+                case "$_dgh_gd" in
+                    "$_dgh_stor"/*) _dgh_wstrict=0 ;;
+                esac
+            fi
             if [ "$_dgh_wstrict" = 1 ]; then
                 _dgh_wh1="(the heal pins them developer-owned 644 under a sticky"
                 _dgh_wh2="collection; a fresh agent worktree or tampering -- re-apply:"
@@ -944,13 +957,13 @@ doctor_git_heal() {
                 esac
                 [ -e "$_dgh_w" ] || [ -L "$_dgh_w" ] || continue
                 if [ -L "$_dgh_w" ]; then
-                    _dgh_wkey=$(printf '%s\n' "$_dgh_w" | tr -d '\000-\037\177')
+                    _dgh_wkey=$(printf '%s\n' "$_dgh_w" | tr -d '\000-\037\177\200-\237')
                     ui_kv_warn "worktree" "$_dgh_wkey is a symlink (the heal walks regular"
                     ui_detail "registrations only) -- inspect before trusting git output"
                     continue
                 fi
                 [ -d "$_dgh_w" ] || continue
-                _dgh_wkey=$(printf '%s\n' "$_dgh_w" | tr -d '\000-\037\177')
+                _dgh_wkey=$(printf '%s\n' "$_dgh_w" | tr -d '\000-\037\177\200-\237')
                 for _dgh_pf in commondir gitdir; do
                     _dgh_pp="$_dgh_w/$_dgh_pf"
                     if [ -L "$_dgh_pp" ]; then
@@ -990,9 +1003,13 @@ doctor_git_heal() {
                 # Back-reference arm (the ".git pointer swap" residual;
                 # the status-core twin's comment in full): the
                 # registration's gitdir file names the worktree's .git
-                # pointer -- cross-check it still points back. Classic
-                # heal: the reference is dev-pinned 644, a swap cannot
-                # hide; storage: group-writable by design, only
+                # pointer -- cross-check it still points back. The pin
+                # makes the reference COSTLY to forge, not airtight
+                # (#787 a C3): the registration dir stays
+                # group-writable by design, so a delete+recreate in it
+                # can forge the pair -- the recreated file surfaces
+                # through the owner leg (gated on a readable dev
+                # name); storage: group-writable outright, only
                 # inconsistent swaps surface (documented residual).
                 # Untrusted content: the resolver's form gates run
                 # before any row names it.
@@ -1033,9 +1050,12 @@ doctor_git_heal() {
                             ui_detail "shape) -- inspect before trusting git output"
                         elif [ ! -f "$_dgh_bref" ]; then
                             # Stale-but-prunable is git's own routine
-                            # state -- a detail line, never a counted
-                            # warn.
-                            ui_detail "worktree: $_dgh_wkey names a gone worktree (prunable --"
+                            # state ('worktree prune' owns it) -- a
+                            # plain uncounted row of its own (#787 a
+                            # A2: a bare ui_detail renders indented
+                            # under the PREVIOUS registration's row,
+                            # misattributed).
+                            ui_kv "worktree" "$_dgh_wkey names a gone worktree (prunable --"
                             ui_detail "'git worktree prune' cleans stale registrations)"
                         else
                             _dgh_btgt=$(sed -n 's/^gitdir: //p' "$_dgh_bref" 2>/dev/null | head -n 1)
@@ -1056,9 +1076,11 @@ doctor_git_heal() {
                                 _dgh_trp=$(realpath -m -- "$_dgh_btgt" 2>/dev/null) || _dgh_trp=""
                                 _dgh_rrp=$(realpath -m -- "$_dgh_w" 2>/dev/null) || _dgh_rrp=""
                                 if [ -z "$_dgh_trp" ] || [ "$_dgh_trp" != "$_dgh_rrp" ]; then
+                                    _dgh_btshow=$(printf '%s\n' "$_dgh_btgt" | tr -d '\000-\037\177\200-\237')
+                                    _dgh_bfshow=$(printf '%s\n' "$_dgh_bref" | tr -d '\000-\037\177\200-\237')
                                     ui_kv_warn "worktree" "$_dgh_wkey -- its worktree's .git does not"
-                                    ui_detail "point back (it says $_dgh_btgt; the registration's"
-                                    ui_detail "gitdir file names $_dgh_bref) -- swapped pointer;"
+                                    ui_detail "point back (it says $_dgh_btshow; the registration's"
+                                    ui_detail "gitdir file names $_dgh_bfshow) -- swapped pointer;"
                                     ui_detail "inspect before trusting git output"
                                 fi
                             fi

@@ -173,6 +173,12 @@ _ghs_stage() {
     # list silently under-reports lockout rows with nothing red.
     : >"$WORK/ghs/root/.git/ORIG_HEAD"
     : >"$WORK/ghs/devhome/.gitconfig"
+    # The worktree arm's layout discriminator reads the storage root
+    # from install.conf ONLY since #787 a B2 (no env precedence on
+    # report surfaces) -- the harness mirrors that contract: the conf
+    # carries the scratch storage, GH_STORAGE stays the RESOLVER's
+    # seam only (the #777 pointer arms).
+    printf 'GITDIR_STORAGE=%s\n' "$WORK/ghs/ptstor" >"$WORK/ghs/install.conf"
     printf '%s\n' "$WORK/ghs/root" >"$WORK/ghs/projects.conf"
 }
 _ghs_run() {
@@ -198,6 +204,7 @@ _ghs_run() {
         DEFAULT_USER="$(id -un)"
         OPENCODE_USER=opencode-ghs-agent
         LIBDIR="$WORK/ghs/lib"
+        INSTALL_CONF="$WORK/ghs/install.conf"
         PROJECTS_CONF="$WORK/ghs/projects.conf"
         status_section_git_heal
     ) 2>&1
@@ -746,10 +753,11 @@ _wt2_reset
 mv "$WORK/ghs/wt2/awt/.git" "$WORK/ghs/wt2/awt/.git.orig"
 _out=$(_ghs_run || true)
 if printf '%s' "$_out" | grep -qF "$WORK/ghs/wt2/repo/.git/worktrees/awt names a gone worktree (prunable" &&
+    printf '%s' "$_out" | grep -qE '^  worktree .*gone worktree' &&
     ! printf '%s' "$_out" | grep -qF "does not"; then
-    pass "git-heal section: a prunable registration renders a detail line, no warn (#653 W2)"
+    pass "git-heal section: a prunable registration renders an owning plain row, no warn (#653 W2, #787 a A2)"
 else
-    fail "git-heal section: prunable arm (out=$(printf '%s' "$_out" | grep -F 'worktree' | head -2)) (#653 W2)"
+    fail "git-heal section: prunable arm (out=$(printf '%s' "$_out" | grep 'worktree' | head -2)) (#653 W2, #787 a A2)"
 fi
 mv "$WORK/ghs/wt2/awt/.git.orig" "$WORK/ghs/wt2/awt/.git"
 # Malformed back-reference arm: control bytes in the reg's gitdir
@@ -770,6 +778,77 @@ if ! printf '%s' "$_out" | grep -qE 'worktree|repo keys|group access/setgid'; th
     pass "git-heal section: the fully-healed W2 fixture renders no new rows (#653 W2 control)"
 else
     fail "git-heal section: healed W2 control fired (out=$(printf '%s' "$_out" | grep -E 'worktree|repo keys|group access' | head -3)) (#653 W2)"
+fi
+
+# --- #787 review a: fix-wave pins --------------------------------------------------
+# a A1/a B2: the empty-storage degeneration. Helpers present, NO
+# storage key in install.conf, and an env GH_STORAGE pointing AT the
+# classic tree (the env must not relax anything on a report surface):
+# the classic 664 registration file must render its group-write row
+# (pre-fix, the empty prefix degenerated "$stor"/* to /* -- every
+# gitdir matched and the strict legs were dead on the default host;
+# probe P1).
+_wt2_reset
+chmod 664 "$WORK/ghs/wt2/repo/.git/worktrees/awt/gitdir"
+printf '# no storage key here\n' >"$WORK/ghs/install-nostor.conf"
+_out=$(
+    (
+        GH_STORAGE="$WORK/ghs/wt2"
+        export GH_STORAGE NO_COLOR=1 GH_GITCONFIG="$WORK/ghs/devhome/.gitconfig"
+        PATH="$STUB:$PATH"
+        . "$UI_LIB"
+        . "$LIB"
+        # shellcheck disable=SC1090
+        . "$GH_CORE"
+        DEFAULT_USER="$(id -un)"
+        OPENCODE_USER=opencode-ghs-agent
+        LIBDIR="$WORK/ghs/lib"
+        INSTALL_CONF="$WORK/ghs/install-nostor.conf"
+        PROJECTS_CONF="$WORK/ghs/projects.conf"
+        status_section_git_heal
+    ) 2>&1 || true
+)
+if printf '%s' "$_out" | grep -qF "$WORK/ghs/wt2/repo/.git/worktrees/awt/gitdir — group-writable"; then
+    pass "git-heal section: no storage key keeps the strict contract; env GH_STORAGE cannot relax it (#787 a A1/a B2)"
+else
+    fail "git-heal section: empty-stor strict arm (out=$(printf '%s' "$_out" | grep -F 'worktree' | head -2)) (#787 a A1/a B2)"
+fi
+# a C5: git renders --list keys all-lowercase (probes P4a-c); a
+# camelCase-written hooksPath key must still render its row naming the
+# lowercased form.
+_wt2_reset
+git -C "$WORK/ghs/wt2/repo" config -f "$WORK/ghs/wt2/repo/.git/config" core.hooksPath /tmp/e2e-evil
+_out=$(_ghs_run || true)
+if printf '%s' "$_out" | grep -qF 'suspicious repo-config keys in' &&
+    printf '%s' "$_out" | grep -qF 'core.hookspath'; then
+    pass "git-heal section: a camelCase hooksPath plant renders its lowercased row (#787 a C5)"
+else
+    fail "git-heal section: hooksPath tolower arm (out=$(printf '%s' "$_out" | grep -F 'repo keys' | head -1)) (#787 a C5)"
+fi
+# a B3: the mismatch row's untrusted fields print through the extended
+# control-byte strip (incl. the 8-bit C1 range 0x80-0x9F, probe class
+# of the round scratch).
+_wt2_reset
+printf 'gitdir: %s\233\n' "$WORK/ghs/wt2/repo/.git" >"$WORK/ghs/wt2/awt/.git"
+_out=$(_ghs_run || true)
+if printf '%s' "$_out" | grep -qF "its worktree's .git does not" &&
+    ! printf '%s' "$_out" | grep -qF "$(printf '\233')"; then
+    pass "git-heal section: the swap row strips the 8-bit C1 byte from pointer content (#787 a B3)"
+else
+    fail "git-heal section: C1 strip arm (out=$(printf '%s' "$_out" | grep -F 'worktree' | head -2)) (#787 a B3)"
+fi
+printf 'gitdir: %s\n' "$WORK/ghs/wt2/repo/.git/worktrees/awt" >"$WORK/ghs/wt2/awt/.git"
+# a B4: a non-traversable gitdir (no execute for anyone -- the 1700
+# agent-run shape's generalized form) renders the incompleteness
+# notice; the gitdir-level rows keep firing.
+_wt2_reset
+chmod 000 "$WORK/ghs/wt2/repo/.git"
+_out=$(_ghs_run || true)
+if printf '%s' "$_out" | grep -qF "entry rows under $WORK/ghs/wt2/repo/.git may be incomplete (not traversable)" &&
+    printf '%s' "$_out" | grep -qF 'sticky bit missing on the gitdir'; then
+    pass "git-heal section: a non-traversable gitdir renders the incompleteness notice (#787 a B4)"
+else
+    fail "git-heal section: traversability notice arm (out=$(printf '%s' "$_out" | grep -F 'traversable' | head -1)) (#787 a B4)"
 fi
 # Layout-split arm (the storage contract): group-writable registration
 # pointer files under the storage root stay QUIET — the #779 re-heal

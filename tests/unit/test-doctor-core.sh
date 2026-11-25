@@ -307,8 +307,12 @@ _dgh_stage() {
     # Widened-operand fixture pins doctor's mirror row set (#684 a a10)
     : >"$WORK/dgh/proj/.git/ORIG_HEAD"
     : >"$WORK/dgh/devhome/.gitconfig"
-    printf 'DEFAULT_USER=%s\nOPENCODE_USER=opencode-dgh-agent\n' "$(id -un)" \
-        >"$WORK/dgh/install.conf"
+    # GITDIR_STORAGE (#787 a B2): the worktree arm's layout
+    # discriminator reads the storage root from install.conf ONLY --
+    # the harness conf names the scratch storage; GH_STORAGE stays the
+    # resolver's seam.
+    printf 'DEFAULT_USER=%s\nOPENCODE_USER=opencode-dgh-agent\nGITDIR_STORAGE=%s\n' \
+        "$(id -un)" "$WORK/dgh/ptstor" >"$WORK/dgh/install.conf"
 }
 _dgh_run() {
     (
@@ -589,12 +593,12 @@ fi
 # the state leg heals with it (getent sees the stripped name, so the
 # state row is not "unknown"). The fixture is otherwise healed
 # (_ddr_reset: the getfacl arm above left the sticky stripped).
-printf 'DEFAULT_USER="%s"\nOPENCODE_USER=opencode-dgh-agent\n' "$(id -un)" \
-    >"$WORK/dgh/install.conf"
+printf 'DEFAULT_USER="%s"\nOPENCODE_USER=opencode-dgh-agent\nGITDIR_STORAGE=%s\n' "$(id -un)" \
+    "$WORK/dgh/ptstor" >"$WORK/dgh/install.conf"
 _ddr_reset
 _out=$(_dgh_run || true)
-printf 'DEFAULT_USER=%s\nOPENCODE_USER=opencode-dgh-agent\n' "$(id -un)" \
-    >"$WORK/dgh/install.conf"
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=opencode-dgh-agent\nGITDIR_STORAGE=%s\n' "$(id -un)" \
+    "$WORK/dgh/ptstor" >"$WORK/dgh/install.conf"
 if ! printf '%s' "$_out" | grep -qE '\.git/(config|hooks) -- ' &&
     ! printf '%s' "$_out" | grep -q "git-heal.*unknown"; then
     pass "doctor git-heal: a quoted DEFAULT_USER compares stripped, state resolves (#785 a B5)"
@@ -771,10 +775,11 @@ _dwt_reset
 mv "$WORK/dgh/wt2/awt/.git" "$WORK/dgh/wt2/awt/.git.orig"
 _out=$(_dgh_run "$WORK/dgh/wt2/repo" || true)
 if printf '%s' "$_out" | grep -qF "$WORK/dgh/wt2/repo/.git/worktrees/awt names a gone worktree (prunable" &&
+    printf '%s' "$_out" | grep -qE '^  worktree .*gone worktree' &&
     ! printf '%s' "$_out" | grep -qF "does not"; then
-    pass "doctor git-heal: a prunable registration renders a detail line, no warn (#653 W2)"
+    pass "doctor git-heal: a prunable registration renders an owning plain row, no warn (#653 W2, #787 a A2)"
 else
-    fail "doctor git-heal: prunable arm (out=$(printf '%s' "$_out" | grep -F 'worktree' | head -2)) (#653 W2)"
+    fail "doctor git-heal: prunable arm (out=$(printf '%s' "$_out" | grep 'worktree' | head -2)) (#653 W2, #787 a A2)"
 fi
 mv "$WORK/dgh/wt2/awt/.git.orig" "$WORK/dgh/wt2/awt/.git"
 # Malformed back-reference arm.
@@ -806,6 +811,66 @@ if ! printf '%s' "$_out" | grep -qF "$WORK/dgh/ptstor/ptproj.git/worktrees/ptwt"
     pass "doctor git-heal: storage-layout registration pointer files stay quiet at g+rw (#653 W2)"
 else
     fail "doctor git-heal: storage relaxed arm fired (out=$(printf '%s' "$_out" | grep -F 'worktree' | head -2)) (#653 W2)"
+fi
+
+# --- #787 review a: fix-wave pins (the status-core twin's arms) ---------------------
+# a A1/a B2: no storage key in install.conf + an env GH_STORAGE
+# pointing at the classic tree -- the strict contract must hold (the
+# pre-fix empty-prefix degeneration to /*).
+_dwt_reset
+chmod 664 "$WORK/dgh/wt2/repo/.git/worktrees/awt/gitdir"
+printf '# no storage key here\n' >"$WORK/dgh/install-nostor.conf"
+_out=$(
+    (
+        GH_STORAGE="$WORK/dgh/wt2"
+        export GH_STORAGE NO_COLOR=1 GH_GITCONFIG="$WORK/dgh/devhome/.gitconfig" \
+            GH_LIBDIR="$WORK/dgh/lib"
+        PATH="$STUB:$PATH"
+        . "$UI_LIB"
+        . "$LIB"
+        # shellcheck disable=SC1090
+        . "$_dgh_repo_lib/sh/git-heal-core.sh"
+        INSTALL_CONF="$WORK/dgh/install-nostor.conf"
+        DOCTOR_ROOT="$WORK/dgh/wt2/repo"
+        DOCTOR_USER=opencode-dgh-agent
+        doctor_git_heal
+    ) 2>&1 || true
+)
+if printf '%s' "$_out" | grep -qF "$WORK/dgh/wt2/repo/.git/worktrees/awt/gitdir -- group-writable"; then
+    pass "doctor git-heal: no storage key keeps the strict contract; env GH_STORAGE cannot relax it (#787 a A1/a B2)"
+else
+    fail "doctor git-heal: empty-stor strict arm (out=$(printf '%s' "$_out" | grep -F 'worktree' | head -2)) (#787 a A1/a B2)"
+fi
+# a C5: camelCase hooksPath renders its lowercased row.
+_dwt_reset
+git -C "$WORK/dgh/wt2/repo" config -f "$WORK/dgh/wt2/repo/.git/config" core.hooksPath /tmp/e2e-evil
+_out=$(_dgh_run "$WORK/dgh/wt2/repo" || true)
+if printf '%s' "$_out" | grep -qF 'suspicious repo-config keys in' &&
+    printf '%s' "$_out" | grep -qF 'core.hookspath'; then
+    pass "doctor git-heal: a camelCase hooksPath plant renders its lowercased row (#787 a C5)"
+else
+    fail "doctor git-heal: hooksPath tolower arm (out=$(printf '%s' "$_out" | grep -F 'repo keys' | head -1)) (#787 a C5)"
+fi
+# a B3: the mismatch row strips the 8-bit C1 byte from pointer content.
+_dwt_reset
+printf 'gitdir: %s\233\n' "$WORK/dgh/wt2/repo/.git" >"$WORK/dgh/wt2/awt/.git"
+_out=$(_dgh_run "$WORK/dgh/wt2/repo" || true)
+if printf '%s' "$_out" | grep -qF "its worktree's .git does not" &&
+    ! printf '%s' "$_out" | grep -qF "$(printf '\233')"; then
+    pass "doctor git-heal: the swap row strips the 8-bit C1 byte from pointer content (#787 a B3)"
+else
+    fail "doctor git-heal: C1 strip arm (out=$(printf '%s' "$_out" | grep -F 'worktree' | head -2)) (#787 a B3)"
+fi
+printf 'gitdir: %s\n' "$WORK/dgh/wt2/repo/.git/worktrees/awt" >"$WORK/dgh/wt2/awt/.git"
+# a B4: the traversability notice.
+_dwt_reset
+chmod 000 "$WORK/dgh/wt2/repo/.git"
+_out=$(_dgh_run "$WORK/dgh/wt2/repo" || true)
+if printf '%s' "$_out" | grep -qF "entry rows under $WORK/dgh/wt2/repo/.git may be incomplete (not traversable)" &&
+    printf '%s' "$_out" | grep -qF 'sticky bit missing on the gitdir'; then
+    pass "doctor git-heal: a non-traversable gitdir renders the incompleteness notice (#787 a B4)"
+else
+    fail "doctor git-heal: traversability notice arm (out=$(printf '%s' "$_out" | grep -F 'traversable' | head -1)) (#787 a B4)"
 fi
 
 # --- sweep floor: doctor-core's python3 sites run -I (#249) ------------------------

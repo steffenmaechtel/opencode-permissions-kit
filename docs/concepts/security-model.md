@@ -333,9 +333,12 @@ Operational notes:
   the whole subtree group-writable by design, #779) and a swapped
   worktree `.git` pointer caught by the back-reference cross-check
   against the registration's `gitdir` file (a stale registration
-  renders a prunable hint instead; under the storage layout a
-  consistently rewritten registration pair can still hide a swap —
-  the #779 group-writable subtree is that trade)
+  renders a prunable hint instead; a consistently rewritten
+  registration pair can hide under EITHER layout — the registration
+  dir keeps group write by design, the recreated file surfaces only
+  through the owner row, which is gated on a readable developer name;
+  the storage layout's whole subtree being group-writable, #779, is
+  that trade's broad form)
   (a missing `getfacl` degrades the ACL leg to one warn row; removal
   stays a human decision).
 - **Wholesale swap of `.git` or a whole project dir (W1/W2 — the
