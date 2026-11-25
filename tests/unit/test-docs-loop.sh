@@ -36,7 +36,7 @@ cd "$REPO_ROOT" || exit 1
 . "$REPO_ROOT/tests/unit/lib/harness.sh"
 
 SCRIPT="$REPO_ROOT/scripts/docs-loop-metrics.py"
-AGENTS_MD_CAP=$((27 * 1024))
+AGENTS_MD_CAP=$((14 * 1024))
 
 WORK="$(work_new)" || {
     echo "docs-loop tests: scratch creation failed (TMPDIR=${TMPDIR:-unset})" >&2

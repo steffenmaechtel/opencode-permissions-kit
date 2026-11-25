@@ -239,7 +239,7 @@ the phase's entry:
    (`make test`), never only the touched suites — tree-wide
    invariant suites (rules-meta, sandbox-policy, workflows,
    format-gate) redden on changes their own files never touched
-   (AGENTS.md, Testing; the #412 round-b B3 instance).
+   (agent/gates.md; the #412 round-b B3 instance).
 4. PUSH, then the loop continues: every fix wave whose fixes touch
    review-relevant code owes its re-review — which is the NEXT round
    (next letter, comment before its own fixes, this skill from

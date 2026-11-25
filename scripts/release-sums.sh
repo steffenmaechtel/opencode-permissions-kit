@@ -9,8 +9,9 @@
 # from the `stable` mirror; a mid-cycle regeneration would publish a
 # hash for bytes stable does not serve yet -- users' verification would
 # fail falsely until the release lands. Mid-cycle waves never owe this
-# target (AGENTS.md, Testing); `make release` pre-flights freshness via
-# --check and refuses to cut a release from a stale block.
+# target (agent/gates.md, Checksums and generated indexes); `make
+# release` pre-flights freshness via --check and refuses to cut a
+# release from a stale block.
 #
 # Modes:
 #   sh scripts/release-sums.sh          rewrite the blocks (make release-sums)

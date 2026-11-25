@@ -138,7 +138,7 @@ printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
 mkdir -p "$WORK/roots/r1"
 
 # --- 0. every core function is defined by sourcing (#754 a B10) ---------------------
-# The three-registration-points rule (AGENTS.md, Testing): entry guard
+# The three-registration-points rule (agent/gates.md): entry guard
 # (bin/opk's git_protection_cli check) + this list + the derived count.
 _defs="_gp_libdir _gp_var _gp_devuser _gp_agentuser _gp_group _gp_root_ok
 _gp_conf_path _gp_storage _gp_storage_derive _gp_enabled _gp_nosym _gp_storage_init

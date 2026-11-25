@@ -156,7 +156,7 @@ make e2e-rootless      # docker-rootless daemon suite (needs systemd-in-containe
   (validated in PR #515): the suites write only untracked paths
   (`tests/e2e/cache/`, `tests/e2e/dumps/`), the reviewers read tracked
   files — start them after the fan-out's checkout-sabotage window
-  closes (AGENTS.md Testing names the e2e suite a same-class tree
+  closes (agent/gates.md names the e2e suite a same-class tree
   reader), and e2e debt owed by the wave discharges inside the wave's
   wall-clock.
 

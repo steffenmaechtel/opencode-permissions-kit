@@ -24,3 +24,4 @@ into [agent/learnings.md](../../agent/learnings.md).
 | [2026-10-10/](2026-10-10/) | snapshots + resolutions 0.0.38–0.0.46: 54 snapshots, 9 resolutions, 620 finding rows |
 | [2026-10-22/](2026-10-22/) | 0.0.47–0.0.49 + PR-keyed pr-00179–pr-00222: 49 snapshots, 15 resolutions, 325 rows |
 | [2026-11-07/](2026-11-07/) | PR-native era #280–#407: 52 PRs, 132 rounds, 339 subagent sessions — staffing economics |
+| [2026-11-25/](2026-11-25/) | M3 baseline: era #280–#776 (398 rounds) + 20-round basis — review efficiency |

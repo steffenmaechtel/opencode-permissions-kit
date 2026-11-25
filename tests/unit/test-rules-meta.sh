@@ -91,12 +91,13 @@ EOF
 new_scratch() { # green baseline tree
     SCRATCH=$WORK/s$$.$1
     mkdir -p "$SCRATCH/scripts" "$SCRATCH/agent" "$SCRATCH/internal/records" \
-        "$SCRATCH/internal/rules-meta"
+        "$SCRATCH/internal/rules-meta" "$SCRATCH/tests"
     cp scripts/gen-rules-index.py "$SCRATCH/scripts/"
     : >"$SCRATCH/agent/test-fidelity.md"  # in SCOPE_FILES; empty = no units
     : >"$SCRATCH/agent/review-concept.md" # in SCOPE_FILES; empty = no units
     : >"$SCRATCH/agent/docs-loop.md"      # in SCOPE_FILES; empty = no units
     : >"$SCRATCH/AGENTS.md"               # in SCOPE_FILES; empty = no units
+    : >"$SCRATCH/tests/AGENTS.md"         # in SCOPE_FILES; empty = no units
     cat >"$SCRATCH/agent/conventions.md" <<'EOF'
 # Conventions
 

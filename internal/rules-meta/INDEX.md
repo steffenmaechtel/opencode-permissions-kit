@@ -8,12 +8,12 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**218 metas · 215 active · 3 retired · 35 review-pending · next due 2026-11-20**
+**218 metas · 215 active · 3 retired · 49 review-pending · next due 2026-11-20**
 
 ## Actionable
 
 - **Review pending:** RM-0190, RM-0191, RM-0192, RM-0193, RM-0194, RM-0195, RM-0196, RM-0197, RM-0198, RM-0199, RM-0200, RM-0201, RM-0202, RM-0203, RM-0204, RM-0205, RM-0206, RM-0207, RM-0208, RM-0209, RM-0210, RM-0211, RM-0212, RM-0213, RM-0214, RM-0215, RM-0216, RM-0217, RM-0218
-- **Amended — pending:** RM-0133 (2026-11-21), RM-0078 (2026-11-22), RM-0135 (2026-11-22), RM-0136 (2026-11-22), RM-0154 (2026-11-22), RM-0182 (2026-11-22)
+- **Amended — pending:** RM-0133 (2026-11-21), RM-0078 (2026-11-22), RM-0135 (2026-11-22), RM-0136 (2026-11-22), RM-0154 (2026-11-22), RM-0182 (2026-11-22), RM-0003 (2026-11-25), RM-0014 (2026-11-25), RM-0015 (2026-11-25), RM-0016 (2026-11-25), RM-0017 (2026-11-25), RM-0042 (2026-11-25), RM-0043 (2026-11-25), RM-0044 (2026-11-25), RM-0111 (2026-11-25), RM-0117 (2026-11-25), RM-0137 (2026-11-25), RM-0151 (2026-11-25), RM-0173 (2026-11-25), RM-0179 (2026-11-25)
 
 ## AGENTS.md
 
@@ -100,24 +100,6 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0155](0/1/5/RM-0155.md) | A mktemp receiver in shipped | active | approved | 1m | 2026-12-15 |
-
-### Test sandbox (unit suites)
-
-| Meta | Rule | Status | Review | Cycle | Next revisit |
-|---|---|---|---|---|---|
-| [RM-0003](0/0/0/RM-0003.md) | An rm — any flag form, on a variable with a… | active | approved | 6m | 2027-05-17 |
-| [RM-0014](0/0/1/RM-0014.md) | Operate only on the suite's scratch | active | approved | 6m | 2027-05-17 |
-| [RM-0015](0/0/1/RM-0015.md) | Never touch real project or system trees | active | approved | 6m | 2027-05-17 |
-| [RM-0016](0/0/1/RM-0016.md) | Fixture data is written sandboxed at the source | active | approved | 6m | 2027-05-17 |
-| [RM-0017](0/0/1/RM-0017.md) | Code extracted from shipped scripts and eval'd… | active | approved | 6m | 2027-05-17 |
-| [RM-0042](0/0/4/RM-0042.md) | Mutation check — a mutating verb | active | approved | 6m | 2027-05-20 |
-| [RM-0043](0/0/4/RM-0043.md) | Real-tree ratchet — any path-shaped | active | approved | 6m | 2027-05-20 |
-| [RM-0044](0/0/4/RM-0044.md) | rm suffix guard — any rm invocation | active | approved | 1m | 2026-12-20 |
-| [RM-0137](0/1/3/RM-0137.md) | Scratch receivers in harness-sourcing suites… | active | approved | 1m | 2026-12-06 |
-| [RM-0151](0/1/5/RM-0151.md) | The decision rule for writing NEW | active | approved | 1m | 2026-12-15 |
-| [RM-0173](0/1/7/RM-0173.md) | A harness env override consumed | active | approved | 1m | 2026-12-17 |
-| [RM-0179](0/1/7/RM-0179.md) | The controlled PATH of an | active | approved | 1m | 2026-12-20 |
-| [RM-0208](0/2/0/RM-0208.md) | Every path a fixture | active | **pending** | 1m | 2026-12-22 |
 
 ### Never-write pins (unit suites)
 
@@ -322,7 +304,7 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0071](0/0/7/RM-0071.md) | The disposition ledger in | active | approved | 1m | 2026-11-28 |
-| [RM-0117](0/1/1/RM-0117.md) | Bookkeeping edits to in-scope files | retired | approved | 1m | 2026-11-24 |
+| [RM-0117](0/1/1/RM-0117.md) | Bookkeeping edits to in-scope files | retired | **amended — pending** | 1m | 2026-11-24 |
 
 ### Finding provenance
 
@@ -379,7 +361,7 @@
 | [RM-0090](0/0/9/RM-0090.md) | Final chat answers are | active | approved | 1m | 2026-11-28 |
 | [RM-0092](0/0/9/RM-0092.md) | Checkpoint files timestamp every subagent | active | approved | 6m | 2027-05-20 |
 | [RM-0108](0/1/0/RM-0108.md) | Fan-out is staged, never launched | active | approved | 1m | 2026-11-22 |
-| [RM-0111](0/1/1/RM-0111.md) | Sabotage spot-checks mutate the | active | approved | 1m | 2026-11-22 |
+| [RM-0111](0/1/1/RM-0111.md) | Sabotage spot-checks mutate the | active | **amended — pending** | 1m | 2026-11-22 |
 | [RM-0114](0/1/1/RM-0114.md) | Agents stamp with their own | active | approved | 1m | 2026-11-22 |
 | [RM-0172](0/1/7/RM-0172.md) | A shipped code block is | active | approved | 1m | 2026-12-17 |
 | [RM-0186](0/1/8/RM-0186.md) | A session close (window, terminal, host) | active | approved | 1m | 2026-12-20 |
@@ -494,3 +476,23 @@
 |---|---|---|---|---|---|
 | [RM-0095](0/0/9/RM-0095.md) | Table rows in rule files | active | approved | 6m | 2027-05-20 |
 | [RM-0096](0/0/9/RM-0096.md) | Narrative-heavy sections start outside | active | approved | 6m | 2027-05-20 |
+
+## tests/AGENTS.md
+
+### Test sandbox (unit suites)
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0003](0/0/0/RM-0003.md) | An rm — any flag form, on a variable with a… | active | **amended — pending** | 6m | 2027-05-17 |
+| [RM-0014](0/0/1/RM-0014.md) | Operate only on the suite's scratch | active | **amended — pending** | 6m | 2027-05-17 |
+| [RM-0015](0/0/1/RM-0015.md) | Never touch real project or system trees | active | **amended — pending** | 6m | 2027-05-17 |
+| [RM-0016](0/0/1/RM-0016.md) | Fixture data is written sandboxed at the source | active | **amended — pending** | 6m | 2027-05-17 |
+| [RM-0017](0/0/1/RM-0017.md) | Code extracted from shipped scripts and eval'd… | active | **amended — pending** | 6m | 2027-05-17 |
+| [RM-0042](0/0/4/RM-0042.md) | Mutation check — a mutating verb | active | **amended — pending** | 6m | 2027-05-20 |
+| [RM-0043](0/0/4/RM-0043.md) | Real-tree ratchet — any path-shaped | active | **amended — pending** | 6m | 2027-05-20 |
+| [RM-0044](0/0/4/RM-0044.md) | rm suffix guard — any rm invocation | active | **amended — pending** | 1m | 2026-12-20 |
+| [RM-0137](0/1/3/RM-0137.md) | Scratch receivers in harness-sourcing suites… | active | **amended — pending** | 1m | 2026-12-06 |
+| [RM-0151](0/1/5/RM-0151.md) | The decision rule for writing NEW | active | **amended — pending** | 1m | 2026-12-15 |
+| [RM-0173](0/1/7/RM-0173.md) | A harness env override consumed | active | **amended — pending** | 1m | 2026-12-17 |
+| [RM-0179](0/1/7/RM-0179.md) | The controlled PATH of an | active | **amended — pending** | 1m | 2026-12-20 |
+| [RM-0208](0/2/0/RM-0208.md) | Every path a fixture | active | **pending** | 1m | 2026-12-22 |

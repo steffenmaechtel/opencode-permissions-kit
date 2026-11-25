@@ -1,0 +1,397 @@
+{
+  "batch": "b2",
+  "snapshots": [
+    {
+      "stem": "pr-00622a",
+      "file": "pr-622/timeline",
+      "date": "2026-11-18",
+      "scope": "wave",
+      "reviewer": "GLM-5.3-Flash x3",
+      "subject": "docs-loop batch #622 rule/meta consistency + code residue",
+      "stop_rule": "n/a",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 1, "INFO": 1 },
+      "findings": [
+        {
+          "id": "A1",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "docs",
+          "provenance": "wave-introduced",
+          "summary": "Flagged four issue refs as uncorroborated; refuted - external verification confirmed all refs resolve and match.",
+          "cross_refs": [],
+          "status": "retracted",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        },
+        {
+          "id": "C1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": "shell-semantics",
+          "area": "docs",
+          "provenance": "wave-introduced",
+          "summary": "Rule text cites dash-only 'parameter not set' literal; bash emits 'unbound variable' on set -u death.",
+          "cross_refs": ["#616"],
+          "status": "reported",
+          "repeat": false,
+          "repeat_basis": "new-class"
+        }
+      ],
+      "process_notes": [
+        "Marker raw 2 matches assignment; 2 findings extracted.",
+        "A1 retracted (refs verified OK externally), stays visible.",
+        "C1 new-class: set -u message-variable shape codified 2026-11-18 (#616) - finding date equals codification date."
+      ]
+    },
+    {
+      "stem": "pr-00654a",
+      "file": "pr-654/timeline",
+      "date": "2026-11-18",
+      "scope": "wave",
+      "reviewer": "glm-5.3-flash x1",
+      "subject": "docs-loop batch #645-#650 quality sweep",
+      "stop_rule": "n/a",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 2, "INFO": 1 },
+      "findings": [
+        {
+          "id": "A1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": "wave-introduced",
+          "summary": "RM-0154 pairs 'pushes 2-4' range with 'caught it both times'; the issue narrates exactly two catches.",
+          "cross_refs": ["#650"],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        },
+        {
+          "id": "A2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": "sibling-sweep",
+          "area": "internal",
+          "provenance": "wave-introduced",
+          "summary": "RM-0182 review log carries two referents for 'fifth leg' - insertion order versus text order.",
+          "cross_refs": ["#645"],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        },
+        {
+          "id": "A3",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "docs",
+          "provenance": "wave-introduced",
+          "summary": "L3 compression moves the re-measurement gate onto the fact table; issue #647 gates the shipped comment.",
+          "cross_refs": ["#647"],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        }
+      ],
+      "process_notes": [
+        "Marker raw 3 matches assignment; 3 findings extracted.",
+        "A2 round provenance 'delta-introduced over pre-existing base' normalized to wave-introduced."
+      ]
+    },
+    {
+      "stem": "pr-00675b",
+      "file": "pr-675/timeline",
+      "date": "2026-11-19",
+      "scope": "wave",
+      "reviewer": "GLM-5.3-Flash x1",
+      "subject": "py/tui robustness fix-wave re-review",
+      "stop_rule": "n/a",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 0, "INFO": 1 },
+      "findings": [
+        {
+          "id": "B1",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "py",
+          "provenance": "pre-existing",
+          "summary": "P11 comment's first clause still overstates exit-3 triggers; only piped shapes exit 3 (Q6 residue).",
+          "cross_refs": ["pr-00675 a Q6"],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "cross-ref"
+        }
+      ],
+      "process_notes": [
+        "Marker raw 1 matches assignment; 1 finding extracted.",
+        "B1 provenance stated as 'pre-existing carried through the fix'; recorded as pre-existing."
+      ]
+    },
+    {
+      "stem": "pr-00705z",
+      "file": "pr-705/timeline",
+      "date": "2026-11-20",
+      "scope": "other",
+      "reviewer": "glm-5.3-flash x4",
+      "subject": "docs-loop batch #686-#692 case ledger, closing round",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 3, "LOW": 4, "INFO": 7 },
+      "findings": [
+        {
+          "id": "a-C1",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "silent-failure",
+          "secondary_class": "test-gap",
+          "area": "tests-e2e",
+          "provenance": "wave-introduced",
+          "summary": "run.sh:284 conflict arm keeps blanket merge silencing - the exact shape the wave's own RM-0191 forbids.",
+          "cross_refs": ["#686", "#678"],
+          "status": "reported",
+          "repeat": false,
+          "repeat_basis": "new-class"
+        },
+        {
+          "id": "a-C2",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "test-gap",
+          "secondary_class": "docs-policy",
+          "area": "multiple",
+          "provenance": "wave-introduced",
+          "summary": "Identity rule parenthetical and RM-0190 Check omit plain git commit; bare-commit arms would pass the Check.",
+          "cross_refs": ["#686"],
+          "status": "reported",
+          "repeat": false,
+          "repeat_basis": "new-class"
+        },
+        {
+          "id": "a-C3",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": "sibling-sweep",
+          "area": "docs",
+          "provenance": "wave-introduced",
+          "summary": "learnings.md 'chain ending in the commit' contradicts the new post-rebase sequence ending in make test.",
+          "cross_refs": ["#687"],
+          "status": "reported",
+          "repeat": false,
+          "repeat_basis": "new-class"
+        },
+        {
+          "id": "a-A1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "docs",
+          "provenance": "wave-introduced",
+          "summary": "Conventions drops the 'global' qualifier from the no-identity claim; repo-local config satisfies commits.",
+          "cross_refs": ["#686"],
+          "status": "reported",
+          "repeat": false,
+          "repeat_basis": "new-class"
+        },
+        {
+          "id": "a-C4",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "docs",
+          "provenance": "wave-introduced",
+          "summary": "'grep -cF (expect exactly 1)' fails on legitimately recurring literals - measured double-counts at two sites.",
+          "cross_refs": ["#483"],
+          "status": "reported",
+          "repeat": false,
+          "repeat_basis": "new-class"
+        },
+        {
+          "id": "a-C5",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": "docs-policy",
+          "area": "docs",
+          "provenance": "wave-introduced",
+          "summary": "Inserted wrap paragraph distances 'follows the same boundary' from its #472 antecedent; anaphor can mis-bind.",
+          "cross_refs": ["#472"],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        },
+        {
+          "id": "a-B1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "process",
+          "secondary_class": "wiring-gate",
+          "area": "internal",
+          "provenance": "wave-introduced",
+          "summary": "Four new metas' Source token '2026-11-19/20' matches the inv10 slash-token regex, resolves to nothing - permanent audit noise.",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": false,
+          "repeat_basis": "new-class"
+        },
+        {
+          "id": "a-A2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "'#483 literals share the latent shape' over-broad - OPENCODE_PODMAN_SOCKET is a single unbreakable token.",
+          "cross_refs": ["#483"],
+          "status": "reported",
+          "repeat": false,
+          "repeat_basis": "new-class"
+        },
+        {
+          "id": "a-A4",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "docs",
+          "provenance": "wave-introduced",
+          "summary": "Wrap narrative omits the emphasis-marker obstacle; the drafted fragment check would miss emphasis-wrapped literals.",
+          "cross_refs": ["#690"],
+          "status": "reported",
+          "repeat": false,
+          "repeat_basis": "new-class"
+        },
+        {
+          "id": "a-A5",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": "wave-introduced",
+          "summary": "RM-0191 'as the only symptom' compresses #686's three-item downstream list to one.",
+          "cross_refs": ["#686"],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        },
+        {
+          "id": "a-B2",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "process",
+          "secondary_class": "wiring-gate",
+          "area": "internal",
+          "provenance": "wave-introduced",
+          "summary": "Issue-only Sources resolve zero legs, skipping the inv10 parity leg for the four new metas; recorded.",
+          "cross_refs": ["#686"],
+          "status": "reported",
+          "repeat": false,
+          "repeat_basis": "new-class"
+        },
+        {
+          "id": "a-B3",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "other",
+          "secondary_class": "process",
+          "area": "internal",
+          "provenance": "wave-introduced",
+          "summary": "Each touched RM id greps a fourth in-tree line via INDEX actionable lines - generator output, sanctioned by design.",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        },
+        {
+          "id": "b-A1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "docs",
+          "provenance": "fix-induced",
+          "summary": "conventions.md cites make-bare-origin.sh unprefixed - dead at repo-root reading; real path tests/e2e/fixtures/.",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        },
+        {
+          "id": "b-A2",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "process",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": "pre-existing",
+          "summary": "RM-0191's quoted 'no merge to abort' lacks in-tree corroboration; verified at external #686; latent inv10 trap recorded.",
+          "cross_refs": ["#686"],
+          "status": "reported",
+          "repeat": false,
+          "repeat_basis": "new-class"
+        }
+      ],
+      "process_notes": [
+        "Closing round: case-total ledger (marker raw 16 -> 14 curated; merges a C1+A3, a C6+A2).",
+        "Per-finding data reconstructed from the rounds a/b comments in the same timeline; IDs prefixed a-/b- to disambiguate round b's A1/A2.",
+        "Closing severity split states 3 MED / 4 LOW / 7 INFO; per-round tables count 3 MED / 6 LOW / 5 INFO; stated_counts recorded as stated.",
+        "new-class repeat calls: e2e git-writing-arm shapes codified 2026-11-20 (#684/#686) at the finding's date; wrap/count pin shapes codified later (#738/#739, 2026-11-22)."
+      ]
+    },
+    {
+      "stem": "pr-00760b",
+      "file": "pr-760/timeline",
+      "date": "2026-11-23",
+      "scope": "wave",
+      "reviewer": "glm-5.3-flash x1",
+      "subject": "fs-baseline fix-wave re-review, mechanical sweep",
+      "stop_rule": "n/a",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 1, "INFO": 1 },
+      "findings": [
+        {
+          "id": "D1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "sibling-sweep",
+          "secondary_class": "docs-policy",
+          "area": "docs",
+          "provenance": "pre-existing",
+          "summary": "sharing-group.md table and intro keep literal opencode spelling above the paragraph generalized to <group> (C3 residue).",
+          "cross_refs": ["pr-00760 a C3"],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "cross-ref"
+        },
+        {
+          "id": "D2",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Companion drive's 660-assert is state-coupled to section 7d's first run; two-pin split collectively sound; recorded.",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": false,
+          "repeat_basis": "new-class"
+        }
+      ],
+      "process_notes": [
+        "Marker raw 2 matches assignment; 2 findings extracted.",
+        "D2 round provenance 'delta-introduced' normalized to wave-introduced."
+      ]
+    }
+  ],
+  "resolutions": []
+}

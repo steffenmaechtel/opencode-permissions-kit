@@ -1,0 +1,291 @@
+{
+  "batch": "b5",
+  "snapshots": [
+    {
+      "stem": "pr-00634a",
+      "file": "pr-634/timeline",
+      "date": "2026-11-18",
+      "scope": "wave",
+      "reviewer": "GLM-5.3-Flash x1",
+      "subject": "docs-loop batch #630/#631/#632 prose-consistency sweep",
+      "stop_rule": "n/a",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 1, "INFO": 0 },
+      "findings": [
+        {
+          "id": "A1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": "docs-policy",
+          "area": "multiple",
+          "provenance": "wave-introduced",
+          "summary": "Amended check-3 bullet carries both 'statement-scoped' and 'not statements' - opposite scope models unreconciled, copied into RM-0044.",
+          "cross_refs": ["#632"],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "cross-ref"
+        }
+      ],
+      "process_notes": [
+        "Marker raw 1 matches assignment; 1 finding extracted.",
+        "Finding explicitly names itself an instance of the #632 class (new prose colliding with sibling text) - repeat via cross-ref.",
+        "Opening round; stop rule not in play (fixed in-round per closing summary, docs-only)."
+      ]
+    },
+    {
+      "stem": "pr-00674b",
+      "file": "pr-674/timeline",
+      "date": "2026-11-19",
+      "scope": "wave",
+      "reviewer": "GLM-5.3-Flash x1",
+      "subject": "git heal #671 fix-wave re-review: reader gates, status loops, pins",
+      "stop_rule": "n/a",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 4, "INFO": 0 },
+      "findings": [
+        {
+          "id": "D1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "silent-failure",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "wave-introduced",
+          "summary": "Conf line '/' strips to empty and returns with no say, contradicting the loud-refusal contract; on-sweep twin misclassifies reason.",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        },
+        {
+          "id": "D2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "fix-induced",
+          "summary": "Status lockout loops find on raw conf lines while comments claim they mirror the gated on-sweep - misleading rows, unbounded walk.",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        },
+        {
+          "id": "D3",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "silent-failure",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "wave-introduced",
+          "summary": "New fail-silent 'mktemp || return 0' in both status loops drops lockout rows wordlessly; detail cites the fail-loud learning itself.",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        },
+        {
+          "id": "D4",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-gap",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Several new reader-gate arms have no executing pin; the 'form arms never relax' claim is one pin away from tested.",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        }
+      ],
+      "process_notes": [
+        "Marker raw 4 matches assignment; 4 findings extracted.",
+        "D2 provenance 'fix-induced (recursion over a pre-existing ungate)' recorded as fix-induced.",
+        "D1/D3 silent-failure and D4 test-gap: standing L1/learnings + conventions coverage predates 2026-11-18; none hit the recently-codified new-class table.",
+        "Round b of an open 6-round loop; stop rule not yet in play."
+      ]
+    },
+    {
+      "stem": "pr-00698c",
+      "file": "pr-698/timeline",
+      "date": "2026-11-20",
+      "scope": "wave",
+      "reviewer": "GLM-5.3-Flash x1",
+      "subject": "ddev handover #697 fix-wave re-review: find-failure pin discrimination",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 1, "INFO": 1 },
+      "findings": [
+        {
+          "id": "E1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Pin (d2) stays green if the probe skips chmod +t entirely - non-discriminating; adjacent (d) pin covers, cost is red misattribution.",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        },
+        {
+          "id": "E2",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "(d2)'s warn grep is unanchored and could substring-match a per-subdir warn; unreachable without two simultaneous regressions.",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        }
+      ],
+      "process_notes": [
+        "Marker raw 2 matches assignment; 2 findings extracted.",
+        "Both findings are weak-pin defects in a test file -> test-vacuous per spec decision rule (E1 weak pin; E2 false-alarm-prone grep).",
+        "Round c declared the stop rule holds (both findings deliberately-not-done records, no review-relevant code)."
+      ]
+    },
+    {
+      "stem": "pr-00746c",
+      "file": "pr-746/timeline",
+      "date": "2026-11-22",
+      "scope": "wave",
+      "reviewer": "GLM-5.3-Flash x1",
+      "subject": "uninstall sweep #681/#748 fix-wave re-review: marker unset, header docs",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 2, "INFO": 2 },
+      "findings": [
+        {
+          "id": "E1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "fix-induced",
+          "summary": "Header parenthetical scopes 'checkout copy first, LIBDIR fallback' over git-heal-core.sh, which sources only the deployed LIBDIR copy.",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        },
+        {
+          "id": "E2",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "other",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "fix-induced",
+          "summary": "Rewrap residue: orphaned '# the' line left in the same header comment.",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": false,
+          "repeat_basis": "new-class"
+        },
+        {
+          "id": "E3",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "sibling-sweep",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "pre-existing",
+          "summary": "D1's unset isolates the probe only; sibling persisted stubs not unset - latent, marker derives solely from the probe.",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        },
+        {
+          "id": "E4",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "test-gap",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "fix-induced",
+          "summary": "The unset also removes a bash export -f-planted probe; the D1 pin cannot cover that variant - recorded coverage note.",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        }
+      ],
+      "process_notes": [
+        "Marker raw 4 matches assignment; 4 findings extracted.",
+        "E2 'other' judged individually: no documented rule/convention covers rewrap-residue hygiene -> repeat false, new-class.",
+        "E3 essence is the D1 class fix missing same-shape sibling sites -> sibling-sweep (L1 class-sweep learning standing).",
+        "E4 recorded (verdict 'recorded'), not retracted; kept status reported.",
+        "Round comment: stop rule holds after wave c (comment-only dispositions)."
+      ]
+    },
+    {
+      "stem": "pr-00770c",
+      "file": "pr-770/timeline",
+      "date": "2026-11-23",
+      "scope": "wave",
+      "reviewer": "GLM-5.3-Flash x1",
+      "subject": "agent host notes #721 fix-wave re-review: literal list pins",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 1, "INFO": 2 },
+      "findings": [
+        {
+          "id": "G1",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "test-gap",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "pre-existing",
+          "summary": "Instruction sentences outside the pairs stay unpinned - strongest: the report line (AGENTS-HOST.md:16-18).",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        },
+        {
+          "id": "G2",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "fix-induced",
+          "summary": "Literal 'Never write into' ends at the line-43 wrap; a re-wrap reds the row with text intact - documented false-alarm mode.",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        },
+        {
+          "id": "G3",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "fix-induced",
+          "summary": "Rewritten list comment accounts for 15 of 17 literals; first-stop and fallback literals sit outside its description.",
+          "cross_refs": [],
+          "status": "reported",
+          "repeat": true,
+          "repeat_basis": "pre-existing-rule"
+        }
+      ],
+      "process_notes": [
+        "Marker raw 3 matches assignment; 3 findings extracted.",
+        "G2's wrap-fragile literal shape is explicitly sanctioned/documented by agent/conventions 'Source-counting pins' - standing convention coverage, pre-existing-rule (not in the new-class table).",
+        "Stop rule declared met conditional on comment-only wave c; closing summary confirms comment-only.",
+        "No explicit cross-references to earlier findings in this round; no cross-ref-based repeats."
+      ]
+    }
+  ],
+  "resolutions": []
+}

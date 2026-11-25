@@ -40,7 +40,7 @@ REPO_FILES="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib"
 WORK="$(work_new)"
 
 # Controlled PATH (the 0.0.46a F2 environment-dependence class; the
-# rule lives in agent/conventions.md, "Test sandbox (unit suites)"):
+# rule lives in tests/AGENTS.md, "Test sandbox (unit suites)"):
 # a scratch bin with stubs for the probes whose HOST state would leak
 # into rows. Everything else the sections touch (stat on scratch paths,
 # getent for absent users) is deterministic on its own.
@@ -408,7 +408,7 @@ fi
 
 # --- 6. Advisories section: missing-binary gate + healthy verdict ------------------
 # Scratch LIBDIR with the REAL shipped advisory database and a stub
-# opencode binary. Controlled PATH (agent/conventions.md, "Test sandbox
+# opencode binary. Controlled PATH (tests/AGENTS.md, "Test sandbox
 # (unit suites)" — the controlled-PATH rule): a scratch bin with
 # symlinks to the section's few externals — stat, grep, sed, head — and
 # deliberately NO sudo, NO timeout, NO curl (every network / privilege
@@ -731,7 +731,7 @@ fi
 # Behavioral pins (L1, #456): the truncation gates EXECUTED, not just
 # present — fresh child per gate, scratch tree carrying a present-but-
 # truncated lib copy (the skew shape), controlled PATH (/usr/bin:/bin,
-# conventions.md "Test sandbox" controlled-PATH rule: the extracted
+# tests/AGENTS.md "Test sandbox" controlled-PATH rule: the extracted
 # code must not see a contributor's nvm & co),
 # the warn row observed the way production renders it (stdout).
 _gate_scratch="$(work_new)"

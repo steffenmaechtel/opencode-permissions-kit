@@ -1,6 +1,6 @@
 #!/bin/sh
 # Unit tests for scripts/reviews-meta-aggregate.py: the aggregator behind
-# the reviews-meta runs. Five pins: (1) COMPAT — regenerating the frozen
+# the reviews-meta runs. Six pins: (1) COMPAT — regenerating the frozen
 # 2026-10-10 extraction data must reproduce its committed stats.json
 # byte-for-byte (a schema/ordering drift in the aggregator would corrupt
 # every future run's comparability); (2) PR-STEM ERA — the 2026-10-22
@@ -10,7 +10,10 @@
 # 7-bit-locale host survives a batch with raw non-ASCII (#513 A3);
 # (4) PRINT — the console summary survives a non-ASCII PRINTED field
 # under the same locale (#517 S1); (5) RECIPE — the reusable extract.py
-# pins its text IO (#517 S2, source pins).
+# pins its text IO (#517 S2, source pins); (6) NORMALIZE — the
+# 2026-11-25 M3 normalize step drops closing summaries in every era
+# spelling and keeps ground-truth PR identity (#780 a B4/B1,
+# execution pins over the real script).
 # Run: sh tests/unit/test-reviews-meta-aggregate.sh
 set -u
 
@@ -234,6 +237,57 @@ check_live "recipe: subagents write pins utf-8 (#517 S2)" "$EXTRACT" \
 _UNPINNED="$(live_src "$EXTRACT" | grep -cE 'text=True|open\([^)]*"[wa]"\)')"
 check "recipe: no unpinned w/a-mode open or text=True remains (#518 a S1, #518 b S1)" \
     [ "$_UNPINNED" -eq 0 ]
+
+# --- #780 a B4/B1: the M3 normalize step (closing exclusion, case identity) ----
+# Round a of PR #780: normalize.py excluded closing summaries only by
+# the OLD-era spellings (state "closed", wave "close"), so the new-era
+# closing markers (wave "z" carrying case-total counts, wave
+# "closing") passed the filter and double-counted into the era totals;
+# the marker's own "case" field overrode the ground-truth PR identity
+# (a marker on PR #563 claimed pr-00562). Execution pins over the real
+# script (no gh): every era spelling of a dedicated closing comment
+# drops; the pilot-era round comment that carried state
+# "closing-proposed" with a round-letter wave STAYS (round-level
+# counts, frozen 2026-11-07 precedent); ground truth beats a forged
+# marker case, logged as an anomaly.
+NORM="$REPO/internal/reviews-meta/2026-11-25/data/normalize.py"
+mkdir -p "$WORK/norm"
+cat >"$WORK/norm/rounds-raw.jsonl" <<'EOF'
+{"case":"pr-00600","wave":"a","state":"open","raw":3,"med":1,"high":0,"pr":600,"mergedAt":"2026-11-20T10:00:00Z","commentAt":"2026-11-20T10:00:00Z"}
+{"case":"pr-00600","wave":"z","state":"closing-proposed","raw":3,"med":1,"high":0,"pr":600,"mergedAt":"2026-11-20T10:00:00Z","commentAt":"2026-11-21T10:00:00Z"}
+{"case":"pr-00601","wave":"closing","state":"closing-proposed","raw":2,"med":0,"high":0,"pr":601,"mergedAt":"2026-11-20T10:00:00Z","commentAt":"2026-11-20T10:00:00Z"}
+{"case":"pr-00602","wave":"close","state":"open","raw":9,"med":9,"high":9,"pr":602,"mergedAt":"2026-11-20T10:00:00Z","commentAt":"2026-11-20T10:00:00Z"}
+{"case":"603","wave":"e","state":"closed","raw":9,"med":9,"high":9,"pr":603,"mergedAt":"2026-11-20T10:00:00Z","commentAt":"2026-11-20T10:00:00Z"}
+{"case":"pr-00287","wave":"e","state":"closing-proposed","raw":1,"med":0,"high":0,"pr":287,"mergedAt":"2026-10-27T10:00:00Z","commentAt":"2026-10-27T10:00:00Z"}
+{"case":"pr-00562","wave":"a","state":"open","raw":2,"med":0,"high":0,"pr":563,"mergedAt":"2026-11-19T10:00:00Z","commentAt":"2026-11-19T10:00:00Z"}
+EOF
+(cd "$WORK/norm" && python3 "$NORM") >/dev/null 2>"$WORK/norm/err.log"
+norm_has() {
+    python3 -c "
+import json, sys
+rows = [json.loads(l) for l in open('$WORK/norm/rounds.jsonl')]
+expr = sys.argv[1]
+sys.exit(0 if eval(expr) else 1)
+" "$1"
+}
+check "wave-z closing summary (case-total marker) is excluded (#780 a B4)" \
+    norm_has "not any(r['wave'] == 'z' for r in rows)"
+check "wave-closing spelling is excluded (#780 a B4)" \
+    norm_has "not any(r['wave'] == 'closing' for r in rows)"
+check "legacy wave-close is excluded (#780 a B4)" \
+    norm_has "not any(r['wave'] == 'close' for r in rows)"
+check "legacy state-closed is excluded (#780 a B4)" \
+    norm_has "not any(r.get('state') == 'closed' for r in rows)"
+check "pilot-era closing-proposed round STAYS with round-level counts (#780 a B4)" \
+    norm_has "any(r['pr'] == 287 and r['wave'] == 'e' and r['raw'] == 1 for r in rows)"
+check "the open round stays (#780 a B4)" \
+    norm_has "any(r['pr'] == 600 and r['wave'] == 'a' and r['raw'] == 3 for r in rows)"
+check "ground-truth PR beats the forged marker case (#780 a B1)" \
+    norm_has "any(r['pr'] == 563 and r['wave'] == 'a' for r in rows) and not any(r['pr'] == 562 for r in rows)"
+check "case-mismatch anomaly is logged to stderr (#780 a B1)" \
+    grep -q "CASE-MISMATCH pr=563 marker case='pr-00562'" "$WORK/norm/err.log"
+check "normalize output counts the three surviving rounds (#780 a B4)" \
+    [ "$(wc -l <"$WORK/norm/rounds.jsonl")" -eq 3 ]
 
 # --- summary gate --------------------------------------------------------------
 echo
