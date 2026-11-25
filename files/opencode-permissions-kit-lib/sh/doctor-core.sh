@@ -738,6 +738,31 @@ doctor_git_heal() {
         fi
     fi
     if [ "$_dgh_skip" = 0 ]; then
+        # Storage root for the worktree arm's layout split (#653
+        # check 4, the status-core twin's comment in full): classic
+        # registrations carry dev-owned 644 pointer files under a
+        # sticky collection, the storage re-heal (#779) leaves the
+        # subtree group-writable by design. Same guarded, validated
+        # read as the resolver's own storage leg, but from the
+        # root-owned install.conf ONLY (#787 a B2: no env precedence
+        # on report-only surfaces; the unit harness drives this leg
+        # through INSTALL_CONF); empty on a skewed lib or a
+        # declined/absent storage key -- every gitdir strict, which is
+        # right for the degraded pointer mode and the non-adopted
+        # host alike. The storage case below re-gates on non-empty
+        # (#787 a A1, probe P1: an empty prefix degenerates to /* and
+        # matches every gitdir -- the all-relaxed inversion).
+        _dgh_stor=""
+        if command -v _ghc_key >/dev/null 2>&1 && command -v _ghc_root_ok >/dev/null 2>&1; then
+            _dgh_stor=$(_ghc_key GITDIR_STORAGE)
+            # Out-param pre-assigned (the _ghc_pt_out idiom).
+            _ghc_root_norm=""
+            if _ghc_root_ok "$_dgh_stor"; then
+                _dgh_stor="$_ghc_root_norm"
+            else
+                _dgh_stor=""
+            fi
+        fi
         # Heal-drift and planted-content rows (#653 wave 1, checks 1+2;
         # the status-core twin enumerates every conf-root gitdir): the
         # healed state is the norm -- fs-baseline.sh's contract for
@@ -766,6 +791,33 @@ doctor_git_heal() {
                 ui_detail "it -- 'sudo opk update --refresh' / 'opk config refresh')"
                 ;;
         esac
+        # Group-access/setgid leg (the #653 wave-2 fold, PR #785
+        # round-a B2; the status-core twin's comment in full, measured
+        # shapes included): wave 1 checked only the sticky position --
+        # a 1700 tamper stayed quiet on every surface. Keys on the
+        # GROUP-EXECUTE slot: 'x' OR 's' (3770 renders rws) is live,
+        # 'S' and '---' (the two no-traverse shapes) fire, the
+        # setgid-only drop (g-s -> 1770, group-x kept) stays quiet by
+        # design. Works in agent runs too: stat on the gitdir path
+        # itself succeeds while its children go EACCES (the #785
+        # round-a probe).
+        case "$_dgh_perm" in
+            "")
+                ;;
+            ??????[xs]???) ;;
+            *)
+                ui_kv_warn "heal drift" "$_dgh_gd -- group access/setgid missing on the gitdir"
+                ui_detail "(the healed gitdir is group-shared 3770; a dropped group leg"
+                ui_detail "locks the agent out of .git -- re-apply: 'sudo opk"
+                ui_detail "update --refresh' / 'opk config refresh')"
+                ;;
+        esac
+        # Traversability notice (#787 a B4): on a non-traversable gitdir
+        # (the 1700 tamper class) every CHILD-entry row below goes
+        # stat-EACCES-silent; the gitdir-level rows above still fired,
+        # so the tamper stays named. The status-core twin's idiom.
+        [ -x "$_dgh_gd" ] ||
+            ui_kv "git-heal" "entry rows under $_dgh_gd may be incomplete (not traversable)"
         for _dgh_ent in config hooks; do
             _dgh_p="$_dgh_gd/$_dgh_ent"
             # A symlinked entry is its own drift: the heal pins regular
@@ -805,6 +857,29 @@ doctor_git_heal() {
             ui_detail "ACLs; re-apply: 'sudo opk update --refresh' -- storage gitdirs"
             ui_detail "re-heal on every 'sudo opk update')"
         done
+        # Suspicious repo-config keys (#653 check 3, the wave-2 arm;
+        # the status-core twin's comment in full): core.fsmonitor,
+        # core.hooksPath, core.pager, core.editor at REPO scope -- the
+        # agent-writable surface the issue names; the heal blocks
+        # FUTURE writes, these rows catch keys planted before a heal
+        # and on unhealed trees. ONE batched read per gitdir, the row
+        # carries the KEY NAMES ONLY (the four known-safe literals the
+        # awk match filters out of the list -- a crafted multi-line or
+        # control-byte VALUE can never reach the rows raw). A
+        # symlinked config is never read through -- its own drift row
+        # fired above.
+        _dgh_cfg="$_dgh_gd/config"
+        if [ -f "$_dgh_cfg" ] && [ ! -L "$_dgh_cfg" ]; then
+            _dgh_keys=$(git config -f "$_dgh_cfg" --list --name-only 2>/dev/null |
+                awk 'tolower($1) ~ /^core\.(fsmonitor|hookspath|pager|editor)$/ {print tolower($1)}' |
+                paste -sd, -)
+            if [ -n "$_dgh_keys" ]; then
+                ui_kv_warn "repo keys" "suspicious repo-config keys in $_dgh_gd/config:"
+                ui_detail "$_dgh_keys -- the repo-scope config is the agent-writable"
+                ui_detail "surface; inspect with 'git config -f $_dgh_gd/config --list'"
+                ui_detail "and remove manually (removal stays a human decision)"
+            fi
+        fi
         # Planted-content row (#653 check 2, the _fsb_heal_hookwarn
         # twin): the heal pins metadata only -- content planted before
         # it survives. Entries, not executables, matching the heal-scan
@@ -837,6 +912,186 @@ doctor_git_heal() {
                 fi
             fi
         done
+        # Worktree registration arms (#653 check 4, the wave-2 close;
+        # the status-core twin's comment in full): the heal's worktree
+        # contract checked from the gitdir side -- sticky collection,
+        # dev-owned pointer files (classic 644 no-group-write strict,
+        # storage group-writable by design, keyed through _dgh_stor
+        # above) and the back-reference cross-check that closes the
+        # fs-baseline.sh:567-573 ".git pointer swap" residual. Glob
+        # walk (newline-safe), control-byte-stripped row names.
+        _dgh_wt="$_dgh_gd/worktrees"
+        if [ -L "$_dgh_wt" ]; then
+            ui_kv_warn "worktree" "$_dgh_wt is a symlink (the heal walks regular"
+            ui_detail "collections only) -- inspect before trusting git output"
+        elif [ -d "$_dgh_wt" ]; then
+            _dgh_wstrict=1
+            if [ -n "$_dgh_stor" ]; then
+                case "$_dgh_gd" in
+                    "$_dgh_stor"/*) _dgh_wstrict=0 ;;
+                esac
+            fi
+            if [ "$_dgh_wstrict" = 1 ]; then
+                _dgh_wh1="(the heal pins them developer-owned 644 under a sticky"
+                _dgh_wh2="collection; a fresh agent worktree or tampering -- re-apply:"
+                _dgh_wh3="'sudo opk update --refresh' / 'opk config refresh')"
+                _dgh_wperm=$(stat -c %A "$_dgh_wt" 2>/dev/null) || _dgh_wperm=""
+                case "$_dgh_wperm" in
+                    ?????????[tT]) ;;
+                    "") ;;
+                    *)
+                        ui_kv_warn "worktree" "$_dgh_wt -- sticky bit missing on the collection"
+                        ui_detail "(the heal pins it sticky so a developer-owned"
+                        ui_detail "registration stays un-replaceable; re-apply: 'sudo"
+                        ui_detail "opk update --refresh' / 'opk config refresh')"
+                        ;;
+                esac
+            else
+                _dgh_wh1="(the storage re-heal pins them developer-owned; a fresh"
+                _dgh_wh2="agent worktree since the last 'sudo opk update' -- the next"
+                _dgh_wh3="update pass re-pins)"
+            fi
+            for _dgh_w in "$_dgh_wt"/* "$_dgh_wt"/.*; do
+                case "${_dgh_w##*/}" in
+                    . | ..) continue ;;
+                esac
+                [ -e "$_dgh_w" ] || [ -L "$_dgh_w" ] || continue
+                if [ -L "$_dgh_w" ]; then
+                    _dgh_wkey=$(printf '%s\n' "$_dgh_w" | tr -d '\000-\037\177')
+                    ui_kv_warn "worktree" "$_dgh_wkey is a symlink (the heal walks regular"
+                    ui_detail "registrations only) -- inspect before trusting git output"
+                    continue
+                fi
+                [ -d "$_dgh_w" ] || continue
+                _dgh_wkey=$(printf '%s\n' "$_dgh_w" | tr -d '\000-\037\177')
+                for _dgh_pf in commondir gitdir; do
+                    _dgh_pp="$_dgh_w/$_dgh_pf"
+                    if [ -L "$_dgh_pp" ]; then
+                        ui_kv_warn "worktree" "$_dgh_wkey/$_dgh_pf is a symlink (the heal"
+                        ui_detail "pins regular entries only) -- inspect before trusting"
+                        ui_detail "git output"
+                        continue
+                    fi
+                    _dgh_pown=$(stat -c %U "$_dgh_pp" 2>/dev/null) || continue
+                    _dgh_pwhy=""
+                    # Owner leg gated on a readable dev name (the
+                    # entries-loop twin's #785 b A5 class).
+                    if [ -n "$_dgh_dev" ] && [ "$_dgh_pown" != "$_dgh_dev" ]; then
+                        _dgh_pwhy="$_dgh_pown-owned (not $_dgh_dev)"
+                    fi
+                    if [ "$_dgh_wstrict" = 1 ]; then
+                        # classic-only legs: group write and extended
+                        # ACLs violate the 644 pin; the storage layout
+                        # leaves both open by design (#779).
+                        _dgh_pperm=$(stat -c %A "$_dgh_pp" 2>/dev/null) || continue
+                        case "$_dgh_pperm" in
+                            ?????w*) _dgh_pwhy="${_dgh_pwhy:+$_dgh_pwhy, }group-writable" ;;
+                        esac
+                        if [ "$_dgh_acl" = 1 ]; then
+                            if getfacl --omit-header -p "$_dgh_pp" 2>/dev/null |
+                                grep -qE '^(user|group):[^:]|^mask::|^default:'; then
+                                _dgh_pwhy="${_dgh_pwhy:+$_dgh_pwhy, }extended ACLs present"
+                            fi
+                        fi
+                    fi
+                    [ -n "$_dgh_pwhy" ] || continue
+                    ui_kv_warn "worktree" "$_dgh_wkey/$_dgh_pf -- $_dgh_pwhy"
+                    ui_detail "$_dgh_wh1"
+                    ui_detail "$_dgh_wh2"
+                    ui_detail "$_dgh_wh3"
+                done
+                # Back-reference arm (the ".git pointer swap" residual;
+                # the status-core twin's comment in full): the
+                # registration's gitdir file names the worktree's .git
+                # pointer -- cross-check it still points back. The pin
+                # makes the reference COSTLY to forge, not airtight
+                # (#787 a C3): the registration dir stays
+                # group-writable by design, so a delete+recreate in it
+                # can forge the pair -- the recreated file surfaces
+                # through the owner leg (gated on a readable dev
+                # name); storage: group-writable outright, only
+                # inconsistent swaps surface (documented residual).
+                # Untrusted content: the resolver's form gates run
+                # before any row names it, and the row texts print it
+                # through the safe control-byte strip (the 8-bit C1
+                # introducers stay the #787 b A1 accepted residual --
+                # their byte range is UTF-8 continuation space).
+                _dgh_bg="$_dgh_w/gitdir"
+                if [ -f "$_dgh_bg" ] && [ ! -L "$_dgh_bg" ]; then
+                    _dgh_bref=$(head -n 1 "$_dgh_bg" 2>/dev/null)
+                    _dgh_bbad=0
+                    case "$_dgh_bref" in
+                        '' | *[[:cntrl:]]*)
+                            _dgh_bbad=1
+                            ;;
+                        /*) ;;
+                        *)
+                            _dgh_bbad=1
+                            ;;
+                    esac
+                    if [ "$_dgh_bbad" = 0 ]; then
+                        case "$_dgh_bref" in
+                            *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]* | *[\*\?\[]*)
+                                _dgh_bbad=1
+                                ;;
+                        esac
+                    fi
+                    if [ "$_dgh_bbad" = 1 ]; then
+                        ui_kv_warn "worktree" "$_dgh_wkey/gitdir -- malformed back-reference"
+                        ui_detail "(the registration's gitdir file names the worktree's .git"
+                        ui_detail "pointer; inspect before trusting git output)"
+                    else
+                        while :; do
+                            case "$_dgh_bref" in
+                                ?*/) _dgh_bref="${_dgh_bref%/}" ;;
+                                *) break ;;
+                            esac
+                        done
+                        if [ -L "$_dgh_bref" ]; then
+                            ui_kv_warn "worktree" "$_dgh_wkey -- the worktree's .git pointer is"
+                            ui_detail "a symlink (a regular pointer file is the only legitimate"
+                            ui_detail "shape) -- inspect before trusting git output"
+                        elif [ ! -f "$_dgh_bref" ]; then
+                            # Stale-but-prunable is git's own routine
+                            # state ('worktree prune' owns it) -- a
+                            # plain uncounted row of its own (#787 a
+                            # A2: a bare ui_detail renders indented
+                            # under the PREVIOUS registration's row,
+                            # misattributed).
+                            ui_kv "worktree" "$_dgh_wkey names a gone worktree (prunable --"
+                            ui_detail "'git worktree prune' cleans stale registrations)"
+                        else
+                            _dgh_btgt=$(sed -n 's/^gitdir: //p' "$_dgh_bref" 2>/dev/null | head -n 1)
+                            case "$_dgh_btgt" in
+                                *[[:cntrl:]]*) _dgh_btgt="" ;;
+                            esac
+                            if [ -z "$_dgh_btgt" ]; then
+                                ui_kv_warn "worktree" "$_dgh_wkey -- its worktree's .git is not a"
+                                ui_detail "pointer file (no 'gitdir: ' line) -- inspect before"
+                                ui_detail "trusting git output"
+                            else
+                                while :; do
+                                    case "$_dgh_btgt" in
+                                        ?*/) _dgh_btgt="${_dgh_btgt%/}" ;;
+                                        *) break ;;
+                                    esac
+                                done
+                                _dgh_trp=$(realpath -m -- "$_dgh_btgt" 2>/dev/null) || _dgh_trp=""
+                                _dgh_rrp=$(realpath -m -- "$_dgh_w" 2>/dev/null) || _dgh_rrp=""
+                                if [ -z "$_dgh_trp" ] || [ "$_dgh_trp" != "$_dgh_rrp" ]; then
+                                    _dgh_btshow=$(printf '%s\n' "$_dgh_btgt" | tr -d '\000-\037\177')
+                                    _dgh_bfshow=$(printf '%s\n' "$_dgh_bref" | tr -d '\000-\037\177')
+                                    ui_kv_warn "worktree" "$_dgh_wkey -- its worktree's .git does not"
+                                    ui_detail "point back (it says $_dgh_btshow; the registration's"
+                                    ui_detail "gitdir file names $_dgh_bfshow) -- swapped pointer;"
+                                    ui_detail "inspect before trusting git output"
+                                fi
+                            fi
+                        fi
+                    fi
+                fi
+            done
+        fi
     fi
 }
 

@@ -353,7 +353,18 @@ check "RL2c: #777 — opk status renders the same resolved-path lockout row" \
 # observe → restore in one E arm; opk status exits 2 on the warning).
 check "RL2c: #653 W1 — status reports heal drift on the resolved storage gitdir" \
     E 'sudo chmod -t /var/www/gitdirs/rl-gh.git && opk status >/tmp/gh-pt-drift.log 2>&1; grep -qF "/var/www/gitdirs/rl-gh.git — sticky bit missing on the gitdir" /tmp/gh-pt-drift.log; _rc=$?; sudo chmod +t /var/www/gitdirs/rl-gh.git; test $_rc -eq 0'
-E 'rm -f /tmp/gh-pt-*.log'
+# #653 W2 twins (plant → observe → restore): the folded group-access
+# leg on a 1700 tamper, a planted repo-config key, and the swapped
+# worktree .git pointer (the storage-relaxed side of the worktree arm).
+check "RL2c: #653 W2 — status reports the 1700 group-access tamper" \
+    E 'sudo chmod 1700 /var/www/gitdirs/rl-gh.git && opk status >/tmp/gh-w2-grp.log 2>&1; grep -qF "/var/www/gitdirs/rl-gh.git — group access/setgid missing on the gitdir" /tmp/gh-w2-grp.log; _rc=$?; sudo chmod 3770 /var/www/gitdirs/rl-gh.git; test $_rc -eq 0'
+check "RL2c: #653 W2 — status reports a planted repo-config key" \
+    E 'git --git-dir=/var/www/gitdirs/rl-gh.git config core.pager less && opk status >/tmp/gh-w2-key.log 2>&1; grep -qF "suspicious repo-config keys in /var/www/gitdirs/rl-gh.git/config:" /tmp/gh-w2-key.log && grep -qF "core.pager" /tmp/gh-w2-key.log; _rc=$?; git --git-dir=/var/www/gitdirs/rl-gh.git config --unset core.pager; test $_rc -eq 0'
+E 'git -C /var/www/vhosts/rl-gh worktree add -q rlwt -b rlwtb 2>/dev/null'
+check "RL2c: #653 W2 — a swapped worktree pointer renders the back-reference row" \
+    E 'printf "gitdir: /var/www/gitdirs/rl-gh.git\n" >/var/www/vhosts/rl-gh/rlwt/.git && opk status >/tmp/gh-w2-sw.log 2>&1; grep -qF "/var/www/gitdirs/rl-gh.git/worktrees/rlwt — its worktree'"'"'s .git does not" /tmp/gh-w2-sw.log; _rc=$?; printf "gitdir: /var/www/gitdirs/rl-gh.git/worktrees/rlwt\n" >/var/www/vhosts/rl-gh/rlwt/.git; test $_rc -eq 0'
+E 'git -C /var/www/vhosts/rl-gh worktree remove --force rlwt >/dev/null 2>&1'
+E 'rm -f /tmp/gh-pt-*.log /tmp/gh-w2-*.log'
 E 'sudo opk git-protection revert --all >/tmp/gp-revert.log 2>&1' &&
     echo "  ${GREEN}OK${NC}  opk git-protection revert --all completed"
 check "RL2c: revert walks rl-gh back to the classic layout" \

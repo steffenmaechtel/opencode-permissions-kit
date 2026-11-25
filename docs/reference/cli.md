@@ -180,10 +180,12 @@ filesystem root is the stop. The doctor report includes the #703
 wholesale-swap detection row: a `.git owner` warn when this project's
 `.git` directory owner differs from the project root's owner
 (`opk status` carries the install-wide twin across every registered
-root), and the #653 wave-1 twin of the status integrity rows — `heal
-drift` warns for this project's gitdir (sticky bit, developer-owned
-`config`/`hooks`, no group write or extended ACLs) and a `planted` warn
-for non-`.sample` hook content (display-only either way). A marker is an
+root), and the #653 twin of the status integrity rows — `heal
+drift` warns for this project's gitdir (sticky bit, group
+access/setgid, developer-owned `config`/`hooks`, no group write or
+extended ACLs), a `repo keys` warn for suspicious repo-scope config
+keys, a `planted` warn for non-`.sample` hook content, and `worktree`
+warns for the registration pointer arms (display-only either way). A marker is an
 existing regular file (a
 symlink to one counts; a dangling symlink or a directory named
 `opk.json` does not — discovery continues to the next ancestor, and
@@ -686,13 +688,23 @@ hints and the one-line verdict (the **Summary** row: *All green* or the
 alert/warning tally). The git-heal section also carries the #703
 wholesale-swap detection: a `.git owner` warn row per repository whose
 `.git` directory owner differs from its project directory's owner, plus
-the #653 wave-1 integrity rows — a `heal drift` warn per gitdir whose
-healed state diverged (sticky bit missing on the gitdir, `config`/`hooks`
-not developer-owned, group-writable or carrying extended ACLs, or a
-symlinked `config`/`hooks` entry; re-apply
+the #653 integrity rows — a `heal drift` warn per gitdir whose
+healed state diverged (sticky bit missing, group access/setgid dropped
+from the group-shared 3770 shape, `config`/`hooks` not developer-owned,
+group-writable or carrying extended ACLs, or a symlinked `config`/`hooks`
+entry; re-apply
 via `sudo opk update --refresh`, storage gitdirs re-heal on every
-`sudo opk update`) and a `planted` warn for non-`.sample` entries in
-`.git/hooks` (all display-only — inspect before trusting git output; see
+`sudo opk update`), a `repo keys` warn for suspicious repo-scope config
+keys (`core.fsmonitor`, `core.hooksPath`, `core.pager`, `core.editor`
+— the row names the keys; the agent-writable surface the issue
+names), a `planted` warn for non-`.sample` entries in
+`.git/hooks`, and `worktree` warns for registration pointer files that
+left the healed contract (developer-owned; classic trees also sticky
+collection, no group write — the storage layout leaves them
+group-writable by design) or for a worktree's `.git` pointer that no
+longer points back at its registration (a swapped pointer; a stale
+registration renders a prunable hint instead) (all display-only —
+inspect before trusting git output; see
 [the security model](../concepts/security-model.md)). The
 `Git protection` section reports the
 [nailed pointer layout](../how-to/git-protection.md) — its rows and
