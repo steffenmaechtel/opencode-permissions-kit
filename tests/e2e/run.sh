@@ -1789,10 +1789,16 @@ echo "--- 12n. opk doctor detect + handover-me warning (issue #352 / #313 phase 
 # fixture uid_maps; the mixed class needs real second-owner files.
 E 'mkdir -p /var/www/vhosts/doctor-det/public/scss /var/www/vhosts/doctor-det/src && cd /var/www/vhosts/doctor-det && git init -q . && printf "public/deps.js\n" >.gitignore && echo body >public/scss/main.scss && echo app >public/deps.js && echo idx >src/index.php'
 # #653 W1: the git-heal section's drift rows are counted warns — carry
-# the healed .git shape (sticky, 644 config, 755 hooks) so the detect
-# legs below keep their no-findings rc-0 semantics (the consent flow is
-# what they pin, not git-heal findings).
+# the healed .git shape (sticky, 644 config, 755 hooks, no extended
+# ACLs) so the detect legs below keep their no-findings rc-0 semantics
+# (the consent flow is what they pin, not git-heal findings). The
+# container's /var/www/vhosts carries default ACLs (full kit install),
+# and a plain git init INHERITS them on config/hooks — the fixture
+# must mirror the real heal's full pin sequence, setfacl -b included:
+# without it the ACL drift row (correctly) fires, doctor exits 2, and
+# the rc-0 legs redden deterministically (#785 a C2).
 E 'cd /var/www/vhosts/doctor-det && chmod +t .git && chmod 644 .git/config && chmod 755 .git/hooks'
+E 'cd /var/www/vhosts/doctor-det && setfacl -b .git/config .git/hooks'
 E 'sudo chown opencode /var/www/vhosts/doctor-det/public/deps.js'
 check "12n: detect proposes the mixed boundary (ignored artifact + human sources)" \
     E 'cd /var/www/vhosts/doctor-det && opk doctor detect </dev/null >/tmp/ddet-eof.log 2>&1; test $? -eq 1 && grep -q "candidate      public --" /tmp/ddet-eof.log && grep -q "mixed with human-owned files" /tmp/ddet-eof.log && grep -q "one owner for both" /tmp/ddet-eof.log'
@@ -1800,10 +1806,14 @@ check "12n: declined detect prints the paste snippet, writes nothing" \
     E 'test ! -e /var/www/vhosts/doctor-det/opk.json && grep -qF "{\"path\": \"public\"," /tmp/ddet-eof.log'
 check "12n: tracked dev-only dirs are no candidates" \
     E '! grep -q "candidate      src --" /tmp/ddet-eof.log'
+# #785 a C2: the dump arms keep their evidence value but no longer own
+# the exit — a bare `cat` tail returned rc 0 and turned a failing
+# assertion into a PASS (the pre-push e2e runs 3/4 were exactly that
+# false green; the archived logs show the marker twice each).
 check "12n: consented detect writes a valid opk.json (rc 0)" \
-    E 'cd /var/www/vhosts/doctor-det && printf "y\n" | opk doctor detect >/tmp/ddet-y.log 2>&1; test $? -eq 0 && python3 -m json.tool /var/www/vhosts/doctor-det/opk.json >/dev/null && grep -qF "\"path\": \"public\"" /var/www/vhosts/doctor-det/opk.json || { echo "----- 12n consented-detect output (failure evidence):"; cat /tmp/ddet-y.log; }'
+    E 'cd /var/www/vhosts/doctor-det && printf "y\n" | opk doctor detect >/tmp/ddet-y.log 2>&1; test $? -eq 0 && python3 -m json.tool /var/www/vhosts/doctor-det/opk.json >/dev/null && grep -qF "\"path\": \"public\"" /var/www/vhosts/doctor-det/opk.json || { echo "----- 12n consented-detect output (failure evidence):"; cat /tmp/ddet-y.log; false; }'
 check "12n: re-detect sees the tree declared, proposes nothing new (rc 0)" \
-    E 'cd /var/www/vhosts/doctor-det && opk doctor detect </dev/null >/tmp/ddet-again.log 2>&1; test $? -eq 0 && grep -q "already declared (via public)" /tmp/ddet-again.log || { echo "----- 12n re-detect output (failure evidence):"; cat /tmp/ddet-again.log; }'
+    E 'cd /var/www/vhosts/doctor-det && opk doctor detect </dev/null >/tmp/ddet-again.log 2>&1; test $? -eq 0 && grep -q "already declared (via public)" /tmp/ddet-again.log || { echo "----- 12n re-detect output (failure evidence):"; cat /tmp/ddet-again.log; false; }'
 check "12n: the scan now reports the declared tree at-risk with the guided remedy hint" \
     E 'cd /var/www/vhosts/doctor-det && opk doctor >/tmp/ddet-scan.log 2>&1; test $? -eq 1 && grep -q "entries at-risk" /tmp/ddet-scan.log && grep -qF "fix: opk doctor fix" /tmp/ddet-scan.log'
 check "12n: handover me on the declared tree warns before acting (dry run previews it)" \
