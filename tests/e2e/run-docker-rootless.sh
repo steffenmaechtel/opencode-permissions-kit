@@ -325,6 +325,21 @@ check "RL2c: the adopt hint fires on a fresh classic tree (hooks on)" \
     E 'git -C /var/www/vhosts init -q rl-gp2 && cd /var/www/vhosts/rl-gp2 && git -c user.email=t@e -c user.name=t commit -q --allow-empty -m x && git checkout -q -b hint 2>/tmp/gp-hint.log && grep -q "opk git-protection" /tmp/gp-hint.log'
 check "RL2c: no adopt hint on the adopted tree (self-silencing)" \
     E 'cd /var/www/vhosts/rl-gh && git checkout -q -b gp-post 2>/tmp/gp-hint2.log && ! grep -q "opk git-protection" /tmp/gp-hint2.log'
+
+# --- RL2c/#777: the git-heal sweeps see POINTER-FILE checkouts ---
+# The run.sh 12q twin: rl-gh is adopted right now and the heal hooks
+# are on since RL2b — `git-heal on` must heal the storage gitdir
+# through the pointer file, and `status` must name that resolved path
+# in its lockout rows (the live incident: both sweeps were blind to
+# pointer shapes and reported green over a real lockout).
+E 'sudo chown root /var/www/gitdirs/rl-gh.git/index'
+check "RL2c: #777 — git-heal on heals the pointer checkout's storage gitdir" \
+    E 'sudo opk git-heal on >/tmp/gh-pt-on.log 2>&1 && grep -qF "operand set re-pinned for /var/www/gitdirs/rl-gh.git" /tmp/gh-pt-on.log && test "$(stat -c %U /var/www/gitdirs/rl-gh.git/index)" = "opencode" && grep -qF "gitdir=/var/www/gitdirs/rl-gh.git" /usr/local/lib/opencode-permissions-kit/git-heal/heal.log'
+check "RL2c: #777 — status names the resolved storage gitdir in its lockout rows" \
+    E 'sudo chown root /var/www/gitdirs/rl-gh.git/index && sudo opk git-heal status >/tmp/gh-pt-st.log 2>&1 && grep -qF "heals it): /var/www/gitdirs/rl-gh.git/index is root-owned" /tmp/gh-pt-st.log'
+check "RL2c: #777 — opk status renders the same resolved-path lockout row" \
+    E 'opk status >/tmp/gh-pt-stsec.log 2>&1; grep -qF "/var/www/gitdirs/rl-gh.git/index is root-owned (transient —" /tmp/gh-pt-stsec.log'
+E 'rm -f /tmp/gh-pt-*.log'
 E 'sudo opk git-protection revert --all >/tmp/gp-revert.log 2>&1' &&
     echo "  ${GREEN}OK${NC}  opk git-protection revert --all completed"
 check "RL2c: revert walks rl-gh back to the classic layout" \

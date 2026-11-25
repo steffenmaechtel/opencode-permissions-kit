@@ -2924,12 +2924,14 @@ fi
 # the broken-kit sites — any over-sweep with this wording, any file,
 # fails with the actual set printed (a growing set is a deliberate
 # ratchet edit: extend _k165_want alongside the new site; update-check
-# joined with issue #358, git-protection-core with #764).
+# joined with issue #358, git-protection-core with #764,
+# git-heal-core with #777 review a S3).
 _k165_want='kit file sh/ddev-handover.sh missing
 kit file sh/ddev-hosts.sh missing
 kit file sh/ddev-migrate.sh missing
 kit file sh/ddev-terminal.sh missing
 kit file sh/git-check.sh missing
+kit file sh/git-heal-core.sh missing
 kit file sh/git-protection-core.sh missing
 kit file sh/update-check.sh missing'
 _k165_got="$(grep -o 'kit file sh/[a-z0-9-]*\.sh missing' "$STATUS_CORE" | LC_ALL=C sort -u)"

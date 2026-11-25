@@ -686,9 +686,33 @@ doctor_git_heal() {
     # Lockout classification for THIS project's main checkout. The row
     # set mirrors heal-index-head's operand list (#678 widening;
     # existence-gated — absent files render nothing, same as the
-    # status-core twin).
+    # status-core twin). BOTH shapes (#777): a pointer-file checkout
+    # classifies through the RESOLVED gitdir (the same resolver the
+    # sweeps use, cross-lib call-site-guarded — unavailable degrades
+    # to ONE counted warn row; a refused pointer keeps the resolver's
+    # own skip note); the wholesale-swap detection row stays
+    # dir-shaped (the pointer layout's swap detection is the nail +
+    # git-protection rows).
     _dgh_gd="$DOCTOR_ROOT/.git"
-    if [ -d "$_dgh_gd" ]; then
+    _dgh_skip=0
+    # _ghc_pt_out is the cross-lib resolver's out-param (assigned in
+    # git-heal-core on its rc-0 path).
+    _ghc_pt_out=""
+    if [ -f "$_dgh_gd" ] && [ ! -L "$_dgh_gd" ]; then
+        if ! command -v _ghc_pt_target >/dev/null 2>&1; then
+            ui_kv_warn "git-heal" "pointer-file checkout not classified -- kit file""\
+ sh/git-heal-core.sh missing or outdated (fix: sudo opk update)"
+            _dgh_skip=1
+        elif ! _ghc_pt_target "$_dgh_gd"; then
+            # The resolver's skip note named the reason (submodule
+            # form, garbage pointer) — nothing further to classify.
+            _dgh_skip=1
+        else
+            _dgh_gd="$_ghc_pt_out"
+        fi
+    elif [ ! -d "$_dgh_gd" ]; then
+        _dgh_skip=1
+    else
         # Wholesale-swap detection row (#653 family, #702/#703 — the
         # status-core twin enumerates every conf-root gitdir): with the
         # top-folder sticky gone (W1/W2 residuals, fs-baseline.sh
@@ -708,6 +732,8 @@ doctor_git_heal() {
             ui_detail "is $_dgh_pown-owned — wholesale .git swap suspected (or an agent-"
             ui_detail "cloned repo); inspect before trusting git output"
         fi
+    fi
+    if [ "$_dgh_skip" = 0 ]; then
         for _dgh_f in index HEAD ORIG_HEAD REBASE_HEAD packed-refs \
             MERGE_HEAD MERGE_MSG MERGE_MODE AUTO_MERGE \
             CHERRY_PICK_HEAD REVERT_HEAD; do

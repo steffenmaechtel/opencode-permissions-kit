@@ -41,7 +41,25 @@ This is opt-in and idempotent; install and update never activate it.
    [secure git config](secure-git-config.md), plus the heal. Project
    hook tooling (husky, pre-commit) stops working for you; on a kit
    machine that trade is usually right.
-3. Heals every kit-managed main checkout once, immediately.
+3. Heals every kit-managed main checkout once, immediately. The
+   sweep enumerates both `.git` shapes under the configured roots:
+   classic directories and pointer files (`gitdir: …`, the
+   [pointer layout](git-protection.md)) — a pointer resolves to the
+   storage gitdir its operands live in, a linked worktree's pointer
+   to its common gitdir (the same target the hooks resolve), and a
+   relative (submodule-form) pointer is skipped with a note:
+   `.git/modules` is developer-pinned by the baseline and never
+   healed. A resolved target is only accepted when it sits under the
+   git-protection storage root or is itself a `.git`-named directory —
+   the two classes the kit deploys; anything else (a foreign
+   `--separate-git-dir` layout, or a pointer planted to nominate an
+   arbitrary repository for the root heal) is skipped with a note.
+   `opk git-heal status` scans the same universe for its
+   lockout rows, and so do the `opk status` git-heal section and
+   `opk doctor`'s per-project row — they resolve pointer checkouts
+   through the same gate and name the resolved storage paths
+   (issue
+   [#777](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/777)).
 
 From then on four identical hooks — `post-merge`, `post-checkout`,
 `post-rewrite`, `post-index-change` — run after your git operations in
@@ -148,4 +166,10 @@ outside every `projects.conf` root — the hooks' fast path accepts
 gitdirs under the configured storage by plain prefix match (the root
 heal's allowlist then re-validates that value through the same reader
 gate as conf roots before authorizing anything), so the heal keeps
-working unchanged after adoption.
+working unchanged after adoption. The `opk git-heal on` sweep and the
+`status` lockout scan reach adopted checkouts the same way: their
+`.git` pointer files resolve to the storage gitdirs, and the rows and
+audit lines name those resolved paths (issue
+[#777](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/777)
+— before, both sweeps matched only directory-shaped `.git` and were
+blind on a fully adopted host).

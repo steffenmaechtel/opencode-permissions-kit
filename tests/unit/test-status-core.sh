@@ -27,6 +27,11 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LIB="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core.sh"
 UI_LIB="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/ui.sh"
+# git-heal-core.sh (#777): the cross-lib resolver the git-heal section
+# call-site-guards after — the entry sources it (management/status.sh);
+# the function-level harness mirrors that sourcing (GHS_NO_GHC=1
+# unsets it for the degrade arm).
+GH_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/git-heal-core.sh"
 REPO_FILES="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib"
 
 # Shared harness (issue #394): pass/fail, colors, counters + the work
@@ -176,6 +181,20 @@ _ghs_run() {
         export PATH NO_COLOR=1 GH_GITCONFIG="$WORK/ghs/devhome/.gitconfig"
         . "$UI_LIB"
         . "$LIB"
+        # The entry's cross-lib sourcing (#777), mirrored: without the
+        # resolver the section's pointer arm degrades (GHS_NO_GHC=1
+        # drives that arm).
+        if [ "${GHS_NO_GHC:-}" != 1 ]; then
+            # shellcheck disable=SC1090
+            . "$GH_CORE"
+            # The resolver's nomination gate (#777 review a C1) reads
+            # the storage root through the documented seam, and the
+            # storage value runs through _ghc_root_ok's reader mirror
+            # (review b B1/B2) -- the relax seam is the documented
+            # unit override for /tmp scratch zones; the e2e arms
+            # exercise the real install.conf leg unrelaxed.
+            export GH_STORAGE="$WORK/ghs/ptstor" GH_CONF_RELAX=1
+        fi
         DEFAULT_USER="$(id -un)"
         OPENCODE_USER=opencode-ghs-agent
         LIBDIR="$WORK/ghs/lib"
@@ -208,6 +227,63 @@ if printf '%s' "$_out" | grep -q "lockout.*$WORK/ghs/scan/deep/repo/.git/index i
 else
     fail "git-heal section: recursive lockout row missing (out=$(printf '%s' "$_out" | grep lockout | head -2))"
 fi
+
+# --- #777: pointer-file checkouts render lockout rows through the
+# RESOLVED storage gitdir — the `opk status` twin of the git-heal sweep
+# fix. Before it, a fully adopted host showed the state row and NO
+# lockout (the same blindness the issue reports for `opk git-heal
+# status`). Fixture: adopted-shape main + worktree pointer + relative
+# (submodule-form) pointer under the scan root; the nonexistent-agent
+# OPENCODE_USER above makes every present operand render.
+mkdir -p "$WORK/ghs/ptstor"
+git -C "$WORK/ghs/scan" init -q -b main ptmain
+git -C "$WORK/ghs/scan/ptmain" -c user.email=t@e -c user.name=t commit -q --allow-empty -m x
+mv "$WORK/ghs/scan/ptmain/.git" "$WORK/ghs/ptstor/ptmain.git"
+printf 'gitdir: %s\n' "$WORK/ghs/ptstor/ptmain.git" >"$WORK/ghs/scan/ptmain/.git"
+git --git-dir="$WORK/ghs/ptstor/ptmain.git" worktree add -q "$WORK/ghs/scan/ptwt" -b ptwb 2>/dev/null
+# The .git-named leg (review a C1's accepted second class): a worktree
+# of a fresh CLASSIC repo under the scan root collapses onto its main
+# .git DIR — accepted with no storage involved (the find already
+# lists that dir; the pointer's contribution dedups onto it). The
+# deep/repo fixture cannot serve here: its .git/HEAD is truncated on
+# purpose (the nested-repo arm's row fixture) and no git op runs
+# against it.
+git -C "$WORK/ghs/scan" init -q -b main clsmain
+git -C "$WORK/ghs/scan/clsmain" -c user.email=t@e -c user.name=t commit -q --allow-empty -m x
+git -C "$WORK/ghs/scan/clsmain" worktree add -q "$WORK/ghs/scan/clswt" -b cwb 2>/dev/null
+printf '%s\n' "$WORK/ghs/scan" >"$WORK/ghs/projects.conf"
+_out=$(_ghs_run || true)
+if printf '%s' "$_out" | grep -q "lockout.*$WORK/ghs/ptstor/ptmain.git/index is $(id -un)-owned — agent git" &&
+    ! printf '%s' "$_out" | grep -qF "$WORK/ghs/ptstor/ptmain.git/worktrees/"; then
+    pass "git-heal section: a pointer checkout's lockout rows name the resolved gitdir (#777)"
+else
+    fail "git-heal section: pointer lockout rows (out=$(printf '%s' "$_out" | grep lockout | head -2)) (#777)"
+fi
+_ptr_n=$(printf '%s' "$_out" | grep -c "lockout.*$WORK/ghs/ptstor/ptmain.git/index is" || true)
+if [ "$_ptr_n" = 1 ]; then
+    pass "git-heal section: main and worktree pointers render one deduped row set (#777)"
+else
+    fail "git-heal section: pointer dedup (rows=$_ptr_n for one operand — 1 expected) (#777)"
+fi
+# The .git-named leg (review a C1): the classic repo's worktree
+# pointer collapses onto the main .git DIR and dedups onto its rows.
+_deep_n=$(printf '%s' "$_out" | grep -c "lockout.*$WORK/ghs/scan/clsmain/.git/index is" || true)
+if [ "$_deep_n" = 1 ]; then
+    pass "git-heal section: a classic worktree pointer dedups onto the main .git dir (review a)"
+else
+    fail "git-heal section: .git-named leg (rows=$_deep_n for one operand — 1 expected) (review a)"
+fi
+# The degrade arm: resolver unavailable (entry's sourcing failed) —
+# ONE counted warn row names it, the classic rows still render, and
+# the section never dies.
+_out=$(GHS_NO_GHC=1 _ghs_run || true)
+if printf '%s' "$_out" | grep -qF "pointer-file checkouts not checked — kit file sh/git-heal-core.sh" &&
+    printf '%s' "$_out" | grep -qF "missing or outdated (fix: sudo opk update)" &&
+    printf '%s' "$_out" | grep -q "lockout.*$WORK/ghs/scan/deep/repo/.git/index is $(id -un)-owned"; then
+    pass "git-heal section: resolver unavailable degrades to a counted warn, classic rows stay (#777)"
+else
+    fail "git-heal section: resolver-degrade arm (out=$(printf '%s' "$_out" | grep -E 'git-heal|lockout' | head -3)) (#777)"
+fi
 printf '%s\n' "$WORK/ghs/root" >"$WORK/ghs/projects.conf"
 
 # Wholesale-swap detection row (#653 family, #703): with the top-folder
@@ -232,6 +308,8 @@ _out=$(
         export PATH NO_COLOR=1 GH_GITCONFIG="$WORK/ghs/devhome/.gitconfig"
         . "$UI_LIB"
         . "$LIB"
+        # shellcheck disable=SC1090
+        . "$GH_CORE"
         DEFAULT_USER="$(id -un)"
         OPENCODE_USER=opencode-ghs-agent
         LIBDIR="$WORK/ghs/lib"
@@ -572,7 +650,8 @@ _xl_combined="$(
 # ddev-hosts.sh, update-check.sh and advisories.sh behind file guards
 # (#461 a Q3 extended the list past the original four — the rider once
 # pinned the incompleteness green; #764 added git-protection-core.sh,
-# the Git protection section's cross-lib); wsl-browser-bridge.sh's
+# the Git protection section's cross-lib; #777 added git-heal-core.sh,
+# the git-heal section's pointer resolver); wsl-browser-bridge.sh's
 # never-shadow probe is the optional surface the xdg call site
 # command-v-guards. Not the whole sh/ glob — its wrapper-side scripts
 # define shell hooks (ddev(), note()) that are not status's callable
@@ -587,6 +666,7 @@ for _xl_rel in opencode-permissions-kit-lib/sh/git-check.sh \
     opencode-permissions-kit-lib/sh/update-check.sh \
     opencode-permissions-kit-lib/sh/advisories.sh \
     opencode-permissions-kit-lib/sh/git-protection-core.sh \
+    opencode-permissions-kit-lib/sh/git-heal-core.sh \
     opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh; do
     _xl_lib="$SCRIPT_DIR/../../files/$_xl_rel"
     [ -f "$_xl_lib" ] || {
