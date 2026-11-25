@@ -316,16 +316,28 @@ Operational notes:
   diff-driver bullet above). Issue
   [#653](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/653)
   tracks report-only detection (heal drift, planted hooks) for `opk
-  status`/`opk doctor`; its first wave shipped alongside the #703
-  wholesale-swap row (owner `.git` vs owner project dir): both commands
-  report heal drift per gitdir — sticky bit missing, `config`/`hooks`
+  status`/`opk doctor` and is closed: its first wave shipped alongside
+  the #703 wholesale-swap row (owner `.git` vs owner project dir), its
+  second closed the folded group/setgid blind spot and the remaining
+  checks. Both commands
+  report heal drift per gitdir — sticky bit missing, group
+  access/setgid dropped (the healed gitdir is group-shared 3770),
+  `config`/`hooks`
   not developer-owned or group-writable, re-granting extended ACLs, or
-  a symlinked `config`/`hooks` entry — and non-`.sample` entries in
-  `.git/hooks` as a planted-hook warning
+  a symlinked `config`/`hooks` entry — non-`.sample` entries in
+  `.git/hooks` as a planted-hook warning, suspicious repo-scope
+  config keys (`core.fsmonitor` class; the row names the keys, values
+  never render), and the worktree arms: registration pointer files
+  off the healed contract (developer-owned; classic trees also a
+  sticky collection with no group write — the storage layout keeps
+  the whole subtree group-writable by design, #779) and a swapped
+  worktree `.git` pointer caught by the back-reference cross-check
+  against the registration's `gitdir` file (a stale registration
+  renders a prunable hint instead; under the storage layout a
+  consistently rewritten registration pair can still hide a swap —
+  the #779 group-writable subtree is that trade)
   (a missing `getfacl` degrades the ACL leg to one warn row; removal
-  stays a human decision). The issue's remaining scope: suspicious
-  repo-config keys (`core.fsmonitor` class) and the worktree pointer
-  arms.
+  stays a human decision).
 - **Wholesale swap of `.git` or a whole project dir (W1/W2 — the
   #703 trade):** with the top-folder sticky bits removed (decision
   [#702](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/702)),

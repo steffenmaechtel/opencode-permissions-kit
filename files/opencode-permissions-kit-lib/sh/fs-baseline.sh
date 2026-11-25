@@ -929,8 +929,10 @@ _fsb_heal_git() {
     # dev-owned dir) would point the developer's git at an agent-owned
     # gitdir OUTSIDE this tree — never healed, never mentioned. A
     # worktree pointer .git is a regular FILE (legitimate); a symlinked
-    # .git is always foreign. Warn loudly, never follow; #653 automates
-    # the report.
+    # .git is always foreign. Warn loudly, never follow; #653's report
+    # walk matches dirs and pointer files only — the symlinked-.git
+    # class stays this scan's warn (a documented residual, the status
+    # rows cannot see it).
     if _fsb_sudo find "$_fsh_root" -type l -name .git -print 2>/dev/null >"${_fsh_list}l"; then
         while IFS= read -r _fsh_sl; do
             [ -n "$_fsh_sl" ] || continue

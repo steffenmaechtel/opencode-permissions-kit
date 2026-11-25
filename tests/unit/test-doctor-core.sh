@@ -602,6 +602,212 @@ else
     fail "doctor git-heal: quoted-conf arm (out=$(printf '%s' "$_out" | grep -E 'heal drift|git-heal' | head -3)) (#785 a B5)"
 fi
 
+# --- #653 wave 2: group/setgid leg, repo-config keys, worktree arms ---------------
+# The status-core twin's arms over doctor's per-project shape (ASCII
+# dash vocabulary). Dedicated fixture: a classic repo with ONE real
+# worktree (dgh/proj is init-only, no commit — no worktree possible
+# there), explicit modes everywhere; the reset heals the full W2
+# contract and restores the reg files' content from pristine copies.
+mkdir -p "$WORK/dgh/wt2"
+git -C "$WORK/dgh/wt2" init -q -b main repo
+git -C "$WORK/dgh/wt2/repo" -c user.email=t@e -c user.name=t commit -q --allow-empty -m x
+git -C "$WORK/dgh/wt2/repo" worktree add -q "$WORK/dgh/wt2/awt" -b awtb 2>/dev/null
+mkdir -p "$WORK/dgh/wt2/regkeep"
+cp "$WORK/dgh/wt2/repo/.git/worktrees/awt/commondir" "$WORK/dgh/wt2/regkeep/"
+cp "$WORK/dgh/wt2/repo/.git/worktrees/awt/gitdir" "$WORK/dgh/wt2/regkeep/"
+_dwt_reset() {
+    chmod 3770 "$WORK/dgh/wt2/repo/.git"
+    chmod 644 "$WORK/dgh/wt2/repo/.git/config"
+    chmod 755 "$WORK/dgh/wt2/repo/.git/hooks"
+    chmod 3770 "$WORK/dgh/wt2/repo/.git/worktrees"
+    cp "$WORK/dgh/wt2/regkeep/commondir" "$WORK/dgh/wt2/repo/.git/worktrees/awt/commondir"
+    cp "$WORK/dgh/wt2/regkeep/gitdir" "$WORK/dgh/wt2/repo/.git/worktrees/awt/gitdir"
+    chmod 644 "$WORK/dgh/wt2/repo/.git/worktrees/awt/commondir" \
+        "$WORK/dgh/wt2/repo/.git/worktrees/awt/gitdir"
+    rm -f "${WORK:?}/dgh/wt2/repo/.git/hooks/pre-commit"
+    git -C "$WORK/dgh/wt2/repo" config -f "$WORK/dgh/wt2/repo/.git/config" \
+        --unset-all core.fsmonitor 2>/dev/null || true
+    git -C "$WORK/dgh/wt2/repo" config -f "$WORK/dgh/wt2/repo/.git/config" \
+        --unset-all core.editor 2>/dev/null || true
+    git -C "$WORK/dgh/wt2/repo" config -f "$WORK/dgh/wt2/repo/.git/config" \
+        --unset-all core.pager 2>/dev/null || true
+}
+# Group-access/setgid leg (the #785 fold): 1700 keeps sticky, kills
+# the group leg — the shape that stayed quiet on every surface (the
+# status twin's comment carries the measured shapes; this arm adds
+# the true '---' form via symbolic g-s).
+_dwt_reset
+chmod 1700 "$WORK/dgh/wt2/repo/.git"
+_out=$(_dgh_run "$WORK/dgh/wt2/repo" || true)
+if printf '%s' "$_out" | grep -qF "$WORK/dgh/wt2/repo/.git -- group access/setgid missing on the gitdir" &&
+    ! printf '%s' "$_out" | grep -qF 'sticky bit missing on the gitdir'; then
+    pass "doctor git-heal: a 1700 gitdir renders the group-access row, sticky stays quiet (#653 W2)"
+else
+    fail "doctor git-heal: group leg 1700 arm (out=$(printf '%s' "$_out" | grep -F 'heal drift' | head -2)) (#653 W2)"
+fi
+_dwt_reset
+chmod g-rwx,g-s "$WORK/dgh/wt2/repo/.git"
+_out=$(_dgh_run "$WORK/dgh/wt2/repo" || true)
+if printf '%s' "$_out" | grep -qF "$WORK/dgh/wt2/repo/.git -- group access/setgid missing on the gitdir" &&
+    [ "$(stat -c %A "$WORK/dgh/wt2/repo/.git")" = 'drwx-----T' ]; then
+    pass "doctor git-heal: the fully-stripped group leg renders the row too (--- arm) (#653 W2)"
+else
+    fail "doctor git-heal: group leg --- shape (mode=$(stat -c %A "$WORK/dgh/wt2/repo/.git"); out=$(printf '%s' "$_out" | grep -F 'heal drift' | head -2)) (#653 W2)"
+fi
+# Plain-x discrimination: a 755 clone fires the sticky row only.
+_dwt_reset
+chmod 755 "$WORK/dgh/wt2/repo/.git"
+_out=$(_dgh_run "$WORK/dgh/wt2/repo" || true)
+if printf '%s' "$_out" | grep -qF 'sticky bit missing on the gitdir' &&
+    ! printf '%s' "$_out" | grep -qF 'group access/setgid'; then
+    pass "doctor git-heal: a 755 clone fires the sticky row only, never the group row (#653 W2)"
+else
+    fail "doctor git-heal: group leg 755 arm (out=$(printf '%s' "$_out" | grep -F 'heal drift' | head -2)) (#653 W2)"
+fi
+# Suspicious repo-config keys: one row per gitdir, key names only
+# (the injection twin: crafted values never reach the row).
+_dwt_reset
+git -C "$WORK/dgh/wt2/repo" config -f "$WORK/dgh/wt2/repo/.git/config" core.fsmonitor /usr/bin/false
+git -C "$WORK/dgh/wt2/repo" config -f "$WORK/dgh/wt2/repo/.git/config" \
+    core.editor "$(printf 'ev\033[31mil')"
+printf '[core]\n\tpager = line1\\\n\tline2\n' >>"$WORK/dgh/wt2/repo/.git/config"
+_out=$(_dgh_run "$WORK/dgh/wt2/repo" || true)
+if printf '%s' "$_out" | grep -qF "suspicious repo-config keys in $WORK/dgh/wt2/repo/.git/config:" &&
+    printf '%s' "$_out" | grep -qF 'core.fsmonitor,core.editor,core.pager' &&
+    ! printf '%s' "$_out" | grep -qF 'line2' &&
+    ! printf '%s' "$_out" | grep -qF "$(printf '\033[31m')"; then
+    pass "doctor git-heal: planted repo-config keys render key names only, never values (#653 W2)"
+else
+    fail "doctor git-heal: repo-keys arm (out=$(printf '%s' "$_out" | grep -F 'repo keys' | head -2)) (#653 W2)"
+fi
+# Symlinked-config skip arm: the wave-1 symlink row fires, the key
+# probe never reads through the link.
+_dwt_reset
+mv "$WORK/dgh/wt2/repo/.git/config" "$WORK/dgh/wt2/cfg-real"
+printf '[core]\n\tfsmonitor = planted\n' >"$WORK/dgh/wt2/cfg-decoy"
+ln -s "$WORK/dgh/wt2/cfg-decoy" "$WORK/dgh/wt2/repo/.git/config"
+_out=$(_dgh_run "$WORK/dgh/wt2/repo" || true)
+if printf '%s' "$_out" | grep -qF "$WORK/dgh/wt2/repo/.git/config is a symlink" &&
+    ! printf '%s' "$_out" | grep -qF 'suspicious repo-config keys'; then
+    pass "doctor git-heal: a symlinked config renders the symlink row, no key read-through (#653 W2)"
+else
+    fail "doctor git-heal: symlinked-config arm (out=$(printf '%s' "$_out" | grep -E 'heal drift|repo keys' | head -2)) (#653 W2)"
+fi
+rm -f "${WORK:?}/dgh/wt2/repo/.git/config"
+mv "$WORK/dgh/wt2/cfg-real" "$WORK/dgh/wt2/repo/.git/config"
+rm -f "${WORK:?}/dgh/wt2/cfg-decoy"
+# Worktree arms: group-write on a registration pointer file.
+_dwt_reset
+chmod 664 "$WORK/dgh/wt2/repo/.git/worktrees/awt/gitdir"
+_out=$(_dgh_run "$WORK/dgh/wt2/repo" || true)
+if printf '%s' "$_out" | grep -qF "$WORK/dgh/wt2/repo/.git/worktrees/awt/gitdir -- group-writable" &&
+    printf '%s' "$_out" | grep -qF 'the heal pins them developer-owned 644 under a sticky'; then
+    pass "doctor git-heal: a group-writable registration pointer renders its row (#653 W2)"
+else
+    fail "doctor git-heal: worktree group-write arm (out=$(printf '%s' "$_out" | grep -F 'worktree' | head -2)) (#653 W2)"
+fi
+# Collection sticky arm.
+_dwt_reset
+chmod -t "$WORK/dgh/wt2/repo/.git/worktrees"
+_out=$(_dgh_run "$WORK/dgh/wt2/repo" || true)
+if printf '%s' "$_out" | grep -qF "$WORK/dgh/wt2/repo/.git/worktrees -- sticky bit missing on the collection"; then
+    pass "doctor git-heal: a non-sticky worktrees collection renders its row (#653 W2)"
+else
+    fail "doctor git-heal: collection sticky arm (out=$(printf '%s' "$_out" | grep -F 'worktree' | head -2)) (#653 W2)"
+fi
+# Owner arm (FORMAT-AWARE stat stub): %U rogue on a registration
+# gitdir file, %A healed everywhere.
+mkdir -p "$WORK/dgh/wtstub"
+cat >"$WORK/dgh/wtstub/stat" <<'EOF'
+#!/bin/sh
+case "$2" in
+%A)
+    case "$3" in
+    */.git | */.git/worktrees) printf 'drwxrws--T\n' ;;
+    *) printf -- '-rw-r--r--\n' ;;
+    esac
+    ;;
+%U)
+    case "$3" in
+    */worktrees/*/gitdir) printf 'rogue\n' ;;
+    *) printf '%s\n' "$(id -un)" ;;
+    esac
+    ;;
+esac
+EOF
+chmod +x "$WORK/dgh/wtstub/stat"
+_dwt_reset
+_out=$(
+    (
+        PATH="$WORK/dgh/wtstub:$STUB:$PATH"
+        export PATH NO_COLOR=1 GH_GITCONFIG="$WORK/dgh/devhome/.gitconfig" \
+            GH_LIBDIR="$WORK/dgh/lib"
+        . "$UI_LIB"
+        . "$LIB"
+        INSTALL_CONF="$WORK/dgh/install.conf"
+        DOCTOR_ROOT="$WORK/dgh/wt2/repo"
+        DOCTOR_USER=opencode-dgh-agent
+        doctor_git_heal
+    ) 2>&1 || true
+)
+if printf '%s' "$_out" | grep -qF "$WORK/dgh/wt2/repo/.git/worktrees/awt/gitdir -- rogue-owned (not $(id -un))"; then
+    pass "doctor git-heal: a foreign-owned registration pointer renders its row (#653 W2)"
+else
+    fail "doctor git-heal: worktree owner arm (out=$(printf '%s' "$_out" | grep -F 'worktree' | head -2)) (#653 W2)"
+fi
+# Back-reference swap arm (the fs-baseline .git-pointer residual).
+_dwt_reset
+printf 'gitdir: %s\n' "$WORK/dgh/wt2/repo/.git" >"$WORK/dgh/wt2/awt/.git"
+_out=$(_dgh_run "$WORK/dgh/wt2/repo" || true)
+if printf '%s' "$_out" | grep -qF "$WORK/dgh/wt2/repo/.git/worktrees/awt -- its worktree's .git does not" &&
+    printf '%s' "$_out" | grep -qF 'swapped pointer'; then
+    pass "doctor git-heal: a swapped worktree .git pointer renders the back-reference row (#653 W2)"
+else
+    fail "doctor git-heal: swap arm (out=$(printf '%s' "$_out" | grep -F 'worktree' | head -2)) (#653 W2)"
+fi
+printf 'gitdir: %s\n' "$WORK/dgh/wt2/repo/.git/worktrees/awt" >"$WORK/dgh/wt2/awt/.git"
+# Prunable arm: detail line, never a counted warn.
+_dwt_reset
+mv "$WORK/dgh/wt2/awt/.git" "$WORK/dgh/wt2/awt/.git.orig"
+_out=$(_dgh_run "$WORK/dgh/wt2/repo" || true)
+if printf '%s' "$_out" | grep -qF "$WORK/dgh/wt2/repo/.git/worktrees/awt names a gone worktree (prunable" &&
+    ! printf '%s' "$_out" | grep -qF "does not"; then
+    pass "doctor git-heal: a prunable registration renders a detail line, no warn (#653 W2)"
+else
+    fail "doctor git-heal: prunable arm (out=$(printf '%s' "$_out" | grep -F 'worktree' | head -2)) (#653 W2)"
+fi
+mv "$WORK/dgh/wt2/awt/.git.orig" "$WORK/dgh/wt2/awt/.git"
+# Malformed back-reference arm.
+_dwt_reset
+printf 'ev\033[31mil\n' >"$WORK/dgh/wt2/repo/.git/worktrees/awt/gitdir"
+_out=$(_dgh_run "$WORK/dgh/wt2/repo" || true)
+if printf '%s' "$_out" | grep -qF "$WORK/dgh/wt2/repo/.git/worktrees/awt/gitdir -- malformed back-reference" &&
+    ! printf '%s' "$_out" | grep -qF "$(printf '\033[31m')"; then
+    pass "doctor git-heal: a malformed back-reference renders its row without the payload (#653 W2)"
+else
+    fail "doctor git-heal: malformed-ref arm (out=$(printf '%s' "$_out" | grep -F 'worktree' | head -2)) (#653 W2)"
+fi
+# Healed control: none of the new rows render.
+_dwt_reset
+_out=$(_dgh_run "$WORK/dgh/wt2/repo" || true)
+if ! printf '%s' "$_out" | grep -qE 'worktree|repo keys|group access/setgid'; then
+    pass "doctor git-heal: the fully-healed W2 fixture renders no new rows (#653 W2 control)"
+else
+    fail "doctor git-heal: healed W2 control fired (out=$(printf '%s' "$_out" | grep -E 'worktree|repo keys|group access' | head -3)) (#653 W2)"
+fi
+# Layout-split arm (the storage contract): the §777 ptproj fixture
+# gains a real worktree; group-writable reg pointer files under the
+# storage root stay quiet (#779 leaves the subtree g+rw by design).
+git --git-dir="$WORK/dgh/ptstor/ptproj.git" worktree add -q "$WORK/dgh/ptwt" -b ptwb 2>/dev/null
+chmod 664 "$WORK/dgh/ptstor/ptproj.git/worktrees/ptwt/commondir" \
+    "$WORK/dgh/ptstor/ptproj.git/worktrees/ptwt/gitdir"
+_out=$(_dgh_run "$WORK/dgh/ptproj" || true)
+if ! printf '%s' "$_out" | grep -qF "$WORK/dgh/ptstor/ptproj.git/worktrees/ptwt"; then
+    pass "doctor git-heal: storage-layout registration pointer files stay quiet at g+rw (#653 W2)"
+else
+    fail "doctor git-heal: storage relaxed arm fired (out=$(printf '%s' "$_out" | grep -F 'worktree' | head -2)) (#653 W2)"
+fi
+
 # --- sweep floor: doctor-core's python3 sites run -I (#249) ------------------------
 # Comment-strip rider per conventions.md ("Source-counting pins") -- a
 # commented-out site must not count. Four sites: cntrl_bad,

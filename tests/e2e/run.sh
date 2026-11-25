@@ -1999,7 +1999,38 @@ check "12q: #653 W1 — doctor reports the same drift row for the pointer projec
     E 'sudo chmod -t /var/www/gitdirs/perm-check.git && opk doctor /var/www/vhosts/perm-check >/tmp/gh-pt-ddrift.log 2>&1; grep -qF "/var/www/gitdirs/perm-check.git -- sticky bit missing on the gitdir" /tmp/gh-pt-ddrift.log; _rc=$?; sudo chmod +t /var/www/gitdirs/perm-check.git; test $_rc -eq 0'
 check "12q: #653 W1 — status reports planted non-sample hook content" \
     E 'sudo touch /var/www/gitdirs/perm-check.git/hooks/planted && opk status >/tmp/gh-pt-plant.log 2>&1; grep -qF "non-sample entries in /var/www/gitdirs/perm-check.git/hooks" /tmp/gh-pt-plant.log; _rc=$?; sudo rm -f /var/www/gitdirs/perm-check.git/hooks/planted; test $_rc -eq 0'
-E 'rm -rf /var/www/vhosts/perm-check/pt-sub /tmp/gh-pt-*.log'
+# #653 W2: the folded group-access leg — a 1700 tamper on the storage
+# gitdir (sticky KEPT, group rwx + setgid dropped, the PR #785 round-a
+# B2 shape) surfaces on both surfaces (plant → observe → restore).
+check "12q: #653 W2 — status reports the 1700 group-access tamper" \
+    E 'sudo chmod 1700 /var/www/gitdirs/perm-check.git && opk status >/tmp/gh-w2-grp.log 2>&1; grep -qF "/var/www/gitdirs/perm-check.git — group access/setgid missing on the gitdir" /tmp/gh-w2-grp.log; _rc=$?; sudo chmod 3770 /var/www/gitdirs/perm-check.git; test $_rc -eq 0'
+check "12q: #653 W2 — doctor reports the same group-access row" \
+    E 'sudo chmod 1700 /var/www/gitdirs/perm-check.git && opk doctor /var/www/vhosts/perm-check >/tmp/gh-w2-grpd.log 2>&1; grep -qF "/var/www/gitdirs/perm-check.git -- group access/setgid missing on the gitdir" /tmp/gh-w2-grpd.log; _rc=$?; sudo chmod 3770 /var/www/gitdirs/perm-check.git; test $_rc -eq 0'
+# #653 W2 check 3: a planted repo-scope key on the resolved storage
+# gitdir's config (the agent-writable surface the issue names).
+check "12q: #653 W2 — status reports a planted repo-config key" \
+    E 'git --git-dir=/var/www/gitdirs/perm-check.git config core.fsmonitor /usr/bin/false && opk status >/tmp/gh-w2-key.log 2>&1; grep -qF "suspicious repo-config keys in /var/www/gitdirs/perm-check.git/config:" /tmp/gh-w2-key.log && grep -qF "core.fsmonitor" /tmp/gh-w2-key.log; _rc=$?; git --git-dir=/var/www/gitdirs/perm-check.git config --unset core.fsmonitor; test $_rc -eq 0'
+# #653 W2 check 4: worktree registration arms over the ADOPTED project
+# (storage layout — the relaxed contract) and a fresh CLASSIC repo
+# (strict). The storage side first: a dev-created worktree must stay
+# quiet (the #779 re-heal leaves the storage subtree group-writable by
+# design), a swapped .git POINTER FILE (the fs-baseline 567-573
+# residual) must surface through the back-reference row.
+E 'git -C /var/www/vhosts/perm-check worktree add -q e2ewt -b e2ewtb 2>/dev/null'
+check "12q: #653 W2 — a storage-layout worktree stays quiet (relaxed contract)" \
+    E 'opk status >/tmp/gh-w2-wt.log 2>&1; ! grep -qF "/var/www/gitdirs/perm-check.git/worktrees/e2ewt" /tmp/gh-w2-wt.log'
+check "12q: #653 W2 — a swapped worktree pointer renders the back-reference row" \
+    E 'printf "gitdir: /var/www/gitdirs/perm-check.git\n" >/var/www/vhosts/perm-check/e2ewt/.git && opk status >/tmp/gh-w2-sw.log 2>&1; grep -qF "/var/www/gitdirs/perm-check.git/worktrees/e2ewt — its worktree'"'"'s .git does not" /tmp/gh-w2-sw.log; _rc=$?; printf "gitdir: /var/www/gitdirs/perm-check.git/worktrees/e2ewt\n" >/var/www/vhosts/perm-check/e2ewt/.git; test $_rc -eq 0'
+E 'git -C /var/www/vhosts/perm-check worktree remove --force e2ewt >/dev/null 2>&1'
+# The classic side: a fresh repo + worktree, healed to the classic
+# contract, quiet first — then a group-writable registration pointer.
+E 'mkdir -p /var/www/vhosts/wt2-cl && git -C /var/www/vhosts/wt2-cl init -q -b main && git -C /var/www/vhosts/wt2-cl -c user.email=t@e -c user.name=t commit -q --allow-empty -m x && git -C /var/www/vhosts/wt2-cl worktree add -q wt -b clwb'
+E 'chmod 3770 /var/www/vhosts/wt2-cl/.git && chmod 644 /var/www/vhosts/wt2-cl/.git/config && chmod 755 /var/www/vhosts/wt2-cl/.git/hooks && chmod 3770 /var/www/vhosts/wt2-cl/.git/worktrees && chmod 644 /var/www/vhosts/wt2-cl/.git/worktrees/wt/commondir /var/www/vhosts/wt2-cl/.git/worktrees/wt/gitdir'
+check "12q: #653 W2 — a classic worktree at the healed contract stays quiet" \
+    E 'opk status >/tmp/gh-w2-cl.log 2>&1; ! grep -qF "/var/www/vhosts/wt2-cl/.git/worktrees/wt" /tmp/gh-w2-cl.log'
+check "12q: #653 W2 — a classic registration pointer renders its drift row" \
+    E 'chmod 664 /var/www/vhosts/wt2-cl/.git/worktrees/wt/gitdir && opk status >/tmp/gh-w2-clg.log 2>&1; grep -qF "/var/www/vhosts/wt2-cl/.git/worktrees/wt/gitdir — group-writable" /tmp/gh-w2-clg.log; _rc=$?; chmod 644 /var/www/vhosts/wt2-cl/.git/worktrees/wt/gitdir; test $_rc -eq 0'
+E 'rm -rf /var/www/vhosts/wt2-cl /var/www/vhosts/perm-check/pt-sub /tmp/gh-pt-*.log /tmp/gh-w2-*.log'
 E 'rm -rf /tmp/gp-update-test /tmp/gp-*.log'
 
 echo ""
