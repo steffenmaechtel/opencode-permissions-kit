@@ -1972,6 +1972,19 @@ fi
 printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
     "$(id -un)" "$(id -un)" "$(id -gn)" >"$IC"
 
+# b A1 (PR #785 round b): the conf extraction strips quotes — a
+# hand-quoted DEFAULT_USER would otherwise fail every dev-owner gate
+# (silent storage-reheal skips, wrong-reason nail refusals), the same
+# class the wave fixed at doctor's owner leg.
+printf 'DEFAULT_USER="%s"\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" >"$WORK/ic-quoted"
+_out=$(_core_run 'GP_INSTALL_CONF="$WORK/ic-quoted" _gp_var DEFAULT_USER' || true)
+if [ "$_out" = "$(id -un)" ]; then
+    pass "conf extraction: a quoted DEFAULT_USER reads back stripped (#785 b A1)"
+else
+    fail "conf extraction: quoted conf value not stripped (got: $_out) (#785 b A1)"
+fi
+
 # C5: a getent-failing agent user still refuses the literal agent-home
 # root (the bounded degradation the finding names) — scratch conf with
 # a NONEXISTENT agent user so getent itself fails.

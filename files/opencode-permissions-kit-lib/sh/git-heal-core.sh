@@ -64,9 +64,11 @@ _ghc_libdir() {
 }
 
 # _ghc_key <key>: read one key from install.conf (doctor-style sed,
-# never a source of a root-owned file).
+# never a source of a root-owned file). Quote-strip like the DOCTOR_USER
+# idiom (#785 b A1): a hand-quoted value would keep its quotes through
+# the owner compares — false lockout rows on every gitdir.
 _ghc_key() {
-    sed -n "s/^$1=//p" "$INSTALL_CONF" 2>/dev/null | tail -n 1
+    sed -n "s/^$1=//p" "$INSTALL_CONF" 2>/dev/null | tail -n 1 | sed 's/^"//;s/"$//'
 }
 
 # _ghc_devuser: the developer username; loud empty on a missing key

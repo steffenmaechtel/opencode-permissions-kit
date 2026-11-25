@@ -1489,6 +1489,17 @@ if [ "$_a2rc" -eq 0 ] &&
 else
     fail "status renderer: counter-mktemp arm (rc=$_a2rc; out=$(printf '%s' "$_out" | grep -i 'mktemp' | head -2)) (#785 a A2)"
 fi
+# b A1: quoted conf values compare stripped — OPENCODE_USER quoted to
+# the REAL invoking user must not fire lockout rows (the pre-fix
+# compare kept the quotes and rendered every operand as a lockout).
+printf 'DEFAULT_USER="%s"\nOPENCODE_USER="%s"\n' "$(id -un)" "$(id -un)" \
+    >"$WORK/install-quoted.conf"
+_out=$(_core_run 'INSTALL_CONF="$WORK/install-quoted.conf" _git_heal_status' || true)
+if ! printf '%s' "$_out" | grep -qE 'lockout \(transient|lockout risk'; then
+    pass "status renderer: quoted conf values compare stripped — no false lockouts (#785 b A1)"
+else
+    fail "status renderer: quoted conf fired false lockout rows (out=$(printf '%s' "$_out" | grep -E 'lockout' | head -2)) (#785 b A1)"
+fi
 chmod 700 "$WORK/zone/scan/locked"
 rmdir "$WORK/zone/scan/locked"
 rm -f "${WORK:?}/devhome/.gitconfig"
