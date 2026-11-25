@@ -1217,10 +1217,16 @@ fi
 # AND the legit-looking ptstor pointer would heal. Everything
 # pointer-shaped is refused (the .git-named class still passes, none
 # lives in this fixture); the sweep stays green and heals nothing.
+# The eval UNSETS GH_STORAGE (review c C1): the subshell would
+# inherit an ambient export from the invoking shell, and an empty
+# assignment would not clear this seam — the resolver's ${GH_STORAGE:-…}
+# falls back on empty as well as unset (the :- trap documented in
+# agent/conventions.md, "Test sandbox (unit suites)"), so only
+# the unset pins the no-storage class.
 : >"$LOG"
 _hr_rc=0
 _b1_out=$(
-    _core_run 'SD_SUDO="" SD_VISUDO="$WORK/visudo" \
+    _core_run 'unset GH_STORAGE; SD_SUDO="" SD_VISUDO="$WORK/visudo" \
         SD_CONF_DIR="$WORK/etc" SD_SUDOERS_D="$WORK/sdd" \
         GH_PROJECTS_CONF="$WORK/pt-projects.conf" HOME="$WORK/devhome" _git_heal_on'
 ) || _hr_rc=$?
