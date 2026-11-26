@@ -100,6 +100,31 @@ beta|/var/tmp/opencode-ddev-mig-roots/vhosts/client/beta" "$RESULT"
 RESULT=$(sh -c ". \"\$1\" && ddev_migrate_projects \"\$2\" \"\$3\"" _ "$MIG" "$WORK/devhome/.ddev" "/does/not/exist") || true
 assert_eq "root filter with no matching dirs yields nothing" "" "$RESULT"
 
+# A "/" root element (issue #728 M2): the membership pattern strips to
+# the empty string. Under dash (the CI lane's sh) the case alternative
+# degenerated to the glob /* — every absolute approot counted as
+# under-roots, the whole registry exported, the outside warning never
+# fired (under bash-as-sh the quoted-empty pattern matched nothing;
+# the pins' pre-fix red exists only in the dash lane). The
+# stripped-empty guard (#677 WO-2 shape) SKIPS the element: "/" alone
+# matches nothing, and a legitimate root after it still decides
+# membership — the skip shape, not a whole-call refusal.
+RESULT=$(sh -c ". \"\$1\" && ddev_migrate_projects \"\$2\" \"\$3\"" _ "$MIG" "$WORK/devhome/.ddev" "/") || true
+assert_eq "root filter skips a / root — never a membership root (#728 M2)" "" "$RESULT"
+
+RESULT=$(sh -c ". \"\$1\" && ddev_migrate_projects \"\$2\" \"\$3\" \"\$4\"" _ "$MIG" "$WORK/devhome/.ddev" "/" "/var/tmp/opencode-ddev-mig-roots/vhosts") || true
+assert_eq "root filter keeps the real root behind a skipped / element (#728 M2)" \
+    "alpha|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha
+beta|/var/tmp/opencode-ddev-mig-roots/vhosts/client/beta" "$RESULT"
+
+# The outside twin: with / skipped every registry project reports
+# outside — the warning the silent whole-registry take-over suppressed.
+RESULT=$(sh -c ". \"\$1\" && ddev_migrate_outside \"\$2\" \"\$3\"" _ "$MIG" "$WORK/devhome/.ddev" "/") || true
+assert_eq "outside filter with a / root lists every project (#728 M2)" \
+    "alpha
+beta
+outside" "$RESULT"
+
 # --- 2b. ddev >= 1.23 registry: standalone project_list.yaml -----------------------
 # ddev >= 1.23.0 (commit 94d77509a) keeps the project list in its own
 # project_list.yaml — top-level name map, 4-space indent as written by

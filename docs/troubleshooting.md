@@ -236,6 +236,10 @@ ls /var/backups/opencode-permissions-kit/ddev-migration-*/
   `/usr/local/lib/opencode-permissions-kit/bin/ddev-migrate registry <your-user> <project-roots>`
   — projects listed as `outside:` fall outside the registered roots and
   are never exported.
+- Roots are matched as directory prefixes — a bare `/` is never a root
+  operand (it is skipped, so every project would report `outside:` and
+  nothing exports); pass the real parent directory, e.g.
+  `/var/www/vhosts`.
 - A project whose export **fails on every run** (for example its database
   was never pulled from staging) does not block the remaining projects — it
   is recorded as `FAIL` and the summary lists it. To mark a project as
