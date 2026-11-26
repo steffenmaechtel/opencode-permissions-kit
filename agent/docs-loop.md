@@ -165,10 +165,10 @@ the maintainer's hand (the Promotion section's reject override). The
 label is what tells a later session stale from declined, and the
 producer side reads it (the skill's Search before filing bullets).
 Class rationales and added demands live in the commission and the
-wave's PR body, not on the issue; the only comment-side texts the
-loop prescribes are the external class's — the landing citation and
-the keep-open note, pointers to where the fix lives or that it is
-still being worked, never a class record.
+wave's PR body, not on the issue; the only comment-side texts a
+disposition prescribes are the external class's — the landing
+citation and the keep-open note, pointers to where the fix lives or
+that it is still being worked, never a class record.
 
 The veto points are the commission — the maintainer reads the issues
 he names — and the PR review; the disposition record is the PR body's
