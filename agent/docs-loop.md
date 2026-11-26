@@ -230,8 +230,7 @@ sessions, one per PR).
   and violated it in the same commit; its round a C1 and C6 were
   claim shapes no enumerated leg named, its A4 fell under the
   compression leg, which existed and was not executed on the claim.
-  Scope
-  models, phrasing, contradictions: two
+  Scope models, phrasing, contradictions: two
   half-true descriptions of one mechanism give a reader opposite
   answers (pr-00629 round a A1–A3: a grep-dead pointer written into the
   citation rule's own item, a name collision in the very file being
@@ -273,7 +272,6 @@ sessions, one per PR).
   "registration probe" existed line-wrapped in review-concept.md
   while the multi-word grep sat empty and the sweep record claimed
   the re-check, #669). (RM-0183)
-
 - A landed topic's feedback issue closes through the wave, across
   repositories: the birth-PR body names every landed issue in the
   cross-repo form GitHub documents (`Closes
