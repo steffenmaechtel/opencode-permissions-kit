@@ -6,7 +6,7 @@ cc0600ce9007dd07229d2c9d0a2538ae17d7777f4586025169679a2410190f33  files/opencode
 c4e9519c341139b43037ff08cfb24537d7d8d0cedb7c708c57d1ea7b298bebb5  files/opencode-permissions-kit-lib/bin/ddev-as-opencode
 c49b1ae4bafda33b445cb6fc80704ca94c2b26c121b6b5f6a9b5a04a10cab284  files/opencode-permissions-kit-lib/bin/ddev-migrate
 5bbb2268b90db2bb134bf23d92a9bee56b76c717e95940c8d3f15f982ca41bf5  files/opencode-permissions-kit-lib/bin/opencode-as-opencode
-f4202d47add98184b4de717457e90668f170c766a0a77bca7f70e90d6166c012  files/opencode-permissions-kit-lib/bin/opk
+61ba64b6e7d7502b4cd2c70ba818404ad1426f0855113becef829af6e7d2baea  files/opencode-permissions-kit-lib/bin/opk
 69c02f385e399d4644cfe02b4df9e9e532a6735ac6b862185f6222d135e3cb49  files/opencode-permissions-kit-lib/bin/setup-container-backend
 72e2b48893c03886b5ba0680cf6b419d7185e84cf2cbe6b12df536652d25db1f  files/opencode-permissions-kit-lib/bin/socket-check
 9f21f5a57ff8c03d0aa913753530a53eb8bdbfd956371d941e6431a2a7dc2913  files/opencode-permissions-kit-lib/bin/xdg-open
@@ -19,7 +19,7 @@ ccf4f99f622d6b43c219605b46142c68d8ca584d903702f26d3d78a8f01e5406  files/opencode
 0143124717df039a4ad69b5959afe504d2da5b1a3090ece4a09dd9ce3523a472  files/opencode-permissions-kit-lib/management/doctor.sh
 1bfd055647422f24dab8f422319fafdcc427083435bdb8d60e11ba2674b26b5b  files/opencode-permissions-kit-lib/management/status.sh
 6e1aefec004c88e8146bb3dfd1b75ec6af57e6f46bfbdcb8dae7048b4086ee94  files/opencode-permissions-kit-lib/management/uninstall.sh
-6ce6c8bf4e6480a8651e6f0cccd8e05120c467ae34c3c5a63b7733869593e555  files/opencode-permissions-kit-lib/management/update.sh
+c84befb89d418b2744427b72aacaa3b56c517ade0ca77b3104419baabb4ce3ee  files/opencode-permissions-kit-lib/management/update.sh
 f547a32d7ad24391f5c9ebd143506d46140d8981af2ce5b6574c7c9cce6f8d4b  files/opencode-permissions-kit-lib/py/jsonc-parser.py
 d9f9fb0aae130f10c300153b745f4768b9a763e07f82298f6f156a671a07e37a  files/opencode-permissions-kit-lib/py/tui-register.py
 dcb8b17188cab386608f95f5e4b2fe3ae0a0cf87e624c4661be08074f32fa1e8  files/opencode-permissions-kit-lib/sh/advisories.sh
@@ -33,9 +33,9 @@ df860e46921b38a6fd5871da32053133201204db0f5118d6b2b6fc5eef17b04a  files/opencode
 4158df826dda9ecd99fc5e607c06ecd7b62c1865de5c94322672b2e4f7b1cdb0  files/opencode-permissions-kit-lib/sh/fs-baseline.sh
 80579d6005c882c689086a3af913ccdf686059905451f43b496aa74005fd0b41  files/opencode-permissions-kit-lib/sh/git-check.sh
 1e7f42a6c4f189e759b0112105f58cdb589fa945bb3bb9a1b19ca859a8d5b831  files/opencode-permissions-kit-lib/sh/git-heal-core.sh
-f7e623be6b86f63589c520891824be2a5f4a51101f87785c29121dc8ae1b1976  files/opencode-permissions-kit-lib/sh/git-protection-core.sh
+3991dd86feef676f34e0340ce8979ee7822bf038697e14ec03e8836fe8c8a6de  files/opencode-permissions-kit-lib/sh/git-protection-core.sh
 5e2eff8b240a6f36b5997c8df70471306265db4ee042034e542d795199a0ef3b  files/opencode-permissions-kit-lib/sh/handover-core.sh
-35f063171b2e5e0c9a9b12013039483c912cd25167c2ff005801079f93ab1a2a  files/opencode-permissions-kit-lib/sh/install-core.sh
+4a719c5fa87102324a35f805cc7820a5b2adb280183315c2825265bc3aefb8b1  files/opencode-permissions-kit-lib/sh/install-core.sh
 89379b608b84b85c43e402a3e0c73aa06024e4f4a79e25e5a0da6bf7ea986d7c  files/opencode-permissions-kit-lib/sh/log.sh
 36ba96811b997b5bb0ee2afef8ba18effba09756aaa9d62cb4ae1b4cf3f34a73  files/opencode-permissions-kit-lib/sh/openchamber-core.sh
 78226ca355c7ee4e310c9e94861247750fcd640cf5f713b3829bd2eff2d8e45f  files/opencode-permissions-kit-lib/sh/path-sane.sh
@@ -47,9 +47,9 @@ b5202dfb69c75c672e6bf0dfa3bdde1516766f21b172f23862f1c2f545c24110  files/opencode
 b6e8c715cb2881c4c4193b8d8772b9076f0a5f304952eb6a0a9a78cb7f720c81  files/opencode-permissions-kit-lib/sh/sudoers-deploy.sh
 5e5bdac5e5dc8b14a15d5f61a8980f3f850fe0baf869f70c3c76b4a7235e2e10  files/opencode-permissions-kit-lib/sh/tui-plugin.sh
 fc51c07b906b60867ec0eadddefc296111ec208a87d4e8e020b8cc8757415e5e  files/opencode-permissions-kit-lib/sh/ui.sh
-a6eb7297e3a1d94acdf96c7ec7e719ebc9458ee2728cc5d7be37d4976d4cea76  files/opencode-permissions-kit-lib/sh/uninstall-core.sh
+081a4de1bb0bcde01d4c2f357f87cc59b51eb852f8a20c92e0ce7c3e8c1bb4a8  files/opencode-permissions-kit-lib/sh/uninstall-core.sh
 b84c5ae854e30e7286c258f7108e1bced15d9cba829e872e35e3197a9c869f2f  files/opencode-permissions-kit-lib/sh/update-check.sh
-1eb21f70c775a845264e42157d2ce9fea1ef8f6f22f11bede2464882a2462b88  files/opencode-permissions-kit-lib/sh/update-core.sh
+c6ac9e1117a2dada8b6bbead0cf10675233405fa55d994aa111501fdf135bbff  files/opencode-permissions-kit-lib/sh/update-core.sh
 49cf2952831b66edadf452762cad54d762477348cb0725ee1e11f9a199c8f8c5  files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh
 8c2234366bc575c6ca0c13dd82f7f2b19c48bbb19f83888c36df643bb58a7689  files/opencode-permissions-kit-lib/templates/AGENTS-HOST.md
 2fc5c12cfc89bfdb42bbf0b52f30a9432e9642a6383fe626ed4b87895d66218b  files/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc
