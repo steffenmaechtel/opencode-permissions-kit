@@ -317,10 +317,23 @@ if printf '%s\n' "$HG8OUT" | grep -q 'ERRS=1$'; then
 else
     fail "heal: the / refusal COUNTS as an error (c S4) — got: $HG8OUT"
 fi
-HG8BRC=0
-FS_SUDO="" sh -c '. "$1" && fs_baseline_root / "$2"' _ "$LIB" "$HGGRP" >/dev/null 2>&1 ||
-    HG8BRC=$?
+HG8BOUT="$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root / "$2"' _ "$LIB" "$HGGRP" 2>&1)" &&
+    HG8BRC=0 || HG8BRC=$?
 assert_eq "belt: the / root is refused before any pass runs (b S2/C7)" "1" "$HG8BRC"
+# Message leg (#792, the #791 a C1 residue): the rc assert above is
+# ambiguous — a sabotage keeping rc 1 while breaking the refusal
+# message stayed green. The captured stderr must carry the arm's own
+# refusal line; inside THIS probe's capture the fragment is
+# leg-specific twice over — the fs-baseline CLI belt's message at
+# :318 shares only the sub-phrase 'never a baseline root', the full
+# fragment does not occur in its emission, and that belt lives in a
+# function this probe never calls (its own legs are pinned
+# separately below).
+if printf '%s\n' "$HG8BOUT" | grep -qF 'error: / is never a baseline root'; then
+    pass "belt: the / refusal names the whole-filesystem scope (b S2/C7; #792)"
+else
+    fail "belt: the / refusal must print its own message (rc=$HG8BRC, out=$HG8BOUT) (b S2/C7; #792)"
+fi
 
 # S1: the wc-guard degradation — a restricted PATH without wc over a
 # tree WITH a non-sample hook must stay rc 0, warn nothing, not abort.
@@ -1783,6 +1796,15 @@ S245X6_ERR=$(_s245_dhr "$S245/glb*root") && S245X6_RC=0 || S245X6_RC=$?
 # refusal message and falls through to the lib guard's rc 1 — both
 # legs green over a broken guard; the lib guard's own warn line is
 # the fall-through tell, so its ABSENCE proves the arm returned.
+# #792: the sibling arms carry the same absence leg — probed per arm
+# (sabotaged lib copies, the return deleted, message kept), the
+# fall-through ends at the lib guard for X2 (link), X3 (link/.),
+# X4 (link//) and X5 (.) alike, each capture carrying both warn lines
+# over rc 1. X6 is deliberately EXCLUDED: its operand (glb*root) is
+# never created on disk, so the dropped-return state ends at the quiet
+# [ -d ] `return 0` — rc 0, the lib-guard warn line never prints, the
+# block's rc leg reds; an absence leg there could not fail for its
+# reason (the L4 vacuous shape).
 S245X7_ERR=$(_s245_dhr "/") && S245X7_RC=0 || S245X7_RC=$?
 if [ "$S245X2_RC" -ne 0 ] &&
     printf '%s' "$S245X2_ERR" | grep -qF 'is a symlink — refusing the ddev handover' &&
@@ -1793,12 +1815,17 @@ if [ "$S245X2_RC" -ne 0 ] &&
     printf '%s' "$S245X6_ERR" | grep -qF 'is a malformed root' &&
     [ "$S245X7_RC" -ne 0 ] &&
     printf '%s' "$S245X7_ERR" | grep -qF 'is never a handover root' &&
-    ! printf '%s' "$S245X7_ERR" | grep -qF 'OPK_DDEV_HANDOVER_LIB is unset' &&
     [ "$S245X5_RC" -ne 0 ] &&
-    printf '%s' "$S245X5_ERR" | grep -qF 'is not an absolute path'; then
-    pass "ddev_handover_root belt refuses link, dodge spellings, glob, bare-/, and non-absolute roots, all rc 1, the / refusal returns without fall-through (#245, b X2, c X1; #665; #728 M1; #791 a B1)"
+    printf '%s' "$S245X5_ERR" | grep -qF 'is not an absolute path' &&
+    ! printf '%s' "$S245X2_ERR" | grep -qF 'OPK_DDEV_HANDOVER_LIB is unset' &&
+    ! printf '%s' "$S245X3_ERR" | grep -qF 'OPK_DDEV_HANDOVER_LIB is unset' &&
+    ! printf '%s' "$S245X4_ERR" | grep -qF 'OPK_DDEV_HANDOVER_LIB is unset' &&
+    ! printf '%s' "$S245X5_ERR" | grep -qF 'OPK_DDEV_HANDOVER_LIB is unset' &&
+    ! printf '%s' "$S245X7_ERR" | grep -qF 'OPK_DDEV_HANDOVER_LIB is unset'; then
+    pass "ddev_handover_root belt refuses link, dodge spellings, glob, bare-/, and non-absolute roots, all rc 1, every refusal returning at its own arm — no fall-through (#245, b X2, c X1; #665; #728 M1; #791 a B1; #792)"
 else
-    fail "ddev_handover_root belt must refuse every dodge spelling (X2=$S245X2_RC X3=$S245X3_RC X4=$S245X4_RC X5=$S245X5_RC X6=$S245X6_RC X7=$S245X7_RC) (#245/#665/#728)"
+    S245X_CAPS="X2=|$S245X2_ERR| X3=|$S245X3_ERR| X4=|$S245X4_ERR| X5=|$S245X5_ERR| X6=|$S245X6_ERR| X7=|$S245X7_ERR|"
+    fail "ddev_handover_root belt must refuse every dodge spelling, each arm returning at its own refusal — a dropped return 1 falls through to the lib guard and its warn line shows inside an X* capture (rcs: X2=$S245X2_RC X3=$S245X3_RC X4=$S245X4_RC X5=$S245X5_RC X6=$S245X6_RC X7=$S245X7_RC; $S245X_CAPS) (#245/#665/#728; #791 b A2; #792)"
 fi
 if live_src "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core.sh" |
     grep -qF 'ui_atten "$root" "symlinked root — register the target directory instead"'; then
