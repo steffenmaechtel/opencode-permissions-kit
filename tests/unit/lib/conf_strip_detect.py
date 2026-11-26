@@ -15,8 +15,11 @@ Mechanics (the trap_detect.py shape):
   puts the operand and the strip on the second physical line, so a
   single-line grep sees only the first (PR #642 round b S1);
 - an extraction site is `sed ['\"]s/^KEY=//p['\"]` with optional -n /
-  -e flags in any order/spacing (single- or double-quoted, the
-  "s/^$1=//p" helper spelling included), OR an anchored-grep value
+  -e / -ne flags as separate shell words in any order and spacing
+  (single- or double-quoted, the "s/^$1=//p" helper spelling
+  included; a script ATTACHED to a flag without whitespace —
+  `sed -nes/^X=//p` — is outside the shape list, recorded #790
+  round c), OR an anchored-grep value
   read -- `grep ... '^KEY=…$'` anchored at BOTH ends over one literal
   (presence checks anchor only at ^ and are out of class; the live
   instance was ddev-handover.sh's DDEV_DEV_OWNED grep, #790 a A1);
