@@ -819,7 +819,7 @@ ln -s "$WORK/rhs-real" "$WORK/rhs-sym"
 _rc=0
 _out=$(_core_run '_gp_reheal_storage "$WORK/rhs-sym"; _r=$?; printf "flag=%s\n" "$_gprs_failed"; printf "rc=%s\n" "$_r"') || _rc=$?
 if printf '%s' "$_out" | grep -qF 'storage reheal skipped: the use-time sanity check failed' &&
-    printf '%s' "$_out" | grep -qF '(non-absolute, bare /, malformed form, or symlinked?)' &&
+    printf '%s' "$_out" | grep -qF 'dot-dot, doubled slash, whitespace, glob, or symlinked?' &&
     printf '%s' "$_out" | grep -qF 'flag=1' &&
     printf '%s' "$_out" | grep -qF 'rc=0'; then
     pass "reheal: an insane storage skips loud AND fails the pass counter (#779, #783 a A1, b B1; #798 C2)"
@@ -913,7 +913,7 @@ printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
 if [ "$_rc" = 1 ] &&
     printf '%s' "$_out" | grep -qF 'storage reheal failed on' &&
     printf '%s' "$_out" | grep -qF 'pass had failures (migration or storage reheal' &&
-    printf '%s' "$_out" | grep -qF 're-run: opk git-protection on'; then
+    printf '%s' "$_out" | grep -qF 're-run: sudo opk git-protection on'; then
     pass "reheal: a failed sweep fails the on-pass (propagation, #779)"
 else
     fail "reheal: propagation arm (rc=$_rc out=$_out)"
@@ -1748,7 +1748,7 @@ if [ "$_rc" = 1 ] &&
     ! printf '%s' "$_out" | grep -qF "adopt $_s3/a;b" &&
     ! printf '%s' "$_out" | grep -qF "adopt $_s3/sub dir/p" &&
     printf '%s' "$_out" |
-    grep -qF 'root itself, whitespace, glob character, dot segment or control byte' &&
+    grep -qF 'root itself, whitespace, glob character, dot segment, doubled slash or' &&
     printf '%s' "$_out" | grep -qF 'move or rename the folder, then adopt it'; then
     pass "rows: gate-refused paths get no command, metacharacter paths a quoted one, control bytes never render (#765 a S3, b F1; #798 C3)"
 else
@@ -1955,7 +1955,8 @@ else
     _rc=0
     _out=$(_core_run 'GP_STORAGE=/ _gp_migrate_one "$WORK/roots/r1/rootstor" yes') || _rc=$?
     if [ "$_rc" = 1 ] &&
-        printf '%s' "$_out" | grep -qF 'use-time sanity check (non-absolute, bare /, malformed form, or symlinked?)' &&
+        printf '%s' "$_out" | grep -qF 'use-time sanity check (non-absolute, bare /,' &&
+        printf '%s' "$_out" | grep -qF 'dot-dot, doubled slash, whitespace, glob, or symlinked?' &&
         [ -d "$WORK/roots/r1/rootstor/.git" ]; then
         pass "security A4c: migrate with a / storage refused before any move (#794)"
     else
@@ -2251,6 +2252,11 @@ fi
 
 # --- 10c. diagnostic-message bookkeeping (#798) --------------------------------------
 #
+# Order: this block must stay LAST — it performs the suite's final
+# $IC write (GITDIR_STORAGE=none, consumed only here) and reuses the
+# A5 storage-sym fixture (#800 a F7); a later section must rewrite
+# $IC before use.
+#
 # S2: the storage consumers split rc 2 (the recorded DECLINE marker,
 # GITDIR_STORAGE=none) from every other failure — the declined flow
 # names the decline, the generic arm stays "no storage configured".
@@ -2294,6 +2300,35 @@ else
     fail "diagnostics S2: nail declined arm (rc=$_rc out=$_out)"
 fi
 
+# F1 (#800 a): the revert CLI refuses the declined marker like the
+# other consumers instead of the false "not ours" skip / the silent
+# exit-0 sweep; the hint names the revert intent (fix the config),
+# not `on` (which would re-enable). The pointer file must survive.
+_mkrepo "$WORK/roots/r1/declr"
+rm -rf "${WORK:?}/roots/r1/declr/.git"
+printf 'gitdir: %s\n' "$WORK/storage/declr.git" >"$WORK/roots/r1/declr/.git"
+_rc=0
+_out=$(_core_run 'unset GP_STORAGE; _git_protection_revert "$WORK/roots/r1/declr"') || _rc=$?
+if [ "$_rc" = 1 ] &&
+    printf '%s' "$_out" | grep -qF 'storage declined (GITDIR_STORAGE=none)' &&
+    printf '%s' "$_out" | grep -qF 'fix GITDIR_STORAGE, then re-run' &&
+    ! printf '%s' "$_out" | grep -qF 'not ours' &&
+    [ -f "$WORK/roots/r1/declr/.git" ]; then
+    pass "diagnostics F1: revert <path> refuses the declined storage with the revert-intent hint (#800 a)"
+else
+    fail "diagnostics F1: revert path arm (rc=$_rc out=$_out)"
+fi
+
+_rc=0
+_out=$(_core_run 'unset GP_STORAGE; _git_protection_revert --all') || _rc=$?
+if [ "$_rc" = 1 ] &&
+    printf '%s' "$_out" | grep -qF 'storage declined (GITDIR_STORAGE=none)' &&
+    ! printf '%s' "$_out" | grep -qF 'not ours'; then
+    pass "diagnostics F1: revert --all refuses the declined storage (no silent exit 0) (#800 a)"
+else
+    fail "diagnostics F1: revert all arm (rc=$_rc out=$_out)"
+fi
+
 # C2: nail and revert render the class enumeration at the use-time
 # sanity gate too (reheal's arm rides the extended pin in section 6b).
 # The fixtures reuse the A5 symlinked storage — sanity refuses before
@@ -2304,7 +2339,7 @@ _out=$(_core_run 'GP_STORAGE="$WORK/storage-sym"
     _gp_nail_one "$WORK/roots/r1/nlsym" "$WORK/storage-sym/nlsym.git"') || _rc=$?
 if [ "$_rc" = 1 ] &&
     printf '%s' "$_out" | grep -qF 'not nailing: storage failed the use-time sanity check' &&
-    printf '%s' "$_out" | grep -qF '(non-absolute, bare /, malformed form, or symlinked?)'; then
+    printf '%s' "$_out" | grep -qF 'dot-dot, doubled slash, whitespace, glob, or symlinked?'; then
     pass "diagnostics C2: the nail sanity refusal enumerates the classes (#798)"
 else
     fail "diagnostics C2: nail sanity arm (rc=$_rc out=$_out)"
@@ -2317,7 +2352,7 @@ _rc=0
 _out=$(_core_run 'GP_STORAGE="$WORK/storage-sym" _gp_revert_one "$WORK/roots/r1/rvsym"') || _rc=$?
 if [ "$_rc" = 1 ] &&
     printf '%s' "$_out" | grep -qF 'storage failed the use-time sanity check' &&
-    printf '%s' "$_out" | grep -qF '(non-absolute, bare /, malformed form, or symlinked?)' &&
+    printf '%s' "$_out" | grep -qF 'dot-dot, doubled slash, whitespace, glob, or symlinked?' &&
     [ -f "$WORK/roots/r1/rvsym/.git" ]; then
     pass "diagnostics C2: the revert sanity refusal enumerates the classes (#798)"
 else
