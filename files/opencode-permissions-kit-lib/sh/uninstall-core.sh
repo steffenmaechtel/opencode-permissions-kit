@@ -1210,7 +1210,7 @@ un_config_dirs_remove() {
         # the bare not-kit-owned wording matches the wrapper/cli
         # sections and is truthful in every case.
         echo "/etc/sysctl.d/99-ddev-rootless.conf is not kit-owned — left untouched."
-        log "sysctl drop-in kept: not kit-owned at /etc/sysctl.d/99-ddev-rootless.conf (#746 a A2)"
+        log "sysctl drop-in kept: not kit-owned at /etc/sysctl.d/99-ddev-rootless.conf"
     fi
     # OpenChamber policy pin (issue #154): remove only what the kit wrote — a
     # policy.json pinning OUR wrapper. Any other content is admin-owned and

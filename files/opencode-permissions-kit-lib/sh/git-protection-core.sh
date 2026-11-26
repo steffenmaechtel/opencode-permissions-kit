@@ -543,7 +543,7 @@ _gp_reheal_storage() {
     done
     if [ "$_gprs_n" -gt 0 ]; then
         ui_detail "storage reheal: existing storage entries walked through the current"
-        ui_detail "gitdir heal contract (sticky, config/hooks pins, operand set — #779): $_gprs_n"
+        ui_detail "gitdir heal contract (sticky, config/hooks pins, operand set): $_gprs_n"
     fi
     return 0
 }
@@ -1531,7 +1531,7 @@ _gp_declined_rows() {
 }
 
 _git_protection_status() {
-    ui_section "git-protection (#704 O4 pointer layout)"
+    ui_section "git-protection (pointer layout)"
     _gpst_stor_rc=0
     _gpst_stor=$(_gp_storage) || _gpst_stor_rc=$?
     # The classic rows' fix command follows the storage state (#764
@@ -1593,7 +1593,7 @@ _git_protection_status() {
 }
 
 _git_protection_on() {
-    ui_section "git-protection: on (#704 O4 pointer layout)"
+    ui_section "git-protection: on (pointer layout)"
     _gpon_stor_rc=0
     _gpon_stor=$(_gp_storage) || _gpon_stor_rc=$?
     if [ "$_gpon_stor_rc" -eq 2 ]; then
@@ -1792,7 +1792,7 @@ _git_protection_revert() {
 }
 
 _git_protection_off() {
-    ui_section "git-protection: off (#704 O4 pointer layout)"
+    ui_section "git-protection: off (pointer layout)"
     # Honesty gate before anything is dropped (#754 a B2): pointers
     # whose locator this config IS must never be orphaned by a
     # success-shaped run that reverted nothing.
@@ -1847,7 +1847,7 @@ git_protection_cli() {
         adopt | nail | revert) ;;
         *)
             cat >&2 <<'EOF'
-usage: opk git-protection <command> (#704 O4 pointer layout)
+usage: opk git-protection <command> (pointer layout)
   status              per-project layout state (no root needed)
   on                  storage init + re-heal entries + migrate all + nail (root)
   adopt <path>        migrate + nail one project (root)

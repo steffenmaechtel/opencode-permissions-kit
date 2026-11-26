@@ -1887,7 +1887,7 @@ do_deploy_phase() {
     fi
     _xdi_trip=$(printf '%s' "$_xdi_ver" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
     if ! xdg_shim_needed_for "${_xdi_maj:-}" "$_xdi_trip"; then
-        log "xdg-open shim skipped: opencode ${_xdi_trip:-<unparsed>} >= $XDG_SHIM_FIX_VERSION opens without one (#257)"
+        log "xdg-open shim skipped: opencode ${_xdi_trip:-<unparsed>} >= $XDG_SHIM_FIX_VERSION opens without one"
     elif ! command -v xdg-open >/dev/null 2>&1 &&
         ! [ -e /usr/local/bin/xdg-open ] && ! [ -L /usr/local/bin/xdg-open ]; then
         sudo ln -s "$LIBDIR/bin/xdg-open" /usr/local/bin/xdg-open

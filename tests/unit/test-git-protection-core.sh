@@ -745,7 +745,7 @@ if [ "$_rc" = 0 ] && [ "$_mode_cfg" = 644 ] && [ "$_hooks_ok" = 1 ] &&
     [ -k "$WORK/rhs/rhproj.git" ] && [ -g "$WORK/rhs/rhproj.git" ] &&
     [ ! -e "$WORK/rhs/rhproj.git/FETCH_HEAD" ] &&
     printf '%s' "$_out" | grep -qF 'storage reheal: existing storage entries' &&
-    printf '%s' "$_out" | grep -qF 'operand set — #779): 1'; then
+    printf '%s' "$_out" | grep -qF 'operand set): 1'; then
     pass "reheal: a drifted storage entry walks back through the contract (#779)"
 else
     fail "reheal: drift arm (rc=$_rc cfg=$_mode_cfg hooks=$_mode_hooks out=$_out)"
@@ -876,7 +876,7 @@ if [ "$_rc" = 0 ] &&
     [ -f "$WORK/rr2-roots/rhnew/.git" ] &&
     [ -d "$WORK/rhs2/rhnew.git" ] &&
     printf '%s' "$_out" | grep -qF 'storage reheal: existing storage entries' &&
-    printf '%s' "$_out" | grep -qF 'operand set — #779): 1'; then
+    printf '%s' "$_out" | grep -qF 'operand set): 1'; then
     pass "reheal: the on-pass heals existing entries before migrating (#779)"
 else
     fail "reheal: on-pass wiring (rc=$_rc out=$_out)"
