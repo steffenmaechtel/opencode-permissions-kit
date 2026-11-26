@@ -702,7 +702,7 @@ _fsb_heal_hookwarn() {
     _fshw_ns=$(_fsb_sudo find "$_fshw_gd/hooks" -mindepth 1 -maxdepth 1 \
         ! -name '*.sample' -printf '%y\n' 2>/dev/null | wc -l 2>/dev/null || printf '0')
     if [ "${_fshw_ns:-0}" -gt 0 ] 2>/dev/null; then
-        printf '  warn: git heal: %s non-sample entries in %s/hooks — remove manually (issue #644)\n' \
+        printf '  warn: git heal: %s non-sample entries in %s/hooks — remove manually\n' \
             "$_fshw_ns" "$_fshw_gd" >&2
     fi
     return 0
@@ -885,7 +885,7 @@ _fsb_heal_git() {
         _fsb_heal_err "$_fsh_root" "the .git scan (find)"
     while IFS= read -r _fsh_gd; do
         [ -n "$_fsh_gd" ] || continue
-        printf '  git heal: %s (hooks/config pinned developer-owned, issue #644)\n' "$_fsh_gd" >&2
+        printf '  git heal: %s (hooks/config pinned developer-owned)\n' "$_fsh_gd" >&2
         # Ancestor-chain sticky STRIP (#702/#703 — migration): the
         # #655 a C1/b C1 bits are removed with the SAME enumeration
         # that once added them (every directory from the root,
