@@ -1778,7 +1778,11 @@ S245X6_ERR=$(_s245_dhr "$S245/glb*root") && S245X6_RC=0 || S245X6_RC=$?
 # #728 M1: a bare "/" root — the sibling fs_baseline_root arm (#655 b
 # S2/C7) mirrored. The form arms above admit a lone slash (absolute,
 # no dot/empty-segment alternative matches it), and the belt would
-# hand find the whole filesystem.
+# hand find the whole filesystem. The third leg (#791 a B1) closes the
+# message-without-refusal class: a dropped `return 1` keeps the
+# refusal message and falls through to the lib guard's rc 1 — both
+# legs green over a broken guard; the lib guard's own warn line is
+# the fall-through tell, so its ABSENCE proves the arm returned.
 S245X7_ERR=$(_s245_dhr "/") && S245X7_RC=0 || S245X7_RC=$?
 if [ "$S245X2_RC" -ne 0 ] &&
     printf '%s' "$S245X2_ERR" | grep -qF 'is a symlink — refusing the ddev handover' &&
@@ -1789,9 +1793,10 @@ if [ "$S245X2_RC" -ne 0 ] &&
     printf '%s' "$S245X6_ERR" | grep -qF 'is a malformed root' &&
     [ "$S245X7_RC" -ne 0 ] &&
     printf '%s' "$S245X7_ERR" | grep -qF 'is never a handover root' &&
+    ! printf '%s' "$S245X7_ERR" | grep -qF 'OPK_DDEV_HANDOVER_LIB is unset' &&
     [ "$S245X5_RC" -ne 0 ] &&
     printf '%s' "$S245X5_ERR" | grep -qF 'is not an absolute path'; then
-    pass "ddev_handover_root belt refuses link, dodge spellings, glob, bare-/, and non-absolute roots, all rc 1 (#245, b X2, c X1; #665; #728 M1)"
+    pass "ddev_handover_root belt refuses link, dodge spellings, glob, bare-/, and non-absolute roots, all rc 1, the / refusal returns without fall-through (#245, b X2, c X1; #665; #728 M1; #791 a B1)"
 else
     fail "ddev_handover_root belt must refuse every dodge spelling (X2=$S245X2_RC X3=$S245X3_RC X4=$S245X4_RC X5=$S245X5_RC X6=$S245X6_RC X7=$S245X7_RC) (#245/#665/#728)"
 fi

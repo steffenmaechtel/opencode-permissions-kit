@@ -101,10 +101,11 @@ RESULT=$(sh -c ". \"\$1\" && ddev_migrate_projects \"\$2\" \"\$3\"" _ "$MIG" "$W
 assert_eq "root filter with no matching dirs yields nothing" "" "$RESULT"
 
 # A "/" root element (issue #728 M2): the membership pattern strips to
-# the empty string, degenerating the case alternative to the glob /* —
-# every absolute approot would count as under-roots (the whole registry
-# exports, the outside warning never fires; the acting caller is
-# bin/ddev-migrate's export arm with operator-typed roots). The
+# the empty string. Under dash (the CI lane's sh) the case alternative
+# degenerated to the glob /* — every absolute approot counted as
+# under-roots, the whole registry exported, the outside warning never
+# fired (under bash-as-sh the quoted-empty pattern matched nothing;
+# the pins' pre-fix red exists only in the dash lane). The
 # stripped-empty guard (#677 WO-2 shape) SKIPS the element: "/" alone
 # matches nothing, and a legitimate root after it still decides
 # membership — the skip shape, not a whole-call refusal.

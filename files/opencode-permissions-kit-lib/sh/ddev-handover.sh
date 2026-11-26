@@ -926,8 +926,9 @@ ddev_handover_root() {
     # [ -d / ] passes — so the find below would walk the whole
     # filesystem, its xargs worker chmod/chown'ing every .ddev hit. No
     # shipped caller passes a raw `/` (the conf-reader loops are
-    # form-gated, the config.sh arms path-sane their targets); the
-    # trigger is the direct/future caller class this belt exists for.
+    # form-gated with the strip-skip, the config.sh writer arms
+    # path-sane their targets); the trigger is the direct/future
+    # caller class this belt exists for.
     if [ "$dhr_root" = "/" ]; then
         printf '  warn: %s is never a handover root (the whole filesystem is out of scope) — refusing the ddev handover\n' \
             "$dhr_root" >&2
