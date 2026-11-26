@@ -27,11 +27,13 @@ gh issue list -R steffenmaechtel/opk-agent-feedback --state all --search "<keywo
 ```
 
 - An OPEN match gets a confirming comment; nothing new is filed.
-- A match CLOSED as not recurring gets the comment and is reopened
+- A match closed as not planned WITHOUT the `rejected` label was
+  stale, not declined — it gets the comment and is reopened
   (`gh issue reopen -R …`).
-- A match that LANDED or was rejected is history, not a match: a rule
-  that landed and still did not prevent the stumble is a different
-  mechanism — file a new issue and link the old one (`Related: #N`).
+- A match closed as completed, or closed as not planned WITH the
+  `rejected` label, is history, not a match: a rule that landed and
+  still did not prevent the stumble is a different mechanism — file a
+  new issue and link the old one (`Related: #N`).
 - A near match (same area, other mechanism) is a new issue too, linking
   its neighbor.
 
@@ -102,6 +104,9 @@ Ref: <PR, branch or round, if any>
 The `Session:` line is the counting unit: promotion counts DISTINCT
 session ids across an issue's body and comments, never its comment
 count — a session confirming twice is one session.
+
+A confirming comment is the only comment type a session posts on a
+reflection issue.
 
 The `Model:` line names the model of the session that files or
 confirms, taken from the session's own context (the system prompt's

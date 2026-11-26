@@ -8,12 +8,12 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**218 metas · 215 active · 3 retired · 1 review-pending · next due 2026-11-28**
+**218 metas · 215 active · 3 retired · 5 review-pending · next due 2026-11-28**
 
 ## Actionable
 
 - **Review pending:** RM-0211
-- **Amended — pending:** none
+- **Amended — pending:** RM-0183 (2026-11-26), RM-0215 (2026-11-26), RM-0216 (2026-11-26), RM-0212 (2026-11-27)
 
 ## AGENTS.md
 
@@ -170,7 +170,7 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0211](0/2/1/RM-0211.md) | A topic is PROMOTED at | active | **pending** | 1m | 2026-12-23 |
-| [RM-0212](0/2/1/RM-0212.md) | Two overrides, both the maintainer's | active | approved | 1m | 2026-12-23 |
+| [RM-0212](0/2/1/RM-0212.md) | Two overrides, both the maintainer's | active | **amended — pending** | 1m | 2026-12-23 |
 | [RM-0213](0/2/1/RM-0213.md) | research-candidate issues are outside the | active | approved | 1m | 2026-12-23 |
 
 ### When a docs wave runs
@@ -190,14 +190,14 @@
 | [RM-0145](0/1/4/RM-0145.md) | Shipped content is English and | active | approved | 1m | 2026-12-15 |
 | [RM-0167](0/1/6/RM-0167.md) | A wave codifying a reflection | active | approved | 1m | 2026-12-17 |
 | [RM-0182](0/1/8/RM-0182.md) | The wave's own new prose | active | approved | 1m | 2026-12-20 |
-| [RM-0183](0/1/8/RM-0183.md) | The self-application sweep's sibling-read is | active | approved | 1m | 2026-12-20 |
-| [RM-0215](0/2/1/RM-0215.md) | A landed topic's feedback issue | active | approved | 1m | 2026-12-23 |
+| [RM-0183](0/1/8/RM-0183.md) | The self-application sweep's sibling-read is | active | **amended — pending** | 1m | 2026-12-20 |
+| [RM-0215](0/2/1/RM-0215.md) | A landed topic's feedback issue | active | **amended — pending** | 1m | 2026-12-23 |
 
 ### Hygiene — the monthly sweep
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0216](0/2/1/RM-0216.md) | Stale-close is a recorded disposition | active | approved | 1m | 2026-12-23 |
+| [RM-0216](0/2/1/RM-0216.md) | Stale-close is a recorded disposition | active | **amended — pending** | 1m | 2026-12-23 |
 
 ## agent/review-concept.md
 
