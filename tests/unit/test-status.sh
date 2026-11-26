@@ -20,6 +20,10 @@ STATUS="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/status.s
 # expectations are unchanged).
 STATUS_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core.sh"
 GIT_HEAL_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/git-heal-core.sh"
+# Raw-grepped by the semantic-helpers pin below (#804 a A1): a pinned
+# source like the other three, defined here so the #713 guard reads it
+# at suite start.
+GIT_CHECK_SH="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/git-check.sh"
 # Shared harness (issue #394): pass/fail, colors, counters
 # (and check/assert_eq where present) live in lib/harness.sh now.
 . "$SCRIPT_DIR/lib/harness.sh"
@@ -42,16 +46,18 @@ _trap_cleanup() {
 }
 trap _trap_cleanup EXIT INT TERM
 
-# --- pinned-source guards (#713): a vanished pin target fails loud ------------------
-# Every source-grep pin below greps these three files raw. grep rc 2 (a
+# --- pinned-source guards (#713, #804 a A1): a vanished pin target fails loud -----
+# Every file the suite GREPS RAW is in the guard list. grep rc 2 (a
 # missing/unreadable operand) lands in the PASS arm of the raw absence
 # shapes — the pin greens over zero inspected bytes; the #244 c S3 trio
 # below is rc-mapped per pin, the negated conjunction legs keep their
-# shape. These guards convert ANY vanished pinned file into a counted
-# FAIL row up front, so the suite cannot green over a missing pin
-# target regardless of the individual pins' branch shapes. ($UI_LIB is
-# sourced, never grepped — its absence already kills the sourcing arms.)
-for _g713 in "$STATUS" "$STATUS_CORE" "$GIT_HEAL_CORE"; do
+# shape. The guards convert ANY vanished raw-grepped source into a
+# counted FAIL row up front, so no raw-grep pin can green over a
+# missing operand regardless of its branch shape. ($UI_LIB is sourced,
+# never grepped — its absence already kills the sourcing arms;
+# $ADV_SRC's #201 block is an existence-conditioned sourcing group, a
+# pre-existing deliberate skip shape, not a raw grep.)
+for _g713 in "$STATUS" "$STATUS_CORE" "$GIT_HEAL_CORE" "$GIT_CHECK_SH"; do
     if [ -f "$_g713" ]; then
         pass "pinned source present: $_g713"
     else
@@ -1584,7 +1590,8 @@ if ! grep -qE '"\$UI_(GREEN|YELLOW|RED)"' "$STATUS" "$STATUS_CORE" &&
 else
     fail "status.sh: raw colored ui_kv row survived the sweep"
 fi
-GIT_CHECK_SH="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/git-check.sh"
+# (GIT_CHECK_SH is defined with the pinned sources at the top — the
+# #713 guard reads it there; #804 a A1.)
 if ! grep -qE 'ui_kv .*"\$UI_(GREEN|YELLOW|RED)"' "$GIT_CHECK_SH"; then
     pass "git-check.sh: Core row uses semantic helpers too"
 else
