@@ -621,12 +621,18 @@ _gp_rollback() {
 # arms _gp_root_ok carries, applied to the WHOLE project path. The
 # parent-only gate (`${p%/*}`) strips a trailing `..` away from the
 # checked bytes; `/root/x/..` then gated only `/root/x` while the
-# migration operated one level above it.
+# migration operated one level above it. rc 0: usable path; rc 1:
+# refused form; rc 3: refused, the bare "/" root (#793 — the
+# _gp_root_ok disposition: "/" is absolute and not malformed, it is
+# the out-of-scope system root).
 _gp_pform_ok() {
     case "$1" in
         /*) ;;
         *) return 1 ;;
     esac
+    # A lone slash passes the absolute gate and no form arm matches
+    # it (#793) — refuse with the sibling rc 3, before the form arms.
+    [ "$1" = "/" ] && return 3
     case "$1" in
         *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]* | *[\*\?\[]*) return 1 ;;
     esac
@@ -773,11 +779,22 @@ _gp_migrate_one() {
             ;;
     esac
     # FULL-path form gate first (#754 a A4): a trailing `..` hides
-    # from the parent-only gate below.
-    if ! _gp_pform_ok "$_gpm_p"; then
-        ui_error "malformed project path (dot, empty segment, whitespace, or glob): $_gpm_p"
-        return 1
-    fi
+    # from the parent-only gate below. rc 3 is the bare-"/" refusal
+    # (#793): "/" has no parent, so the parent gate below could
+    # never name that cause.
+    _gpm_pf_rc=0
+    _gp_pform_ok "$_gpm_p" || _gpm_pf_rc=$?
+    case "$_gpm_pf_rc" in
+        0) ;;
+        3)
+            ui_error "project path refused (the whole filesystem is out of scope): $_gpm_p"
+            return 1
+            ;;
+        *)
+            ui_error "malformed project path (dot, empty segment, whitespace, or glob): $_gpm_p"
+            return 1
+            ;;
+    esac
     _gpm_rk_rc=0
     _gp_root_ok "${_gpm_p%/*}" || _gpm_rk_rc=$?
     if [ "$_gpm_rk_rc" -ne 0 ]; then
@@ -1003,11 +1020,22 @@ _gp_revert_one() {
             return 1
             ;;
     esac
-    # FULL-path form gate (#754 a A4 — the `x/..` shape).
-    if ! _gp_pform_ok "$_gpr_p"; then
-        ui_error "malformed project path (dot, empty segment, whitespace, or glob): $_gpr_p"
-        return 1
-    fi
+    # FULL-path form gate (#754 a A4 — the `x/..` shape). rc 3 is
+    # the bare-"/" refusal (#793): a lone slash must not reach the
+    # pointer probes below.
+    _gpr_pf_rc=0
+    _gp_pform_ok "$_gpr_p" || _gpr_pf_rc=$?
+    case "$_gpr_pf_rc" in
+        0) ;;
+        3)
+            ui_error "project path refused (the whole filesystem is out of scope): $_gpr_p"
+            return 1
+            ;;
+        *)
+            ui_error "malformed project path (dot, empty segment, whitespace, or glob): $_gpr_p"
+            return 1
+            ;;
+    esac
     [ -f "$_gpr_p/.git" ] || {
         ui_detail "skip: no pointer file: $_gpr_p"
         return 0

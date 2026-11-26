@@ -8,7 +8,8 @@
 #     persist + drop on a scratch install.conf, project
 #     classification (classic / nailed / unnailed / foreign-pointer /
 #     worktree-reg), the atomic migrate (happy path, skip arms,
-#     collision suffix, worktree repair, rollback), the #779 storage
+#     collision suffix, worktree repair, rollback, the #793 bare-/
+#     full-path-form refusal), the #779 storage
 #     reheal sweep (drift heal, the symlink/foreign/junk skip gates,
 #     the failure count, the on-pass wiring and its failure
 #     propagation), the storage entry
@@ -1873,6 +1874,43 @@ if [ "$_rc" = 1 ] && printf '%s' "$_out" | grep -qF 'malformed project path' &&
     pass "security A4: adopt-shaped /.. path refused before any move"
 else
     fail "security A4: /.. arm (rc=$_rc out=$_out)"
+fi
+
+# A4b (#793): a bare "/" passes the absolute gate and no form arm
+# matches a lone slash — the gate refuses it with the sibling
+# _gp_root_ok disposition (rc 3, the out-of-scope system root; "/"
+# is absolute and not malformed), and migrate/revert render their
+# own arm for it instead of the form enumeration ("/" has no parent
+# for the parent-gate message, and the old revert path let it reach
+# the pointer probes). Sabotage the gate line or a caller's 3-arm
+# and these red through rc (pform) and message (migrate/revert).
+_rc=0
+_out=$(_core_run '_gp_pform_ok /') || _rc=$?
+if [ "$_rc" = 3 ]; then
+    pass "security A4b: pform gate refuses the bare / root (rc 3, #793)"
+else
+    fail "security A4b: pform bare-/ arm (rc=$_rc out=$_out)"
+fi
+_rc=0
+_out=$(_core_run '_gp_pform_ok "$WORK/roots/r1"') || _rc=$?
+if [ "$_rc" = 0 ]; then
+    pass "security A4b: pform gate keeps passing a normal absolute path"
+else
+    fail "security A4b: pform normal-path arm (rc=$_rc out=$_out)"
+fi
+_rc=0
+_out=$(_core_run '_gp_migrate_one / yes') || _rc=$?
+if [ "$_rc" = 1 ] && printf '%s' "$_out" | grep -qF 'the whole filesystem is out of scope'; then
+    pass "security A4b: migrate / names the out-of-scope cause (#793)"
+else
+    fail "security A4b: migrate / arm (rc=$_rc out=$_out)"
+fi
+_rc=0
+_out=$(_core_run '_gp_revert_one /') || _rc=$?
+if [ "$_rc" = 1 ] && printf '%s' "$_out" | grep -qF 'the whole filesystem is out of scope'; then
+    pass "security A4b: revert / refused before the pointer probes (#793)"
+else
+    fail "security A4b: revert / arm (rc=$_rc out=$_out)"
 fi
 
 # A5: a symlinked storage is refused at use time (migrate leg).

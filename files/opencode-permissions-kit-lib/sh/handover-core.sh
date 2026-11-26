@@ -481,11 +481,27 @@ PYEOF
                     case "$_ho_decl" in
                         *[\*\?\[]*) _ho_badform=1 ;;
                     esac
+                    # doctor's path_error refuses these five as shell-
+                    # significant (#344 a S3) — for them the skip row
+                    # may keep the "doctor rejects it too" parity claim.
                     case "$_ho_decl" in
-                        *"'"* | *'"'* | *'`'* | *'$'* | *';'* | *"|"* | *"&"* | *"<"* | *">"*) _ho_badform=1 ;;
+                        *"'"* | *'"'* | *'`'* | *'$'* | *';'*) _ho_badform=1 ;;
+                    esac
+                    # | & < > are the belt-only class (#356 a A8/B3):
+                    # doctor's path_error has no arm for them (#736),
+                    # so they must not overwrite a doctor-agreeing tag
+                    # and their row drops the doctor claim.
+                    case "$_ho_decl" in
+                        *"|"* | *"&"* | *"<"* | *">"*)
+                            [ "$_ho_badform" = 0 ] && _ho_badform=2
+                            ;;
                     esac
                     if [ "$_ho_badform" = 1 ]; then
                         ui_detail "declared path '$_ho_decl' skipped -- unusable form (doctor rejects it too)"
+                        continue
+                    fi
+                    if [ "$_ho_badform" = 2 ]; then
+                        ui_detail "declared path '$_ho_decl' skipped -- unusable form (doctor accepts |&<>)"
                         continue
                     fi
                     _ho_tree="$(realpath -m "$_ho_policy_dir/$_ho_decl" 2>/dev/null ||
