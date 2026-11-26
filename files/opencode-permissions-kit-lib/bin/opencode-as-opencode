@@ -84,7 +84,7 @@ fi
 # missing passes a section-only guard and dies mid-run (or silently
 # degrades where its call sits in a condition), the exact #413 harm.
 wrapper_pairing_guard() {
-    for _wpg in wrapper_headless_classify wrapper_validate_cwd \
+    for _wpg in wrapper_headless_classify wrapper_validate_cwd wrapper_root_form_ok \
         wrapper_version_passthrough wrapper_refusal wrapper_banner \
         wrapper_update_note wrapper_advisories openchamber_guard \
         wrapper_path_shadow_warning wrapper_wsl_checks \
