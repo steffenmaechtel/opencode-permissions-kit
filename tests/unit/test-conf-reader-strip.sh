@@ -134,6 +134,22 @@ else
     fail "scanner: sed -e probe not flagged (rows=$_rows)"
 fi
 
+# b A1/b A3 (PR #790 round b): reordered and combined flag spellings —
+# the broadened flag set accepts any order and -ne; this arm's lines
+# are covered by NOTHING under the pre-broadening regex, so it
+# discriminates the broadening itself (the plain -e probe above stays
+# green through a revert).
+cat >"$WORK/probe-sed-reordered.sh" <<'EOF'
+_v=$(sed -e -n 's/^KIT_CHANNEL=//p' "$conf" | tail -1)
+_w=$(sed -ne 's/^DDEV_VERSION=//p' "$conf" | tail -1)
+EOF
+_rows=$(python3 "$DETECT" "$WORK/probe-sed-reordered.sh")
+if [ "$(printf '%s' "$_rows" | grep -c 'unstripped conf extraction')" = 2 ]; then
+    pass "scanner: reordered (-e -n) and combined (-ne) spellings are flagged"
+else
+    fail "scanner: reordered-flag probe not flagged twice (rows=$_rows)"
+fi
+
 cat >"$WORK/probe-tsx-notrim.tsx" <<'EOF'
 version = /^VERSION=(.+)$/m.exec(conf)?.[1] ?? ""
 EOF

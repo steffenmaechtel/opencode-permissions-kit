@@ -61,7 +61,7 @@ ALLOW = [
 ]
 
 EXTRACT = re.compile(
-    r"""sed (?:-n\s+)?(?:-e\s+)?(['"])s/\^([A-Za-z_][A-Za-z0-9_]*|\$1)=//p\1""")
+    r"""sed(?:\s+(?:-ne|-n|-e))*(?:\s+)?(['"])s/\^([A-Za-z_][A-Za-z0-9_]*|\$1)=//p\1""")
 GREP_VALUE = re.compile(
     r"""grep\b[^|]*['\"]\^[A-Za-z_][A-Za-z0-9_]*=[^'\"]*\$['\"]""")
 STRIP = 's/^"//;s/"$//'
