@@ -66,7 +66,16 @@ ddev_devowned_enabled() {
         true | TRUE | 1 | yes) return 0 ;;
     esac
     _dve_conf="${OPK_INSTALL_CONF:-/etc/opencode-permissions-kit/install.conf}"
-    [ -f "$_dve_conf" ] && grep -qE '^DDEV_DEV_OWNED=(true|TRUE|1|yes)$' "$_dve_conf"
+    [ -f "$_dve_conf" ] || return 1
+    # Quote-strip like the DOCTOR_USER idiom (#790 a A1): the old
+    # anchored grep failed a hand-quoted stamp at the $ anchor, so the
+    # mode read OFF while the status reader (sed, stripped since #786)
+    # displayed ON — two readers of one conf line disagreeing.
+    _dve_stamp=$(sed -n 's/^DDEV_DEV_OWNED=//p' "$_dve_conf" 2>/dev/null | tail -1 | sed 's/^"//;s/"$//')
+    case "${_dve_stamp:-}" in
+        true | TRUE | 1 | yes) return 0 ;;
+    esac
+    return 1
 }
 
 # ddev_devowned_flagged <project-dir>: true when the project's committed

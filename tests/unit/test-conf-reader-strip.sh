@@ -97,6 +97,53 @@ else
     fail "scanner: strip-helper tsx flagged (rows=$_rows)"
 fi
 
+# a A1 (PR #790 round a): an anchored-grep conf VALUE read (both ends
+# anchored) is quote-intolerant by construction — the ddev-handover
+# DDEV_DEV_OWNED shape. Flagged as its own class; presence checks (no
+# $ anchor) and key-line filters stay out of it.
+cat >"$WORK/probe-grepval.sh" <<'EOF'
+[ -f "$conf" ] && grep -qE '^DDEV_DEV_OWNED=(true|TRUE|1|yes)$' "$conf"
+EOF
+_rows=$(python3 "$DETECT" "$WORK/probe-grepval.sh")
+if printf '%s' "$_rows" | grep -q 'anchored-grep conf value read'; then
+    pass "scanner: an anchored-grep conf value read is flagged"
+else
+    fail "scanner: grep value-read probe not flagged (rows=$_rows)"
+fi
+
+cat >"$WORK/probe-greppresence.sh" <<'EOF'
+grep -q '^DDEV_EXPORTED=' "$conf" 2>/dev/null
+EOF
+_rows=$(python3 "$DETECT" "$WORK/probe-greppresence.sh")
+if [ -z "$_rows" ]; then
+    pass "scanner: a presence check (no \$ anchor) stays out of the class"
+else
+    fail "scanner: presence-check probe flagged (rows=$_rows)"
+fi
+
+# a A3 (PR #790 round a): the extraction match tolerates flag spellings
+# (-e without -n, extra spacing) — the sed class cannot escape by
+# re-spelling.
+cat >"$WORK/probe-sed-e.sh" <<'EOF'
+_v=$(sed -e 's/^KIT_CHANNEL=//p' "$conf" | tail -1)
+EOF
+_rows=$(python3 "$DETECT" "$WORK/probe-sed-e.sh")
+if printf '%s' "$_rows" | grep -q 'unstripped conf extraction'; then
+    pass "scanner: a sed -e spelling extraction is flagged"
+else
+    fail "scanner: sed -e probe not flagged (rows=$_rows)"
+fi
+
+cat >"$WORK/probe-tsx-notrim.tsx" <<'EOF'
+version = /^VERSION=(.+)$/m.exec(conf)?.[1] ?? ""
+EOF
+_rows=$(python3 "$DETECT" "$WORK/probe-tsx-notrim.tsx")
+if printf '%s' "$_rows" | grep -q 'unstripped conf regex read'; then
+    pass "scanner: a bare tsx read without .trim() is flagged"
+else
+    fail "scanner: tsx no-trim probe not flagged (rows=$_rows)"
+fi
+
 # A stale allowlist entry must red, not pass silently: a file wearing
 # an allowlisted basename WITHOUT its allowlisted site leaves the entry
 # stale (the allowlist must not outlive its sites).
@@ -138,11 +185,23 @@ for f in "$REPO/files/install.sh" "$REPO/files/etc/umask.sh" \
     [ -f "$f" ] && set -- "$@" "$f"
 done
 
-_rows=$(python3 "$DETECT" "$@")
+_rows=$(python3 "$DETECT" --strict-allowlist "$@")
 if [ -z "$_rows" ]; then
     pass "corpus: every shipped conf extraction carries the quote-strip"
 else
     fail "corpus: unstripped conf extraction(s) remain ($(printf '%s' "$_rows" | tr '\n' ';'))"
+fi
+
+# a C2 (PR #790 round a): strict mode reports an allowlisted basename
+# absent from the scanned corpus — a renamed or deleted allowlisted
+# file can no longer leave its entries silently exempt. The probe runs
+# over a scratch basename no allowlist entry names, so every entry must
+# go stale.
+_rows=$(python3 "$DETECT" --strict-allowlist "$WORK/probe-unstripped.sh")
+if printf '%s' "$_rows" | grep -q 'stale allowlist file'; then
+    pass "scanner: strict mode reports an allowlisted file gone from the corpus"
+else
+    fail "scanner: strict-allowlist probe not flagged (rows=$_rows)"
 fi
 
 # Non-vacuity floors (not rosters): the corpus must still CONTAIN

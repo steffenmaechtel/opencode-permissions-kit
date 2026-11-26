@@ -358,6 +358,28 @@ check_live "devowned-flag: helper respects the OPK_INSTALL_CONF override" \
     "$HELPER" \
     -qF 'INSTALL_CONF="${OPK_INSTALL_CONF:-/etc/opencode-permissions-kit/install.conf}"'
 
+# --- 2c-b. the conf stamp arm strips quotes (#790 a A1) ------------------------
+# ddev_devowned_enabled's install.conf arm used to read the stamp by
+# anchored grep — a hand-quoted DDEV_DEV_OWNED="true" failed the $
+# anchor and the mode read OFF while the status reader (sed, stripped
+# since #786) displayed ON: two readers of one conf line disagreeing.
+# The arm now extracts through the DOCTOR_USER strip; this pin drives
+# the lib function over a quoted stamp (the lib is sourced in a
+# subshell — any top-level effect stays contained).
+printf 'DDEV_DEV_OWNED="true"\n' >"$DF/devowned-quoted.conf"
+_QD_RC=0
+DDEV_DEV_OWNED="" OPK_INSTALL_CONF="$DF/devowned-quoted.conf" \
+    sh -c '. "$1"; ddev_devowned_enabled' _ "$HANDOVER" >/dev/null 2>&1 ||
+    _QD_RC=$?
+check "devowned stamp: a quoted DDEV_DEV_OWNED reads back ON (#790 a A1)" \
+    [ "$_QD_RC" = 0 ]
+printf 'DDEV_DEV_OWNED=false\n' >"$DF/devowned-off.conf"
+_QF_RC=0
+DDEV_DEV_OWNED="" OPK_INSTALL_CONF="$DF/devowned-off.conf" \
+    sh -c '. "$1"; ddev_devowned_enabled' _ "$HANDOVER" >/dev/null 2>&1 ||
+    _QF_RC=$?
+check "devowned stamp: an unquoted false stamp still reads OFF" [ "$_QF_RC" = 1 ]
+
 # 0.0.46b W1: the delivery pins. The hook's sudo call runs this mode as
 # `... 2>/dev/null || true`, so everything on stderr is discarded on
 # exactly the path this mode exists for — which swallowed all four

@@ -14,15 +14,22 @@ Mechanics (the trap_detect.py shape):
 - backslash continuations are JOINED before matching -- the house wrap
   puts the operand and the strip on the second physical line, so a
   single-line grep sees only the first (PR #642 round b S1);
-- an extraction site is `sed -n 's/^KEY=//p'` (single- or
-  double-quoted, the "s/^$1=//p" helper spelling included);
+- an extraction site is `sed ['\"]s/^KEY=//p['\"]` with optional -n /
+  -e flags in any order/spacing (single- or double-quoted, the
+  "s/^$1=//p" helper spelling included), OR an anchored-grep value
+  read -- `grep ... '^KEY=…$'` anchored at BOTH ends over one literal
+  (presence checks anchor only at ^ and are out of class; the live
+  instance was ddev-handover.sh's DDEV_DEV_OWNED grep, #790 a A1);
 - every site must carry `sed 's/^"//;s/"$//'` in the SAME joined line;
 - out-of-class sites (a different input file, quote-safe by other
   means) are allowlisted by (basename, key); a stale allowlist entry
-  (site gone from the scanned corpus) is reported as a row -- the
-  allowlist must not outlive its sites;
+  (site gone from a still-scanned file) is reported as a row, and
+  `--strict-allowlist` additionally reports an allowlisted BASENAME
+  absent from the scanned corpus -- a renamed or deleted allowlisted
+  file can no longer leave its entries silently exempt (#790 a C2);
 - tui/kit-mode*.tsx: regex conf reads must strip through the val()
-  helper -- a bare `.exec(conf)` chain without .replace( is a row.
+  helper -- a bare `.exec(conf)` chain without .replace( is a row,
+  with or without a trailing .trim().
 
 Findings go to stdout as rows (file, joined-line-no, key, reason);
 rc 0 even with findings (the consumer suite decides); rc 1 with a
@@ -53,7 +60,10 @@ ALLOW = [
      "parses loginctl show-user stdout, not install.conf"),
 ]
 
-EXTRACT = re.compile(r"""sed -n (['"])s/\^([A-Za-z_][A-Za-z0-9_]*|\$1)=//p\1""")
+EXTRACT = re.compile(
+    r"""sed (?:-n\s+)?(?:-e\s+)?(['"])s/\^([A-Za-z_][A-Za-z0-9_]*|\$1)=//p\1""")
+GREP_VALUE = re.compile(
+    r"""grep\b[^|]*['\"]\^[A-Za-z_][A-Za-z0-9_]*=[^'\"]*\$['\"]""")
 STRIP = 's/^"//;s/"$//'
 RE_COMMENT_LINE = re.compile(r'^\s*#')
 
@@ -82,22 +92,26 @@ def detect_file(path):
         if RE_COMMENT_LINE.match(line):
             continue
         if base.endswith('.tsx'):
-            if ('.exec(conf)' in line and '.trim()' in line
-                    and '.replace(' not in line):
+            if '.exec(conf)' in line and '.replace(' not in line:
                 rows.append('%s\t%d\ttsx-read\tunstripped conf regex read'
                             % (path, idx))
             continue
         m = EXTRACT.search(line)
-        if not m:
+        if m:
+            key = m.group(2)
+            sites += 1
+            if key in allow_keys:
+                allow_seen.add(key)
+                continue
+            if STRIP not in line:
+                rows.append('%s\t%d\t%s\tunstripped conf extraction'
+                            % (path, idx, key))
             continue
-        key = m.group(2)
-        sites += 1
-        if key in allow_keys:
-            allow_seen.add(key)
-            continue
-        if STRIP not in line:
-            rows.append('%s\t%d\t%s\tunstripped conf extraction'
-                        % (path, idx, key))
+        if GREP_VALUE.search(line):
+            sites += 1
+            rows.append('%s\t%d\tgrep-read\tanchored-grep conf value read '
+                        '(extract-then-case with the strip)'
+                        % (path, idx))
     for key in sorted(allow_keys - allow_seen):
         rows.append('%s\t-\t%s\tstale allowlist entry' % (base, key))
     return rows, sites, len(allow_seen)
@@ -106,20 +120,36 @@ def detect_file(path):
 def main(argv):
     args = argv[1:]
     stats = False
+    strict = False
     if '--stats' in args:
         stats = True
         args = [a for a in args if a != '--stats']
+    if '--strict-allowlist' in args:
+        strict = True
+        args = [a for a in args if a != '--strict-allowlist']
     if not args:
         sys.stderr.write('conf_strip_detect.py: no files given\n')
         return 1
     out = []
     nfiles = nsites = nallow = 0
+    scanned = set()
     for path in args:
         rows, sites, allow = detect_file(path)
         nfiles += 1
         nsites += sites
         nallow += allow
+        scanned.add(pathlib.Path(path).name)
         out.extend(rows)
+    if strict:
+        # C2 (#790 round a): the per-file stale check above fires only
+        # for files the scan still SEES — a renamed or deleted
+        # allowlisted file would leave its entries silently exempt
+        # forever. Under this flag an allowlisted basename absent from
+        # the scanned corpus is reported, so the allowlist cannot
+        # outlive its files either.
+        for b, _k, _r in ALLOW:
+            if b not in scanned:
+                out.append('%s\t-\t-\tstale allowlist file' % b)
     if stats:
         sys.stdout.write('files %d\nsites %d\nallow %d\n'
                          % (nfiles, nsites, nallow))
