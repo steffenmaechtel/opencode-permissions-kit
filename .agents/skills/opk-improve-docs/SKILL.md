@@ -106,8 +106,7 @@ session ids across an issue's body and comments, never its comment
 count — a session confirming twice is one session.
 
 A confirming comment is the only comment type a session posts on a
-reflection issue: the maintainer's list-view comment column reads as
-the confirmation count, and nothing a session posts may dilute it.
+reflection issue.
 
 The `Model:` line names the model of the session that files or
 confirms, taken from the session's own context (the system prompt's

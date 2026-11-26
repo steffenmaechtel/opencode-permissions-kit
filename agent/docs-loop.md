@@ -38,7 +38,7 @@ redesign moved it to the sessions that hit the topic (issue #755).
 - Two overrides, both the maintainer's: an issue filed `prio:high`
   (rare but severe — data loss, security class) is promoted on filing,
   the quorum bypassed; and the maintainer may promote any issue by hand
-  or reject one that reached quorum, at any time — the hand-applied
+  or reject any open issue, at any time — the hand-applied
   `promoted` label or the `rejected` label on the closed issue is the
   record. (RM-0212)
 - `research-candidate` issues are outside the loop's work: they wait
@@ -101,13 +101,13 @@ never count toward a wave. A promotion is the label, not a comment:
 issue timeline is the record, and the `Session:` lines that reached
 the quorum are its evidence, already in place.
 
-Comments on a reflection issue are confirming comments only — the one
-comment type the loop knows (the skill's template). That is what makes
-the list view's comment column readable as the confirmation count: the
-filer sits in the body, each confirming session adds one comment,
-quorum shows as two comments — and the gate still counts distinct
-session ids, never the column, because a session confirming twice is
-one session.
+The comments a session posts on a reflection issue are confirming
+comments only (the skill's template, the one comment type). That is
+what makes the list view's comment column readable as the
+confirmation count: the filer sits in the body, each confirming
+session adds one comment, quorum shows as two comments — and the gate
+still counts distinct session ids, never the column, because a
+session confirming twice is one session.
 
 ## Triage — every item gets a disposition class
 
@@ -155,15 +155,19 @@ extracted work order lands in THIS repository and cites its topic as
 `opk-agent-feedback#N`.
 
 Every class lands in one of the tracker's three native states — open,
-closed as completed, closed as not planned — never in a comment on the
-issue: apply, code and dedup close as completed through the wave's
-cross-repo `Closes` lines; covered closes as completed, the covering
-ref named where the class was assigned; extract closes as completed,
-its work order citing the topic; reject closes as not planned with the
-`rejected` label set — the label is what tells a later session stale
-from declined, and the producer side reads it (the skill's
-search-before-filing). Class rationales and added demands live in the
-commission and the wave's PR body, not on the issue.
+closed as completed, closed as not planned — and the class record is
+state and label, never a comment on the issue: apply, code and dedup
+close as completed through the wave's cross-repo `Closes` lines;
+covered closes as completed, the covering ref named where the class
+was assigned; extract closes as completed, its work order citing the
+topic; reject closes as not planned with the `rejected` label set by
+the maintainer's hand (the Promotion section's reject override). The
+label is what tells a later session stale from declined, and the
+producer side reads it (the skill's Search before filing bullets).
+Class rationales and added demands live in the commission and the
+wave's PR body, not on the issue; the one comment-side text the loop
+prescribes is the external class's landing citation — a pointer to
+where the fix lives, never a class record.
 
 The veto points are the commission — the maintainer reads the issues
 he names — and the PR review; the disposition record is the PR body's
@@ -366,9 +370,12 @@ the local opencode.db and prints the snapshot's tables.
 ## Closure — and the next cycle
 
 The loop stops by the ordinary stop rule; the closing summary — the PR
-body, the disposition record — lists every item of every covered issue
-with its class and landing place, and every covered feedback issue is
-named in a cross-repo `Closes` line before the merge. The session still
-ends with the `opk-improve-docs` ask — doc
+body, the disposition record — lists every item of every dispositioned
+issue with its class and landing place, and every landed feedback
+issue is named in a cross-repo `Closes` line before the merge. A
+reject-dispositioned issue is named in the `Ref` form instead — the
+merge must not close it — and the maintainer closes it by hand, not
+planned with the `rejected` label. The session still ends with the
+`opk-improve-docs` ask — doc
 waves are sessions too: a wave whose own rules prove wrong becomes the
 next reflection topic, and the loop corrects itself.
