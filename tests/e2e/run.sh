@@ -1801,11 +1801,11 @@ E 'cd /var/www/vhosts/doctor-det && chmod +t .git && chmod 644 .git/config && ch
 E 'cd /var/www/vhosts/doctor-det && setfacl -b .git/config .git/hooks'
 E 'sudo chown opencode /var/www/vhosts/doctor-det/public/deps.js'
 check "12n: detect proposes the mixed boundary (ignored artifact + human sources)" \
-    E 'cd /var/www/vhosts/doctor-det && opk doctor detect </dev/null >/tmp/ddet-eof.log 2>&1; test $? -eq 1 && grep -q "candidate      public --" /tmp/ddet-eof.log && grep -q "mixed with human-owned files" /tmp/ddet-eof.log && grep -q "one owner for both" /tmp/ddet-eof.log'
+    E 'cd /var/www/vhosts/doctor-det && opk doctor detect </dev/null >/tmp/ddet-eof.log 2>&1; test $? -eq 1 && grep -q "candidate      public —" /tmp/ddet-eof.log && grep -q "mixed with human-owned files" /tmp/ddet-eof.log && grep -q "one owner for both" /tmp/ddet-eof.log'
 check "12n: declined detect prints the paste snippet, writes nothing" \
     E 'test ! -e /var/www/vhosts/doctor-det/opk.json && grep -qF "{\"path\": \"public\"," /tmp/ddet-eof.log'
 check "12n: tracked dev-only dirs are no candidates" \
-    E '! grep -q "candidate      src --" /tmp/ddet-eof.log'
+    E '! grep -q "candidate      src —" /tmp/ddet-eof.log'
 # #785 a C2: the dump arms keep their evidence value but no longer own
 # the exit — a bare `cat` tail returned rc 0 and turned a failing
 # assertion into a PASS (the pre-push e2e runs 3/4 were exactly that
@@ -1989,7 +1989,7 @@ check "12q: #777/#782 — status names the resolved storage gitdir in its lockou
 check "12q: #777 — opk status renders the same resolved-path lockout row" \
     E 'opk status >/tmp/gh-pt-stsec.log 2>&1; grep -qF "/var/www/gitdirs/perm-check.git/index is root-owned (transient —" /tmp/gh-pt-stsec.log'
 check "12q: #777 — opk doctor classifies the pointer checkout through the storage gitdir" \
-    E 'opk doctor /var/www/vhosts/perm-check >/tmp/gh-pt-dr.log 2>&1; grep -qF "/var/www/gitdirs/perm-check.git/index is root-owned (transient --" /tmp/gh-pt-dr.log'
+    E 'opk doctor /var/www/vhosts/perm-check >/tmp/gh-pt-dr.log 2>&1; grep -qF "/var/www/gitdirs/perm-check.git/index is root-owned (transient —" /tmp/gh-pt-dr.log'
 # #653 W1: heal-drift and planted-content rows on the RESOLVED storage
 # gitdir (plant → observe → restore inside one E arm; opk status exits
 # 2 on the warning rows, so the check observes grep's rc, not status's).

@@ -1335,7 +1335,7 @@ if not isinstance(doc, dict):
 # so a bare != would accept JSON true/1.0 as "version 1"
 version = doc.get("version", 1)
 if isinstance(version, bool) or not isinstance(version, int) or version != 1:
-    bad("unsupported version %r — this kit reads version 1" % (version,))
+    bad("unsupported version %r -- this kit reads version 1" % (version,))
 trees = doc.get("containerTrees", [])
 if not isinstance(trees, list):
     bad("containerTrees must be an array")

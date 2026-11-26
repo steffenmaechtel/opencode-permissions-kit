@@ -29,7 +29,7 @@ df860e46921b38a6fd5871da32053133201204db0f5118d6b2b6fc5eef17b04a  files/opencode
 8112725d9e3992a7e20afe9fbda49e161a673c59c90e351edd6b604ef0edb091  files/opencode-permissions-kit-lib/sh/ddev-migrate.sh
 47d414945a1f7c4bc00047afc4321fd6b647bff990f109e985d905b3df651ca1  files/opencode-permissions-kit-lib/sh/ddev-terminal.sh
 9b39876de8ca322f7e83e995a1eb7c5da3f5f9645fd37bb0244b388db017d9de  files/opencode-permissions-kit-lib/sh/deploy-lib.sh
-20d4c54e5613d803a0f80f412bf0ece44725e2fa47582d952c87314cdb30e2f0  files/opencode-permissions-kit-lib/sh/doctor-core.sh
+461fede883b4ea458f36d78ac3b1460e345524a8bf2863fc31258a4458764449  files/opencode-permissions-kit-lib/sh/doctor-core.sh
 4158df826dda9ecd99fc5e607c06ecd7b62c1865de5c94322672b2e4f7b1cdb0  files/opencode-permissions-kit-lib/sh/fs-baseline.sh
 80579d6005c882c689086a3af913ccdf686059905451f43b496aa74005fd0b41  files/opencode-permissions-kit-lib/sh/git-check.sh
 1e7f42a6c4f189e759b0112105f58cdb589fa945bb3bb9a1b19ca859a8d5b831  files/opencode-permissions-kit-lib/sh/git-heal-core.sh
