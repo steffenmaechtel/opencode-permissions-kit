@@ -37,11 +37,12 @@ asks before removing the kit block; your own entries always stay.
   forms. The display-only readers (status rows, the doctor `all`
   scan roots, `config projects list`) render such lines as written.
   The opencode wrapper applies the same form gate (issue #735): a
-  line that is not an absolute path, or that carries dot or empty
-  segments, whitespace or glob characters, is never a valid project
-  directory (the start refusal lists the well-formed lines and notes
-  how many it skipped) and is never picked as the `serve` fallback
-  directory. Lines starting with `#` are comments and are ignored by every
+  line that is not an absolute path, or that carries `..`, dot or
+  empty segments, whitespace or glob characters, is never a valid
+  project directory and is never picked as the `serve` fallback
+  directory; the start refusal drops it from the list (a bare `/`
+  is dropped there too) and notes how many malformed lines it
+  skipped. Lines starting with `#` are comments and are ignored by every
   reader (status counts, the doctor `all` scan roots, the config/update
   refresh passes — an
   annotated conf renders no verdict rows). Entries are

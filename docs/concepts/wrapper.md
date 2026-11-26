@@ -11,10 +11,12 @@ Every `opencode` invocation goes through the wrapper at
 1. **Validate working directory** — the current directory must be inside a
    path listed in `projects.conf`. Otherwise the interactive start is
    refused (headless invocations skip this — see
-   [below](#headless-invocations-serve-run-queries)). Only well-formed
-   lines count: a hand-edited line in a form the kit never writes is not a
-   project directory, and the refusal screen notes how many it skipped
-   (format rules: [Files and paths](../reference/files.md)).
+   [below](#headless-invocations-serve-run-queries)). Only lines in a
+   well-formed shape count: a hand-edited line that is not an absolute
+   path, or that carries `..`, dot or empty segments, whitespace or glob
+   characters, is not a project directory, and the refusal screen notes
+   how many of those it skipped (format rules:
+   [Files and paths](../reference/files.md)).
 2. **Detect container tools** — if the project's final `opencode.jsonc` allows
    docker/ddev broadly, the wrapper attaches the configured rootless backend.
 3. **Probe the backend** — docker-rootless: the per-user socket is verified

@@ -23,7 +23,7 @@ d578dafb2a614fb218b42e11168ad7edcb7601574b2306b736235e5c90f137a2  files/opencode
 f547a32d7ad24391f5c9ebd143506d46140d8981af2ce5b6574c7c9cce6f8d4b  files/opencode-permissions-kit-lib/py/jsonc-parser.py
 d9f9fb0aae130f10c300153b745f4768b9a763e07f82298f6f156a671a07e37a  files/opencode-permissions-kit-lib/py/tui-register.py
 dcb8b17188cab386608f95f5e4b2fe3ae0a0cf87e624c4661be08074f32fa1e8  files/opencode-permissions-kit-lib/sh/advisories.sh
-4646810936574fd44971d69df5c018a7dcd0a73fb3cfcf7a82779f37b569eb2d  files/opencode-permissions-kit-lib/sh/as-opencode-core.sh
+0bf5ce86d295d964795fd3bbdf400bcd11fdeb4e42b79c367344c0efeaa69765  files/opencode-permissions-kit-lib/sh/as-opencode-core.sh
 91c6ef6f7f41657cd81849a3b4ad5d8bce67aad360a6d57d11fbb763983a9473  files/opencode-permissions-kit-lib/sh/ddev-handover.sh
 785c7d7d8a262956a5334acf387637c1d601d6e9d83ddfaa9037473624dc4bae  files/opencode-permissions-kit-lib/sh/ddev-hosts.sh
 a6f317ab7f4589bdc244db55296119a882c27f855bc14442cedf301dd06ca7e4  files/opencode-permissions-kit-lib/sh/ddev-migrate.sh

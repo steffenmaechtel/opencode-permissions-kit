@@ -108,12 +108,13 @@ note() {
 
 # wrapper_root_form_ok <projects.conf-line>
 # The wrapper's form gate over one projects.conf line (issue #735): the
-# lexical class the root-run reader mirrors refuse -- the same
-# dot-arm case line uninstall-core's reader loop, update-core's root
-# loop and config.sh's refresh loop carry (grep the line across files/
-# for the rest of the family), plus the whitespace and glob arms. These
-# are forms the sanctioned writer refuses (sh/path-sane.sh
-# project_path_sane), which a hand-edited conf can still carry.
+# case line the root-run reader mirrors carry verbatim --
+# dot/empty-segment, whitespace and glob arms in ONE line
+# (uninstall-core's reader loop, update-core's root loop, config.sh's
+# refresh loop; grep it across files/ for the rest of the family).
+# These are forms the sanctioned writer refuses (sh/path-sane.sh
+# project_path_sane), which a hand-edited conf can still carry -- the
+# writer's line splits the whitespace and glob arms out separately.
 # Shared by every wrapper loop over the conf: wrapper_validate_cwd,
 # wrapper_refusal and both passes of wrapper_serve_cwd_fallback.
 # Measured on the pre-gate tree: the cwd validation accepted an
@@ -134,7 +135,12 @@ note() {
 # symlink root, the system paths, the scratch prefixes and the agent
 # home bound the recursive group baseline -- which this wrapper never
 # runs (the project-dir check is the soft start gate; the permission
-# layer lives in opencode.jsonc). No output, no probes: the cwd
+# layer lives in opencode.jsonc). The control-character and backslash
+# refusal (#670 a L2) is writer-only as well -- a hand-edited line
+# carrying them passes this gate and reaches the invoking user's
+# terminal through the refusal listing's raw print, the recorded
+# display residual there, as on the other display-only readers.
+# This gate itself has no output and runs no probes: the cwd
 # validation runs before the wrapper's first user-visible byte, in
 # headless mode too.
 wrapper_root_form_ok() {
@@ -228,6 +234,17 @@ wrapper_refusal() {
                     _wr_bad=$((_wr_bad + 1))
                     continue
                 }
+                # Bare "/" (#674 c E1; #789 a A2+B2+C2): the gate passes
+                # it -- "/" is absolute and carries none of the refused
+                # forms -- but the cwd validation refuses it via the
+                # empty-strip guard and the serve fallback skips it
+                # likewise, so suggesting it would send the user to a
+                # directory the next start refuses again. Mirror the
+                # skip here. Deliberately NOT counted in _wr_bad: that
+                # counter is the form gate's account, and "/" is not one
+                # of its refused forms.
+                root_clean="${root%/}"
+                [ -n "$root_clean" ] || continue
                 count=$((count + 1))
                 if [ "$count" -gt 10 ]; then
                     echo "  ... and more"
@@ -242,7 +259,7 @@ wrapper_refusal() {
                 # skip cause of wrapper_root_form_ok -- a new cause
                 # extends this line too.
                 echo "  ($_wr_bad malformed line(s) skipped in projects.conf — a project root is an absolute path"
-                echo "   without dot, empty segment, whitespace, or glob)"
+                echo "   without .., dot or empty segments, whitespace, or glob)"
             fi
         else
             echo "  (none configured — run install.sh first)"

@@ -332,9 +332,13 @@ serve_arm "serve fallback: pass 2 skips the / line and picks the root" \
 mkdir -p "$WORK/form/root/proj" "$WORK/form/has space" "$WORK/form/gl*b" "$WORK/serve/has space"
 
 # 7a. the gate itself, function-level (source the lib, call it): one
-# arm per refused form -- deleting a case arm reds exactly its row --
-# and the shapes the writer DOES store pass (a single dot inside a
-# name, one trailing slash the callers strip after the gate).
+# arm per refused form -- deleting a DISCRIMINATING alternative reds
+# exactly its row (the redundant `/./` and `./*` alternatives are
+# family-verbatim and deletion-invisible: `*/./*` matches what `/./`
+# would catch, `./*` dies at the absolute gate first -- probed,
+# #789 a C1) -- and the shapes the writer DOES store pass (a single
+# dot inside a name, one trailing slash the callers strip after the
+# gate).
 form_case() { # <label> <conf-line> <want: refuse|pass>
     if (. "$LIB" && wrapper_root_form_ok "$2"); then _fa=pass; else _fa=refuse; fi
     if [ "$_fa" = "$3" ]; then
@@ -474,10 +478,25 @@ else
     fail "refusal list (#735): malformed lines must not be suggested (rc=$_rf_rc out=$_rf_out)"
 fi
 if printf '%s' "$_rf_out" | grep -qF '(2 malformed line(s) skipped in projects.conf' &&
-    printf '%s' "$_rf_out" | grep -qF 'dot, empty segment, whitespace, or glob)'; then
+    printf '%s' "$_rf_out" | grep -qF 'without .., dot or empty segments, whitespace, or glob)'; then
     pass "refusal list (#735): the skip count and its causes are named"
 else
     fail "refusal list (#735): the dropped lines must be counted with their causes (out=$_rf_out)"
+fi
+# A bare "/" line is dropped from the listing without counting
+# (#674 c E1; #789 a A2+B2+C2): the gate passes it, the validation
+# refuses it -- the screen suggests only what the next start accepts.
+# Exact-line match for the forbidden row: every other line in the
+# capture carries more bytes.
+printf '%s\n' "/" "$WORK/form/root" >"$WORK/form/conf-list-slash"
+_rf_rc=0
+_rf_out="$(refusal_out "$WORK/form/conf-list-slash")" || _rf_rc=$?
+if [ "$_rf_rc" -eq 1 ] && printf '%s' "$_rf_out" | grep -qF -- "- $WORK/form/root" &&
+    ! printf '%s' "$_rf_out" | grep -qxF '  - /' &&
+    ! printf '%s' "$_rf_out" | grep -q 'malformed'; then
+    pass "refusal list (#735): a bare / line is neither suggested nor counted (#789 a)"
+else
+    fail "refusal list (#735): bare / must be dropped from the listing without counting (rc=$_rf_rc out=$_rf_out)"
 fi
 _rf_rc=0
 _rf_out="$(refusal_out "$WORK/form/conf-list-bad-only")" || _rf_rc=$?
