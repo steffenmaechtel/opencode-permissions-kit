@@ -1748,7 +1748,7 @@ if [ "$_rc" = 1 ] &&
     ! printf '%s' "$_out" | grep -qF "adopt $_s3/a;b" &&
     ! printf '%s' "$_out" | grep -qF "adopt $_s3/sub dir/p" &&
     printf '%s' "$_out" |
-    grep -qF 'root itself, whitespace, glob character, dot segment, doubled slash or' &&
+    grep -qF 'root itself, dot-dot or dot segment, whitespace, glob character, doubled' &&
     printf '%s' "$_out" | grep -qF 'move or rename the folder, then adopt it'; then
     pass "rows: gate-refused paths get no command, metacharacter paths a quoted one, control bytes never render (#765 a S3, b F1; #798 C3)"
 else

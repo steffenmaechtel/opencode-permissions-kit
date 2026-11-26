@@ -51,10 +51,10 @@ is set up the rows name `on` instead — `adopt` refuses without one),
 an unnailed pointer carries `sudo opk git-protection nail <path>`.
 Paste the command as printed: a path that is not plain is
 single-quoted there. A project path the migration gates refuse
-(whitespace, a glob character, a dot segment, a doubled slash, the
-filesystem root itself), or a path carrying a control character,
-gets no command but the move-or-rename hint (`adopt` would refuse
-it). The
+(whitespace, a glob character, dot-dot or a dot segment, a doubled
+slash, the filesystem root itself), or a path carrying a control
+character, gets no command but the move-or-rename hint (`adopt`
+would refuse it). The
 remaining row kinds are informational: `foreign-pointer` (a
 pointer to somewhere else — every linked worktree of a not-yet-migrated
 project shows this shape) and `worktree-reg` (a `.git` directory

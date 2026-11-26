@@ -1389,10 +1389,11 @@ _gp_q() {
 #             without one, while `on` sets it up, migrates everything
 #             and (since #764) replaces a GITDIR_STORAGE=none marker
 # The path in a command goes through _gp_q, and a path the migration
-# form gate refuses (whitespace, glob character, dot segment, doubled
-# slash, the bare root — `_gp_pform_ok`: rc 3 for the bare root, rc 1
-# for the rest) gets NO command: `adopt` would refuse it, so the row
-# names the move-or-rename instead (#765 a S3, #793/#798). A
+# form gate refuses (whitespace, glob character, dot-dot or dot
+# segment, doubled slash, the bare root — `_gp_pform_ok`: rc 3 for
+# the bare root, rc 1 for the rest) gets NO command: `adopt` would
+# refuse it, so the row names the move-or-rename instead (#765 a S3,
+# #793/#798, #800 b R3). A
 # no-command row whose path carries a CONTROL byte renders its key
 # through _gp_disp — that byte must not reach the terminal raw (#765
 # b F1); a merely whitespace-bearing path keeps its key as is (a
@@ -1424,8 +1425,8 @@ _gp_rows() {
                     ui_kv_bad "$_gprl_key" "classic .git (unprotected -- the mv .git arm) -- no command""\
  for this path"
                     ui_detail "the path fails a migration gate or cannot be pasted safely (the filesystem"
-                    ui_detail "root itself, whitespace, glob character, dot segment, doubled slash or"
-                    ui_detail "control byte) -- move or rename the folder, then adopt it"
+                    ui_detail "root itself, dot-dot or dot segment, whitespace, glob character, doubled"
+                    ui_detail "slash or control byte) -- move or rename the folder, then adopt it"
                 fi
                 _gp_rows_actionable=1
                 _gp_rows_classic=$((_gp_rows_classic + 1))
@@ -1876,7 +1877,7 @@ _git_protection_off() {
         ui_success "classic .git layout and the storage config is dropped"
     else
         ui_error "revert had failures — config NOT dropped (the remaining pointers"
-        ui_error "need it); fix them, then re-run: opk git-protection off"
+        ui_error "need it); fix them, then re-run: sudo opk git-protection off"
         exit 1
     fi
     ui_detail "storage dir left in place (remove manually if unwanted)"
