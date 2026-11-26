@@ -59,7 +59,7 @@ openchamber_core() {
         exec sudo env OPK_OPENCHAMBER_ROOT=1 sh "$LIBDIR/bin/opk" openchamber-secure "$@"
     fi
     # Running as root from here.
-    _oc_duser=$(sed -n 's/^DEFAULT_USER=//p' "$INSTALL_CONF" 2>/dev/null | tail -1)
+    _oc_duser=$(sed -n 's/^DEFAULT_USER=//p' "$INSTALL_CONF" 2>/dev/null | tail -1 | sed 's/^"//;s/"$//')
     if [ -z "$_oc_duser" ]; then
         ui_error "DEFAULT_USER not found in $INSTALL_CONF — is the kit installed?"
         exit 1

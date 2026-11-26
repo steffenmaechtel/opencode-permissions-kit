@@ -39,6 +39,7 @@
     test-format-gate \
     test-install-args \
     test-kit-files \
+    test-conf-reader-strip \
     test-tui-mode \
     test-uninstall \
     test-uninstall-core \
@@ -205,6 +206,7 @@ help:
 	@echo "  make test-agents-host-notes  Run agent host notes tests"
 	@echo "  make test-install-args  Run install.sh arg-parsing tests"
 	@echo "  make test-kit-files     Run kit file list consistency tests"
+	@echo "  make test-conf-reader-strip  Run conf reader quote-strip gate (issue #786)"
 	@echo "  make test-uninstall     Run uninstall.sh tests"
 	@echo "  make test-uninstall-core  Run uninstall section-lib tests"
 	@echo "  make test-status        Run status.sh tests"
@@ -277,6 +279,7 @@ test: lint \
       test-reviews-meta-aggregate \
       test-workflows \
       test-kit-files \
+      test-conf-reader-strip \
       test-e2e-sources \
       test-pages \
       test-agents-host-notes \
@@ -651,6 +654,10 @@ test-install-args:
 test-kit-files:
 	@echo "=== Kit File List Consistency Tests ==="
 	@./tests/unit/test-kit-files.sh
+
+test-conf-reader-strip:
+	@echo "=== Conf Reader Quote-Strip Gate (issue #786) ==="
+	@./tests/unit/test-conf-reader-strip.sh
 
 test-tui-mode:
 	@echo "=== TUI Mode Display Tests ==="

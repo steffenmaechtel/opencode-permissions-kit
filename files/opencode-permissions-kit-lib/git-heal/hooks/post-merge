@@ -83,7 +83,7 @@ fi
 # matches. An unreadable install.conf degrades to empty -- silence,
 # never a broken checkout (fail soft, the same discipline as $CONF).
 _gp_storage="${GP_STORAGE:-$(sed -n 's/^GITDIR_STORAGE=//p' \
-    /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -n 1)}"
+    /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -n 1 | sed 's/^"//;s/"$//')}"
 if [ "$_gh_hit" != 1 ]; then
     case "$_gp_storage" in
         /*)

@@ -1622,7 +1622,8 @@ _st_ddev_basic() {
     # writes disable_settings_management: true into projects' .ddev/config.yaml
     # and keeps settings dirs + project root developer-owned; off = ddev
     # manages settings (handover model). install.conf is world-readable.
-    _dv_stamp=$(sed -n 's/^DDEV_DEV_OWNED=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1)
+    _dv_stamp=$(sed -n 's/^DDEV_DEV_OWNED=//p' /etc/opencode-permissions-kit/install.conf \
+        2>/dev/null | tail -1 | sed 's/^"//;s/"$//')
     case "${_dv_stamp:-}" in
         true | TRUE | 1 | yes)
             ui_kv_ok "ddev settings" "dev-owned — kit writes disable_settings_management (permanent 2775/664)"

@@ -104,7 +104,7 @@ done
 # || true on the optional-file reads: with pipefail the sed failure on a
 # missing install.conf must not abort (the old tail-masking hid it).
 _kit_stamped_channel="$(sed -n 's/^KIT_CHANNEL=//p' /etc/opencode-permissions-kit/install.conf \
-    2>/dev/null | tail -1 || true)"
+    2>/dev/null | tail -1 | sed 's/^"//;s/"$//' || true)"
 KIT_BRANCH="${KIT_BRANCH:-${_kit_stamped_channel:-master}}"
 # The resolved ref is re-stamped as KIT_CHANNEL into install.conf, which
 # privileged scripts source wholesale — refuse anything outside a git-ref
@@ -639,7 +639,8 @@ else
     # old chain's `|| echo "0.0.0"` protected exactly this arm, and the
     # preflight's named "Not installed yet" die (not a silent rc 1
     # before the banner) is the contract.
-    VERSION=$(sed -n 's/^VERSION=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1 || true)
+    VERSION=$(sed -n 's/^VERSION=//p' /etc/opencode-permissions-kit/install.conf \
+        2>/dev/null | tail -1 | sed 's/^"//;s/"$//' || true)
     [ -n "$VERSION" ] || VERSION="0.0.0"
 fi
 LIBDIR="/usr/local/lib/opencode-permissions-kit"
@@ -901,7 +902,7 @@ INSTALLED_VERSION=""
 # want install.conf to overwrite the freshly-read VERSION from the repo.
 KIT_VERSION="$VERSION"
 if [ -f "$INSTALL_CONF" ]; then
-    INSTALLED_VERSION=$(sed -n 's/^VERSION=//p' "$INSTALL_CONF" | tail -1)
+    INSTALLED_VERSION=$(sed -n 's/^VERSION=//p' "$INSTALL_CONF" | tail -1 | sed 's/^"//;s/"$//')
     . "$INSTALL_CONF"
 fi
 VERSION="$KIT_VERSION"

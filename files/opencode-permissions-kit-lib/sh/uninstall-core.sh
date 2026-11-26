@@ -526,7 +526,7 @@ un_git_protection_remove() {
     echo ""
     echo "--- Removing git-protection pointer layout ---"
     _un_gpr_ic="${UN_GP_INSTALL_CONF:-/etc/opencode-permissions-kit/install.conf}"
-    _un_gpr_val=$(sed -n 's/^GITDIR_STORAGE=//p' "$_un_gpr_ic" 2>/dev/null | tail -n 1)
+    _un_gpr_val=$(sed -n 's/^GITDIR_STORAGE=//p' "$_un_gpr_ic" 2>/dev/null | tail -n 1 | sed 's/^"//;s/"$//')
     if [ -z "$_un_gpr_val" ] || [ "$_un_gpr_val" = "none" ]; then
         echo "git-protection not configured (no storage)."
         # #754 a B7: pointers can outlive their config (a broken `off`,

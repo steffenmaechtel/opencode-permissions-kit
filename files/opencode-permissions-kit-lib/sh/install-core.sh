@@ -466,11 +466,14 @@ do_plan_phase() {
     # || true: the file is optional (fresh install) — with pipefail the sed
     # failure must not abort (the old tail-masking hid it).
     DDEV_EXPORTED_PRE=$(sed -n 's/^DDEV_EXPORTED=//p' /etc/opencode-permissions-kit/install.conf \
-        2>/dev/null | tail -1 || true)
+        2>/dev/null | tail -1 | sed 's/^"//;s/"$//' || true)
     if [ -f /etc/opencode-permissions-kit/install.conf ]; then
-        _be=$(sed -n 's/^CONTAINER_BACKEND=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null)
-        _dh=$(sed -n 's/^OPENCODE_DOCKER_HOST=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null)
-        _ps=$(sed -n 's/^OPENCODE_PODMAN_SOCKET=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null)
+        _be=$(sed -n 's/^CONTAINER_BACKEND=//p' /etc/opencode-permissions-kit/install.conf \
+            2>/dev/null | sed 's/^"//;s/"$//')
+        _dh=$(sed -n 's/^OPENCODE_DOCKER_HOST=//p' /etc/opencode-permissions-kit/install.conf \
+            2>/dev/null | sed 's/^"//;s/"$//')
+        _ps=$(sed -n 's/^OPENCODE_PODMAN_SOCKET=//p' /etc/opencode-permissions-kit/install.conf \
+            2>/dev/null | sed 's/^"//;s/"$//')
         case "$_be" in
             docker-rootless | podman-rootless)
                 CONTAINER_BACKEND="$_be"
@@ -568,7 +571,7 @@ do_plan_phase() {
         [ -L /usr/local/bin/opencode ]; then
         _ekv="unknown"
         [ -f /etc/opencode-permissions-kit/install.conf ] &&
-            _ekv=$(sed -n 's/^VERSION=//p' /etc/opencode-permissions-kit/install.conf)
+            _ekv=$(sed -n 's/^VERSION=//p' /etc/opencode-permissions-kit/install.conf | sed 's/^"//;s/"$//')
         ui_atten "existing kit" "detected (v${_ekv:-?}) — update.sh is the usual upgrade path"
         if [ "$INTERACTIVE" = true ]; then
             # Convention: agent/conventions.md — [Y/n] via ui_confirm.
@@ -721,7 +724,8 @@ do_plan_phase() {
         command -v openchamber >/dev/null 2>&1 && _oc_seen=true
         _oc_prev=""
         if [ -f /etc/opencode-permissions-kit/install.conf ]; then
-            _oc_prev=$(sed -n 's/^OPENCHAMBER_POLICY=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1)
+            _oc_prev=$(sed -n 's/^OPENCHAMBER_POLICY=//p' /etc/opencode-permissions-kit/install.conf \
+                2>/dev/null | tail -1 | sed 's/^"//;s/"$//')
         fi
         if [ "$INTERACTIVE" = true ] && [ "$_oc_seen" = true ]; then
             if ui_confirm "Protect OpenChamber sessions too? (policy pin — its self-update buttons go dark)" "y"; then
@@ -1720,7 +1724,7 @@ do_deploy_phase() {
         # detects at runtime); the in-process gate below follows the same
         # value so the 2.x TUI branch matches what the wrapper resolves.
         OPENCODE_MAJOR=$(sed -n 's/^OPENCODE_MAJOR=//p' /etc/opencode-permissions-kit/install.conf \
-            2>/dev/null | tail -1 || true)
+            2>/dev/null | tail -1 | sed 's/^"//;s/"$//' || true)
         OPENCODE_MAJOR="${OPENCODE_MAJOR:-1}"
         ui_warn "opencode version probe unparseable — OPENCODE_MAJOR stamp left unchanged"
         ui_detail "if the binary hangs, fix it and re-run install.sh — an unset stamp is detected at runtime"

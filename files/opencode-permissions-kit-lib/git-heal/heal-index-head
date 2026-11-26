@@ -109,7 +109,7 @@ esac
 # kit lib carries for the canonical user. Resolved BEFORE the
 # allowlist: the conf-line gate's agent-home arm needs it.
 _gh_agent="${GH_AGENT_USER:-$(sed -n 's/^OPENCODE_USER=//p' \
-    /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -n 1)}"
+    /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -n 1 | sed 's/^"//;s/"$//')}"
 _gh_agent="${_gh_agent:-opencode}"
 
 # _gh_root_ok <line>: reader-side conf-line gate (files.md contract:
@@ -201,7 +201,7 @@ _gh_allowlisted() {
         esac
     done <"$_gh_conf"
     _gh_storage="${GH_STORAGE:-$(sed -n 's/^GITDIR_STORAGE=//p' \
-        /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -n 1)}"
+        /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -n 1 | sed 's/^"//;s/"$//')}"
     case "$_gh_storage" in
         /*) ;;
         *) return 1 ;;

@@ -60,9 +60,12 @@ function kitState(confPath: string) {
   let opencodeUser = ""
   try {
     const conf = fs.readFileSync(confPath, "utf8")
-    backend = /^CONTAINER_BACKEND=(.+)$/m.exec(conf)?.[1]?.trim() ?? ""
-    version = /^VERSION=(.+)$/m.exec(conf)?.[1]?.trim() ?? ""
-    opencodeUser = /^OPENCODE_USER=(.+)$/m.exec(conf)?.[1]?.trim() ?? ""
+    // Quote-strip (issue #786): a hand-quoted conf value reads back the
+    // same as the unquoted one, so mode/version/bypass facts stay correct.
+    const val = (re: RegExp) => re.exec(conf)?.[1]?.trim()?.replace(/^"|"$/g, "") ?? ""
+    backend = val(/^CONTAINER_BACKEND=(.+)$/m)
+    version = val(/^VERSION=(.+)$/m)
+    opencodeUser = val(/^OPENCODE_USER=(.+)$/m)
   } catch {
     // unreadable/missing install.conf: no kit facts, treat as no-backend
   }
