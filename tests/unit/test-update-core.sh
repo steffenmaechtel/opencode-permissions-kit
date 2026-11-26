@@ -1024,6 +1024,38 @@ else
     fail "consent: conf-none arm (out=$_uc_out)"
 fi
 
+# state 2b (#786 c A1): a HAND-QUOTED decline marker honors the decline
+# the same way — unstripped, the quoted "none" read as a configured
+# storage and every update re-ran the enable pass (recorded consent
+# silently flipped to enabled; the inner _gp_storage read has been
+# stripped since #785 wave b, so the two readers disagreed about the
+# same conf line). The decline arm prints nothing, so the
+# discriminating observable is the missing "enabled" line plus the
+# untouched marker.
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\nGITDIR_STORAGE="none"\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" >"$UC_IC"
+_uc_out=$(
+    GIT_PROTECTION_CORE="$GPCORE" INSTALL_CONF="$UC_IC" \
+        GP_CONF="$UC_CONF" GP_INSTALL_CONF="$UC_IC" GP_STORAGE="$WORK/ucstorage" \
+        GP_ALLOW_NONROOT=1 GP_CONF_RELAX=1 sh -c '
+        . "$1"
+        ui_info() { echo "info: $*"; }
+        ui_detail() { echo "detail: $*"; }
+        ui_section() { echo "section: $*"; }
+        ui_kv() { echo "kv: $1 $2"; }
+        ui_success() { echo "success: $*"; }
+        ui_warn() { echo "warn: $*"; }
+        update_git_protection_consent
+    ' _ "$LIB" 2>&1 || true
+)
+if ! printf '%s' "$_uc_out" | grep -q 'git-protection: enabled' &&
+    [ "$(sed -n 's/^GITDIR_STORAGE=//p' "$UC_IC")" = '"none"' ] &&
+    [ ! -e "$WORK/ucroots/r1/proj/.git.nailed" ]; then
+    pass "consent: a quoted decline marker is honored (#786 c A1)"
+else
+    fail "consent: quoted-none arm ran the enable pass (out=$_uc_out)"
+fi
+
 # state 3: --yes (non-interactive) leaves a hint, never a marker.
 printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
     "$(id -un)" "$(id -un)" "$(id -gn)" >"$UC_IC"

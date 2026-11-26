@@ -222,6 +222,15 @@ else
     fail "uninstall.sh removes the 2x plugin dir and cli.json entries"
 fi
 
+# #786: the conf regex reads strip surrounding quotes — the TSX sibling
+# of the shell readers' DOCTOR_USER idiom. A hand-quoted install.conf
+# value must not flip the mode facts or fire a false bypass warning
+# (opencodeUser comparing against the quoted name).
+check_live "kit-mode.tsx: conf reads strip quoted values (#786)" "$PLUGIN" \
+    -qF '.replace(/^"|"$/g, "")'
+check_live "kit-mode-2x.tsx: conf reads strip quoted values (#786)" "$PLUGIN2X" \
+    -qF '.replace(/^"|"$/g, "")'
+
 # tui-register.py functional behavior (cli.json is user-owned state)
 check "tui-register.py exists" test -f "$REGISTER"
 # Loud scratch guard (#441 a B1 / #454 a C1 class): the suite runs set -u

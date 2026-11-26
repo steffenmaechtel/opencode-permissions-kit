@@ -857,7 +857,8 @@ container_backend_apply() {
     # all three backend keys and re-adds only what it is handed. Carry
     # the pre-existing value over when switching TO podman-rootless.
     if [ "$new_backend" = "podman-rootless" ] && [ -f "$INSTALL_CONF" ]; then
-        podman_socket=$(sed -n 's/^OPENCODE_PODMAN_SOCKET=//p' "$INSTALL_CONF" 2>/dev/null | tail -1 || true)
+        podman_socket=$(sed -n 's/^OPENCODE_PODMAN_SOCKET=//p' "$INSTALL_CONF" \
+            2>/dev/null | tail -1 | sed 's/^"//;s/"$//' || true)
     fi
     local setup_out
     setup_out=$(sudo sh "$setup_script" "$new_backend" --yes 2>&1) || {

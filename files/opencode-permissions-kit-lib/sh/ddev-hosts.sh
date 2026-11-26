@@ -189,7 +189,10 @@ ddev_hosts_add() {
 
     dha_conf="/etc/opencode-permissions-kit/install.conf"
     dha_dev="${DDEV_HOSTS_DEV_USER:-}"
-    [ -n "$dha_dev" ] || { [ -f "$dha_conf" ] && dha_dev=$(sed -n 's/^DEFAULT_USER=//p' "$dha_conf" | tail -1); }
+    [ -n "$dha_dev" ] || {
+        [ -f "$dha_conf" ] &&
+            dha_dev=$(sed -n 's/^DEFAULT_USER=//p' "$dha_conf" | tail -1 | sed 's/^"//;s/"$//')
+    }
     # Resolve the caller: prefer the override/install.conf, fall back to
     # SUDO_USER; empty when already running as that user (or root without
     # either) — then run ddev directly.

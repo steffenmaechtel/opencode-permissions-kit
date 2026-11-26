@@ -99,7 +99,7 @@ oc_bypass_bin() { # <path> -> rc 0 when the path is a bypass binary
 VERSION="0.0.0"
 INSTALL_CONF="${OPK_INSTALL_CONF:-/etc/opencode-permissions-kit/install.conf}"
 if [ -f "$INSTALL_CONF" ]; then
-    _v=$(sed -n 's/^VERSION=//p' "$INSTALL_CONF" | tail -1)
+    _v=$(sed -n 's/^VERSION=//p' "$INSTALL_CONF" | tail -1 | sed 's/^"//;s/"$//')
     [ -n "$_v" ] && VERSION="$_v"
 fi
 
@@ -332,7 +332,7 @@ $LIBDIR/sh/openchamber-core.sh) — is the kit installed?"
         if [ "$(id -u)" -eq 0 ]; then
             _kitsu=""
             [ -f /etc/opencode-permissions-kit/install.conf ] &&
-                _kitsu=$(sed -n 's/^DEFAULT_USER=//p' /etc/opencode-permissions-kit/install.conf | tail -1)
+                _kitsu=$(sed -n 's/^DEFAULT_USER=//p' /etc/opencode-permissions-kit/install.conf | tail -1 | sed 's/^"//;s/"$//')
             [ -n "$_kitsu" ] || _kitsu="${SUDO_USER:-}"
             if [ -z "$_kitsu" ] || [ "$(id -u "$_kitsu" 2>/dev/null || echo 0)" = "0" ]; then
                 ui_error "cannot resolve the developer user — run as your user, not as root"
@@ -539,7 +539,7 @@ $LIBDIR/sh/openchamber-core.sh) — is the kit installed?"
         [ "$#" -le 1 ] || _es_err "ensure-shared: exactly one directory expected (got $# arguments)"
         _es_dir="${1:-$PWD/.ddev}"
         [ -f "$INSTALL_CONF" ] || _es_err "ensure-shared: $INSTALL_CONF not found — is the kit installed?"
-        _es_user=$(sed -n 's/^OPENCODE_USER=//p' "$INSTALL_CONF" 2>/dev/null | tail -1)
+        _es_user=$(sed -n 's/^OPENCODE_USER=//p' "$INSTALL_CONF" 2>/dev/null | tail -1 | sed 's/^"//;s/"$//')
         [ -n "$_es_user" ] || _es_err "ensure-shared: install.conf has no OPENCODE_USER"
         id -u "$_es_user" >/dev/null 2>&1 || _es_err "ensure-shared: user '$_es_user' does not exist"
         _es_helper="$LIBDIR/bin/ddev-as-opencode"

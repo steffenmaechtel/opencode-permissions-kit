@@ -103,6 +103,10 @@ Key notes:
 - `OPENCHAMBER_POLICY`: opt-in from the install prompt,
   `--openchamber-policy yes`, or `opk openchamber-secure`; `opk update`
   re-applies the pin only on `yes`.
+- Value quoting: the kit writes every key unquoted. A hand-edited
+  quoted value (`KEY="value"`) reads back the same as its unquoted
+  form — the conf readers strip surrounding quotes at extraction
+  (issue #786), so both spellings behave identically.
 
 ## /etc/openchamber/
 

@@ -137,5 +137,28 @@ else
     fail "best-effort: unwritable location is silent and non-fatal (rc=$rc out=$out)"
 fi
 
+# --- N. quoted conf: the admin group resolves through the strip (#786 c A2) ----
+# log_init reads DEFAULT_USER via OPK_INSTALL_CONF (the test seam, the
+# same convention as bin/opk). A hand-quoted value must still resolve
+# the admin's primary group into LOG_GROUP — unstripped, the id lookup
+# failed and LOG_GROUP stayed root, re-permissioning the log dir to
+# root:root 750 with the failure swallowed by || true (the admin loses
+# log read access). The chown itself cannot run unprivileged; LOG_GROUP
+# is the discriminating observable the chown operand is built from.
+printf 'DEFAULT_USER="%s"\n' "$(id -un)" >"$WORK/quoted.conf"
+_qgrp=$(
+    OPK_INSTALL_CONF="$WORK/quoted.conf" LOG_DIR="$WORK/log" \
+        LOG_FILE="$WORK/log/kit.log" sh -c '_d="$LOG_DIR"; _f="$LOG_FILE"
+        . "$1"
+        LOG_DIR="$_d"; LOG_FILE="$_f"
+        log_init >/dev/null 2>&1
+        printf "%s" "${LOG_GROUP:-}"' x "$LOG_SH"
+)
+if [ "$_qgrp" = "$(id -gn)" ]; then
+    pass "log_init: a quoted DEFAULT_USER still resolves the admin group (#786 c A2)"
+else
+    fail "log_init: quoted DEFAULT_USER left LOG_GROUP=${_qgrp:-empty} (want $(id -gn)) (#786 c A2)"
+fi
+
 # --- Summary ---------------------------------------------------------------------
 suite_done "tests"

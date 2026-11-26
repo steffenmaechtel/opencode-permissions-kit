@@ -782,7 +782,10 @@ update_git_protection_consent() {
         }
     done
     _gpc_env="${KIT_GITDIR_STORAGE:-}"
-    _gpc_conf=$(sed -n 's/^GITDIR_STORAGE=//p' "$INSTALL_CONF" 2>/dev/null | tail -n 1)
+    # Quote-strip like the DOCTOR_USER idiom (#786): a hand-quoted
+    # decline marker must still hit the "none" check below — unstripped
+    # it read as configured and flipped declined consent to enabled.
+    _gpc_conf=$(sed -n 's/^GITDIR_STORAGE=//p' "$INSTALL_CONF" 2>/dev/null | tail -n 1 | sed 's/^"//;s/"$//')
     if [ "$_gpc_env" = "none" ]; then
         return 0
     fi
@@ -1067,7 +1070,7 @@ current_opencode_major() {
             return 0
         fi
     fi
-    _com_maj=$(sed -n 's/^OPENCODE_MAJOR=//p' "$CONFDIR/install.conf" 2>/dev/null | tail -1 || true)
+    _com_maj=$(sed -n 's/^OPENCODE_MAJOR=//p' "$CONFDIR/install.conf" 2>/dev/null | tail -1 | sed 's/^"//;s/"$//' || true)
     echo "${_com_maj:-1}"
 }
 
@@ -1433,7 +1436,7 @@ update_finalize_ddev_stamp() {
     # does (as the opencode user, HOME/DOCKER_HOST re-set). The direct binary
     # (PATH, then the two standard locations) is the fallback; when neither
     # answers, the old stamp survives.
-    NEW_DDEV_VERSION="$(sed -n 's/^DDEV_VERSION=//p' "$INSTALL_CONF" 2>/dev/null | tail -1 || true)"
+    NEW_DDEV_VERSION="$(sed -n 's/^DDEV_VERSION=//p' "$INSTALL_CONF" 2>/dev/null | tail -1 | sed 's/^"//;s/"$//' || true)"
     _ddev_probe=""
     if [ -x "$LIBDIR/bin/ddev-as-opencode" ] && id "$OPENCODE_USER" >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then
         _ddev_probe=$(sudo -n -u "$OPENCODE_USER" "$LIBDIR/bin/ddev-as-opencode" --version 2>/dev/null |
@@ -1549,7 +1552,7 @@ update_finalize_tui_files() {
     # remove it on 1.x (the 1.x tui.json/danger theme are major-agnostic and
     # stay). The major comes from the install.conf stamp, freshly re-stamped
     # by any binary upgrade above.
-    _oc_major=$(sed -n 's/^OPENCODE_MAJOR=//p' "$CONFDIR/install.conf" 2>/dev/null | tail -1 || true)
+    _oc_major=$(sed -n 's/^OPENCODE_MAJOR=//p' "$CONFDIR/install.conf" 2>/dev/null | tail -1 | sed 's/^"//;s/"$//' || true)
     [ -n "$_oc_major" ] || _oc_major=1
     sync_tui_registration "$_oc_major"
 }

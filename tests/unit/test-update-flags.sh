@@ -1755,9 +1755,15 @@ else
 fi
 # Static arm (discriminates on installed hosts where the behavioral arm
 # above cannot force a missing install.conf): the fallback read carries
-# the || true guard, comment-stripped.
+# the || true guard, comment-stripped. #786 co-move: the same pipe
+# gained the quote-strip and the line wraps — both fragments pinned
+# (conventions "Formatting": a pin matches the WRAP, not the contiguous
+# phrase; the 8-space continuation prefix keeps fragment 2 on the
+# VERSION read, not the KIT_CHANNEL sibling above it).
 if live_src "$UPDATE" |
-    grep -qF 'sed -n '"'"'s/^VERSION=//p'"'"' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1 || true'; then
+    grep -qF 'sed -n '"'"'s/^VERSION=//p'"'"' /etc/opencode-permissions-kit/install.conf' &&
+    live_src "$UPDATE" |
+    grep -qF '        2>/dev/null | tail -1 | sed '"'"'s/^"//;s/"$//'"'"' || true)'; then
     pass "fallback read carries the pipefail || true guard (pr-00429 a B1, static arm)"
 else
     fail "fallback read lost its || true guard (pr-00429 a B1, static arm)"

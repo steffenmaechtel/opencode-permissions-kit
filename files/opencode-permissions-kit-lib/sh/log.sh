@@ -34,9 +34,15 @@ log_init() {
     # locked out while the admin can read the log without sudo. Falls back to
     # root-only when no config/user is resolvable.
     LOG_GROUP="root"
-    conf="/etc/opencode-permissions-kit/install.conf"
+    # OPK_INSTALL_CONF overrides the conf path for tests (same
+    # convention as bin/opk). The read quote-strips like the
+    # DOCTOR_USER idiom (#786): a hand-quoted DEFAULT_USER must still
+    # resolve the admin group — unstripped the id lookup failed and
+    # the log dir degraded to root:root 750 (admin write access lost,
+    # swallowed by || true).
+    conf="${OPK_INSTALL_CONF:-/etc/opencode-permissions-kit/install.conf}"
     if [ -f "$conf" ]; then
-        default_user=$(sed -n 's/^DEFAULT_USER=//p' "$conf" | tail -1)
+        default_user=$(sed -n 's/^DEFAULT_USER=//p' "$conf" | tail -1 | sed 's/^"//;s/"$//')
     fi
     if [ -n "${default_user:-}" ] && id -u "$default_user" >/dev/null 2>&1; then
         LOG_GROUP=$(id -gn "$default_user")

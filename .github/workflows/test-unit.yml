@@ -131,6 +131,8 @@ jobs:
         run: ./tests/unit/test-install-args.sh
       - name: Run kit file list tests
         run: ./tests/unit/test-kit-files.sh
+      - name: Run conf reader quote-strip gate (issue #786)
+        run: ./tests/unit/test-conf-reader-strip.sh
       - name: Run TUI mode display tests
         run: ./tests/unit/test-tui-mode.sh
       - name: Run uninstall tests
