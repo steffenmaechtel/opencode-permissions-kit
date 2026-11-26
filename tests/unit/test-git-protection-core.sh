@@ -8,8 +8,8 @@
 #     persist + drop on a scratch install.conf, project
 #     classification (classic / nailed / unnailed / foreign-pointer /
 #     worktree-reg), the atomic migrate (happy path, skip arms,
-#     collision suffix, worktree repair, rollback, the #793 bare-/
-#     full-path-form refusal), the #779 storage
+#     collision suffix, worktree repair, rollback, the #793/#794
+#     bare-/ refusals: project path and storage root), the #779 storage
 #     reheal sweep (drift heal, the symlink/foreign/junk skip gates,
 #     the failure count, the on-pass wiring and its failure
 #     propagation), the storage entry
@@ -1911,6 +1911,38 @@ if [ "$_rc" = 1 ] && printf '%s' "$_out" | grep -qF 'the whole filesystem is out
     pass "security A4b: revert / refused before the pointer probes (#793)"
 else
     fail "security A4b: revert / arm (rc=$_rc out=$_out)"
+fi
+
+# A4c (#794): a bare "/" storage root passes the absolute gate and no
+# form arm matches a lone slash — the same class A4b closed for the
+# project path, at the use-time storage gate: membership compares
+# would degenerate to /* and migrate's mv destination would land at
+# the filesystem root. Refused rc 1 (the consumers render the
+# generic sanity-check message); the negative arm keeps a real
+# storage passing, and migrate must refuse BEFORE any move.
+_rc=0
+_out=$(_core_run '_gp_storage_sane /') || _rc=$?
+if [ "$_rc" = 1 ]; then
+    pass "security A4c: storage sanity gate refuses the bare / root (#794)"
+else
+    fail "security A4c: storage bare-/ arm (rc=$_rc out=$_out)"
+fi
+_rc=0
+_out=$(_core_run '_gp_storage_sane "$WORK/storage"') || _rc=$?
+if [ "$_rc" = 0 ]; then
+    pass "security A4c: storage sanity gate keeps passing the real scratch storage"
+else
+    fail "security A4c: storage normal-path arm (rc=$_rc out=$_out)"
+fi
+_mkrepo "$WORK/roots/r1/rootstor"
+_rc=0
+_out=$(_core_run 'GP_STORAGE=/ _gp_migrate_one "$WORK/roots/r1/rootstor" yes') || _rc=$?
+if [ "$_rc" = 1 ] &&
+    printf '%s' "$_out" | grep -qF 'use-time sanity check (bare /, malformed form, or symlinked component?)' &&
+    [ -d "$WORK/roots/r1/rootstor/.git" ]; then
+    pass "security A4c: migrate with a / storage refused before any move (#794)"
+else
+    fail "security A4c: migrate /-storage arm (rc=$_rc out=$_out)"
 fi
 
 # A5: a symlinked storage is refused at use time (migrate leg).

@@ -645,12 +645,17 @@ _gp_pform_ok() {
 # re-derives the path from env/conf and MUST re-check — an
 # agent-writable storage parent (the w11 condition the init warns
 # about) allows swapping the storage for a symlink between runs.
+# The bare "/" root is refused too (#794, the sibling class #793
+# closed for _gp_pform_ok): no form arm matches a lone slash, the
+# membership compares would degenerate to /* and migrate's mv
+# destination would land at the filesystem root.
 _gp_storage_sane() {
     _gpss_s=$1
     case "$_gpss_s" in
         /*) ;;
         *) return 1 ;;
     esac
+    [ "$_gpss_s" = "/" ] && return 1
     case "$_gpss_s" in
         *..* | *//* | *[[:space:]]* | *[\*\?\[]*) return 1 ;;
     esac
@@ -827,10 +832,11 @@ _gp_migrate_one() {
         ui_error "storage missing: $_gpm_stor (run: opk git-protection on)"
         return 1
     }
-    # use-time storage sanity (#754 a A5): form + no symlinked
-    # component — init-time rigor alone trusts a too-wide window.
+    # use-time storage sanity (#754 a A5): form + bare-/ refusal
+    # (#794) + no symlinked component — init-time rigor alone trusts
+    # a too-wide window.
     if ! _gp_storage_sane "$_gpm_stor"; then
-        ui_error "storage failed the use-time sanity check (symlinked component?): $_gpm_stor"
+        ui_error "storage failed the use-time sanity check (bare /, malformed form, or symlinked component?): $_gpm_stor"
         return 1
     fi
 
