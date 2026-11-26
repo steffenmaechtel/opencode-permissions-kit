@@ -47,16 +47,22 @@ _trap_cleanup() {
 trap _trap_cleanup EXIT INT TERM
 
 # --- pinned-source guards (#713, #804 a A1): a vanished pin target fails loud -----
-# Every file the suite GREPS RAW is in the guard list. grep rc 2 (a
-# missing/unreadable operand) lands in the PASS arm of the raw absence
-# shapes — the pin greens over zero inspected bytes; the #244 c S3 trio
-# below is rc-mapped per pin, the negated conjunction legs keep their
-# shape. The guards convert ANY vanished raw-grepped source into a
-# counted FAIL row up front, so no raw-grep pin can green over a
-# missing operand regardless of its branch shape. ($UI_LIB is sourced,
-# never grepped — its absence already kills the sourcing arms;
-# $ADV_SRC's #201 block is an existence-conditioned sourcing group, a
-# pre-existing deliberate skip shape, not a raw grep.)
+# Every source FILE the suite greps raw as a single-file operand is in
+# the guard list. grep rc 2 (a missing/unreadable operand) lands in the
+# PASS arm of the raw absence shapes — the pin greens its own row over
+# zero inspected bytes; the #244 c S3 trio below is rc-mapped per pin,
+# the negated conjunction legs keep their shape. The guards add a
+# counted FAIL row up front, so the SUITE cannot green over a missing
+# pin target — the individual pin's row may still read PASS (its
+# branch shape is unchanged; the guard's FAIL row is what reddens the
+# run). ($UI_LIB is sourced, never grepped — its absence already kills
+# the sourcing arms. $ADV_SRC's #201 block is an existence-conditioned
+# sourcing group whose absent-file arm is a counted FAIL row, not a
+# raw grep. The W2 mktemp-fallback class sweep below greps the whole
+# files/ tree as a DIRECTORY operand with `|| true` — outside this
+# single-file guard class by shape: a total-tree vanish trips these
+# four guards transitively, a partial-subtree vanish narrows that one
+# sweep silently.)
 for _g713 in "$STATUS" "$STATUS_CORE" "$GIT_HEAL_CORE" "$GIT_CHECK_SH"; do
     if [ -f "$_g713" ]; then
         pass "pinned source present: $_g713"
