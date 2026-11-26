@@ -1775,6 +1775,11 @@ S245X5_ERR=$(_s245_dhr ".") && S245X5_RC=0 || S245X5_RC=$?
 # #665: the sibling belt's glob arm — same spelling class as the
 # fs_baseline_root H arm above.
 S245X6_ERR=$(_s245_dhr "$S245/glb*root") && S245X6_RC=0 || S245X6_RC=$?
+# #728 M1: a bare "/" root — the sibling fs_baseline_root arm (#655 b
+# S2/C7) mirrored. The form arms above admit a lone slash (absolute,
+# no dot/empty-segment alternative matches it), and the belt would
+# hand find the whole filesystem.
+S245X7_ERR=$(_s245_dhr "/") && S245X7_RC=0 || S245X7_RC=$?
 if [ "$S245X2_RC" -ne 0 ] &&
     printf '%s' "$S245X2_ERR" | grep -qF 'is a symlink — refusing the ddev handover' &&
     [ "$S245X3_RC" -ne 0 ] && [ "$S245X4_RC" -ne 0 ] &&
@@ -1782,11 +1787,13 @@ if [ "$S245X2_RC" -ne 0 ] &&
     printf '%s' "$S245X4_ERR" | grep -qF 'is a malformed root' &&
     [ "$S245X6_RC" -ne 0 ] &&
     printf '%s' "$S245X6_ERR" | grep -qF 'is a malformed root' &&
+    [ "$S245X7_RC" -ne 0 ] &&
+    printf '%s' "$S245X7_ERR" | grep -qF 'is never a handover root' &&
     [ "$S245X5_RC" -ne 0 ] &&
     printf '%s' "$S245X5_ERR" | grep -qF 'is not an absolute path'; then
-    pass "ddev_handover_root belt refuses link, dodge spellings, glob roots and non-absolute roots, all rc 1 (#245, b X2, c X1; #665)"
+    pass "ddev_handover_root belt refuses link, dodge spellings, glob, bare-/, and non-absolute roots, all rc 1 (#245, b X2, c X1; #665; #728 M1)"
 else
-    fail "ddev_handover_root belt must refuse every dodge spelling (X2=$S245X2_RC X3=$S245X3_RC X4=$S245X4_RC X5=$S245X5_RC X6=$S245X6_RC) (#245/#665)"
+    fail "ddev_handover_root belt must refuse every dodge spelling (X2=$S245X2_RC X3=$S245X3_RC X4=$S245X4_RC X5=$S245X5_RC X6=$S245X6_RC X7=$S245X7_RC) (#245/#665/#728)"
 fi
 if live_src "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/status-core.sh" |
     grep -qF 'ui_atten "$root" "symlinked root — register the target directory instead"'; then

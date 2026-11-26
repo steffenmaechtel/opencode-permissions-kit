@@ -919,6 +919,20 @@ ddev_handover_root() {
             return 1
             ;;
     esac
+    # Whole-filesystem refusal (issue #728 M1, the fs-baseline #655 b
+    # S2/C7 arm mirrored): the form arms below admit a bare `/` — the
+    # absolute gate passed it, no dot/empty-segment alternative matches
+    # a lone slash, [ -L "${dhr_root%/}" ] probes the empty string, and
+    # [ -d / ] passes — so the find below would walk the whole
+    # filesystem, its xargs worker chmod/chown'ing every .ddev hit. No
+    # shipped caller passes a raw `/` (the conf-reader loops are
+    # form-gated, the config.sh arms path-sane their targets); the
+    # trigger is the direct/future caller class this belt exists for.
+    if [ "$dhr_root" = "/" ]; then
+        printf '  warn: %s is never a handover root (the whole filesystem is out of scope) — refusing the ddev handover\n' \
+            "$dhr_root" >&2
+        return 1
+    fi
     case "$dhr_root" in
         *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]* | *[\*\?\[]*)
             printf '  warn: %s is a malformed root (dot/empty segment, whitespace, or glob) — refusing the ddev handover\n' \

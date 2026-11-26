@@ -89,10 +89,22 @@ ddev_migrate_registry() {
 
 # ddev_migrate_under_roots <approot> <root> [root ...]
 # True (0) when <approot> lies under one of the roots (or equals one).
+# A "/" root element is skipped: it strips to the empty pattern, which
+# would match every absolute approot (issue #728 M2, the #677 WO-2
+# strip-empty guard).
 ddev_migrate_under_roots() {
     dmur_p="${1%/}"
     shift
     for dmur_r in "$@"; do
+        # A "/" root strips to the empty string: the membership
+        # alternative below degenerates to the glob /*, taking in every
+        # absolute approot — an export fed "/" would silently take over
+        # the whole registry and the outside warning would never fire
+        # (issue #728 M2; the acting caller is bin/ddev-migrate's
+        # export arm with operator-typed roots). Skip the element; the
+        # remaining roots decide membership (#677 WO-2, the
+        # strip-empty guard shape).
+        [ -n "${dmur_r%/}" ] || continue
         case "$dmur_p" in "${dmur_r%/}" | "${dmur_r%/}"/*) return 0 ;; esac
     done
     return 1
