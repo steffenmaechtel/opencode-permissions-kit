@@ -1086,6 +1086,48 @@ case "$out" in
         ;;
 esac
 
+# the belt-only class (#736): doctor's path_error has no arm for
+# | & < > (verified at doctor_load_policy's validator), so the skip
+# row must not claim "doctor rejects it too" for them -- the row
+# drops the doctor claim instead. A declaration also carrying a
+# doctor-agreeing character keeps the parity row (the belt-only arm
+# never overwrites its tag). Sabotage the belt-only arm's guarded
+# assignment to 1 and this pin reds through the doctor claim.
+printf '{"containerTrees":["tr|ees"]}\n' >"$HO_PROJ/tree/opk.json"
+out="$(_ho_warn_run "$HO_PROJ/tree" me sub --dry-run)" || true
+case "$out" in
+    *"declared path 'tr|ees' skipped -- unusable form (doctor accepts |&<>)"*)
+        pass "belt-only class row drops the doctor claim (#736)"
+        ;;
+    *"doctor rejects it too"*)
+        fail "belt-only class row still claims doctor parity (#736, got: $out)"
+        ;;
+    *)
+        fail "belt-only class row missing (#736, got: $out)"
+        ;;
+esac
+
+# mixed declaration (#796 a Q1): a declaration carrying BOTH a
+# doctor-agreeing character (the semicolon here) and a belt-only
+# pipe must keep the parity row -- the belt-only arm's guard must
+# never let a doctor-refused class render the "doctor accepts
+# |&<>" row. This pin asserts the class-1 PARENTHETICAL, which no
+# other pin covers; sabotage the guard to an unconditional
+# assignment and this reds through the belt-only row appearing.
+printf '{"containerTrees":["tr;ee|s"]}\n' >"$HO_PROJ/tree/opk.json"
+out="$(_ho_warn_run "$HO_PROJ/tree" me sub --dry-run)" || true
+case "$out" in
+    *"declared path 'tr;ee|s' skipped -- unusable form (doctor rejects it too)"*)
+        pass "mixed declaration keeps the parity row (#796 a Q1)"
+        ;;
+    *"doctor accepts |&<>"*)
+        fail "mixed declaration flipped to the belt-only row (#796 a Q1, got: $out)"
+        ;;
+    *)
+        fail "mixed declaration row missing (#796 a Q1, got: $out)"
+        ;;
+esac
+
 # a top-level non-dict opk.json (the natural "paste a list" mistake)
 # takes the same warn row as broken JSON (#356 a A3) -- never a silent
 # skip
