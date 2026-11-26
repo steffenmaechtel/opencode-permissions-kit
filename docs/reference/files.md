@@ -35,12 +35,15 @@ asks before removing the kit block; your own entries always stay.
   `--projects` values since 0.0.42f, and every reader that runs root
   operations over the roots skips them like the other malformed
   forms. The display-only readers (status rows, the doctor `all`
-  scan roots, `config projects list`) render such lines as written,
-  and the opencode wrapper reads them with no form gate (#729 b D1):
-  its refusal listing renders the line, its cwd validation and serve
-  fallback accept an existing directory line as a root. Lines starting
-  with `#` are comments and are ignored by every reader (status counts,
-  the doctor `all` scan roots, the config/update refresh passes — an
+  scan roots, `config projects list`) render such lines as written.
+  The opencode wrapper applies the same form gate (issue #735): a
+  line that is not an absolute path, or that carries dot or empty
+  segments, whitespace or glob characters, is never a valid project
+  directory (the start refusal lists the well-formed lines and notes
+  how many it skipped) and is never picked as the `serve` fallback
+  directory. Lines starting with `#` are comments and are ignored by every
+  reader (status counts, the doctor `all` scan roots, the config/update
+  refresh passes — an
   annotated conf renders no verdict rows). Entries are
   written by install and `opk config` only: every consumer that runs
   root operations over the roots (`opk update`, `opk config refresh`,

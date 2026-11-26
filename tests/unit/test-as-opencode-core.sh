@@ -47,7 +47,9 @@ else
 fi
 
 # --- 2. every section entry point + helper is defined by sourcing ----------------
-_defs="wrapper_headless_classify wrapper_validate_cwd
+# _defs is a registration point for new lib functions (next to the
+# entry's pairing-guard list): a helper added to the lib is added here.
+_defs="wrapper_headless_classify wrapper_validate_cwd wrapper_root_form_ok
 wrapper_version_passthrough wrapper_refusal wrapper_banner
 wrapper_update_note wrapper_advisories wrapper_path_shadow_warning
 wrapper_wsl_checks wrapper_resolve_major wrapper_container_detect
@@ -309,5 +311,207 @@ serve_arm "serve fallback: trailing-slash root still wins pass 1" \
 printf '%s\n' "/" "$WORK/serve/root/" >"$WORK/serve/conf-slash-then-root"
 serve_arm "serve fallback: pass 2 skips the / line and picks the root" \
     "$WORK/serve/conf-slash-then-root" "/srv/not-configured" "$WORK/serve/root"
+
+# --- 7. form gate over projects.conf lines (#735) ---------------------------------
+# The wrapper's four conf loops -- cwd validation, refusal listing and
+# both serve-fallback passes -- share ONE lexical gate,
+# wrapper_root_form_ok: the form class the root-run reader mirrors
+# refuse (non-absolute, dot/empty segment, whitespace, glob), which the
+# writer refuses and a hand-edited conf can still carry. Measured on
+# the pre-gate tree: an EXISTING directory named by such a line
+# validated as a project root, was suggested as a valid project
+# directory, and was promoted to SERVE_FALLBACK. Every discriminating
+# arm names an EXISTING directory of the malformed shape: the
+# existence gates sit behind the form gate, so a nonexistent line
+# would be eaten by them and the arm would stay green over a deleted
+# gate (environment luck).
+# Helper names here carry no `rm` substring on purpose: the sandbox
+# policy's check 3 matches `rm` without a left word boundary, and a
+# one-line `..._arm "label" "$VAR/..."` call reads as an unguarded rm
+# operand there.
+mkdir -p "$WORK/form/root/proj" "$WORK/form/has space" "$WORK/form/gl*b" "$WORK/serve/has space"
+
+# 7a. the gate itself, function-level (source the lib, call it): one
+# arm per refused form -- deleting a case arm reds exactly its row --
+# and the shapes the writer DOES store pass (a single dot inside a
+# name, one trailing slash the callers strip after the gate).
+form_case() { # <label> <conf-line> <want: refuse|pass>
+    if (. "$LIB" && wrapper_root_form_ok "$2"); then _fa=pass; else _fa=refuse; fi
+    if [ "$_fa" = "$3" ]; then
+        pass "form gate (#735): $1 -> $3"
+    else
+        fail "form gate (#735): $1 (want $3, got $_fa)"
+    fi
+}
+form_case "relative line" "form/root" refuse
+form_case "parent segment" "$WORK/form/../x" refuse
+form_case "interior dot segment" "$WORK/form/./x" refuse
+form_case "trailing dot segment" "$WORK/form/root/." refuse
+form_case "empty segment" "$WORK/form//root" refuse
+form_case "whitespace" "$WORK/form/has space" refuse
+form_case "glob star" "$WORK/form/gl*b" refuse
+form_case "glob question mark" "$WORK/form/qu?st" refuse
+form_case "glob bracket" "$WORK/form/br[a]ck" refuse
+form_case "clean root" "$WORK/form/root" pass
+form_case "one trailing slash" "$WORK/form/root/" pass
+form_case "single dot inside a name" "$WORK/form/a.b" pass
+
+# 7b. wrapper_validate_cwd: the discriminating arms cd INTO an
+# existing malformed-shaped directory named by the conf -- the pre-gate
+# loop validated both (measured). The positive arm proves the skip does
+# not end the loop: a clean root between malformed lines still wins.
+valid_case() { # <label> <conf> <cwd> <want: true|false>
+    _vl_rc=0
+    _vl=$( (
+        . "$LIB"
+        PROJECTS_CONF="$2"
+        cd "$3" || exit 9
+        wrapper_validate_cwd
+        printf '%s' "$VALID"
+    ) 2>/dev/null) || _vl_rc=$?
+    if [ "$_vl_rc" -ne 0 ]; then
+        fail "wrapper (#735): $1 (fixture run died rc=$_vl_rc)"
+    elif [ "$_vl" = "$4" ]; then
+        pass "wrapper (#735): $1 (VALID=$_vl)"
+    else
+        fail "wrapper (#735): $1 (VALID=$_vl, want $4)"
+    fi
+}
+printf '%s\n' "$WORK/form/has space" >"$WORK/form/conf-space"
+printf '%s\n' "$WORK/form/gl*b" >"$WORK/form/conf-glob"
+printf '%s\n' "$WORK/form/has space" "$WORK/form/root" "$WORK/form/gl*b" >"$WORK/form/conf-mixed"
+valid_case "an existing spaced dir is no project root" \
+    "$WORK/form/conf-space" "$WORK/form/has space" false
+valid_case "an existing glob-named dir is no project root" \
+    "$WORK/form/conf-glob" "$WORK/form/gl*b" false
+valid_case "a clean root between malformed lines still validates its project" \
+    "$WORK/form/conf-mixed" "$WORK/form/root/proj" true
+
+# 7c. wrapper_serve_cwd_fallback: neither pass promotes a malformed
+# line, even where the readability probe would answer "readable" for it
+# (a real spaced directory is readable). One arm per pass, each
+# discriminating exactly its own pass's gate: in the pass-1 arm a clean
+# root listed AFTER the malformed one contains the cwd too -- gated,
+# pass 1 picks it and pass 2 never runs, so only pass 1's gate stands
+# between the malformed line and the promotion (with a clean root that
+# does not contain the cwd, pass 2 would promote the line instead and
+# the arm went red over EITHER gate's deletion -- measured); in the
+# pass-2 arm the cwd lies under no root, so pass 1 cannot match and
+# only pass 2 can pick. The probe log is the witness that the malformed
+# candidate was never probed -- a result-level assert alone cannot see
+# which pass dropped it.
+serve_form_case() { # <label> <conf> <cwd> <want-fallback>
+    : >"$PROBELOG"
+    _fm_rc=0
+    _fm=$( (
+        . "$LIB"
+        RED='' YELLOW='' NC='' HEADLESS=true
+        cwd_probe() {
+            printf '%s\n' "$1" >>"$PROBELOG"
+            if [ -n "$1" ] && grep -qxF -- "$1" "$WORK/form/readable"; then
+                printf 'readable'
+            else
+                printf 'unreadable'
+            fi
+        }
+        PROJECTS_CONF="$2"
+        CWD="$3"
+        SERVE_FALLBACK=""
+        wrapper_serve_cwd_fallback serve
+        printf '%s' "$SERVE_FALLBACK"
+    ) 2>/dev/null) || _fm_rc=$?
+    if [ "$_fm_rc" -ne 0 ]; then
+        fail "$1 (fixture run died rc=$_fm_rc)"
+    elif [ "$_fm" = "$4" ]; then
+        pass "$1 (fallback [$_fm])"
+    else
+        fail "$1 (got [$_fm], want [$4])"
+    fi
+    # whole-line match: the pass-1 arm's cwd probe logs
+    # <spaced root>/proj, which a substring grep would mistake for a
+    # candidate probe
+    if grep -qxF -- "$WORK/serve/has space" "$PROBELOG"; then
+        fail "$1: the malformed line was probed as a candidate (#735)"
+    else
+        pass "$1: the malformed line is never probed"
+    fi
+}
+printf '%s\n' "$WORK/serve/has space" "$WORK/serve/root" "$WORK/serve" >"$WORK/form/readable"
+printf '%s\n' "$WORK/serve/has space" "$WORK/serve" >"$WORK/serve/conf-form-p1"
+printf '%s\n' "$WORK/serve/has space" "$WORK/serve/root" >"$WORK/serve/conf-form"
+serve_form_case "serve fallback (#735): pass 1 skips a malformed root containing the cwd" \
+    "$WORK/serve/conf-form-p1" "$WORK/serve/has space/proj" "$WORK/serve"
+serve_form_case "serve fallback (#735): pass 2 skips a malformed readable root" \
+    "$WORK/serve/conf-form" "$WORK/serve/elsewhere" "$WORK/serve/root"
+
+# 7d. wrapper_refusal: the listing suggests no line the form gate
+# refuses (the cwd validation refuses it as a root), and accounts for
+# the dropped ones -- the count names how many malformed lines it read,
+# the enumeration names every skip cause of the gate.
+refusal_out() { # <conf> — the refusal screen (stdout+stderr), refusal forced
+    (
+        . "$LIB"
+        HEADLESS=false
+        RED='' YELLOW='' NC=''
+        CWD="$WORK/form/elsewhere"
+        VALID=false
+        PROJECTS_CONF="$1"
+        wrapper_refusal
+    ) 2>&1
+}
+printf '%s\n' '# ops annotation' "$WORK/form/has space" "$WORK/form/gl*b" "$WORK/form/root" \
+    >"$WORK/form/conf-list-mixed"
+printf '%s\n' '# ops annotation' "$WORK/form/root" >"$WORK/form/conf-list-clean"
+printf '%s\n' "$WORK/form/has space" >"$WORK/form/conf-list-bad-only"
+_rf_rc=0
+_rf_out="$(refusal_out "$WORK/form/conf-list-mixed")" || _rf_rc=$?
+if [ "$_rf_rc" -eq 1 ] &&
+    printf '%s' "$_rf_out" | grep -qF -- "- $WORK/form/root" &&
+    ! printf '%s' "$_rf_out" | grep -qF -- "- $WORK/form/has space" &&
+    ! printf '%s' "$_rf_out" | grep -qF -- "- $WORK/form/gl*b"; then
+    pass "refusal list (#735): malformed lines are not suggested as project directories"
+else
+    fail "refusal list (#735): malformed lines must not be suggested (rc=$_rf_rc out=$_rf_out)"
+fi
+if printf '%s' "$_rf_out" | grep -qF '(2 malformed line(s) skipped in projects.conf' &&
+    printf '%s' "$_rf_out" | grep -qF 'dot, empty segment, whitespace, or glob)'; then
+    pass "refusal list (#735): the skip count and its causes are named"
+else
+    fail "refusal list (#735): the dropped lines must be counted with their causes (out=$_rf_out)"
+fi
+_rf_rc=0
+_rf_out="$(refusal_out "$WORK/form/conf-list-bad-only")" || _rf_rc=$?
+if [ "$_rf_rc" -eq 1 ] && ! printf '%s' "$_rf_out" | grep -q '^  - ' &&
+    printf '%s' "$_rf_out" | grep -qF '(1 malformed line(s) skipped in projects.conf'; then
+    pass "refusal list (#735): a conf of malformed lines only lists none and says so"
+else
+    fail "refusal list (#735): malformed-only conf must list nothing and count one (rc=$_rf_rc out=$_rf_out)"
+fi
+_rf_rc=0
+_rf_out="$(refusal_out "$WORK/form/conf-list-clean")" || _rf_rc=$?
+if [ "$_rf_rc" -eq 1 ] && printf '%s' "$_rf_out" | grep -qF -- "- $WORK/form/root" &&
+    ! printf '%s' "$_rf_out" | grep -q 'malformed'; then
+    pass "refusal list (#735): no skip note over a well-formed conf"
+else
+    fail "refusal list (#735): a well-formed conf must list its root with no skip note (rc=$_rf_rc out=$_rf_out)"
+fi
+
+# 7e. wiring census: the gate sits in every conf loop -- one call in
+# the validation and in the listing, two in the serve fallback (one
+# per pass) -- and the lib's conf-reading loops number exactly those
+# four. A dropped call, or a fifth conf loop added without the gate,
+# reds here.
+_fg_calls() { # <function> — live gate calls inside the extracted block
+    extract_func "$LIB" "$1" | sed 's/^[[:space:]]*#.*$//' |
+        grep -c 'wrapper_root_form_ok "\$root"' || true
+}
+_fg="validate=$(_fg_calls wrapper_validate_cwd) refusal=$(_fg_calls wrapper_refusal)"
+_fg="$_fg serve=$(_fg_calls wrapper_serve_cwd_fallback)"
+_fg_loops="$(live_src "$LIB" | grep -c 'done <"\$PROJECTS_CONF"' || true)"
+if [ "$_fg" = "validate=1 refusal=1 serve=2" ] && [ "$_fg_loops" = 4 ]; then
+    pass "form gate (#735): wired into every conf loop ($_fg, loops=$_fg_loops)"
+else
+    fail "form gate (#735): conf-loop wiring drift ($_fg loops=$_fg_loops; want validate=1 refusal=1 serve=2 loops=4)"
+fi
 
 suite_done "as-opencode-core lib tests"

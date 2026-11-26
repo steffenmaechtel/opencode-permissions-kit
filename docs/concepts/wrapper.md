@@ -11,7 +11,10 @@ Every `opencode` invocation goes through the wrapper at
 1. **Validate working directory** — the current directory must be inside a
    path listed in `projects.conf`. Otherwise the interactive start is
    refused (headless invocations skip this — see
-   [below](#headless-invocations-serve-run-queries)).
+   [below](#headless-invocations-serve-run-queries)). Only well-formed
+   lines count: a hand-edited line in a form the kit never writes is not a
+   project directory, and the refusal screen notes how many it skipped
+   (format rules: [Files and paths](../reference/files.md)).
 2. **Detect container tools** — if the project's final `opencode.jsonc` allows
    docker/ddev broadly, the wrapper attaches the configured rootless backend.
 3. **Probe the backend** — docker-rootless: the per-user socket is verified
@@ -81,7 +84,8 @@ opencode home) before starting the binary.
 `serve` additionally sanity-checks its working directory: UIs like OpenChamber
 default it to the developer's `$HOME`, which the `opencode` user cannot read.
 The wrapper probes readability from the opencode user's context (`cwd-check`),
-warns on stderr and starts the server from a readable fallback (see the
+warns on stderr and starts the server from a readable fallback — a
+well-formed `projects.conf` root, else the opencode home (see the
 [OpenChamber how-to](../how-to/openchamber.md#server-working-directory)).
 
 `OPENCODE_SERVER_PASSWORD` and `OPENCODE_SERVER_USERNAME` are preserved
