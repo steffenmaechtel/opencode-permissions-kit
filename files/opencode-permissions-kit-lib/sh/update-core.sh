@@ -236,9 +236,9 @@ update_redeploy_xdg_shim() {
             [ "$(readlink /usr/local/bin/xdg-open 2>/dev/null || true)" = "$LIBDIR/bin/xdg-open" ]; then
             sudo rm -f /usr/local/bin/xdg-open
             ui_detail "xdg-open fallback removed: opencode ${_xds_trip} opens without one (>= $XDG_SHIM_FIX_VERSION)"
-            log "xdg-open shim removed: opencode $_xds_trip >= $XDG_SHIM_FIX_VERSION needs no fallback (#257)"
+            log "xdg-open shim removed: opencode $_xds_trip >= $XDG_SHIM_FIX_VERSION needs no fallback"
         else
-            log "xdg-open shim withheld: opencode ${_xds_trip:-<unparsed>} opens without one (>= $XDG_SHIM_FIX_VERSION, #257)"
+            log "xdg-open shim withheld: opencode ${_xds_trip:-<unparsed>} opens without one (>= $XDG_SHIM_FIX_VERSION)"
         fi
         return 0
     fi
@@ -387,7 +387,7 @@ update_redeploy_shell_hooks() {
             ui_warn "shell-startup hooks skipped: the install recorded '$DEFAULT_USER' (uid 0)"
             ui_warn "as the developer — a root-shell install cannot be updated into shape"
             ui_detail "reinstall from your normal user: opk update cannot fix this"
-            log "shell-startup hooks skipped: DEFAULT_USER=$DEFAULT_USER is uid 0 (issue #192)"
+            log "shell-startup hooks skipped: DEFAULT_USER=$DEFAULT_USER is uid 0"
         elif [ -d "$DEFAULT_HOME" ]; then
             for cf in "$DEFAULT_HOME/.bashrc" "$DEFAULT_HOME/.zshrc" "$DEFAULT_HOME/.profile"; do
                 [ -f "$cf" ] || continue
@@ -405,7 +405,7 @@ update_redeploy_shell_hooks() {
                 if ! update_ensure_backup_dir ||
                     ! sudo cp "$cf" "$UPD_BACKUP_DIR/rc-$(basename "$cf")" 2>/dev/null; then
                     ui_warn "could not back up $cf before editing it — the rc edits below have no recovery copy"
-                    log "rc backup FAILED for $cf (edited without recovery copy, #425 degradation)"
+                    log "rc backup FAILED for $cf (edited without recovery copy)"
                 fi
                 if sudo grep -q 'opencode-permissions-kit/sh/shell-warn.sh\|opencode-permissions-kit/shell-warn.sh' \
                     "$cf" 2>/dev/null; then
@@ -660,7 +660,7 @@ update_redeploy_project_roots() {
         if [ "$_ho_skip" -gt 0 ]; then
             ui_detail "skipped the ddev handover rescan for $_ho_skip root(s) — nothing changed since the last pass"
             ui_detail "force it with 'sudo opk update --refresh' or 'sudo opk config handover <path>'"
-            log "ddev handover rescan skipped for $_ho_skip root(s) (issue #112 stamps)"
+            log "ddev handover rescan skipped for $_ho_skip root(s)"
         fi
         if [ "$REFRESH" = true ]; then
             ui_success "group baseline refreshed (chgrp + setgid + g+rw + default ACLs)"
@@ -668,7 +668,7 @@ update_redeploy_project_roots() {
         elif [ "$_ho_ran" -gt 0 ]; then
             ui_detail "group baseline re-applied for $_ho_ran root(s) — the handover stamp was"
             ui_detail "invalid (no stamp yet, or ownership/mode or baseline semantics changed)"
-            log "group baseline re-applied for $_ho_ran root(s) (stamp-triggered, issue #696)"
+            log "group baseline re-applied for $_ho_ran root(s) (stamp-triggered)"
         else
             ui_detail "skipped group-baseline re-apply (stamps valid — --refresh forces it)"
         fi

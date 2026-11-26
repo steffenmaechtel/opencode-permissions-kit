@@ -1035,7 +1035,7 @@ Usage: ./update.sh [--yes] [--refresh] [--binary] [--only-binary] [--binary-path
   --yes            skip the confirmation prompt
   --refresh        also re-apply the group baseline (chgrp/setgid/default ACLs)
   --binary         also upgrade the opencode binary to the latest release
-                   of the CURRENT major (issue #99: never crosses majors)
+                   of the CURRENT major (never crosses majors)
   --only-binary    skip every kit step, ONLY upgrade the opencode binary
   --binary-path    install the given binary file instead of downloading
   --channel        switch the tracking ref for this and every future update
@@ -1046,7 +1046,7 @@ Usage: ./update.sh [--yes] [--refresh] [--binary] [--only-binary] [--binary-path
                    prefix: 2.* from npm, 1.x from GitHub)
 Environment:
   KIT_GITDIR_STORAGE=none    skip the one-time git-protection storage
-                             question on unattended updates (#704);
+                             question on unattended updates;
                              an absolute path configures it without
                              asking (automation opt-in)
 EOF

@@ -891,8 +891,8 @@ fi
 # Here: the section consults the gate on BOTH sides (withhold/remove)
 # and names the cause in each arm.
 if live_src "$LIB" | grep -qF 'if ! xdg_shim_needed_for "${_xds_maj:-}" "$_xds_trip"; then' &&
-    live_src "$LIB" | grep -qF 'needs no fallback (#257)' &&
-    live_src "$LIB" | grep -qF 'opens without one (>= $XDG_SHIM_FIX_VERSION, #257)'; then
+    live_src "$LIB" | grep -qF 'needs no fallback' &&
+    live_src "$LIB" | grep -qF 'withheld: opencode ${_xds_trip:-<unparsed>} opens without one (>= $XDG_SHIM_FIX_VERSION)'; then
     pass "xdg shim section: version gate + named causes wired (#257)"
 else
     fail "the shim section must gate on xdg_shim_needed_for and name its causes (#257)"
