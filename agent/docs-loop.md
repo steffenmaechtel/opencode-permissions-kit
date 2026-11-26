@@ -165,9 +165,10 @@ the maintainer's hand (the Promotion section's reject override). The
 label is what tells a later session stale from declined, and the
 producer side reads it (the skill's Search before filing bullets).
 Class rationales and added demands live in the commission and the
-wave's PR body, not on the issue; the one comment-side text the loop
-prescribes is the external class's landing citation — a pointer to
-where the fix lives, never a class record.
+wave's PR body, not on the issue; the only comment-side texts the
+loop prescribes are the external class's — the landing citation and
+the keep-open note, pointers to where the fix lives or that it is
+still being worked, never a class record.
 
 The veto points are the commission — the maintainer reads the issues
 he names — and the PR review; the disposition record is the PR body's
@@ -371,8 +372,9 @@ the local opencode.db and prints the snapshot's tables.
 
 The loop stops by the ordinary stop rule; the closing summary — the PR
 body, the disposition record — lists every item of every dispositioned
-issue with its class and landing place, and every landed feedback
-issue is named in a cross-repo `Closes` line before the merge. A
+issue with its class and landing place (a reject item's entry is its
+rationale — the one class that lands nothing), and every landed
+feedback issue is named in a cross-repo `Closes` line before the merge. A
 reject-dispositioned issue is named in the `Ref` form instead — the
 merge must not close it — and the maintainer closes it by hand, not
 planned with the `rejected` label. The session still ends with the
