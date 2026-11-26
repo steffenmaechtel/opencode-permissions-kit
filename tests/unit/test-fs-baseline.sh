@@ -324,9 +324,11 @@ assert_eq "belt: the / root is refused before any pass runs (b S2/C7)" "1" "$HG8
 # ambiguous — a sabotage keeping rc 1 while breaking the refusal
 # message stayed green. The captured stderr must carry the arm's own
 # refusal line; inside THIS probe's capture the fragment is
-# leg-specific (the fs-baseline CLI belt's same-phrase message at
-# :318 lives in a function this probe never calls, and its own legs
-# are pinned separately below).
+# leg-specific twice over — the fs-baseline CLI belt's message at
+# :318 shares only the sub-phrase 'never a baseline root', the full
+# fragment does not occur in its emission, and that belt lives in a
+# function this probe never calls (its own legs are pinned
+# separately below).
 if printf '%s\n' "$HG8BOUT" | grep -qF 'error: / is never a baseline root'; then
     pass "belt: the / refusal names the whole-filesystem scope (b S2/C7; #792)"
 else
