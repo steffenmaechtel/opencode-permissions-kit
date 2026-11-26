@@ -42,6 +42,23 @@ _trap_cleanup() {
 }
 trap _trap_cleanup EXIT INT TERM
 
+# --- pinned-source guards (#713): a vanished pin target fails loud ------------------
+# Every source-grep pin below greps these three files raw. grep rc 2 (a
+# missing/unreadable operand) lands in the PASS arm of the raw absence
+# shapes — the pin greens over zero inspected bytes; the #244 c S3 trio
+# below is rc-mapped per pin, the negated conjunction legs keep their
+# shape. These guards convert ANY vanished pinned file into a counted
+# FAIL row up front, so the suite cannot green over a missing pin
+# target regardless of the individual pins' branch shapes. ($UI_LIB is
+# sourced, never grepped — its absence already kills the sourcing arms.)
+for _g713 in "$STATUS" "$STATUS_CORE" "$GIT_HEAL_CORE"; do
+    if [ -f "$_g713" ]; then
+        pass "pinned source present: $_g713"
+    else
+        fail "pinned source MISSING: $_g713 — pins below grep its bytes (#713)"
+    fi
+done
+
 # --- 0. dev-owned mode line (internal/records/ddev-dev-owned-projects.md) -------------
 if live_src "$STATUS_CORE" | grep -q 'ui_kv "ddev settings"' &&
     live_src "$STATUS_CORE" | grep -q 'dev-owned — kit writes disable_settings_management' &&
@@ -3184,15 +3201,26 @@ fi
 #    before any byte is pumped, so "found," is deterministic even on an
 #    instant scan; later frames may carry a live count (race, not
 #    asserted).
+#    (#745) The label is FIXED-LENGTH, deliberately decoupled from the
+#    scan root: a label embedding "$T210" grows with TMPDIR, and the
+#    draw truncates over-76 lines from the left ("  …" + the last 73
+#    bytes) — a long TMPDIR evicted the "scanning" prefix from the raw
+#    capture and reddened exactly this pin (deterministic red, wrong
+#    environmental attribution during #741). Fixed label => green under
+#    any TMPDIR; the truncation boundary is 4b's own pin (its
+#    deliberately over-long label), and the no-leader leg below makes 4
+#    and 4b complements: 4 = short label draws fully, 4b = over-long
+#    label truncates.
 export SCAN_HELPERS
 cat >"$WORK/t210-pty.sh" <<EOF
 eval "\$SCAN_HELPERS"
-_st_ddev_scan "ddev share: scanning $T210" "$T210" "$WORK/t210-pty.txt"
+_st_ddev_scan "ddev share: scanning t210" "$T210" "$WORK/t210-pty.txt"
 echo "SCAN-FINISHED"
 EOF
 script -qec "sh $WORK/t210-pty.sh" /dev/null >"$WORK/t210-pty.raw" 2>&1
 if grep -aq "found," "$WORK/t210-pty.raw" &&
     grep -aq "scanning" "$WORK/t210-pty.raw" &&
+    ! grep -aq "$(printf '\342\200\246')" "$WORK/t210-pty.raw" &&
     grep -aq "SCAN-FINISHED" "$WORK/t210-pty.raw" &&
     grep -aqE ' {70,}' "$WORK/t210-pty.raw" &&
     cmp -s "$WORK/t210-ref.txt" "$WORK/t210-pty.txt"; then
@@ -3221,10 +3249,13 @@ else
 fi
 
 # 5) --short (UI_SILENT) on a terminal: no live line at all — the
-#    one-line discipline holds even where drawing would be possible
+#    one-line discipline holds even where drawing would be possible.
+#    (#745) Fixed label for the same reason as pin 4: with a
+#    TMPDIR-length label the truncated draw would lack "scanning" even
+#    when UI_SILENT leaked, making that negative leg vacuous.
 cat >"$WORK/t210-silent.sh" <<EOF
 eval "\$SCAN_HELPERS"
-UI_SILENT=1 _st_ddev_scan "ddev share: scanning $T210" "$T210" "$WORK/t210-sil.txt"
+UI_SILENT=1 _st_ddev_scan "ddev share: scanning t210" "$T210" "$WORK/t210-sil.txt"
 echo "SCAN-FINISHED"
 EOF
 script -qec "sh $WORK/t210-silent.sh" /dev/null >"$WORK/t210-sil.raw" 2>&1
@@ -3242,24 +3273,38 @@ fi
 #     feed, scan parser) while every EXPECTED failure stays silent —
 #     the empty/warn output contracts are untouched. Line-shape pins
 #     first (re-adding a stderr discard goes red), behavior after.
-if grep -qF "import sys, threading, time' >/dev/null 2>&1" "$STATUS" "$STATUS_CORE" "$GIT_HEAL_CORE"; then
-    fail "#244 c S3: probe must not discard interpreter stderr (2>&1 found)"
-else
-    pass "#244 c S3: probe no longer discards interpreter stderr"
-fi
-if grep -qF 'or ""))'"'"' 2>/dev/null); then' "$STATUS" "$STATUS_CORE"; then
-    fail "#244 c S3: advisory parse must not discard interpreter stderr"
-else
-    pass "#244 c S3: advisory parse no longer discards interpreter stderr"
-fi
-# Absence pin in if-found-then-fail shape: the leak-scan parser must
-# NOT discard its stderr -- a commented-out forbidden line SHOULD keep
-# counting (conventions.md "Source-counting pins"), bare by design.
-if grep -qF 'python3 "$PARSER" "$SCAN_CFG" 2>/dev/null' "$STATUS" "$STATUS_CORE"; then
-    fail "#244 c S3: leak-scan parser must not discard its diagnostic stderr"
-else
-    pass "#244 c S3: leak-scan parser no longer discards its diagnostic stderr"
-fi
+#     (#713) The three line-shape pins are rc-mapped (check_absent
+#     semantics, multi-file): grep rc 2 — a vanished/unreadable pinned
+#     file — fails loud instead of falling into the pass arm and
+#     greening the pin over zero inspected bytes. The greps stay BARE
+#     (un-ridden) on purpose: a commented-out forbidden line should
+#     keep counting (conventions.md "Source-counting pins").
+_s3a_rc=0
+grep -qF "import sys, threading, time' >/dev/null 2>&1" \
+    "$STATUS" "$STATUS_CORE" "$GIT_HEAL_CORE" || _s3a_rc=$?
+case "$_s3a_rc" in
+    0) fail "#244 c S3: probe must not discard interpreter stderr (2>&1 found)" ;;
+    1) pass "#244 c S3: probe no longer discards interpreter stderr" ;;
+    *) fail "#244 c S3: grep rc $_s3a_rc — pinned file missing/unreadable, fails loud (#713)" ;;
+esac
+_s3b_rc=0
+grep -qF 'or ""))'"'"' 2>/dev/null); then' "$STATUS" "$STATUS_CORE" || _s3b_rc=$?
+case "$_s3b_rc" in
+    0) fail "#244 c S3: advisory parse must not discard interpreter stderr" ;;
+    1) pass "#244 c S3: advisory parse no longer discards interpreter stderr" ;;
+    *) fail "#244 c S3: grep rc $_s3b_rc — pinned file missing/unreadable, fails loud (#713)" ;;
+esac
+# Absence pin in rc-mapped shape: the leak-scan parser must NOT discard
+# its stderr — a commented-out forbidden line SHOULD keep counting
+# (conventions.md "Source-counting pins"), bare by design; a vanished
+# pinned file fails loud instead of passing as absent (#713).
+_s3c_rc=0
+grep -qF 'python3 "$PARSER" "$SCAN_CFG" 2>/dev/null' "$STATUS" "$STATUS_CORE" || _s3c_rc=$?
+case "$_s3c_rc" in
+    0) fail "#244 c S3: leak-scan parser must not discard its diagnostic stderr" ;;
+    1) pass "#244 c S3: leak-scan parser no longer discards its diagnostic stderr" ;;
+    *) fail "#244 c S3: grep rc $_s3c_rc — pinned file missing/unreadable, fails loud (#713)" ;;
+esac
 # Probe behavior, on a real tty (the probe only runs on the tty path):
 # the shim's diagnostic must appear in the terminal transcript while
 # the scan output stays byte-identical to the reference — the scan
