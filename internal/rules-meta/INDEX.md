@@ -8,12 +8,12 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**218 metas · 215 active · 3 retired · 21 review-pending · next due 2026-11-20**
+**218 metas · 215 active · 3 retired · 3 review-pending · next due 2026-11-20**
 
 ## Actionable
 
 - **Review pending:** RM-0211
-- **Amended — pending:** RM-0133 (2026-11-21), RM-0078 (2026-11-22), RM-0135 (2026-11-22), RM-0136 (2026-11-22), RM-0154 (2026-11-22), RM-0182 (2026-11-22), RM-0003 (2026-11-25), RM-0014 (2026-11-25), RM-0015 (2026-11-25), RM-0016 (2026-11-25), RM-0017 (2026-11-25), RM-0042 (2026-11-25), RM-0043 (2026-11-25), RM-0044 (2026-11-25), RM-0111 (2026-11-25), RM-0117 (2026-11-25), RM-0137 (2026-11-25), RM-0151 (2026-11-25), RM-0173 (2026-11-25), RM-0179 (2026-11-25)
+- **Amended — pending:** RM-0111 (2026-11-25), RM-0117 (2026-11-25)
 
 ## AGENTS.md
 
@@ -189,7 +189,7 @@
 | [RM-0144](0/1/4/RM-0144.md) | learnings.md additions carry era-marked | active | approved | 1m | 2026-12-15 |
 | [RM-0145](0/1/4/RM-0145.md) | Shipped content is English and | active | approved | 1m | 2026-12-15 |
 | [RM-0167](0/1/6/RM-0167.md) | A wave codifying a reflection | active | approved | 1m | 2026-12-17 |
-| [RM-0182](0/1/8/RM-0182.md) | The wave's own new prose | active | **amended — pending** | 1m | 2026-12-20 |
+| [RM-0182](0/1/8/RM-0182.md) | The wave's own new prose | active | approved | 1m | 2026-12-20 |
 | [RM-0183](0/1/8/RM-0183.md) | The self-application sweep's sibling-read is | active | approved | 1m | 2026-12-20 |
 | [RM-0215](0/2/1/RM-0215.md) | A landed topic's feedback issue | active | approved | 1m | 2026-12-23 |
 
@@ -236,7 +236,7 @@
 | [RM-0115](0/1/1/RM-0115.md) | A round never declares the | active | approved | 1m | 2026-11-28 |
 | [RM-0118](0/1/1/RM-0118.md) | Closure is a recorded step | active | approved | 1m | 2026-11-28 |
 | [RM-0134](0/1/3/RM-0134.md) | On the non-shipped track, a | active | approved | 1m | 2026-11-30 |
-| [RM-0136](0/1/3/RM-0136.md) | Deferred work orders collected during | active | **amended — pending** | 1m | 2026-12-17 |
+| [RM-0136](0/1/3/RM-0136.md) | Deferred work orders collected during | active | approved | 1m | 2026-12-17 |
 | [RM-0140](0/1/4/RM-0140.md) | After the work-order gate settles | active | approved | 1m | 2026-12-15 |
 | [RM-0161](0/1/6/RM-0161.md) | A FILED work order is self-contained at creation | active | approved | 1m | 2026-12-17 |
 | [RM-0185](0/1/8/RM-0185.md) | A deferred-findings COLLECTION issue states | active | approved | 1m | 2026-12-20 |
@@ -256,7 +256,7 @@
 |---|---|---|---|---|---|
 | [RM-0131](0/1/3/RM-0131.md) | Non-shipped staffing: standard | active | approved | 1m | 2026-11-30 |
 | [RM-0132](0/1/3/RM-0132.md) | Fresh-session entry (the batch | active | approved | 1m | 2026-11-30 |
-| [RM-0133](0/1/3/RM-0133.md) | Disposition policy on the non-shipped | active | **amended — pending** | 1m | 2026-11-30 |
+| [RM-0133](0/1/3/RM-0133.md) | Disposition policy on the non-shipped | active | approved | 1m | 2026-11-30 |
 | [RM-0176](0/1/7/RM-0176.md) | The in-round exceptions above | active | approved | 1m | 2026-12-17 |
 | [RM-0198](0/1/9/RM-0198.md) | The docs-only close is a | active | approved | 1m | 2026-12-21 |
 
@@ -285,7 +285,7 @@
 | [RM-0128](0/1/2/RM-0128.md) | One comment per review | active | approved | 1m | 2026-11-28 |
 | [RM-0129](0/1/2/RM-0129.md) | Size guard: GitHub caps | active | approved | 1m | 2026-11-28 |
 | [RM-0153](0/1/5/RM-0153.md) | PR-body edits for wave-authored | active | approved | 1m | 2026-12-15 |
-| [RM-0154](0/1/5/RM-0154.md) | The CI status fields assert | active | **amended — pending** | 1m | 2026-12-20 |
+| [RM-0154](0/1/5/RM-0154.md) | The CI status fields assert | active | approved | 1m | 2026-12-20 |
 | [RM-0158](0/1/5/RM-0158.md) | names its observation scope | active | approved | 1m | 2026-12-16 |
 | [RM-0166](0/1/6/RM-0166.md) | The closing summary's marker carries | active | approved | 1m | 2026-12-17 |
 | [RM-0170](0/1/7/RM-0170.md) | Mechanical fields derive from the | active | approved | 1m | 2026-12-17 |
@@ -334,7 +334,7 @@
 |---|---|---|---|---|---|
 | [RM-0076](0/0/7/RM-0076.md) | Every finding class that can | active | approved | 6m | 2027-05-20 |
 | [RM-0077](0/0/7/RM-0077.md) | Root-script behavior changes owe | active | approved | 6m | 2027-05-20 |
-| [RM-0078](0/0/7/RM-0078.md) | Record the environment in | active | **amended — pending** | 1m | 2026-12-17 |
+| [RM-0078](0/0/7/RM-0078.md) | Record the environment in | active | approved | 1m | 2026-12-17 |
 | [RM-0079](0/0/7/RM-0079.md) | A disposition claim | active | approved | 6m | 2027-05-20 |
 | [RM-0113](0/1/1/RM-0113.md) | The debt's due date splits | active | approved | 1m | 2026-12-20 |
 
@@ -439,7 +439,7 @@
 | [RM-0035](0/0/3/RM-0035.md) | Examples use the abstract token | active | approved | 6m | 2027-05-17 |
 | [RM-0093](0/0/9/RM-0093.md) | In meta bodies, cross-references | active | approved | 6m | 2027-05-20 |
 | [RM-0094](0/0/9/RM-0094.md) | The review log names the | active | approved | 6m | 2027-05-20 |
-| [RM-0135](0/1/3/RM-0135.md) | Post-approval changes set | active | **amended — pending** | 1m | 2026-12-20 |
+| [RM-0135](0/1/3/RM-0135.md) | Post-approval changes set | active | approved | 1m | 2026-12-20 |
 | [RM-0156](0/1/5/RM-0156.md) | The quote: needle is the | active | approved | 1m | 2026-12-17 |
 | [RM-0159](0/1/5/RM-0159.md) | Quoted strings in meta bodies | active | approved | 1m | 2026-12-16 |
 
@@ -483,16 +483,16 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0003](0/0/0/RM-0003.md) | An rm — any flag form, on a variable with a… | active | **amended — pending** | 6m | 2027-05-17 |
-| [RM-0014](0/0/1/RM-0014.md) | Operate only on the suite's scratch | active | **amended — pending** | 6m | 2027-05-17 |
-| [RM-0015](0/0/1/RM-0015.md) | Never touch real project or system trees | active | **amended — pending** | 6m | 2027-05-17 |
-| [RM-0016](0/0/1/RM-0016.md) | Fixture data is written sandboxed at the source | active | **amended — pending** | 6m | 2027-05-17 |
-| [RM-0017](0/0/1/RM-0017.md) | Code extracted from shipped scripts and eval'd… | active | **amended — pending** | 6m | 2027-05-17 |
-| [RM-0042](0/0/4/RM-0042.md) | Mutation check — a mutating verb | active | **amended — pending** | 6m | 2027-05-20 |
-| [RM-0043](0/0/4/RM-0043.md) | Real-tree ratchet — any path-shaped | active | **amended — pending** | 6m | 2027-05-20 |
-| [RM-0044](0/0/4/RM-0044.md) | rm suffix guard — any rm invocation | active | **amended — pending** | 1m | 2026-12-20 |
-| [RM-0137](0/1/3/RM-0137.md) | Scratch receivers in harness-sourcing suites… | active | **amended — pending** | 1m | 2026-12-06 |
-| [RM-0151](0/1/5/RM-0151.md) | The decision rule for writing NEW | active | **amended — pending** | 1m | 2026-12-15 |
-| [RM-0173](0/1/7/RM-0173.md) | A harness env override consumed | active | **amended — pending** | 1m | 2026-12-17 |
-| [RM-0179](0/1/7/RM-0179.md) | The controlled PATH of an | active | **amended — pending** | 1m | 2026-12-20 |
+| [RM-0003](0/0/0/RM-0003.md) | An rm — any flag form, on a variable with a… | active | approved | 6m | 2027-05-17 |
+| [RM-0014](0/0/1/RM-0014.md) | Operate only on the suite's scratch | active | approved | 6m | 2027-05-17 |
+| [RM-0015](0/0/1/RM-0015.md) | Never touch real project or system trees | active | approved | 6m | 2027-05-17 |
+| [RM-0016](0/0/1/RM-0016.md) | Fixture data is written sandboxed at the source | active | approved | 6m | 2027-05-17 |
+| [RM-0017](0/0/1/RM-0017.md) | Code extracted from shipped scripts and eval'd… | active | approved | 6m | 2027-05-17 |
+| [RM-0042](0/0/4/RM-0042.md) | Mutation check — a mutating verb | active | approved | 6m | 2027-05-20 |
+| [RM-0043](0/0/4/RM-0043.md) | Real-tree ratchet — any path-shaped | active | approved | 6m | 2027-05-20 |
+| [RM-0044](0/0/4/RM-0044.md) | rm suffix guard — any rm invocation | active | approved | 1m | 2026-12-20 |
+| [RM-0137](0/1/3/RM-0137.md) | Scratch receivers in harness-sourcing suites… | active | approved | 1m | 2026-12-06 |
+| [RM-0151](0/1/5/RM-0151.md) | The decision rule for writing NEW | active | approved | 1m | 2026-12-15 |
+| [RM-0173](0/1/7/RM-0173.md) | A harness env override consumed | active | approved | 1m | 2026-12-17 |
+| [RM-0179](0/1/7/RM-0179.md) | The controlled PATH of an | active | approved | 1m | 2026-12-20 |
 | [RM-0208](0/2/0/RM-0208.md) | Every path a fixture | active | approved | 1m | 2026-12-22 |
