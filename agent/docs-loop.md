@@ -31,13 +31,16 @@ redesign moved it to the sessions that hit the topic (issue #755).
   plus two independent confirmations — counted by distinct `Session:`
   ids over the issue body and its comments, never by comment count.
   The count is taken at every trigger check and at the monthly sweep; a
-  newly promoted issue gets the `promoted` label and a ledger comment
-  naming the count. (RM-0211)
+  newly promoted issue gets the `promoted` label — the label event in
+  the issue timeline is the promotion record, the `Session:` lines
+  that reached quorum are its evidence, and the label stays on after
+  the issue closes (history, not live state). (RM-0211)
 - Two overrides, both the maintainer's: an issue filed `prio:high`
   (rare but severe — data loss, security class) is promoted on filing,
   the quorum bypassed; and the maintainer may promote any issue by hand
   or reject one that reached quorum, at any time — the hand-applied
-  `promoted` label or the closing comment is the record. (RM-0212)
+  `promoted` label or the `rejected` label on the closed issue is the
+  record. (RM-0212)
 - `research-candidate` issues are outside the loop's work: they wait
   for the monthly sweep, where the maintainer refiles keepers into this
   repository as research issues (the #715 pattern) and closes the rest.
@@ -93,9 +96,18 @@ hit the topic. A `Model:` line a body or comment may carry beside its
 informational — triage and later metrics read it, the count never does.
 Promote what reaches three, and every `prio:high` issue
 whatever its count; `research-candidate` issues are not listed — they
-never count toward a wave. A promotion is recorded, not just observed:
-`gh issue edit -R … --add-label promoted`, plus the ledger comment
-naming the count and the session ids.
+never count toward a wave. A promotion is the label, not a comment:
+`gh issue edit -R … --add-label promoted` — the label event in the
+issue timeline is the record, and the `Session:` lines that reached
+the quorum are its evidence, already in place.
+
+Comments on a reflection issue are confirming comments only — the one
+comment type the loop knows (the skill's template). That is what makes
+the list view's comment column readable as the confirmation count: the
+filer sits in the body, each confirming session adds one comment,
+quorum shows as two comments — and the gate still counts distinct
+session ids, never the column, because a session confirming twice is
+one session.
 
 ## Triage — every item gets a disposition class
 
@@ -122,8 +134,8 @@ issue into items and classifies each:
 | external | the fix lives outside this repository (a global skill, user-level config) — re-label `external-fix` |
 
 An `external` re-label takes both loop labels off — `promoted` and
-`from-reflection` — leaving `external-fix` as the only loop label
-(a priority label may remain; nothing in the loop keys on it): the
+`from-reflection` — leaving `external-fix` as the only loop label on
+it (a priority label may remain; nothing in the loop keys on it): the
 issue leaves the loop's counting and its listings (the trigger
 check filters `from-reflection`, the trigger count `promoted`),
 never rides a wave, and the monthly sweep dispositions it under its
@@ -133,16 +145,30 @@ repository, a config change, whatever carries the landing), or
 keeping it open with a note while it is worked there.
 
 Triage reads the issue's full TIMELINE, never only the body — a
-maintainer comment posted after filing is triage input (class
-override or added demand): the 2026-11-18 batch triaged #620 from
-its body and missed the overnight item-1 reject plus the issue-detail
-demand, both sitting in comments (disclosed in PR #622's amendment).
-An extracted work order lands in THIS repository and cites its topic
-as `opk-agent-feedback#N`.
+confirming comment carries its session's manifestation of the topic,
+and that manifestation is triage input: the 2026-11-18 batch triaged
+#620 from its body and missed the overnight item-1 reject plus the
+issue-detail demand, both sitting in comments (disclosed in PR #622's
+amendment). The maintainer's own class override or added demand rides
+the commission — the scope authority the session reads anyway. An
+extracted work order lands in THIS repository and cites its topic as
+`opk-agent-feedback#N`.
 
-The ledger posts as one append-only comment per issue BEFORE waves
-open, so the maintainer can veto class assignments cheaply. An issue
-closes only when every item has a final disposition (the `Closes`/
+Every class lands in one of the tracker's three native states — open,
+closed as completed, closed as not planned — never in a comment on the
+issue: apply, code and dedup close as completed through the wave's
+cross-repo `Closes` lines; covered closes as completed, the covering
+ref named where the class was assigned; extract closes as completed,
+its work order citing the topic; reject closes as not planned with the
+`rejected` label set — the label is what tells a later session stale
+from declined, and the producer side reads it (the skill's
+search-before-filing). Class rationales and added demands live in the
+commission and the wave's PR body, not on the issue.
+
+The veto points are the commission — the maintainer reads the issues
+he names — and the PR review; the disposition record is the PR body's
+closing summary (the closure section's demand). An issue closes only
+when every item has a final disposition (the `Closes`/
 `Ref` discipline is the birth-PR rule, review.md — the agent-side
 bullet lives in review-concept, "Round typing and tiering"; a feedback
 issue is referenced in the cross-repo form, the closure bullet below).
@@ -154,9 +180,19 @@ The commission is the scope authority
 names the issues and whether they ride one PR or several. A commission
 that names the issues but not the cut still authorizes the loop: the
 session takes the default collection-PR cut and names the inference
-in the ledger's Commission line as a disclosed default — the veto
-points are the ledger comment and the PR review (#627 item 2). The
-default
+in the PR body as a disclosed default — the veto points are the
+commission and the PR review (#627 item 2).
+
+Related siblings — issues linked by a `Related: #N` line, the link
+visible from either side (the line on the linking issue's body, a
+cross-reference event on the linked one's timeline) — resolve at
+commission time, at the maintainer's discretion: the commission may
+name them together, hand-promoting any sibling below quorum (the
+Promotion section's maintainer override), pre-authorize a conditional
+extra close, or leave them to the sweep. A wave that finds its fix
+also closes an issue the commission did not name proposes that close
+in chat — extra `Closes` lines are never self-added (maintainer chat
+2026-11-26). The default
 proposal for a reflection backlog is the batch PR — most items are
 one-to-three sentence sharpenings, so one session works several issues
 into one coherent diff:
@@ -256,7 +292,7 @@ sessions, one per PR).
   sweep's job (learnings L2), and doc waves owe it tree-wide: grep
   the edited rule's distinctive vocabulary across the whole tree
   with no path filters, and record the grep pattern itself in the
-  ledger, never
+  wave's PR body, never
   only the site list — a filtered grep's silent exclusions are
   invisible in a site list (pr-00640 round a Q2/Q3: the root-run
   rename left the standing-review rule's unit and meta in
@@ -266,7 +302,7 @@ sessions, one per PR).
   returns EMPTY over house-wrapped text is evidence only after the
   single-word re-check (or a wrap-tolerant pattern): house wrapping
   splits phrases across lines, so the empty multi-word result is the
-  no-collision FALSE negative — the ledger records BOTH patterns, or
+  no-collision FALSE negative — the wave's PR body records BOTH patterns, or
   records the phrase as wrap-split and skips the multi-word form
   deliberately (pr-00668 round a Q2: the coined phrase
   "registration probe" existed line-wrapped in review-concept.md
@@ -275,10 +311,11 @@ sessions, one per PR).
 - A landed topic's feedback issue closes through the wave, across
   repositories: the birth-PR body names every landed issue in the
   cross-repo form GitHub documents (`Closes
-  steffenmaechtel/opk-agent-feedback#N`), and the wave does not rely on
-  it — before the merge it posts the disposition comment on the issue
-  (class, landing PR), and the next trigger check closes whatever that
-  PR left open (`gh issue close -R … --reason completed`). A closing
+  steffenmaechtel/opk-agent-feedback#N`) — the PR body's closing
+  summary carries class and landing place per issue, the disposition
+  record — and the wave does not rely on the merge alone: the next
+  trigger check closes whatever that PR left open
+  (`gh issue close -R … --reason completed`). A closing
   keyword across two repositories is platform behavior — observed
   once, and it worked: the cutover PR #769's merge (2026-11-23T23:36:04Z)
   closed its check issue opk-agent-feedback#1 seconds later, by
@@ -309,10 +346,12 @@ gh issue list -R steffenmaechtel/opk-agent-feedback --state open --limit 300 \
 - Stale-close is a recorded disposition, never a silent rot: an
   unpromoted issue without a new confirming session for three months is
   closed as not planned (`gh issue close -R … --reason "not planned"`)
-  with a ledger comment carrying its session count and the date of the
-  last confirmation. The sweep's summary lists every issue it promoted
-  or closed. Promoted issues are never stale-closed — they wait for a
-  wave. (RM-0216)
+  — the close state is the record, the session count and the last
+  confirmation date re-derivable from the timeline it leaves behind. A
+  deliberate rejection closes the same way with the `rejected` label
+  added, separating it from a stale-close for every later reader. The
+  sweep's summary lists every issue it promoted or closed. Promoted
+  issues are never stale-closed — they wait for a wave. (RM-0216)
 
 ## Metrics — measured, not assumed
 
@@ -326,9 +365,10 @@ the local opencode.db and prints the snapshot's tables.
 
 ## Closure — and the next cycle
 
-The loop stops by the ordinary stop rule; the closing summary lists
-every item of every covered issue with its class and landing place, and
-each covered feedback issue carries its disposition comment before the
-merge. The session still ends with the `opk-improve-docs` ask — doc
+The loop stops by the ordinary stop rule; the closing summary — the PR
+body, the disposition record — lists every item of every covered issue
+with its class and landing place, and every covered feedback issue is
+named in a cross-repo `Closes` line before the merge. The session still
+ends with the `opk-improve-docs` ask — doc
 waves are sessions too: a wave whose own rules prove wrong becomes the
 next reflection topic, and the loop corrects itself.
