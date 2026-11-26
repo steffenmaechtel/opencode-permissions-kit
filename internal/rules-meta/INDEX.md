@@ -8,7 +8,7 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**218 metas · 215 active · 3 retired · 1 review-pending · next due 2026-11-20**
+**218 metas · 215 active · 3 retired · 1 review-pending · next due 2026-11-28**
 
 ## Actionable
 
@@ -22,14 +22,14 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0097](0/0/9/RM-0097.md) | Never commit on master | active | approved | 1m | 2026-12-17 |
-| [RM-0098](0/0/9/RM-0098.md) | All shipped content is English | active | approved | 1m | 2026-11-20 |
-| [RM-0099](0/0/9/RM-0099.md) | Follow agent/conventions.md for interactive… | active | approved | 1m | 2026-11-20 |
-| [RM-0100](0/1/0/RM-0100.md) | Docs change with the code | active | approved | 1m | 2026-11-20 |
-| [RM-0101](0/1/0/RM-0101.md) | Don't rename scripts in files/ | active | approved | 1m | 2026-11-20 |
-| [RM-0102](0/1/0/RM-0102.md) | Don't bump VERSION unless the maintainer asks | active | approved | 1m | 2026-11-20 |
-| [RM-0103](0/1/0/RM-0103.md) | The security model is deliberately | active | approved | 1m | 2026-11-20 |
-| [RM-0104](0/1/0/RM-0104.md) | The kit never edits user-owned | active | approved | 1m | 2026-11-20 |
-| [RM-0105](0/1/0/RM-0105.md) | Run the L1–L7 checklist before | active | approved | 1m | 2026-11-20 |
+| [RM-0098](0/0/9/RM-0098.md) | All shipped content is English | active | approved | 6m | 2027-05-26 |
+| [RM-0099](0/0/9/RM-0099.md) | Follow agent/conventions.md for interactive… | active | approved | 6m | 2027-05-26 |
+| [RM-0100](0/1/0/RM-0100.md) | Docs change with the code | active | approved | 6m | 2027-05-26 |
+| [RM-0101](0/1/0/RM-0101.md) | Don't rename scripts in files/ | active | approved | 6m | 2027-05-26 |
+| [RM-0102](0/1/0/RM-0102.md) | Don't bump VERSION unless the maintainer asks | active | approved | 6m | 2027-05-26 |
+| [RM-0103](0/1/0/RM-0103.md) | The security model is deliberately | active | approved | 6m | 2027-05-26 |
+| [RM-0104](0/1/0/RM-0104.md) | The kit never edits user-owned | active | approved | 6m | 2027-05-26 |
+| [RM-0105](0/1/0/RM-0105.md) | Run the L1–L7 checklist before | active | approved | 6m | 2027-05-26 |
 | [RM-0218](0/2/1/RM-0218.md) | AGENTS.md does not grow past | active | approved | 1m | 2026-12-23 |
 
 ## agent/conventions.md
@@ -128,7 +128,7 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0116](0/1/1/RM-0116.md) | Every RM key appears at exactly three sites | active | approved | 1m | 2026-11-24 |
+| [RM-0116](0/1/1/RM-0116.md) | Every RM key appears at exactly three sites | active | approved | 6m | 2027-05-26 |
 | [RM-0180](0/1/8/RM-0180.md) | Citation-FIXING waves are the prime | active | approved | 1m | 2026-12-20 |
 
 ### Referencing reflection topics
@@ -231,7 +231,7 @@
 | [RM-0066](0/0/6/RM-0066.md) | A round whose fixes stay | active | approved | 1m | 2026-12-17 |
 | [RM-0067](0/0/6/RM-0067.md) | Any round whose fixes touch | active | approved | 1m | 2026-12-17 |
 | [RM-0068](0/0/6/RM-0068.md) | If a chain has not converged | retired | approved | 1m | 2026-11-19 |
-| [RM-0106](0/1/0/RM-0106.md) | A round's disposition covers ALL | active | approved | 1m | 2026-11-22 |
+| [RM-0106](0/1/0/RM-0106.md) | A round's disposition covers ALL | active | approved | 6m | 2027-05-26 |
 | [RM-0107](0/1/0/RM-0107.md) | The cadence authority is | active | approved | 1m | 2026-11-28 |
 | [RM-0115](0/1/1/RM-0115.md) | A round never declares the | active | approved | 1m | 2026-11-28 |
 | [RM-0118](0/1/1/RM-0118.md) | Closure is a recorded step | active | approved | 1m | 2026-11-28 |
@@ -360,9 +360,9 @@
 | [RM-0089](0/0/8/RM-0089.md) | Release-critical high-tier passes: | active | approved | 6m | 2027-05-20 |
 | [RM-0090](0/0/9/RM-0090.md) | Final chat answers are | active | approved | 1m | 2026-11-28 |
 | [RM-0092](0/0/9/RM-0092.md) | Checkpoint files timestamp every subagent | active | approved | 6m | 2027-05-20 |
-| [RM-0108](0/1/0/RM-0108.md) | Fan-out is staged, never launched | active | approved | 1m | 2026-11-22 |
+| [RM-0108](0/1/0/RM-0108.md) | Fan-out is staged, never launched | active | approved | 6m | 2027-05-26 |
 | [RM-0111](0/1/1/RM-0111.md) | Sabotage spot-checks mutate the | active | approved | 6m | 2027-05-26 |
-| [RM-0114](0/1/1/RM-0114.md) | Agents stamp with their own | active | approved | 1m | 2026-11-22 |
+| [RM-0114](0/1/1/RM-0114.md) | Agents stamp with their own | active | approved | 6m | 2027-05-26 |
 | [RM-0172](0/1/7/RM-0172.md) | A shipped code block is | active | approved | 1m | 2026-12-17 |
 | [RM-0186](0/1/8/RM-0186.md) | A session close (window, terminal, host) | active | approved | 1m | 2026-12-20 |
 | [RM-0202](0/2/0/RM-0202.md) | Every phase boundary the run | active | approved | 1m | 2026-12-22 |
@@ -414,7 +414,7 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0001](0/0/0/RM-0001.md) | Every rule carries a falsifiable rationale | active | approved | 1m | 2026-11-22 |
+| [RM-0001](0/0/0/RM-0001.md) | Every rule carries a falsifiable rationale | active | approved | 6m | 2027-05-26 |
 
 ### Decisions
 
