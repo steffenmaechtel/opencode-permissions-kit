@@ -8,11 +8,11 @@
 > Overdue is report-only: `make rules-report` · rules-audit.sh
 > stdout (inv 7) — no date-dependent lane here by design (#527).
 
-**218 metas · 215 active · 3 retired · 49 review-pending · next due 2026-11-20**
+**218 metas · 215 active · 3 retired · 21 review-pending · next due 2026-11-20**
 
 ## Actionable
 
-- **Review pending:** RM-0190, RM-0191, RM-0192, RM-0193, RM-0194, RM-0195, RM-0196, RM-0197, RM-0198, RM-0199, RM-0200, RM-0201, RM-0202, RM-0203, RM-0204, RM-0205, RM-0206, RM-0207, RM-0208, RM-0209, RM-0210, RM-0211, RM-0212, RM-0213, RM-0214, RM-0215, RM-0216, RM-0217, RM-0218
+- **Review pending:** RM-0211
 - **Amended — pending:** RM-0133 (2026-11-21), RM-0078 (2026-11-22), RM-0135 (2026-11-22), RM-0136 (2026-11-22), RM-0154 (2026-11-22), RM-0182 (2026-11-22), RM-0003 (2026-11-25), RM-0014 (2026-11-25), RM-0015 (2026-11-25), RM-0016 (2026-11-25), RM-0017 (2026-11-25), RM-0042 (2026-11-25), RM-0043 (2026-11-25), RM-0044 (2026-11-25), RM-0111 (2026-11-25), RM-0117 (2026-11-25), RM-0137 (2026-11-25), RM-0151 (2026-11-25), RM-0173 (2026-11-25), RM-0179 (2026-11-25)
 
 ## AGENTS.md
@@ -30,7 +30,7 @@
 | [RM-0103](0/1/0/RM-0103.md) | The security model is deliberately | active | approved | 1m | 2026-11-20 |
 | [RM-0104](0/1/0/RM-0104.md) | The kit never edits user-owned | active | approved | 1m | 2026-11-20 |
 | [RM-0105](0/1/0/RM-0105.md) | Run the L1–L7 checklist before | active | approved | 1m | 2026-11-20 |
-| [RM-0218](0/2/1/RM-0218.md) | AGENTS.md does not grow past | active | **pending** | 1m | 2026-12-23 |
+| [RM-0218](0/2/1/RM-0218.md) | AGENTS.md does not grow past | active | approved | 1m | 2026-12-23 |
 
 ## agent/conventions.md
 
@@ -72,16 +72,16 @@
 |---|---|---|---|---|---|
 | [RM-0163](0/1/6/RM-0163.md) | A special builtin's failed redirection is FATAL | active | approved | 1m | 2026-12-17 |
 | [RM-0164](0/1/6/RM-0164.md) | Comment text inside a single-quoted sh -c worker | active | approved | 1m | 2026-12-17 |
-| [RM-0203](0/2/0/RM-0203.md) | A case pattern list split | active | **pending** | 1m | 2026-12-22 |
-| [RM-0209](0/2/0/RM-0209.md) | A presence check on a | active | **pending** | 1m | 2026-12-22 |
+| [RM-0203](0/2/0/RM-0203.md) | A case pattern list split | active | approved | 1m | 2026-12-22 |
+| [RM-0209](0/2/0/RM-0209.md) | A presence check on a | active | approved | 1m | 2026-12-22 |
 
 ### Python3 pipeline tees (health probe, fork cache, degrade)
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0194](0/1/9/RM-0194.md) | The python3 check is a HEALTH | active | **pending** | 1m | 2026-12-21 |
-| [RM-0195](0/1/9/RM-0195.md) | Probe once per run, from the | active | **pending** | 1m | 2026-12-21 |
-| [RM-0196](0/1/9/RM-0196.md) | On probe failure the path | active | **pending** | 1m | 2026-12-21 |
+| [RM-0194](0/1/9/RM-0194.md) | The python3 check is a HEALTH | active | approved | 1m | 2026-12-21 |
+| [RM-0195](0/1/9/RM-0195.md) | Probe once per run, from the | active | approved | 1m | 2026-12-21 |
+| [RM-0196](0/1/9/RM-0196.md) | On probe failure the path | active | approved | 1m | 2026-12-21 |
 
 ### Fail-loud detector sweeps
 
@@ -112,10 +112,10 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0190](0/1/9/RM-0190.md) | Any e2e arm whose git | active | **pending** | 1m | 2026-12-20 |
-| [RM-0191](0/1/9/RM-0191.md) | Never silence a git command | active | **pending** | 1m | 2026-12-20 |
-| [RM-0192](0/1/9/RM-0192.md) | Recreate pruned directories after every | active | **pending** | 1m | 2026-12-20 |
-| [RM-0193](0/1/9/RM-0193.md) | Fixture state constrains every later | active | **pending** | 1m | 2026-12-20 |
+| [RM-0190](0/1/9/RM-0190.md) | Any e2e arm whose git | active | approved | 1m | 2026-12-20 |
+| [RM-0191](0/1/9/RM-0191.md) | Never silence a git command | active | approved | 1m | 2026-12-20 |
+| [RM-0192](0/1/9/RM-0192.md) | Recreate pruned directories after every | active | approved | 1m | 2026-12-20 |
+| [RM-0193](0/1/9/RM-0193.md) | Fixture state constrains every later | active | approved | 1m | 2026-12-20 |
 
 ### Referencing review findings
 
@@ -135,7 +135,7 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0217](0/2/1/RM-0217.md) | A feedback issue is cited by | active | **pending** | 1m | 2026-12-23 |
+| [RM-0217](0/2/1/RM-0217.md) | A feedback issue is cited by | active | approved | 1m | 2026-12-23 |
 
 ### Standing prose: history, not rosters
 
@@ -170,14 +170,14 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0211](0/2/1/RM-0211.md) | A topic is PROMOTED at | active | **pending** | 1m | 2026-12-23 |
-| [RM-0212](0/2/1/RM-0212.md) | Two overrides, both the maintainer's | active | **pending** | 1m | 2026-12-23 |
-| [RM-0213](0/2/1/RM-0213.md) | research-candidate issues are outside the | active | **pending** | 1m | 2026-12-23 |
+| [RM-0212](0/2/1/RM-0212.md) | Two overrides, both the maintainer's | active | approved | 1m | 2026-12-23 |
+| [RM-0213](0/2/1/RM-0213.md) | research-candidate issues are outside the | active | approved | 1m | 2026-12-23 |
 
 ### When a docs wave runs
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0214](0/2/1/RM-0214.md) | The trigger counts PROMOTED issues | active | **pending** | 1m | 2026-12-23 |
+| [RM-0214](0/2/1/RM-0214.md) | The trigger counts PROMOTED issues | active | approved | 1m | 2026-12-23 |
 
 ### What doc waves owe beyond the ordinary loop
 
@@ -191,13 +191,13 @@
 | [RM-0167](0/1/6/RM-0167.md) | A wave codifying a reflection | active | approved | 1m | 2026-12-17 |
 | [RM-0182](0/1/8/RM-0182.md) | The wave's own new prose | active | **amended — pending** | 1m | 2026-12-20 |
 | [RM-0183](0/1/8/RM-0183.md) | The self-application sweep's sibling-read is | active | approved | 1m | 2026-12-20 |
-| [RM-0215](0/2/1/RM-0215.md) | A landed topic's feedback issue | active | **pending** | 1m | 2026-12-23 |
+| [RM-0215](0/2/1/RM-0215.md) | A landed topic's feedback issue | active | approved | 1m | 2026-12-23 |
 
 ### Hygiene — the monthly sweep
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0216](0/2/1/RM-0216.md) | Stale-close is a recorded disposition | active | **pending** | 1m | 2026-12-23 |
+| [RM-0216](0/2/1/RM-0216.md) | Stale-close is a recorded disposition | active | approved | 1m | 2026-12-23 |
 
 ## agent/review-concept.md
 
@@ -258,7 +258,7 @@
 | [RM-0132](0/1/3/RM-0132.md) | Fresh-session entry (the batch | active | approved | 1m | 2026-11-30 |
 | [RM-0133](0/1/3/RM-0133.md) | Disposition policy on the non-shipped | active | **amended — pending** | 1m | 2026-11-30 |
 | [RM-0176](0/1/7/RM-0176.md) | The in-round exceptions above | active | approved | 1m | 2026-12-17 |
-| [RM-0198](0/1/9/RM-0198.md) | The docs-only close is a | active | **pending** | 1m | 2026-12-21 |
+| [RM-0198](0/1/9/RM-0198.md) | The docs-only close is a | active | approved | 1m | 2026-12-21 |
 
 ### Curation and verification
 
@@ -266,7 +266,7 @@
 |---|---|---|---|---|---|
 | [RM-0126](0/1/2/RM-0126.md) | Curation: the MAIN | active | approved | 1m | 2026-11-28 |
 | [RM-0127](0/1/2/RM-0127.md) | Verification: every curated | active | approved | 1m | 2026-12-17 |
-| [RM-0210](0/2/1/RM-0210.md) | Severity anchors for process/bookkeeping | active | **pending** | 1m | 2026-12-22 |
+| [RM-0210](0/2/1/RM-0210.md) | Severity anchors for process/bookkeeping | active | approved | 1m | 2026-12-22 |
 
 ### Reviewer freshness
 
@@ -289,8 +289,8 @@
 | [RM-0158](0/1/5/RM-0158.md) | names its observation scope | active | approved | 1m | 2026-12-16 |
 | [RM-0166](0/1/6/RM-0166.md) | The closing summary's marker carries | active | approved | 1m | 2026-12-17 |
 | [RM-0170](0/1/7/RM-0170.md) | Mechanical fields derive from the | active | approved | 1m | 2026-12-17 |
-| [RM-0206](0/2/0/RM-0206.md) | A polling CI watch | active | **pending** | 1m | 2026-12-22 |
-| [RM-0207](0/2/0/RM-0207.md) | An EMPTY run list | active | **pending** | 1m | 2026-12-22 |
+| [RM-0206](0/2/0/RM-0206.md) | A polling CI watch | active | approved | 1m | 2026-12-22 |
+| [RM-0207](0/2/0/RM-0207.md) | An EMPTY run list | active | approved | 1m | 2026-12-22 |
 
 ### Fixes close classes, not sites
 
@@ -323,10 +323,10 @@
 | [RM-0139](0/1/3/RM-0139.md) | Sabotage spot-checks run only against | active | approved | 1m | 2026-12-10 |
 | [RM-0162](0/1/6/RM-0162.md) | A finding whose mechanism rests on shell… | active | approved | 1m | 2026-12-17 |
 | [RM-0168](0/1/6/RM-0168.md) | A claim about what a | active | approved | 1m | 2026-12-17 |
-| [RM-0197](0/1/9/RM-0197.md) | A CONFIRMED verdict covers the | active | **pending** | 1m | 2026-12-21 |
-| [RM-0199](0/1/9/RM-0199.md) | The empirical probe owed before | active | **pending** | 1m | 2026-12-22 |
-| [RM-0200](0/2/0/RM-0200.md) | A figure the session itself generates | active | **pending** | 1m | 2026-12-22 |
-| [RM-0201](0/2/0/RM-0201.md) | A completeness claim in a commit | active | **pending** | 1m | 2026-12-22 |
+| [RM-0197](0/1/9/RM-0197.md) | A CONFIRMED verdict covers the | active | approved | 1m | 2026-12-21 |
+| [RM-0199](0/1/9/RM-0199.md) | The empirical probe owed before | active | approved | 1m | 2026-12-22 |
+| [RM-0200](0/2/0/RM-0200.md) | A figure the session itself generates | active | approved | 1m | 2026-12-22 |
+| [RM-0201](0/2/0/RM-0201.md) | A completeness claim in a commit | active | approved | 1m | 2026-12-22 |
 
 ### Suites are the standing review
 
@@ -365,7 +365,7 @@
 | [RM-0114](0/1/1/RM-0114.md) | Agents stamp with their own | active | approved | 1m | 2026-11-22 |
 | [RM-0172](0/1/7/RM-0172.md) | A shipped code block is | active | approved | 1m | 2026-12-17 |
 | [RM-0186](0/1/8/RM-0186.md) | A session close (window, terminal, host) | active | approved | 1m | 2026-12-20 |
-| [RM-0202](0/2/0/RM-0202.md) | Every phase boundary the run | active | **pending** | 1m | 2026-12-22 |
+| [RM-0202](0/2/0/RM-0202.md) | Every phase boundary the run | active | approved | 1m | 2026-12-22 |
 
 ### Release gate
 
@@ -395,7 +395,7 @@
 | [RM-0049](0/0/4/RM-0049.md) | Real-binary tiers | active | approved | 6m | 2027-05-20 |
 | [RM-0050](0/0/5/RM-0050.md) | Environment matrix as a test | active | approved | 6m | 2027-05-20 |
 | [RM-0165](0/1/6/RM-0165.md) | No controlling tty in containers — split display | active | approved | 1m | 2026-12-17 |
-| [RM-0204](0/2/0/RM-0204.md) | Privileged-channel probes: who opens the | active | **pending** | 1m | 2026-12-22 |
+| [RM-0204](0/2/0/RM-0204.md) | Privileged-channel probes: who opens the | active | approved | 1m | 2026-12-22 |
 
 ### 6. Checklist for new kit code
 
@@ -406,7 +406,7 @@
 | [RM-0053](0/0/5/RM-0053.md) | New fake/shim → replicate the | active | approved | 6m | 2027-05-20 |
 | [RM-0054](0/0/5/RM-0054.md) | rc-installed behavior (functions, hooks, PATH) | active | approved | 6m | 2027-05-21 |
 | [RM-0055](0/0/5/RM-0055.md) | Interactive-only surfaces (browser launch,… | active | approved | 6m | 2027-05-20 |
-| [RM-0205](0/2/0/RM-0205.md) | A comment asserting an environment | active | **pending** | 1m | 2026-12-22 |
+| [RM-0205](0/2/0/RM-0205.md) | A comment asserting an environment | active | approved | 1m | 2026-12-22 |
 
 ## internal/records/rules-meta.md
 
@@ -495,4 +495,4 @@
 | [RM-0151](0/1/5/RM-0151.md) | The decision rule for writing NEW | active | **amended — pending** | 1m | 2026-12-15 |
 | [RM-0173](0/1/7/RM-0173.md) | A harness env override consumed | active | **amended — pending** | 1m | 2026-12-17 |
 | [RM-0179](0/1/7/RM-0179.md) | The controlled PATH of an | active | **amended — pending** | 1m | 2026-12-20 |
-| [RM-0208](0/2/0/RM-0208.md) | Every path a fixture | active | **pending** | 1m | 2026-12-22 |
+| [RM-0208](0/2/0/RM-0208.md) | Every path a fixture | active | approved | 1m | 2026-12-22 |

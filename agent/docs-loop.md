@@ -273,7 +273,6 @@ sessions, one per PR).
   "registration probe" existed line-wrapped in review-concept.md
   while the multi-word grep sat empty and the sweep record claimed
   the re-check, #669). (RM-0183)
-
 - A landed topic's feedback issue closes through the wave, across
   repositories: the birth-PR body names every landed issue in the
   cross-repo form GitHub documents (`Closes
