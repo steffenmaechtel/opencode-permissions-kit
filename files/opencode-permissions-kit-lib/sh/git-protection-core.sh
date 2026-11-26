@@ -515,7 +515,8 @@ _gp_reheal_storage() {
     _gprs_n=0
     [ -d "$_gprs_stor" ] || return 0
     if ! _gp_storage_sane "$_gprs_stor"; then
-        ui_warn "storage reheal skipped: the use-time sanity check failed: $_gprs_stor"
+        ui_warn "storage reheal skipped: the use-time sanity check failed""\
+ (non-absolute, bare /, dot-dot, doubled slash, whitespace, glob, or symlinked?): $_gprs_stor"
         _gprs_failed=1
         return 0
     fi
@@ -641,8 +642,8 @@ _gp_pform_ok() {
 
 # _gp_storage_sane <stor>: the use-time storage re-check (#754 a A5):
 # form gate + no symlinked component + not a link itself. _gp_storage_init
-# enforces this at creation; every later consumer (migrate/nail/revert)
-# re-derives the path from env/conf and MUST re-check — an
+# enforces this at creation; every later consumer (migrate/nail/revert/
+# reheal) re-derives the path from env/conf and MUST re-check — an
 # agent-writable storage parent (the w11 condition the init warns
 # about) allows swapping the storage for a symlink between runs.
 # The bare "/" root is refused too (#794, the sibling class #793
@@ -824,19 +825,30 @@ _gp_migrate_one() {
     }
     _gpm_stor_rc=0
     _gpm_stor=$(_gp_storage) || _gpm_stor_rc=$?
+    # #798 S2: rc 2 is the recorded DECLINE marker (GITDIR_STORAGE=none),
+    # not an absent config — the message names the real cause. The hint
+    # is the same command either way (#764: `on` replaces the marker and
+    # initializes) — unless THIS run's persist step failed (the non-fatal
+    # warn in _git_protection_on), in which case the marker survives and
+    # the re-run retries once the persist cause is fixed. (#800 a F4)
+    if [ "$_gpm_stor_rc" -eq 2 ]; then
+        ui_error "storage declined (GITDIR_STORAGE=none) (run: sudo opk git-protection on)"
+        return 1
+    fi
     if [ "$_gpm_stor_rc" -ne 0 ]; then
-        ui_error "no storage configured (run: opk git-protection on)"
+        ui_error "no storage configured (run: sudo opk git-protection on)"
         return 1
     fi
     [ -d "$_gpm_stor" ] || {
-        ui_error "storage missing: $_gpm_stor (run: opk git-protection on)"
+        ui_error "storage missing: $_gpm_stor (run: sudo opk git-protection on)"
         return 1
     }
     # use-time storage sanity (#754 a A5): form + bare-/ refusal
     # (#794) + no symlinked component — init-time rigor alone trusts
     # a too-wide window.
     if ! _gp_storage_sane "$_gpm_stor"; then
-        ui_error "storage failed the use-time sanity check (non-absolute, bare /, malformed form, or symlinked?): $_gpm_stor"
+        ui_error "storage failed the use-time sanity check (non-absolute, bare /,""\
+ dot-dot, doubled slash, whitespace, glob, or symlinked?): $_gpm_stor"
         return 1
     fi
 
@@ -985,7 +997,8 @@ _gp_nail_one() {
             ;;
     esac
     _gp_storage_sane "$_gpn_stor" || {
-        ui_warn "not nailing: storage failed the use-time sanity check: $_gpn_stor"
+        ui_warn "not nailing: storage failed the use-time sanity check""\
+ (non-absolute, bare /, dot-dot, doubled slash, whitespace, glob, or symlinked?): $_gpn_stor"
         return 1
     }
     [ -L "$_gpn_gd" ] && {
@@ -1083,7 +1096,8 @@ _gp_revert_one() {
     esac
     # A5: use-time storage sanity.
     _gp_storage_sane "$_gpr_stor" || {
-        ui_error "storage failed the use-time sanity check — not reverting: $_gpr_stor"
+        ui_error "storage failed the use-time sanity check (non-absolute, bare /,""\
+ dot-dot, doubled slash, whitespace, glob, or symlinked?) — not reverting: $_gpr_stor"
         return 1
     }
     [ -d "$_gpr_tgt" ] || {
@@ -1375,13 +1389,15 @@ _gp_q() {
 #             without one, while `on` sets it up, migrates everything
 #             and (since #764) replaces a GITDIR_STORAGE=none marker
 # The path in a command goes through _gp_q, and a path the migration
-# form gate refuses (whitespace, glob character, dot segment —
-# `_gp_pform_ok`) gets NO command: `adopt` would refuse it, so the row
-# names the rename instead (#765 a S3). A no-command row whose path
-# carries a CONTROL byte renders its key through _gp_disp — that byte
-# must not reach the terminal raw (#765 b F1); a merely whitespace-
-# bearing path keeps its key as is (a UTF-8 name must not turn into
-# question marks).
+# form gate refuses (whitespace, glob character, dot-dot or dot
+# segment, doubled slash, the bare root — `_gp_pform_ok`: rc 3 for
+# the bare root, rc 1 for the rest) gets NO command: `adopt` would
+# refuse it, so the row names the move-or-rename instead (#765 a S3,
+# #793/#798, #800 b R3). A
+# no-command row whose path carries a CONTROL byte renders its key
+# through _gp_disp — that byte must not reach the terminal raw (#765
+# b F1); a merely whitespace-bearing path keeps its key as is (a
+# UTF-8 name must not turn into question marks).
 # Two or more classic rows under `adopt` add the all-at-once hint
 # (`on` migrates every project in one run — the better fit there).
 # _gp_rows_actionable is the callers' counter (1 when a classic or
@@ -1408,8 +1424,9 @@ _gp_rows() {
                     _gprl_key=$(_gp_rowkey "$_gprl_proj")
                     ui_kv_bad "$_gprl_key" "classic .git (unprotected -- the mv .git arm) -- no command""\
  for this path"
-                    ui_detail "the path fails a migration gate or cannot be pasted safely (whitespace, glob"
-                    ui_detail "character, dot segment or control byte) -- rename the folder, then adopt it"
+                    ui_detail "the path fails a migration gate or cannot be pasted safely (the filesystem"
+                    ui_detail "root itself, dot-dot or dot segment, whitespace, glob character, doubled"
+                    ui_detail "slash or control byte) -- move or rename the folder, then adopt it"
                 fi
                 _gp_rows_actionable=1
                 _gp_rows_classic=$((_gp_rows_classic + 1))
@@ -1609,7 +1626,7 @@ _git_protection_on() {
         if [ "$_gpon_stor_rc" -ne 0 ]; then
             ui_error "git-protection is declined on this host (GITDIR_STORAGE=none) and no default"
             ui_error "storage is derivable (no usable projects.conf root)"
-            ui_detail "replace that line with an absolute storage path, then run: opk git-protection on"
+            ui_detail "replace that line with an absolute storage path, then run: sudo opk git-protection on"
             exit 1
         fi
         ui_info "git-protection was declined on this host (GITDIR_STORAGE=none) -- this run enables it"
@@ -1658,7 +1675,7 @@ _git_protection_on() {
         ui_success "migration complete — wholesale .git attacks (mv .git, rename-over,"
         ui_success "rm, append, hardlink) are closed for every migrated project"
     else
-        ui_warn "pass had failures (migration or storage reheal — see above) -- re-run: opk git-protection on"
+        ui_warn "pass had failures (migration or storage reheal — see above) -- re-run: sudo opk git-protection on"
         exit 1
     fi
     ui_detail "new clones: the git-heal post-* hooks print the adopt hint for classic trees"
@@ -1670,12 +1687,18 @@ _git_protection_adopt() {
     _gpad_p=$1
     _gpad_stor_rc=0
     _gpad_stor=$(_gp_storage) || _gpad_stor_rc=$?
+    # #798 S2: the declined marker names its own cause (the split's
+    # reason lives at the _gp_migrate_one storage block).
+    if [ "$_gpad_stor_rc" -eq 2 ]; then
+        ui_error "storage declined (GITDIR_STORAGE=none) (run: sudo opk git-protection on)"
+        exit 1
+    fi
     if [ "$_gpad_stor_rc" -ne 0 ]; then
-        ui_error "no storage configured (run: opk git-protection on)"
+        ui_error "no storage configured (run: sudo opk git-protection on)"
         exit 1
     fi
     [ -d "$_gpad_stor" ] || {
-        ui_error "storage missing: $_gpad_stor (run: opk git-protection on)"
+        ui_error "storage missing: $_gpad_stor (run: sudo opk git-protection on)"
         exit 1
     }
     _gp_migrate_one "$_gpad_p" yes || exit 1
@@ -1703,8 +1726,14 @@ _gp_nail_path() {
 _git_protection_nail() {
     _gpnl_stor_rc=0
     _gpnl_stor=$(_gp_storage) || _gpnl_stor_rc=$?
+    # #798 S2: the declined marker names its own cause (the split's
+    # reason lives at the _gp_migrate_one storage block).
+    if [ "$_gpnl_stor_rc" -eq 2 ]; then
+        ui_error "storage declined (GITDIR_STORAGE=none) (run: sudo opk git-protection on)"
+        exit 1
+    fi
     if [ "$_gpnl_stor_rc" -ne 0 ]; then
-        ui_error "no storage configured (run: opk git-protection on)"
+        ui_error "no storage configured (run: sudo opk git-protection on)"
         exit 1
     fi
     # `nail <path>`: the one project, no sweep.
@@ -1777,15 +1806,32 @@ _gp_revert_all() {
 _git_protection_revert() {
     _gprv_mode=${1:-}
     case "$_gprv_mode" in
+        --all | /*) ;;
+        *)
+            ui_error "usage: opk git-protection revert <path>|--all"
+            exit 64
+            ;;
+    esac
+    # #800 a F1: the revert flows need the storage resolvable to know
+    # kit-owned pointers — refuse with the declined-cause split like
+    # the other consumers instead of the false "not ours" skip (the
+    # pointers' storage path is what GITDIR_STORAGE must name again).
+    _gprv_stor_rc=0
+    _gprv_stor=$(_gp_storage) || _gprv_stor_rc=$?
+    if [ "$_gprv_stor_rc" -eq 2 ]; then
+        ui_error "storage declined (GITDIR_STORAGE=none) -- fix GITDIR_STORAGE, then re-run"
+        exit 1
+    fi
+    if [ "$_gprv_stor_rc" -ne 0 ]; then
+        ui_error "no storage configured (run: sudo opk git-protection on)"
+        exit 1
+    fi
+    case "$_gprv_mode" in
         --all)
             _gp_revert_all || exit 1
             ;;
         /*)
             _gp_revert_one "$_gprv_mode" || exit 1
-            ;;
-        *)
-            ui_error "usage: opk git-protection revert <path>|--all"
-            exit 64
             ;;
     esac
     return 0
@@ -1831,7 +1877,7 @@ _git_protection_off() {
         ui_success "classic .git layout and the storage config is dropped"
     else
         ui_error "revert had failures — config NOT dropped (the remaining pointers"
-        ui_error "need it); fix them, then re-run: opk git-protection off"
+        ui_error "need it); fix them, then re-run: sudo opk git-protection off"
         exit 1
     fi
     ui_detail "storage dir left in place (remove manually if unwanted)"

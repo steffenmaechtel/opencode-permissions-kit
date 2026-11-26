@@ -17,7 +17,9 @@
 #     (storage prefix, dev ownership, chattr failure, lsattr verify),
 #     revert (kit-owned only, happy path), status rc semantics, the
 #     report rows (#764: fix command per storage state, unreferenced
-#     storage entries, the pointer-reference list), and
+#     storage entries, the pointer-reference list), the #798
+#     diagnostic arms (declined-cause split per storage consumer,
+#     the sanity-message class enumeration), and
 #     the CLI surface (usage rc 64, pre-hop path validation, the
 #     loop-guarded sudo re-exec shape).
 #
@@ -817,9 +819,10 @@ ln -s "$WORK/rhs-real" "$WORK/rhs-sym"
 _rc=0
 _out=$(_core_run '_gp_reheal_storage "$WORK/rhs-sym"; _r=$?; printf "flag=%s\n" "$_gprs_failed"; printf "rc=%s\n" "$_r"') || _rc=$?
 if printf '%s' "$_out" | grep -qF 'storage reheal skipped: the use-time sanity check failed' &&
+    printf '%s' "$_out" | grep -qF 'dot-dot, doubled slash, whitespace, glob, or symlinked?' &&
     printf '%s' "$_out" | grep -qF 'flag=1' &&
     printf '%s' "$_out" | grep -qF 'rc=0'; then
-    pass "reheal: an insane storage skips loud AND fails the pass counter (#779, #783 a A1, b B1)"
+    pass "reheal: an insane storage skips loud AND fails the pass counter (#779, #783 a A1, b B1; #798 C2)"
 else
     fail "reheal: sanity arm (rc=$_rc out=$_out) (#783 a A1, b B1)"
 fi
@@ -910,7 +913,7 @@ printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\n' \
 if [ "$_rc" = 1 ] &&
     printf '%s' "$_out" | grep -qF 'storage reheal failed on' &&
     printf '%s' "$_out" | grep -qF 'pass had failures (migration or storage reheal' &&
-    printf '%s' "$_out" | grep -qF 're-run: opk git-protection on'; then
+    printf '%s' "$_out" | grep -qF 're-run: sudo opk git-protection on'; then
     pass "reheal: a failed sweep fails the on-pass (propagation, #779)"
 else
     fail "reheal: propagation arm (rc=$_rc out=$_out)"
@@ -1706,6 +1709,8 @@ fi
 # shell metacharacter gets its command with the path single-quoted; a
 # path with a control byte gets no command at all — and its row KEY is
 # rendered through _gp_disp, the raw byte appears nowhere (#765 b F1).
+# #798 C3: the no-command detail names the bare root among the causes
+# and keeps the move-or-rename remediation.
 _s3="$WORK/roots/r6"
 mkdir -p "$_s3/sub dir/p/.git/objects" "$_s3/a;b/.git/objects" "$_s3/a\$(id)b/.git/objects"
 printf 'ref: x\n' >"$_s3/sub dir/p/.git/HEAD"
@@ -1742,8 +1747,10 @@ if [ "$_rc" = 1 ] &&
     ! printf '%s' "$_out" | grep -qF 'b??ro' &&
     ! printf '%s' "$_out" | grep -qF "adopt $_s3/a;b" &&
     ! printf '%s' "$_out" | grep -qF "adopt $_s3/sub dir/p" &&
-    printf '%s' "$_out" | grep -qF 'rename the folder, then adopt it'; then
-    pass "rows: gate-refused paths get no command, metacharacter paths a quoted one, control bytes never render (#765 a S3, b F1)"
+    printf '%s' "$_out" |
+    grep -qF 'root itself, dot-dot or dot segment, whitespace, glob character, doubled' &&
+    printf '%s' "$_out" | grep -qF 'move or rename the folder, then adopt it'; then
+    pass "rows: gate-refused paths get no command, metacharacter paths a quoted one, control bytes never render (#765 a S3, b F1; #798 C3)"
 else
     fail "rows: paste-safety arms (rc=$_rc out=$_out)"
 fi
@@ -1917,9 +1924,10 @@ fi
 # form arm matches a lone slash — the same class A4b closed for the
 # project path, at the use-time storage gate: membership compares
 # would degenerate to /* and migrate's mv destination would land at
-# the filesystem root. Refused rc 1 (migrate renders the class-
-# enumerating sanity message pinned below; nail, revert and reheal
-# keep generic text); the negative arm keeps a real
+# the filesystem root. Refused rc 1 (every consumer renders the class-
+# enumerating sanity message — migrate pinned below, nail/revert in
+# the #798 C2 block, reheal's pin extended in place); the negative arm
+# keeps a real
 # storage passing, and migrate must refuse BEFORE any move.
 _rc=0
 _out=$(_core_run '_gp_storage_sane /') || _rc=$?
@@ -1947,7 +1955,8 @@ else
     _rc=0
     _out=$(_core_run 'GP_STORAGE=/ _gp_migrate_one "$WORK/roots/r1/rootstor" yes') || _rc=$?
     if [ "$_rc" = 1 ] &&
-        printf '%s' "$_out" | grep -qF 'use-time sanity check (non-absolute, bare /, malformed form, or symlinked?)' &&
+        printf '%s' "$_out" | grep -qF 'use-time sanity check (non-absolute, bare /,' &&
+        printf '%s' "$_out" | grep -qF 'dot-dot, doubled slash, whitespace, glob, or symlinked?' &&
         [ -d "$WORK/roots/r1/rootstor/.git" ]; then
         pass "security A4c: migrate with a / storage refused before any move (#794)"
     else
@@ -2240,5 +2249,119 @@ if printf '%s' "$_out" | grep -qF 'worktree enumeration failed'; then
 else
     fail "fix-wave C4: enumeration warn (out=$_out)"
 fi
+
+# --- 10c. diagnostic-message bookkeeping (#798) --------------------------------------
+#
+# Order: this block must stay LAST — it performs the suite's final
+# $IC write (GITDIR_STORAGE=none, consumed only here) and reuses the
+# A5 storage-sym fixture (#800 a F7); a later section must rewrite
+# $IC before use.
+#
+# S2: the storage consumers split rc 2 (the recorded DECLINE marker,
+# GITDIR_STORAGE=none) from every other failure — the declined flow
+# names the decline, the generic arm stays "no storage configured".
+# The absence legs pipe the capture (grep reads stdin, never the
+# capture as a file operand — the vacuous-inverted-rc shape from
+# agent/conventions.md, "Fail-loud detector sweeps"); the
+# migrate arm additionally proves the refusal happened BEFORE any
+# move (.git still classic).
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\nGITDIR_STORAGE=none\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" >"$IC"
+_mkrepo "$WORK/roots/r1/declm"
+_rc=0
+_out=$(_core_run 'unset GP_STORAGE; _gp_migrate_one "$WORK/roots/r1/declm" yes') || _rc=$?
+if [ "$_rc" = 1 ] &&
+    printf '%s' "$_out" | grep -qF 'storage declined (GITDIR_STORAGE=none)' &&
+    ! printf '%s' "$_out" | grep -qF 'no storage configured' &&
+    [ -d "$WORK/roots/r1/declm/.git" ]; then
+    pass "diagnostics S2: a declined storage migrates nothing and names the decline (#798)"
+else
+    fail "diagnostics S2: migrate declined arm (rc=$_rc out=$_out)"
+fi
+
+_mkrepo "$WORK/roots/r1/decla"
+_rc=0
+_out=$(_core_run 'unset GP_STORAGE; _git_protection_adopt "$WORK/roots/r1/decla"') || _rc=$?
+if [ "$_rc" = 1 ] &&
+    printf '%s' "$_out" | grep -qF 'storage declined (GITDIR_STORAGE=none)' &&
+    ! printf '%s' "$_out" | grep -qF 'no storage configured'; then
+    pass "diagnostics S2: adopt names the recorded decline, not a missing config (#798)"
+else
+    fail "diagnostics S2: adopt declined arm (rc=$_rc out=$_out)"
+fi
+
+_rc=0
+_out=$(_core_run 'unset GP_STORAGE; _git_protection_nail') || _rc=$?
+if [ "$_rc" = 1 ] &&
+    printf '%s' "$_out" | grep -qF 'storage declined (GITDIR_STORAGE=none)' &&
+    ! printf '%s' "$_out" | grep -qF 'no storage configured'; then
+    pass "diagnostics S2: nail names the recorded decline, not a missing config (#798)"
+else
+    fail "diagnostics S2: nail declined arm (rc=$_rc out=$_out)"
+fi
+
+# F1 (#800 a): the revert CLI refuses the declined marker like the
+# other consumers instead of the false "not ours" skip / the silent
+# exit-0 sweep; the hint names the revert intent (fix the config),
+# not `on` (which would re-enable). The pointer file must survive.
+_mkrepo "$WORK/roots/r1/declr"
+rm -rf "${WORK:?}/roots/r1/declr/.git"
+printf 'gitdir: %s\n' "$WORK/storage/declr.git" >"$WORK/roots/r1/declr/.git"
+_rc=0
+_out=$(_core_run 'unset GP_STORAGE; _git_protection_revert "$WORK/roots/r1/declr"') || _rc=$?
+if [ "$_rc" = 1 ] &&
+    printf '%s' "$_out" | grep -qF 'storage declined (GITDIR_STORAGE=none)' &&
+    printf '%s' "$_out" | grep -qF 'fix GITDIR_STORAGE, then re-run' &&
+    ! printf '%s' "$_out" | grep -qF 'not ours' &&
+    [ -f "$WORK/roots/r1/declr/.git" ]; then
+    pass "diagnostics F1: revert <path> refuses the declined storage with the revert-intent hint (#800 a)"
+else
+    fail "diagnostics F1: revert path arm (rc=$_rc out=$_out)"
+fi
+
+_rc=0
+_out=$(_core_run 'unset GP_STORAGE; _git_protection_revert --all') || _rc=$?
+if [ "$_rc" = 1 ] &&
+    printf '%s' "$_out" | grep -qF 'storage declined (GITDIR_STORAGE=none)' &&
+    ! printf '%s' "$_out" | grep -qF 'not ours'; then
+    pass "diagnostics F1: revert --all refuses the declined storage (no silent exit 0) (#800 a)"
+else
+    fail "diagnostics F1: revert all arm (rc=$_rc out=$_out)"
+fi
+
+# C2: nail and revert render the class enumeration at the use-time
+# sanity gate too (reheal's arm rides the extended pin in section 6b).
+# The fixtures reuse the A5 symlinked storage — sanity refuses before
+# any nail/revert act on the target (revert keeps the pointer file).
+_mkrepo "$WORK/roots/r1/nlsym"
+_rc=0
+_out=$(_core_run 'GP_STORAGE="$WORK/storage-sym"
+    _gp_nail_one "$WORK/roots/r1/nlsym" "$WORK/storage-sym/nlsym.git"') || _rc=$?
+if [ "$_rc" = 1 ] &&
+    printf '%s' "$_out" | grep -qF 'not nailing: storage failed the use-time sanity check' &&
+    printf '%s' "$_out" | grep -qF 'dot-dot, doubled slash, whitespace, glob, or symlinked?'; then
+    pass "diagnostics C2: the nail sanity refusal enumerates the classes (#798)"
+else
+    fail "diagnostics C2: nail sanity arm (rc=$_rc out=$_out)"
+fi
+
+_mkrepo "$WORK/roots/r1/rvsym"
+rm -rf "${WORK:?}/roots/r1/rvsym/.git"
+printf 'gitdir: %s\n' "$WORK/storage-sym/rvsym.git" >"$WORK/roots/r1/rvsym/.git"
+_rc=0
+_out=$(_core_run 'GP_STORAGE="$WORK/storage-sym" _gp_revert_one "$WORK/roots/r1/rvsym"') || _rc=$?
+if [ "$_rc" = 1 ] &&
+    printf '%s' "$_out" | grep -qF 'storage failed the use-time sanity check' &&
+    printf '%s' "$_out" | grep -qF 'dot-dot, doubled slash, whitespace, glob, or symlinked?' &&
+    [ -f "$WORK/roots/r1/rvsym/.git" ]; then
+    pass "diagnostics C2: the revert sanity refusal enumerates the classes (#798)"
+else
+    fail "diagnostics C2: revert sanity arm (rc=$_rc out=$_out)"
+fi
+
+# C3: the no-command classic row's refusal causes and remediation are
+# pinned behaviorally at the #765 a S3 paste-safety pin above (the
+# same else-branch renders for a whitespace-refused path; a bare-root
+# ROW itself cannot be planted — conf roots are root_ok-gated).
 
 suite_done "git-protection core tests"
