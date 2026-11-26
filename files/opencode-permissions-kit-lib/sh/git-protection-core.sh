@@ -836,7 +836,7 @@ _gp_migrate_one() {
     # (#794) + no symlinked component — init-time rigor alone trusts
     # a too-wide window.
     if ! _gp_storage_sane "$_gpm_stor"; then
-        ui_error "storage failed the use-time sanity check (bare /, malformed form, or symlinked component?): $_gpm_stor"
+        ui_error "storage failed the use-time sanity check (non-absolute, bare /, malformed form, or symlinked?): $_gpm_stor"
         return 1
     fi
 
