@@ -231,7 +231,7 @@ doctor_roots_append() {
     # in it must not forge transcript lines in the row that reports the
     # failed read.
     dra_show="$(doctor_show_sanitize "$1")"
-    [ "$dra_rc" -gt 1 ] && ui_kv_warn "scan root" "$dra_show unreadable -- its roots are not scanned"
+    [ "$dra_rc" -gt 1 ] && ui_kv_warn "scan root" "$dra_show unreadable — its roots are not scanned"
     return 0
 }
 doctor_all() {
@@ -240,7 +240,7 @@ doctor_all() {
     # re-check everything themselves -- this only keeps a degraded
     # install from printing its error once per discovered project.
     if [ ! -f "$INSTALL_CONF" ]; then
-        ui_error "doctor: $INSTALL_CONF not found -- is the kit installed?"
+        ui_error "doctor: $INSTALL_CONF not found — is the kit installed?"
         exit 1
     fi
     # a scan root of '/' would walk the whole filesystem's top levels --
@@ -253,7 +253,7 @@ doctor_all() {
     # fail loud on a dead workspace (#360 a F5): an empty WORK_ALL would
     # collapse every path below to root-level literals (/roots, /hits ...)
     WORK_ALL="$(mktemp -d)" || {
-        ui_error "doctor: cannot create a temp dir (mktemp failed) -- is \$TMPDIR writable?"
+        ui_error "doctor: cannot create a temp dir (mktemp failed) — is \$TMPDIR writable?"
         exit 1
     }
     trap _doctor_all_cleanup EXIT
@@ -288,7 +288,7 @@ doctor_all() {
                 # too (helper), not just the static -r precheck arm below
                 doctor_roots_append "$PROJECTS_CONF" "$WORK_ALL/roots"
             else
-                ui_kv_warn "scan root" "$PROJECTS_CONF unreadable -- its roots are not scanned"
+                ui_kv_warn "scan root" "$PROJECTS_CONF unreadable — its roots are not scanned"
             fi
         fi
     fi
@@ -304,7 +304,7 @@ doctor_all() {
     # -> read strips the NUL with no row).
     _da_stx="$(printf '\002')"
     if ! tr '\000' '\002' <"$WORK_ALL/roots" >"$WORK_ALL/roots.t"; then
-        ui_error "doctor: cannot process the scan-root list (tr failed) -- refusing to scan"
+        ui_error "doctor: cannot process the scan-root list (tr failed) — refusing to scan"
         exit 1
     fi
     mv "$WORK_ALL/roots.t" "$WORK_ALL/roots"
@@ -324,7 +324,7 @@ doctor_all() {
                 # roots join the same list) -- name both, the display
                 # strips the byte either way
                 _da_show="$(doctor_show_sanitize "$_da_root")"
-                ui_kv_warn "scan root" "list line carries a NUL or STX byte -- skipped: '$_da_show'"
+                ui_kv_warn "scan root" "list line carries a NUL or STX byte — skipped: '$_da_show'"
                 continue
                 ;;
         esac
@@ -342,7 +342,7 @@ doctor_all() {
                 # control bytes -- only the display copy is scrubbed, the
                 # check itself stays on the raw spelling
                 _da_show="$(doctor_show_sanitize "$_da_root")"
-                ui_kv_warn "scan root" "'$_da_show' is not an absolute path -- skipped (list roots must be absolute)"
+                ui_kv_warn "scan root" "'$_da_show' is not an absolute path — skipped (list roots must be absolute)"
                 continue
                 ;;
         esac
@@ -372,7 +372,7 @@ doctor_all() {
         if printf '%s' "$_da_root" | LC_ALL=C grep -qF '\' ||
             doctor_cntrl_bad "$_da_root"; then
             _da_show="$(doctor_show_sanitize "$_da_root" | tr -d '\\')"
-            ui_kv_warn "scan root" "'$_da_show' carries control characters or backslashes -- skipped"
+            ui_kv_warn "scan root" "'$_da_show' carries control characters or backslashes — skipped"
             continue
         fi
         # belt for list-sourced roots (the positional '/' is refused with
@@ -383,7 +383,7 @@ doctor_all() {
         # onto the '/' arm (#360 c S3).
         case "$_da_root" in
             / | // | /// | /. | /./ | /.. | /../)
-                ui_kv_warn "scan root" "'$_da_root' refused -- doctor all does not walk the whole filesystem"
+                ui_kv_warn "scan root" "'$_da_root' refused — doctor all does not walk the whole filesystem"
                 continue
                 ;;
         esac
@@ -391,9 +391,9 @@ doctor_all() {
             if [ -e "$_da_root" ]; then
                 # (#370 a C4): an existing NON-directory is not
                 # "missing" -- the row must not lie about the tree
-                ui_kv_warn "scan root" "'$_da_root' is not a directory -- skipped"
+                ui_kv_warn "scan root" "'$_da_root' is not a directory — skipped"
             else
-                ui_kv_warn "scan root" "'$_da_root' is missing -- skipped"
+                ui_kv_warn "scan root" "'$_da_root' is missing — skipped"
             fi
             continue
         fi
@@ -406,7 +406,7 @@ doctor_all() {
         find -H "$_da_root" -maxdepth 2 -type l -print >"$WORK_ALL/links" 2>>"$WORK_ALL/ferr"
         if [ -s "$WORK_ALL/ferr" ]; then
             _da_n="$(wc -l <"$WORK_ALL/ferr")"
-            ui_kv_warn "scan root" "$_da_n unreadable entries under $_da_root -- marker list may be incomplete"
+            ui_kv_warn "scan root" "$_da_n unreadable entries under $_da_root — marker list may be incomplete"
             ui_detail "run 'doctor all' as the tree owner (or with sudo) for a complete picture"
         fi
         # fragment integrity (#360 a F1): find -print and read share the
@@ -439,7 +439,7 @@ doctor_all() {
             # dangling symlink, a link to a directory) is not a marker
             if [ ! -f "$_da_hit" ]; then
                 _da_show="$(doctor_show_sanitize "$_da_hit")"
-                ui_kv_warn "scan root" "'$_da_show' is not a regular file through symlinks -- not a marker (the walk-up rule)"
+                ui_kv_warn "scan root" "'$_da_show' is not a regular file through symlinks — not a marker (the walk-up rule)"
                 ALL_MARK_SKIP=$((ALL_MARK_SKIP + 1))
                 continue
             fi
@@ -451,7 +451,7 @@ doctor_all() {
             if printf '%s' "$_da_proj" | LC_ALL=C grep -qF '\' ||
                 doctor_cntrl_bad "$_da_proj"; then
                 _da_show="$(doctor_show_sanitize "$_da_proj" | tr -d '\\')"
-                ui_kv_warn "scan root" "marker at '$_da_show' skipped -- control characters or backslashes in the path"
+                ui_kv_warn "scan root" "marker at '$_da_show' skipped — control characters or backslashes in the path"
                 ALL_MARK_SKIP=$((ALL_MARK_SKIP + 1))
                 continue
             fi
@@ -468,7 +468,7 @@ doctor_all() {
             # link name, and the name under the scanned tree is not the
             # operator's own spelling -- agent-choosable bytes
             _da_show="$(doctor_show_sanitize "$_da_link")"
-            ui_kv_warn "scan root" "symlinked project '$_da_show' is not descended -- pass the real directory"
+            ui_kv_warn "scan root" "symlinked project '$_da_show' is not descended — pass the real directory"
         done <"$WORK_ALL/links"
     done <"$WORK_ALL/roots"
     LC_ALL=C sort -u "$WORK_ALL/projects" >"$WORK_ALL/projects.s" &&
@@ -485,7 +485,7 @@ doctor_all() {
     ALL_ALERT=0
     ALL_ERR=0
     if [ -s "$WORK_ALL/projects" ]; then
-        ui_section "Doctor all -- one scan per project"
+        ui_section "Doctor all — one scan per project"
         while IFS= read -r _da_proj; do
             [ -n "$_da_proj" ] || continue
             ALL_N=$((ALL_N + 1))
@@ -498,25 +498,25 @@ doctor_all() {
                 2) ALL_WARN=$((ALL_WARN + 1)) ;;
                 *)
                     ALL_ERR=$((ALL_ERR + 1))
-                    ui_kv_warn "project" "doctor exited $_da_rc -- counted as an alert"
+                    ui_kv_warn "project" "doctor exited $_da_rc — counted as an alert"
                     ;;
             esac
         done <"$WORK_ALL/projects"
     fi
 
     # --- aggregate summary (worst-of, the contract in the block comment) -------------
-    ui_section "Doctor all -- summary"
+    ui_section "Doctor all — summary"
     if [ "$ALL_N" -eq 0 ]; then
         if [ "$ALL_ROOTS_USED" -eq 0 ]; then
             if [ "$ALL_ROOTS_N" -eq 0 ]; then
-                ui_kv_warn "result" "no scan roots available -- pass one, or use the /var/www/vhosts layout or projects.conf"
+                ui_kv_warn "result" "no scan roots available — pass one, or use the /var/www/vhosts layout or projects.conf"
             else
-                ui_kv_warn "result" "no scan root could be scanned -- every listed root is missing or unusable"
+                ui_kv_warn "result" "no scan root could be scanned — every listed root is missing or unusable"
             fi
         elif [ "$ALL_MARK_SKIP" -gt 0 ]; then
-            ui_kv_warn "result" "all $ALL_MARK_SKIP marker(s) skipped -- nothing to check"
+            ui_kv_warn "result" "all $ALL_MARK_SKIP marker(s) skipped — nothing to check"
         else
-            ui_kv_warn "result" "no opk.json markers found under the scanned root(s) -- nothing to check"
+            ui_kv_warn "result" "no opk.json markers found under the scanned root(s) — nothing to check"
         fi
         exit 2
     fi
@@ -590,7 +590,7 @@ doctor_walkup() {
     # detect needs it for the walk itself.
     if [ "$DOCTOR_MODE" = "detect" ] &&
         { printf '%s' "$DOCTOR_ROOT" | LC_ALL=C grep -qF '\' || doctor_cntrl_bad "$DOCTOR_ROOT"; }; then
-        ui_error "doctor: project root contains control characters or backslashes -- unusable for 'detect'"
+        ui_error "doctor: project root contains control characters or backslashes — unusable for 'detect'"
         exit 64
     fi
     # Fix-mode only (#348 a C3): the candidate round-trip ($WORK/fixcand) is
@@ -603,7 +603,7 @@ doctor_walkup() {
     # rows only -- verdict and rc stay intact (#344 a S1/S2 class).
     if [ "$DOCTOR_MODE" = "fix" ] &&
         doctor_cntrl_bad "$DOCTOR_ROOT"; then
-        ui_error "doctor: project root contains control characters -- unusable for 'fix' (candidate round-trip)"
+        ui_error "doctor: project root contains control characters — unusable for 'fix' (candidate round-trip)"
         exit 64
     fi
 }
@@ -676,16 +676,16 @@ doctor_git_heal() {
         ui_kv_warn "git-heal" "kit pieces incomplete under $_dgh_lib/git-heal (fix: sudo opk update)"
     fi
     case "$_dgh_state" in
-        on) ui_kv "git-heal" "ON -- developer git ops re-pin the heal operand set to $DOCTOR_USER" ;;
+        on) ui_kv "git-heal" "ON — developer git ops re-pin the heal operand set to $DOCTOR_USER" ;;
         off)
-            ui_kv "git-heal" "OFF -- 'sudo opk git-heal on' keeps the agent's main-checkout"
+            ui_kv "git-heal" "OFF — 'sudo opk git-heal on' keeps the agent's main-checkout"
             ui_detail "git workflow (git add / git switch) green across developer checkouts/pulls"
             ;;
         foreign)
-            ui_kv "git-heal" "OFF -- core.hooksPath holds a foreign value ($_dgh_cur)"
+            ui_kv "git-heal" "OFF — core.hooksPath holds a foreign value ($_dgh_cur)"
             ui_detail "the heal hooks are not in effect; 'sudo opk git-heal on' would retake the path"
             ;;
-        unknown) ui_kv "git-heal" "unknown -- cannot read the developer's global gitconfig" ;;
+        unknown) ui_kv "git-heal" "unknown — cannot read the developer's global gitconfig" ;;
     esac
     # Lockout classification for THIS project's main checkout. The row
     # set mirrors heal-index-head's operand list (#678 widening;
@@ -704,7 +704,7 @@ doctor_git_heal() {
     _ghc_pt_out=""
     if [ -f "$_dgh_gd" ] && [ ! -L "$_dgh_gd" ]; then
         if ! command -v _ghc_pt_target >/dev/null 2>&1; then
-            ui_kv_warn "git-heal" "pointer-file checkout not classified -- kit file""\
+            ui_kv_warn "git-heal" "pointer-file checkout not classified — kit file""\
  sh/git-heal-core.sh missing or outdated (fix: sudo opk update)"
             _dgh_skip=1
         elif ! _ghc_pt_target "$_dgh_gd"; then
@@ -777,7 +777,7 @@ doctor_git_heal() {
         _dgh_acl=1
         command -v getfacl >/dev/null 2>&1 || _dgh_acl=0
         [ "$_dgh_acl" = 1 ] ||
-            ui_kv_warn "git-heal" "heal drift ACLs not checked -- getfacl unavailable"
+            ui_kv_warn "git-heal" "heal drift ACLs not checked — getfacl unavailable"
         # Sticky: %A's last position, 't' OR 'T' -- the shared-tree
         # model's gitdirs carry o=0 (mode 3770 renders "drwxrws--T").
         _dgh_perm=$(stat -c %A "$_dgh_gd" 2>/dev/null) || _dgh_perm=""
@@ -786,9 +786,9 @@ doctor_git_heal() {
                 ;;
             ?????????[tT]) ;;
             *)
-                ui_kv_warn "heal drift" "$_dgh_gd -- sticky bit missing on the gitdir"
+                ui_kv_warn "heal drift" "$_dgh_gd — sticky bit missing on the gitdir"
                 ui_detail "(a fresh clone or a partial heal; the baseline heal re-applies"
-                ui_detail "it -- 'sudo opk update --refresh' / 'opk config refresh')"
+                ui_detail "it — 'sudo opk update --refresh' / 'opk config refresh')"
                 ;;
         esac
         # Group-access/setgid leg (the #653 wave-2 fold, PR #785
@@ -806,9 +806,9 @@ doctor_git_heal() {
                 ;;
             ??????[xs]???) ;;
             *)
-                ui_kv_warn "heal drift" "$_dgh_gd -- group access/setgid missing on the gitdir"
+                ui_kv_warn "heal drift" "$_dgh_gd — group access/setgid missing on the gitdir"
                 ui_detail "(the healed gitdir is group-shared 3770; a dropped group leg"
-                ui_detail "locks the agent out of .git -- re-apply: 'sudo opk"
+                ui_detail "locks the agent out of .git — re-apply: 'sudo opk"
                 ui_detail "update --refresh' / 'opk config refresh')"
                 ;;
         esac
@@ -825,7 +825,7 @@ doctor_git_heal() {
             # LINK TARGET's state through the link, not the link.
             if [ -L "$_dgh_p" ]; then
                 ui_kv_warn "heal drift" "$_dgh_p is a symlink (the heal pins regular"
-                ui_detail "entries only) -- inspect before trusting git output"
+                ui_detail "entries only) — inspect before trusting git output"
                 continue
             fi
             _dgh_own=$(stat -c %U "$_dgh_p" 2>/dev/null) || continue
@@ -852,9 +852,9 @@ doctor_git_heal() {
                 fi
             fi
             [ -n "$_dgh_why" ] || continue
-            ui_kv_warn "heal drift" "$_dgh_p -- $_dgh_why"
+            ui_kv_warn "heal drift" "$_dgh_p — $_dgh_why"
             ui_detail "(the heal pins $_dgh_ent developer-owned with no group write or"
-            ui_detail "ACLs; re-apply: 'sudo opk update --refresh' -- storage gitdirs"
+            ui_detail "ACLs; re-apply: 'sudo opk update --refresh' — storage gitdirs"
             ui_detail "re-heal on every 'sudo opk update')"
         done
         # Suspicious repo-config keys (#653 check 3, the wave-2 arm;
@@ -875,7 +875,7 @@ doctor_git_heal() {
                 paste -sd, -)
             if [ -n "$_dgh_keys" ]; then
                 ui_kv_warn "repo keys" "suspicious repo-config keys in $_dgh_gd/config:"
-                ui_detail "$_dgh_keys -- the repo-scope config is the agent-writable"
+                ui_detail "$_dgh_keys — the repo-scope config is the agent-writable"
                 ui_detail "surface; inspect with 'git config -f $_dgh_gd/config --list'"
                 ui_detail "and remove manually (removal stays a human decision)"
             fi
@@ -893,7 +893,7 @@ doctor_git_heal() {
                 ! -name '*.sample' -printf '%y\n' 2>/dev/null | wc -l 2>/dev/null || printf '0')
             if [ "${_dgh_ns:-0}" -gt 0 ] 2>/dev/null; then
                 ui_kv_warn "planted" "$_dgh_ns non-sample entries in $_dgh_hk"
-                ui_detail "(planted content survives the heal -- it runs only if the"
+                ui_detail "(planted content survives the heal — it runs only if the"
                 ui_detail "entry is executable and that git call uses .git/hooks;"
                 ui_detail "inspect and remove manually)"
             fi
@@ -904,10 +904,10 @@ doctor_git_heal() {
             _dgh_own=$(stat -c %U "$_dgh_gd/$_dgh_f" 2>/dev/null) || continue
             if [ "$_dgh_own" != "$DOCTOR_USER" ]; then
                 if [ "$_dgh_state" = on ]; then
-                    ui_kv "git-heal-file" "$_dgh_gd/$_dgh_f is $_dgh_own-owned (transient --"
+                    ui_kv "git-heal-file" "$_dgh_gd/$_dgh_f is $_dgh_own-owned (transient —"
                     ui_detail "the next developer git operation heals it)"
                 else
-                    ui_kv_warn "git-heal-file" "$_dgh_gd/$_dgh_f is $_dgh_own-owned -- agent git"
+                    ui_kv_warn "git-heal-file" "$_dgh_gd/$_dgh_f is $_dgh_own-owned — agent git"
                     ui_detail "blocked in this main checkout; 'sudo opk git-heal on' heals and keeps it healed"
                 fi
             fi
@@ -923,7 +923,7 @@ doctor_git_heal() {
         _dgh_wt="$_dgh_gd/worktrees"
         if [ -L "$_dgh_wt" ]; then
             ui_kv_warn "worktree" "$_dgh_wt is a symlink (the heal walks regular"
-            ui_detail "collections only) -- inspect before trusting git output"
+            ui_detail "collections only) — inspect before trusting git output"
         elif [ -d "$_dgh_wt" ]; then
             _dgh_wstrict=1
             if [ -n "$_dgh_stor" ]; then
@@ -933,14 +933,14 @@ doctor_git_heal() {
             fi
             if [ "$_dgh_wstrict" = 1 ]; then
                 _dgh_wh1="(the heal pins them developer-owned 644 under a sticky"
-                _dgh_wh2="collection; a fresh agent worktree or tampering -- re-apply:"
+                _dgh_wh2="collection; a fresh agent worktree or tampering — re-apply:"
                 _dgh_wh3="'sudo opk update --refresh' / 'opk config refresh')"
                 _dgh_wperm=$(stat -c %A "$_dgh_wt" 2>/dev/null) || _dgh_wperm=""
                 case "$_dgh_wperm" in
                     ?????????[tT]) ;;
                     "") ;;
                     *)
-                        ui_kv_warn "worktree" "$_dgh_wt -- sticky bit missing on the collection"
+                        ui_kv_warn "worktree" "$_dgh_wt — sticky bit missing on the collection"
                         ui_detail "(the heal pins it sticky so a developer-owned"
                         ui_detail "registration stays un-replaceable; re-apply: 'sudo"
                         ui_detail "opk update --refresh' / 'opk config refresh')"
@@ -948,7 +948,7 @@ doctor_git_heal() {
                 esac
             else
                 _dgh_wh1="(the storage re-heal pins them developer-owned; a fresh"
-                _dgh_wh2="agent worktree since the last 'sudo opk update' -- the next"
+                _dgh_wh2="agent worktree since the last 'sudo opk update' — the next"
                 _dgh_wh3="update pass re-pins)"
             fi
             for _dgh_w in "$_dgh_wt"/* "$_dgh_wt"/.*; do
@@ -959,7 +959,7 @@ doctor_git_heal() {
                 if [ -L "$_dgh_w" ]; then
                     _dgh_wkey=$(printf '%s\n' "$_dgh_w" | tr -d '\000-\037\177')
                     ui_kv_warn "worktree" "$_dgh_wkey is a symlink (the heal walks regular"
-                    ui_detail "registrations only) -- inspect before trusting git output"
+                    ui_detail "registrations only) — inspect before trusting git output"
                     continue
                 fi
                 [ -d "$_dgh_w" ] || continue
@@ -968,7 +968,7 @@ doctor_git_heal() {
                     _dgh_pp="$_dgh_w/$_dgh_pf"
                     if [ -L "$_dgh_pp" ]; then
                         ui_kv_warn "worktree" "$_dgh_wkey/$_dgh_pf is a symlink (the heal"
-                        ui_detail "pins regular entries only) -- inspect before trusting"
+                        ui_detail "pins regular entries only) — inspect before trusting"
                         ui_detail "git output"
                         continue
                     fi
@@ -995,7 +995,7 @@ doctor_git_heal() {
                         fi
                     fi
                     [ -n "$_dgh_pwhy" ] || continue
-                    ui_kv_warn "worktree" "$_dgh_wkey/$_dgh_pf -- $_dgh_pwhy"
+                    ui_kv_warn "worktree" "$_dgh_wkey/$_dgh_pf — $_dgh_pwhy"
                     ui_detail "$_dgh_wh1"
                     ui_detail "$_dgh_wh2"
                     ui_detail "$_dgh_wh3"
@@ -1037,7 +1037,7 @@ doctor_git_heal() {
                         esac
                     fi
                     if [ "$_dgh_bbad" = 1 ]; then
-                        ui_kv_warn "worktree" "$_dgh_wkey/gitdir -- malformed back-reference"
+                        ui_kv_warn "worktree" "$_dgh_wkey/gitdir — malformed back-reference"
                         ui_detail "(the registration's gitdir file names the worktree's .git"
                         ui_detail "pointer; inspect before trusting git output)"
                     else
@@ -1048,9 +1048,9 @@ doctor_git_heal() {
                             esac
                         done
                         if [ -L "$_dgh_bref" ]; then
-                            ui_kv_warn "worktree" "$_dgh_wkey -- the worktree's .git pointer is"
+                            ui_kv_warn "worktree" "$_dgh_wkey — the worktree's .git pointer is"
                             ui_detail "a symlink (a regular pointer file is the only legitimate"
-                            ui_detail "shape) -- inspect before trusting git output"
+                            ui_detail "shape) — inspect before trusting git output"
                         elif [ ! -f "$_dgh_bref" ]; then
                             # Stale-but-prunable is git's own routine
                             # state ('worktree prune' owns it) -- a
@@ -1058,7 +1058,7 @@ doctor_git_heal() {
                             # A2: a bare ui_detail renders indented
                             # under the PREVIOUS registration's row,
                             # misattributed).
-                            ui_kv "worktree" "$_dgh_wkey names a gone worktree (prunable --"
+                            ui_kv "worktree" "$_dgh_wkey names a gone worktree (prunable —"
                             ui_detail "'git worktree prune' cleans stale registrations)"
                         else
                             _dgh_btgt=$(sed -n 's/^gitdir: //p' "$_dgh_bref" 2>/dev/null | head -n 1)
@@ -1066,8 +1066,8 @@ doctor_git_heal() {
                                 *[[:cntrl:]]*) _dgh_btgt="" ;;
                             esac
                             if [ -z "$_dgh_btgt" ]; then
-                                ui_kv_warn "worktree" "$_dgh_wkey -- its worktree's .git is not a"
-                                ui_detail "pointer file (no 'gitdir: ' line) -- inspect before"
+                                ui_kv_warn "worktree" "$_dgh_wkey — its worktree's .git is not a"
+                                ui_detail "pointer file (no 'gitdir: ' line) — inspect before"
                                 ui_detail "trusting git output"
                             else
                                 while :; do
@@ -1081,9 +1081,9 @@ doctor_git_heal() {
                                 if [ -z "$_dgh_trp" ] || [ "$_dgh_trp" != "$_dgh_rrp" ]; then
                                     _dgh_btshow=$(printf '%s\n' "$_dgh_btgt" | tr -d '\000-\037\177')
                                     _dgh_bfshow=$(printf '%s\n' "$_dgh_bref" | tr -d '\000-\037\177')
-                                    ui_kv_warn "worktree" "$_dgh_wkey -- its worktree's .git does not"
+                                    ui_kv_warn "worktree" "$_dgh_wkey — its worktree's .git does not"
                                     ui_detail "point back (it says $_dgh_btshow; the registration's"
-                                    ui_detail "gitdir file names $_dgh_bfshow) -- swapped pointer;"
+                                    ui_detail "gitdir file names $_dgh_bfshow) — swapped pointer;"
                                     ui_detail "inspect before trusting git output"
                                 fi
                             fi
@@ -1099,7 +1099,7 @@ doctor_git_heal() {
 # INSTALL_CONF resolves above (the 'all' block shares it)
 doctor_daemon_user() {
     if [ ! -f "$INSTALL_CONF" ]; then
-        ui_error "doctor: $INSTALL_CONF not found -- is the kit installed?"
+        ui_error "doctor: $INSTALL_CONF not found — is the kit installed?"
         exit 1
     fi
     # sed, not source: doctor needs one key, and a sourced conf must not be
@@ -1107,7 +1107,7 @@ doctor_daemon_user() {
     # a future writer quotes the value (handover reads it unquoted today).
     DOCTOR_USER="$(sed -n 's/^OPENCODE_USER=//p' "$INSTALL_CONF" | tail -1 | sed 's/^"//;s/"$//')"
     if [ -z "$DOCTOR_USER" ]; then
-        ui_error "doctor: install.conf has no OPENCODE_USER -- is the kit installed?"
+        ui_error "doctor: install.conf has no OPENCODE_USER — is the kit installed?"
         exit 1
     fi
     # Shape-gate the extracted value (#660 M7, the status.sh/update.sh/
@@ -1193,7 +1193,7 @@ doctor_ranges() {
     # every path below to a root-level literal (/ranges, /trees, /uids ...)
     # -- the #360 a F5 class, sibling of the all-block guard above
     WORK="$(mktemp -d)" || {
-        ui_error "doctor: cannot create a temp dir (mktemp failed) -- is \$TMPDIR writable?"
+        ui_error "doctor: cannot create a temp dir (mktemp failed) — is \$TMPDIR writable?"
         exit 1
     }
     # Signal handlers EXIT (#344 a C1): a non-exiting INT/TERM handler runs the
@@ -1221,7 +1221,7 @@ doctor_ranges() {
 
 # --- report header ----------------------------------------------------------------
 doctor_header() {
-    ui_section "Doctor -- container-tree ownership"
+    ui_section "Doctor — container-tree ownership"
     # Root rows display-sanitized (#660 M7): scan mode has no cntrl gate
     # on the root (the fix/detect gates are operand-safety, deliberately
     # mode-scoped) -- a control byte in the path must not reach the
@@ -1244,11 +1244,11 @@ doctor_header() {
         ui_kv "mapped range" "$(awk -F: '
             { if ($2 == 1) printf "%s%s", sep, $1
               else printf "%s%s-%s", sep, $1, $1 + $2 - 1
-              sep = ", " }' "$WORK/ranges") -- live uid_map"
+              sep = ", " }' "$WORK/ranges") — live uid_map"
     else
-        ui_kv_warn "mapped range" "unverified -- no user namespace of '$DOCTOR_USER' found (backend down?)"
+        ui_kv_warn "mapped range" "unverified — no user namespace of '$DOCTOR_USER' found (backend down?)"
         ui_detail "matching the daemon uid only; subuid-owned files may classify at-risk"
-        ui_detail "until the backend runs -- re-run doctor with the containers up"
+        ui_detail "until the backend runs — re-run doctor with the containers up"
     fi
 }
 
@@ -1266,9 +1266,9 @@ doctor_policy() {
             # searched -- "strict-cwd" would be a lie since phase 4. Explicit
             # roots keep the plain v1 text (nothing was searched above them).
             if [ "$DOCTOR_WALKED" = 1 ]; then
-                ui_warn "no opk.json found in $(doctor_show_sanitize "$DOCTOR_ROOT") (searched upward to /) -- nothing to check"
+                ui_warn "no opk.json found in $(doctor_show_sanitize "$DOCTOR_ROOT") (searched upward to /) — nothing to check"
             else
-                ui_warn "no opk.json found in $(doctor_show_sanitize "$DOCTOR_ROOT") -- nothing to check"
+                ui_warn "no opk.json found in $(doctor_show_sanitize "$DOCTOR_ROOT") — nothing to check"
             fi
             ui_detail "declare the trees your container builds write to (docs/reference/cli.md, 'doctor')"
             ui_detail "or run 'opk doctor detect' to propose entries from ownership evidence"
@@ -1276,14 +1276,14 @@ doctor_policy() {
         fi
         # detect without a policy is normal (fresh project): the declared
         # set is simply empty and every finding is new
-        ui_kv "policy" "none yet -- detect will propose one (entries are written only on consent)"
+        ui_kv "policy" "none yet — detect will propose one (entries are written only on consent)"
     else
         ui_kv "policy" "$(doctor_show_sanitize "$DOCTOR_ROOT")/opk.json"
     fi
 
     if [ "$DOCTOR_POLICY_PRESENT" = 1 ]; then
         if ! doctor_load_policy "$DOCTOR_ROOT" >"$WORK/trees"; then
-            ui_error "doctor: the policy file was rejected -- fix opk.json (format: docs/reference/cli.md)"
+            ui_error "doctor: the policy file was rejected — fix opk.json (format: docs/reference/cli.md)"
             exit 1
         fi
     else
@@ -1477,21 +1477,21 @@ doctor_scan_trees() {
         # primary gate (#344 a S5, b R3).
         case "$DOCTOR_PATH" in
             /* | */ | . | ./* | .. | ../* | */. | */./* | */.. | */../* | *//* | *\\*)
-                ui_kv_warn "container tree" "$DOCTOR_PATH -- rejected path form, skipped"
+                ui_kv_warn "container tree" "$DOCTOR_PATH — rejected path form, skipped"
                 continue
                 ;;
         esac
         DOCTOR_TREE="$DOCTOR_ROOT/$DOCTOR_PATH"
         if [ ! -e "$DOCTOR_TREE" ]; then
-            ui_kv_warn "container tree" "$DOCTOR_PATH -- declared but missing (fresh clone? build or create it first)"
+            ui_kv_warn "container tree" "$DOCTOR_PATH — declared but missing (fresh clone? build or create it first)"
             continue
         fi
         if [ -L "$DOCTOR_TREE" ]; then
-            ui_kv_warn "container tree" "$DOCTOR_PATH -- a symlink, skipped (declare the real tree)"
+            ui_kv_warn "container tree" "$DOCTOR_PATH — a symlink, skipped (declare the real tree)"
             continue
         fi
         if [ ! -d "$DOCTOR_TREE" ]; then
-            ui_kv_warn "container tree" "$DOCTOR_PATH -- not a directory, skipped"
+            ui_kv_warn "container tree" "$DOCTOR_PATH — not a directory, skipped"
             continue
         fi
 
@@ -1503,7 +1503,7 @@ doctor_scan_trees() {
             # fail loud, not fail absent: unreadable entries would silently
             # shrink the tree and could turn a red verdict green (#312 class
             # feeds on exactly such partial views)
-            ui_kv_warn "container tree" "$DOCTOR_PATH -- scan incomplete: $(wc -l <"$WORK/scan.err") unreadable entries"
+            ui_kv_warn "container tree" "$DOCTOR_PATH — scan incomplete: $(wc -l <"$WORK/scan.err") unreadable entries"
             ui_detail "run doctor as the tree owner (or with sudo) to get a complete verdict"
         fi
         doctor_classify "$WORK/uids" "$DOCTOR_DAEMON_UID" "$DOCTOR_RANGES" >"$WORK/cls"
@@ -1548,10 +1548,10 @@ doctor_scan_trees() {
         fi
 
         if [ "$_cl_risk" -gt 0 ]; then
-            ui_kv_bad "container tree" "$DOCTOR_PATH -- $_cl_risk of $_cl_total entries at-risk (unmapped owners)"
+            ui_kv_bad "container tree" "$DOCTOR_PATH — $_cl_risk of $_cl_total entries at-risk (unmapped owners)"
             [ -n "$_cl_uids" ] && ui_detail "at-risk owners: uid ${_cl_uids%, }"
             [ -n "$_cl_ex" ] && ui_detail "examples: $(doctor_show_sanitize "$_cl_ex")"
-            ui_detail "container metadata ops (futimes/chmod/chown) EPERM on these -- the known build-breaker class"
+            ui_detail "container metadata ops (futimes/chmod/chown) EPERM on these — the known build-breaker class"
             ui_detail "fix: opk doctor fix"
             ui_detail "or rebuild the affected outputs clean (docs/troubleshooting.md, EPERM entry)"
             if [ "$DOCTOR_MODE" = "fix" ]; then
@@ -1559,9 +1559,9 @@ doctor_scan_trees() {
                     >>"$WORK/fixcand"
             fi
         elif [ "$_cl_total" -gt 0 ]; then
-            ui_kv_ok "container tree" "$DOCTOR_PATH -- $_cl_total entries mapped-safe"
+            ui_kv_ok "container tree" "$DOCTOR_PATH — $_cl_total entries mapped-safe"
         else
-            ui_kv "container tree" "$DOCTOR_PATH -- empty (nothing classified)"
+            ui_kv "container tree" "$DOCTOR_PATH — empty (nothing classified)"
         fi
         # the policy note is the tree's own documentation -- surface it so
         # the verdict row carries its context (SC2034 drove the decision to
@@ -1616,7 +1616,7 @@ doctor_detect() {
     if [ -s "$WORK/dwalk.err" ]; then
         # fail loud, not fail absent (same class as the scan's unreadable
         # subtree warn): missing evidence must not read as "no evidence"
-        ui_kv_warn "scan" "$(wc -l <"$WORK/dwalk.err") unreadable entries -- evidence may be incomplete"
+        ui_kv_warn "scan" "$(wc -l <"$WORK/dwalk.err") unreadable entries — evidence may be incomplete"
         ui_detail "run detect as the tree owner (or with sudo) for a complete picture"
     fi
 
@@ -1663,8 +1663,8 @@ doctor_detect() {
         END { if (drop + 0 > 0) printf "%d\n", drop >dropf }
     ' "$WORK/dwalk" >"$WORK/dcls"
     if [ -f "$WORK/ddrop" ]; then
-        ui_kv_warn "scan" "$(cat "$WORK/ddrop") entries dropped -- unusable path forms"
-        ui_detail "non-ASCII, control or shell-significant characters -- declare such trees manually"
+        ui_kv_warn "scan" "$(cat "$WORK/ddrop") entries dropped — unusable path forms"
+        ui_detail "non-ASCII, control or shell-significant characters — declare such trees manually"
         rm -f "${WORK:?}/ddrop"
     fi
 
@@ -1697,7 +1697,7 @@ doctor_detect() {
         # the ignore answers are unavailable, D evidence cannot be
         # verified as regenerable -- S evidence still works (L1: the
         # fallback is a warn row in EVERY arm of it, never silence)
-        ui_kv_warn "detect" "git ignore answers unavailable -- daemon-owned entries need them and do not count"
+        ui_kv_warn "detect" "git ignore answers unavailable — daemon-owned entries need them and do not count"
         ui_detail "only subuid-owner evidence is used; run detect inside the repo for full evidence"
         # (#370 a C2): a REAL git failure (rc > 1) wrote its diagnosis
         # to ign.err -- dubious ownership names its safe.directory
@@ -1784,7 +1784,7 @@ doctor_detect() {
     LC_ALL=C sort -t"$DOCTOR_TAB" -k1,1 -o "$WORK/dcand" "$WORK/dcand"
     if [ -s "$WORK/droot" ]; then
         ui_kv_warn "detect" "$(cat "$WORK/droot") evidence entries sit directly in the project root"
-        ui_detail "detect never proposes the project root itself -- declare such subtrees manually"
+        ui_detail "detect never proposes the project root itself — declare such subtrees manually"
         rm -f "${WORK:?}/droot"
     fi
 
@@ -1793,7 +1793,7 @@ doctor_detect() {
     DET_SKIPPED=0
     DET_NCOVERED=0
     : >"$WORK/dnew"
-    ui_section "Doctor detect -- container-tree candidates (ownership evidence)"
+    ui_section "Doctor detect — container-tree candidates (ownership evidence)"
     while IFS="$DOCTOR_TAB" read -r DET_B DET_CNT DET_OWN DET_MIXED DET_EX _det_extra <&3; do
         [ -n "$DET_B" ] || continue
         # belt over the classify-time character gate (the writer re-checks
@@ -1817,18 +1817,18 @@ doctor_detect() {
         done <"$WORK/trees"
         if [ -n "$DET_COVERED" ]; then
             DET_NCOVERED=$((DET_NCOVERED + 1))
-            ui_kv "candidate" "$DET_B -- already declared (via $DET_COVERED)"
+            ui_kv "candidate" "$DET_B — already declared (via $DET_COVERED)"
             continue
         fi
         DET_N=$((DET_N + 1))
         if [ "$DET_MIXED" = 1 ]; then
             _det_mixrow="mixed with human-owned files"
-            DET_NOTE="detect: container-written entries mixed with human-owned files -- one owner for both"
+            DET_NOTE="detect: container-written entries mixed with human-owned files — one owner for both"
         else
             _det_mixrow="container-written only"
-            DET_NOTE="detect: $DET_CNT container-written entries ($DET_OWN) -- declare the whole build tree"
+            DET_NOTE="detect: $DET_CNT container-written entries ($DET_OWN) — declare the whole build tree"
         fi
-        ui_kv "candidate" "$DET_B -- $DET_CNT container-written entries ($DET_OWN), $_det_mixrow"
+        ui_kv "candidate" "$DET_B — $DET_CNT container-written entries ($DET_OWN), $_det_mixrow"
         [ -n "$DET_EX" ] && ui_detail "examples: $DET_EX"
         ui_detail "evidence: mapped owners only containers create (subuid twins) / daemon-owned on gitignored paths"
         # consent per finding: opk.json is a COMMITTED project file --
@@ -1838,17 +1838,17 @@ doctor_detect() {
         if ui_confirm "Declare '$DET_B' in $DOCTOR_ROOT/opk.json (a committed project file)?" n; then
             printf '%s\t%s\n' "$DET_B" "$DET_NOTE" >>"$WORK/dnew"
             DET_DECLARED=$((DET_DECLARED + 1))
-            ui_detail "queued -- opk.json is written after the last candidate"
+            ui_detail "queued — opk.json is written after the last candidate"
         else
             # declined: the snippet to paste (L1: never a silent decline)
-            ui_detail "declined -- paste this into $DOCTOR_ROOT/opk.json (containerTrees):"
+            ui_detail "declined — paste this into $DOCTOR_ROOT/opk.json (containerTrees):"
             printf '    {"path": "%s", "note": "%s"}\n' "$DET_B" "$DET_NOTE" | while IFS= read -r _det_line; do
                 ui_detail "$_det_line"
             done
         fi
     done 3<"$WORK/dcand"
     if [ "$DET_SKIPPED" -gt 0 ]; then
-        ui_kv_warn "detect" "$DET_SKIPPED candidate(s) skipped -- unusable path forms"
+        ui_kv_warn "detect" "$DET_SKIPPED candidate(s) skipped — unusable path forms"
         ui_detail "non-ASCII, control or shell-significant characters (see the drop rows above)"
     fi
 
@@ -1861,7 +1861,7 @@ doctor_detect() {
             # the 0.0.39g S2 class: never write at/through a linked
             # policy file -- the mv below would replace the link, and
             # the committed file the project carries is not what we saw
-            ui_error "detect: $DOCTOR_ROOT/opk.json is a symlink -- not writing; edit the real file"
+            ui_error "detect: $DOCTOR_ROOT/opk.json is a symlink — not writing; edit the real file"
             exit 1
         fi
         # atomic: temp in the same dir (same fs), then rename. The temp
@@ -1876,14 +1876,14 @@ doctor_detect() {
             # landed with the mktemp default 0600. Fail loud instead:
             # the candidates stay valid, re-run after fixing access.
             _dt_mode="$(stat -c %a "$DOCTOR_ROOT/opk.json" 2>/dev/null)" || {
-                ui_error "detect: cannot read the mode of the existing opk.json -- not writing over it"
-                ui_detail "the candidates above stay valid -- fix access to opk.json, then re-run detect"
+                ui_error "detect: cannot read the mode of the existing opk.json — not writing over it"
+                ui_detail "the candidates above stay valid — fix access to opk.json, then re-run detect"
                 exit 1
             }
         fi
         _dt_tmp=$(mktemp "$DOCTOR_ROOT/opk.json.opk.XXXXXX") || {
             ui_error "detect: cannot create a temp file in $DOCTOR_ROOT (not writable?)"
-            ui_detail "the candidates above stay valid -- paste the snippets, or re-run with permissions fixed"
+            ui_detail "the candidates above stay valid — paste the snippets, or re-run with permissions fixed"
             exit 1
         }
         if python3 -I - "$DOCTOR_ROOT" "$WORK/dnew" <<'PYEOF' >"$_dt_tmp"
@@ -1945,7 +1945,7 @@ PYEOF
             :
         else
             rm -f "${_dt_tmp:?}"
-            ui_error "detect: writing opk.json failed (rejected content -- see the errors above)"
+            ui_error "detect: writing opk.json failed (rejected content — see the errors above)"
             exit 1
         fi
         # (#356 a B1): chmod resolves the NAME and follows a swapped
@@ -1958,7 +1958,7 @@ PYEOF
         # follows); the remaining window is gate->op, the house shape.
         if [ -L "$_dt_tmp" ]; then
             rm -f "${_dt_tmp:?}"
-            ui_error "detect: the temp changed to a symlink mid-write -- not writing (chmod refused)"
+            ui_error "detect: the temp changed to a symlink mid-write — not writing (chmod refused)"
             exit 1
         fi
         chmod "$_dt_mode" "$_dt_tmp" ||
@@ -1977,24 +1977,24 @@ PYEOF
             fi
         else
             rm -f "${_dt_tmp:?}"
-            ui_error "detect: opk.json (or its temp) changed to a symlink or directory mid-write -- not writing"
+            ui_error "detect: opk.json (or its temp) changed to a symlink or directory mid-write — not writing"
             exit 1
         fi
     fi
 
     # --- detect summary (own rc contract, documented in cli.md) ----------------------
     if [ "$DET_WROTE" = 1 ]; then
-        ui_kv_ok "result" "$DET_DECLARED of $DET_N candidate(s) declared in opk.json -- commit it (team policy)"
+        ui_kv_ok "result" "$DET_DECLARED of $DET_N candidate(s) declared in opk.json — commit it (team policy)"
         ui_detail "next: 'opk doctor' classifies the declared trees, 'opk doctor fix' offers the handover remedy"
     elif [ "$DET_N" -gt 0 ]; then
         ui_kv_ok "result" "$DET_DECLARED of $DET_N candidate(s) declared"
     elif [ "$DET_NCOVERED" -gt 0 ]; then
-        ui_kv_ok "result" "all evidence already declared ($DET_NCOVERED tree(s) covered) -- nothing new to propose"
+        ui_kv_ok "result" "all evidence already declared ($DET_NCOVERED tree(s) covered) — nothing new to propose"
     else
-        ui_kv_ok "result" "no container-write evidence found -- nothing to declare"
+        ui_kv_ok "result" "no container-write evidence found — nothing to declare"
     fi
     if [ "$DET_LEFT" -gt 0 ]; then
-        ui_kv_bad "result" "$DET_LEFT candidate(s) left undeclared -- snippets above; re-run detect any time"
+        ui_kv_bad "result" "$DET_LEFT candidate(s) left undeclared — snippets above; re-run detect any time"
         exit 1
     fi
     if [ "$UI_ROWS_WARN" -gt 0 ]; then
@@ -2017,9 +2017,9 @@ doctor_fix() {
     DOCTOR_FIX_FAILED=0
     if [ "$DOCTOR_MODE" = "fix" ] && [ -s "$WORK/fixcand" ]; then
         if [ "$DOCTOR_FIX_DRY" = 1 ]; then
-            ui_section "Doctor fix -- dry run (nothing is changed)"
+            ui_section "Doctor fix — dry run (nothing is changed)"
             while IFS="$DOCTOR_TAB" read -r _fx_rel _fx_abs _fx_risk _fx_total <&3; do
-                ui_kv "candidate" "$_fx_rel -- $_fx_risk of $_fx_total entries at-risk (unmapped owners)"
+                ui_kv "candidate" "$_fx_rel — $_fx_risk of $_fx_total entries at-risk (unmapped owners)"
                 ui_detail "would run: opk handover opencode '$_fx_abs' --dry-run"
                 # handover's own dry run prints the plan (and previews its
                 # refuses); its rc is observed, not assumed (fail loud)
@@ -2028,9 +2028,9 @@ doctor_fix() {
                 fi
             done 3<"$WORK/fixcand"
         else
-            ui_section "Doctor fix -- hand at-risk trees over to opencode"
+            ui_section "Doctor fix — hand at-risk trees over to opencode"
             while IFS="$DOCTOR_TAB" read -r _fx_rel _fx_abs _fx_risk _fx_total <&3; do
-                ui_kv "candidate" "$_fx_rel -- $_fx_risk of $_fx_total entries at-risk (unmapped owners)"
+                ui_kv "candidate" "$_fx_rel — $_fx_risk of $_fx_total entries at-risk (unmapped owners)"
                 # [y/N] default n (conventions: a system-changing step defaults
                 # to no); ui_confirm reads /dev/tty when one exists, stdin
                 # otherwise (the loop itself reads fd 3 -- see above)
@@ -2039,17 +2039,17 @@ doctor_fix() {
                     if sh "$DOCTOR_OPK" handover opencode "$_fx_abs"; then
                         DOCTOR_FIX_RAN=1
                     else
-                        ui_error "fix: handover failed for '$_fx_rel' -- see the errors above"
+                        ui_error "fix: handover failed for '$_fx_rel' — see the errors above"
                         DOCTOR_FIX_RAN=1
                         DOCTOR_FIX_FAILED=1
                     fi
                 else
-                    ui_detail "skipped '$_fx_rel' -- 'opk doctor fix' re-offers it any time"
+                    ui_detail "skipped '$_fx_rel' — 'opk doctor fix' re-offers it any time"
                 fi
             done 3<"$WORK/fixcand"
         fi
         if [ "$DOCTOR_FIX_RAN" = 1 ]; then
-            ui_section "Doctor fix -- re-check after handover"
+            ui_section "Doctor fix — re-check after handover"
             # Counter reset (ui.sh issue #158): the first pass's rows must not
             # survive into the post-fix verdict. The mapped-uid set is
             # deliberately NOT re-resolved: a handover changes ownership, not
@@ -2065,7 +2065,7 @@ doctor_fix() {
                 # ownership change re-verified green and the summary exited
                 # 0 over it (the counter reset above wiped every trace of
                 # the failure). The bad row feeds the shared verdict gate.
-                ui_kv_bad "fix" "a handover failed this run -- the rows above reflect the post-failure state; re-run 'opk doctor fix'"
+                ui_kv_bad "fix" "a handover failed this run — the rows above reflect the post-failure state; re-run 'opk doctor fix'"
             fi
         fi
     fi
@@ -2074,7 +2074,7 @@ doctor_fix() {
         # remedy). After executed fixes (DOCTOR_FIX_RAN=1) the re-check's own
         # verdict rows above speak instead -- "nothing to fix" would read as
         # if there never had been anything to do.
-        ui_info "nothing to fix -- no at-risk finding with a known remedy (handover opencode)"
+        ui_info "nothing to fix — no at-risk finding with a known remedy (handover opencode)"
     fi
 }
 
@@ -2083,7 +2083,7 @@ doctor_fix() {
 # never counts. Exit code: 0 all green, 1 alert(s), 2 warning(s) only.
 doctor_summary() {
     if [ "$UI_ROWS_BAD" -gt 0 ]; then
-        ui_kv_bad "result" "$UI_ROWS_BAD alert(s), $UI_ROWS_WARN warning(s) -- fix with 'opk doctor fix'"
+        ui_kv_bad "result" "$UI_ROWS_BAD alert(s), $UI_ROWS_WARN warning(s) — fix with 'opk doctor fix'"
         exit 1
     fi
     if [ "$UI_ROWS_WARN" -gt 0 ]; then

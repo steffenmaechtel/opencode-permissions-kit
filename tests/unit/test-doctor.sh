@@ -462,7 +462,7 @@ mkmap 42 "0 0 1" "1 $CURUID 65536"
 mkproj
 policy '{"version":1,"containerTrees":[{"path":"tree","note":"build outputs"}]}'
 rc_doctor "healthy tree -> rc 0" 0 "$PROJ"
-grep_last_out "healthy verdict row" grep -qF "tree -- 3 entries mapped-safe"
+grep_last_out "healthy verdict row" grep -qF "tree — 3 entries mapped-safe"
 grep_last_out "summary says all mapped-safe" grep -qF "all declared container trees mapped-safe"
 grep_last_out "policy note displayed" grep -qF "declared: build outputs"
 if printf '%s' "$_rd_out" | grep -q "at-risk"; then
@@ -489,8 +489,8 @@ mkdir -p "$PROJ/second"
 echo z >"$PROJ/second/file"
 policy '{"containerTrees":["tree","second"]}'
 rc_doctor "multi-tree project with findings -> rc 1" 1 "$PROJ"
-grep_last_out "first tree reported" grep -qF "tree -- 3 of 3 entries at-risk"
-grep_last_out "second tree reported" grep -qF "second -- 2 of 2 entries at-risk"
+grep_last_out "first tree reported" grep -qF "tree — 3 of 3 entries at-risk"
+grep_last_out "second tree reported" grep -qF "second — 2 of 2 entries at-risk"
 
 # fallback: no namespace at all -> unverified warn + daemon-uid floor
 rm -rf "$PROCFIX"
@@ -498,7 +498,7 @@ mkdir -p "$PROCFIX"
 mkproj
 policy '{"containerTrees":["tree"]}'
 rc_doctor "no namespace found -> rc 1 with at-risk files" 1 "$PROJ"
-grep_last_out "range-unverified warn shown" grep -qF "unverified -- no user namespace"
+grep_last_out "range-unverified warn shown" grep -qF "unverified — no user namespace"
 grep_last_out "unverified consequence told" grep -qF "may classify at-risk"
 
 # warnings only: declared but missing tree -> rc 2
@@ -523,7 +523,7 @@ mkdir -p "$PROJ/web assets"
 echo s >"$PROJ/web assets/app.css"
 policy '{"containerTrees":["web assets"]}'
 rc_doctor "tree path with a space -> rc 0" 0 "$PROJ"
-grep_last_out "space-tree verdict" grep -qF "web assets -- 2 entries mapped-safe"
+grep_last_out "space-tree verdict" grep -qF "web assets — 2 entries mapped-safe"
 
 # empty declaration: valid, nothing to flag
 mkproj
@@ -547,7 +547,7 @@ mkdir -p "$ESCPROJ"
 rc_doctor "esc-named root, no policy -> rc 2" 2 "$ESCPROJ"
 grep_last_out "M7: header row shows the stripped root" grep -qF "project root   $WORK/escproj"
 grep_last_out "M7: no-policy warn shows the stripped root" \
-    grep -qF "no opk.json found in $WORK/escproj -- nothing to check"
+    grep -qF "no opk.json found in $WORK/escproj — nothing to check"
 if printf '%s' "$_rd_out" | LC_ALL=C grep -q "$(printf '\033')"; then
     fail "an esc-named root must not leak its escape byte into any row (#660 M7)"
 else
@@ -598,7 +598,7 @@ grep_last_out "discovered root named in header" grep -qF "project root   $PROJ"
 grep_last_out "root via row names the start dir" \
     grep -qF "root via       walk-up from $PROJ/sub/deep (nearest opk.json)"
 grep_last_out "trees resolve against the discovered root" \
-    grep -qF "tree -- 3 entries mapped-safe"
+    grep -qF "tree — 3 entries mapped-safe"
 
 # #660 M7 walk-up variant: the "root via" row names the START dir (the
 # invocation cwd) -- same display duty while the discovery itself works on
@@ -635,8 +635,8 @@ fi
 printf '{"containerTrees":["deep"]}\n' >"$PROJ/sub/opk.json"
 rc_doctor_in "nearest opk.json wins -> rc 0" 0 "$PROJ/sub/deep"
 grep_last_out "nested root named in header" grep -qF "project root   $PROJ/sub"
-grep_last_out "nested policy governs the verdict" grep -qF "deep -- 1 entries mapped-safe"
-if printf '%s' "$_rd_out" | grep -qF "tree --"; then
+grep_last_out "nested policy governs the verdict" grep -qF "deep — 1 entries mapped-safe"
+if printf '%s' "$_rd_out" | grep -qF "tree —"; then
     fail "parent policy is not read when a nearer opk.json exists"
 else
     pass "parent policy is not read when a nearer opk.json exists"
@@ -653,13 +653,13 @@ mkdir -p "$WALKNONE/inner"
 rc_doctor_in "no hit anywhere -> rc 2" 2 "$WALKNONE/inner"
 grep_last_out "root stays the invocation dir" grep -qF "project root   $WALKNONE/inner"
 grep_last_out "warning names the searched scope" \
-    grep -qF "no opk.json found in $WALKNONE/inner (searched upward to /) -- nothing to check"
+    grep -qF "no opk.json found in $WALKNONE/inner (searched upward to /) — nothing to check"
 rm -rf "${WALKNONE:?}"
 
 # explicit positional stays authoritative: no discovery, no scope note
 policy '{"containerTrees":["tree"]}'
 rc_doctor "explicit root without policy: v1 warn, rc 2" 2 "$PROJ/sub"
-grep_last_out "plain v1 warn text" grep -qF "no opk.json found in $PROJ/sub -- nothing to check"
+grep_last_out "plain v1 warn text" grep -qF "no opk.json found in $PROJ/sub — nothing to check"
 if printf '%s' "$_rd_out" | grep -qF "searched upward"; then
     fail "explicit root claims a search it never ran"
 else
@@ -677,7 +677,7 @@ rc_doctor_in "'./' walks up like the bare dot -> rc 0" 0 "$PROJ/sub/deep" ./
 grep_last_out "slash-dot invocation discovers the root" grep -qF "root via       walk-up from $PROJ/sub/deep"
 rc_doctor_in "'./.' is an explicit root: strict, rc 2" 2 "$PROJ/sub/deep" ./.
 grep_last_out "dot-dot-slash keeps the plain v1 warn" \
-    grep -qF "no opk.json found in $PROJ/sub/deep -- nothing to check"
+    grep -qF "no opk.json found in $PROJ/sub/deep — nothing to check"
 
 # realpath absent (#357 a A1, the fallback arm's class): the fallback
 # re-feeds the raw arg -- the cd+pwd normalization must turn "." into
@@ -830,7 +830,7 @@ rc_doctor_roots() {
 # mixed fleet via the seam: green + error + warning -> worst-of rc 1
 rc_doctor_roots "all: mixed fleet -> rc 1" 1 "$ALLROOTS" all
 grep_last_out "project row names the green root" grep -qF "project        $ALLSCAN/org/good"
-grep_last_out "child verdict row from the green project" grep -qF "tree -- 2 entries mapped-safe"
+grep_last_out "child verdict row from the green project" grep -qF "tree — 2 entries mapped-safe"
 grep_last_out "broken policy reported by its own child" grep -qF "policy file was rejected"
 grep_last_out "summary projects row" grep -qF "projects       3 scanned under 1 scan root(s)"
 grep_last_out "summary findings row" grep -qF "findings       1 project(s) with at-risk findings"
@@ -846,7 +846,7 @@ fi
 # aborts before the counted fail row, the exact shape this file's own
 # comment ("the fail must be a ROW, not an abort") forbids. Every bare
 # count assignment below carries the guard.
-_n_child="$(printf '%s' "$_rd_out" | grep -c 'Doctor -- container-tree ownership' || true)"
+_n_child="$(printf '%s' "$_rd_out" | grep -c 'Doctor — container-tree ownership' || true)"
 if [ "$_n_child" = 3 ]; then
     pass "one fresh doctor section per project (3 children)"
 else
@@ -893,7 +893,7 @@ ALLEMPTY="$WORK/allempty"
 mkdir -p "$ALLEMPTY"
 rc_doctor "all: no markers -> rc 2" 2 all "$ALLEMPTY"
 grep_last_out "zero-marker warn" \
-    grep -qF "no opk.json markers found under the scanned root(s) -- nothing to check"
+    grep -qF "no opk.json markers found under the scanned root(s) — nothing to check"
 
 # no scan roots at all (seam file without a single line) -> rc 2
 ALLNONE="$WORK/all-none.txt"
@@ -928,7 +928,7 @@ chmod 644 "$ALLROOTS"
     doctor_roots_append "$WORK/m5-vanished" "$_m5dst" >"$WORK/m5-vanish.out" 2>&1
     _m5rc=$?
     [ "$_m5rc" -eq 0 ] && echo M5-RC0-OK
-    grep -qF "m5-vanished unreadable -- its roots are not scanned" "$WORK/m5-vanish.out" &&
+    grep -qF "m5-vanished unreadable — its roots are not scanned" "$WORK/m5-vanish.out" &&
         echo M5-WARN-OK
 ) >"$WORK/m5.out" 2>&1 || true
 _m5ok=0
@@ -968,7 +968,7 @@ fi
     : >"$WORK/m7-dst"
     doctor_roots_append "$WORK/m7-esc$(printf '\033')gone" "$WORK/m7-dst"
 ) >"$WORK/m7-esc.out" 2>"$WORK/m7-esc.err"
-if grep -qF "m7-escgone unreadable -- its roots are not scanned" "$WORK/m7-esc.out" &&
+if grep -qF "m7-escgone unreadable — its roots are not scanned" "$WORK/m7-esc.out" &&
     ! LC_ALL=C grep -q "$(printf '\033')" "$WORK/m7-esc.out"; then
     pass "doctor_roots_append: unreadable warn row is sanitized (#660 M7)"
 else
@@ -1019,7 +1019,7 @@ ALLRESC="$WORK/all-rel-esc.txt"
 printf 'rel\033root\n' >"$ALLRESC"
 rc_doctor_roots "all: esc-carrying relative line skipped -> rc 2" 2 "$ALLRESC" all
 grep_last_out "M7: absolute-gate row sanitized" \
-    grep -qF "'relroot' is not an absolute path -- skipped"
+    grep -qF "'relroot' is not an absolute path — skipped"
 if printf '%s' "$_rd_out" | LC_ALL=C grep -q "$(printf '\033')"; then
     fail "the absolute-gate row must not leak the escape byte (#660 M7)"
 else
@@ -1031,9 +1031,9 @@ fi
 ALLGONE="$WORK/all-gone.txt"
 printf '%s\n' "$WORK/all-gone-dir" >"$ALLGONE"
 rc_doctor_roots "all: missing scan root skipped -> rc 2" 2 "$ALLGONE" all
-grep_last_out "missing-root warn row" grep -qF "is missing -- skipped"
+grep_last_out "missing-root warn row" grep -qF "is missing — skipped"
 grep_last_out "names the nothing-scanned state" \
-    grep -qF "no scan root could be scanned -- every listed root is missing or unusable"
+    grep -qF "no scan root could be scanned — every listed root is missing or unusable"
 
 # existing FILE as scan root (#370 a C4): the row must not claim
 # "missing" for a path that exists -- not-a-directory is its own state
@@ -1042,7 +1042,7 @@ ALLFILE="$WORK/all-file.txt"
 printf '%s\n' "$WORK/root-is-file" >"$ALLFILE"
 rc_doctor_roots "all: file as scan root skipped -> rc 2" 2 "$ALLFILE" all
 grep_last_out "C4: not-a-directory row (no false 'missing')" \
-    grep -qF "'$WORK/root-is-file' is not a directory -- skipped"
+    grep -qF "'$WORK/root-is-file' is not a directory — skipped"
 if printf '%s' "$_rd_out" | grep -qF "'$WORK/root-is-file' is missing"; then
     fail "C4: existing file no longer reported missing"
 else
@@ -1055,7 +1055,7 @@ mkdir -p "$ALLCT"
 printf '%s\n' '{"containerTrees":[]}' >"$ALLCT/opk.json"
 rc_doctor_roots "all: control-char marker skipped, fleet rc 1" 1 "$ALLROOTS" all
 grep_last_out "charset skip warn" \
-    grep -qF "skipped -- control characters or backslashes in the path"
+    grep -qF "skipped — control characters or backslashes in the path"
 # (round d D1): THIS run fires the SECOND composed tr site (the marker
 # gate's display sanitize) -- the absence check here is the plural
 # claim's other half (the a-A1 pin covers the first site's run).
@@ -1064,7 +1064,7 @@ if printf '%s' "$_rd_out" | grep -qF "tr: warning"; then
 else
     pass "d D1: no tr portability warning on the marker-gate warn path"
 fi
-_n_child="$(printf '%s' "$_rd_out" | grep -c 'Doctor -- container-tree ownership' || true)"
+_n_child="$(printf '%s' "$_rd_out" | grep -c 'Doctor — container-tree ownership' || true)"
 if [ "$_n_child" = 3 ]; then
     pass "the skipped marker runs no child"
 else
@@ -1092,7 +1092,7 @@ _rd_out="$(
         NO_COLOR=1 setsid sh "$DOCTOR" all </dev/null 2>&1
 )" || _rd_rc=$?
 if [ "$_rd_rc" = 1 ] &&
-    printf '%s' "$_rd_out" | grep -qF "not found -- is the kit installed?" &&
+    printf '%s' "$_rd_out" | grep -qF "not found — is the kit installed?" &&
     ! printf '%s' "$_rd_out" | grep -q "Doctor all"; then
     pass "degraded install: one pre-flight error, no scanning"
 else
@@ -1143,7 +1143,7 @@ printf '%s\n' '{"containerTrees":["tree"]}' >"$ALLDT/real/opk.json"
 echo f >"$ALLDT/real/tree/f"
 rc_doctor "a F12: dir/dangling opk.json no markers -> rc 0" 0 all "$ALLDT"
 grep_last_out "a F12: non-regular marker warned" \
-    grep -qF "is not a regular file through symlinks -- not a marker (the walk-up rule)"
+    grep -qF "is not a regular file through symlinks — not a marker (the walk-up rule)"
 _n_proj="$(printf '%s' "$_rd_out" | grep -cF 'project        ' || true)"
 if [ "$_n_proj" = 1 ]; then
     pass "a F12: only the real project ran (2 non-markers skipped)"
@@ -1196,7 +1196,7 @@ _rd_out="$(
         NO_COLOR=1 setsid sh "$DOCTOR" all "$ALLGREEN" </dev/null 2>&1
 )" || _rd_rc=$?
 if [ "$_rd_rc" = 1 ] &&
-    printf '%s' "$_rd_out" | grep -qF "doctor exited 3 -- counted as an alert" &&
+    printf '%s' "$_rd_out" | grep -qF "doctor exited 3 — counted as an alert" &&
     printf '%s' "$_rd_out" | grep -qF "failed         1 scan(s) exited unexpectedly (counted as alerts)"; then
     pass "a F4: child rc 3 -> alert row, failed row, fleet rc 1"
 else
@@ -1216,7 +1216,7 @@ ALLSK="$WORK/all-skip"
 mkdir -p "$ALLSK/we$(printf '\t')ird"
 printf '%s\n' '{"containerTrees":[]}' >"$ALLSK/we$(printf '\t')ird/opk.json"
 rc_doctor "a F16: all markers skipped -> rc 2 with the skip message" 2 all "$ALLSK"
-grep_last_out "a F16: all-skipped message" grep -qF "all 1 marker(s) skipped -- nothing to check"
+grep_last_out "a F16: all-skipped message" grep -qF "all 1 marker(s) skipped — nothing to check"
 
 # F11: a symlinked project dir is warned (not silently dropped); a
 # symlinked SCAN ROOT is followed (-H) and works
@@ -1227,17 +1227,17 @@ echo f >"$ALLSYM/realproj/tree/f"
 ln -s "$ALLSYM/realproj" "$ALLSYM/linkproj"
 rc_doctor "a F11: symlinked project warned, real scanned -> rc 0" 0 all "$ALLSYM"
 grep_last_out "a F11: symlink warn row" grep -qF "symlinked project"
-grep_last_out "a F11: the real project still ran" grep -qF "tree -- 2 entries mapped-safe"
+grep_last_out "a F11: the real project still ran" grep -qF "tree — 2 entries mapped-safe"
 ln -s "$ALLGREEN" "$ALLSYM/rootlink"
 rc_doctor "a F11: symlinked scan root followed (-H) -> rc 0" 0 all "$ALLSYM/rootlink"
-grep_last_out "a F11: marker found through the root link" grep -qF "tree -- 2 entries mapped-safe"
+grep_last_out "a F11: marker found through the root link" grep -qF "tree — 2 entries mapped-safe"
 
 # #660 M7: the symlinked-project row renders the SANITIZED link name -- find
 # output carries agent-choosable bytes under the scanned tree.
 ln -s "$ALLSYM/realproj" "$ALLSYM/esc$(printf '\033')link"
 rc_doctor "all: esc-named project symlink warned -> rc 0" 0 all "$ALLSYM"
 grep_last_out "M7: symlink warn row sanitized" \
-    grep -qF "symlinked project '$ALLSYM/esclink' is not descended -- pass the real directory"
+    grep -qF "symlinked project '$ALLSYM/esclink' is not descended — pass the real directory"
 if printf '%s' "$_rd_out" | LC_ALL=C grep -q "$(printf '\033')"; then
     fail "the symlink warn row must not leak the escape byte (#660 M7)"
 else
@@ -1250,7 +1250,7 @@ ALLCRLF="$WORK/all-crlf.txt"
 printf '%s\r\n' "$ALLGREEN" >"$ALLCRLF"
 rc_doctor_roots "a F8: CRLF root line skipped -> rc 2" 2 "$ALLCRLF" all
 grep_last_out "a F8: charset skip warn names the sanitized root" \
-    grep -qF "carries control characters or backslashes -- skipped"
+    grep -qF "carries control characters or backslashes — skipped"
 if printf '%s' "$_rd_out" | LC_ALL=C grep -q "$(printf '\r')"; then
     fail "a F8: the warn row carries no raw CR"
 else
@@ -1274,7 +1274,7 @@ ALLFS="$WORK/all-fs.txt"
 printf '//\n/./\n' >"$ALLFS"
 rc_doctor_roots "b S1: '//' and '/./' refused via normalization -> rc 2" 2 "$ALLFS" all
 grep_last_out "b S1: refusal row names the belt" \
-    grep -qF "refused -- doctor all does not walk the whole filesystem"
+    grep -qF "refused — doctor all does not walk the whole filesystem"
 
 # S2 + C3: a relative seam line warns ON THE RAW SPELLING and is
 # skipped -- the absolute gate must be reachable on realpath-present
@@ -1283,7 +1283,7 @@ ALLREL="$WORK/all-rel.txt"
 printf '%s\n' "relative-root" >"$ALLREL"
 rc_doctor_roots "b S2+C3: relative root line refused loudly -> rc 2" 2 "$ALLREL" all
 grep_last_out "b S2+C3: the warn names the RAW relative line" \
-    grep -qF "'relative-root' is not an absolute path -- skipped"
+    grep -qF "'relative-root' is not an absolute path — skipped"
 if printf '%s' "$_rd_out" | grep -qF "$PWD/relative-root"; then
     fail "b S2+C3: no cwd-anchored scan of a relative line"
 else
@@ -1306,7 +1306,7 @@ _rd_out="$(
         OPK_DOCTOR_SCAN_ROOTS="$ALLREL" NO_COLOR=1 setsid sh "$DOCTOR" all </dev/null 2>&1
 )" || _rd_rc=$?
 if [ "$_rd_rc" = 2 ] &&
-    printf '%s' "$_rd_out" | grep -qF "is not an absolute path -- skipped"; then
+    printf '%s' "$_rd_out" | grep -qF "is not an absolute path — skipped"; then
     pass "b S2 fallback: realpath absent -- relative line refused loudly"
 else
     fail "b S2 fallback: realpath absent -- relative line refused loudly (rc $_rd_rc)"
@@ -1320,7 +1320,7 @@ _rd_out="$(
     PATH="$S3BIN:$PATH" OPK_INSTALL_CONF="$CONF" OPK_DOCTOR_PROC_ROOT="$PROCFIX" \
         OPK_DOCTOR_SCAN_ROOTS="$ALLLINK" NO_COLOR=1 setsid sh "$DOCTOR" all </dev/null 2>&1
 )" || _rd_rc=$?
-if [ "$_rd_rc" = 0 ] && printf '%s' "$_rd_out" | grep -qF "tree -- 2 entries mapped-safe"; then
+if [ "$_rd_rc" = 0 ] && printf '%s' "$_rd_out" | grep -qF "tree — 2 entries mapped-safe"; then
     pass "b S3: realpath absent -- -H follows the symlinked list root"
 else
     fail "b S3: realpath absent -- -H follows the symlinked list root (rc $_rd_rc)"
@@ -1338,7 +1338,7 @@ ALLCLN="$WORK/all-clean.txt"
 printf '%s\n' "$WORK/all-clean-link" >"$ALLCLN"
 rc_doctor_roots "c S1: cntrl target behind a clean symlink skipped -> rc 2" 2 "$ALLCLN" all
 grep_last_out "c S1: the normalized value is gated" \
-    grep -qF "carries control characters or backslashes -- skipped"
+    grep -qF "carries control characters or backslashes — skipped"
 
 # --- (round a A1): the shell-side gates carry the FULL control set ---------------
 # A raw C1 byte (0x9B, 8-bit CSI) in a scan-root line is skipped like
@@ -1354,7 +1354,7 @@ mkdir -p "$ALLC1ROOT"
 printf '%s\n' "$ALLC1ROOT" >"$ALLC1"
 rc_doctor_roots "a A1: C1-byte root line skipped -> rc 2" 2 "$ALLC1" all
 grep_last_out "a A1: C1 skip warn (sanitized root)" \
-    grep -qF "carries control characters or backslashes -- skipped"
+    grep -qF "carries control characters or backslashes — skipped"
 if printf '%s' "$_rd_out" | grep -qF "tr: warning"; then
     fail "c C1: no tr portability warning on the warn paths"
 else
@@ -1373,7 +1373,7 @@ ALLU="$WORK/all-umlaut.txt"
 printf '%s\n' "$ALLUROOT" >"$ALLU"
 rc_doctor_roots "a A1: valid UTF-8 root stays scannable (rc 0)" 0 "$ALLU" all
 grep_last_out "a A1: the UTF-8 root's project scanned green" \
-    grep -qF "tree -- 2 entries mapped-safe"
+    grep -qF "tree — 2 entries mapped-safe"
 
 # --- (round b B1): display sanitize is UTF-8-aware ---------------------------------
 # The old byte-range strip mangled legit names (U+00DF = 0xC3 0x9F --
@@ -1394,7 +1394,7 @@ grep_last_out "b B1: the not-a-marker row keeps the UTF-8 name intact" \
 printf '/definitely/not/there\0junk\n' >"$ALLB1"
 rc_doctor_roots "b B2: NUL-carrying list line refused (rc 2)" 2 "$ALLB1" all
 grep_last_out "b B2+c C3: the NUL/STX warn row names the class" \
-    grep -qF "list line carries a NUL or STX byte -- skipped"
+    grep -qF "list line carries a NUL or STX byte — skipped"
 
 # --- (round d D2): the NUL->STX swap's failure is loud ----------------------------
 # A failing tr (PATH stub; the swap is the FIRST tr call in the all
@@ -1434,7 +1434,7 @@ fi
 # --- 5. kit-state failure paths ----------------------------------------------------
 _rd_rc=0
 _rd_out="$(OPK_INSTALL_CONF="$WORK/nope.conf" NO_COLOR=1 sh "$DOCTOR" "$PROJ" 2>&1)" || _rd_rc=$?
-[ "$_rd_rc" = 1 ] && printf '%s' "$_rd_out" | grep -qF "not found -- is the kit installed?" &&
+[ "$_rd_rc" = 1 ] && printf '%s' "$_rd_out" | grep -qF "not found — is the kit installed?" &&
     pass "missing install.conf -> rc 1 with hint" ||
     fail "missing install.conf -> rc 1 with hint (rc $_rd_rc)"
 printf 'VERSION=9.9.9\n' >"$WORK/no-user.conf"
@@ -1486,7 +1486,7 @@ _nl_name="$(printf 'weird\nname')"
 echo n >"$PROJ/tree/$_nl_name"
 policy '{"containerTrees":["tree"]}'
 rc_doctor "newline filename -> counts intact, rc 0" 0 "$PROJ"
-grep_last_out "newline file counted once" grep -qF "tree -- 4 entries mapped-safe"
+grep_last_out "newline file counted once" grep -qF "tree — 4 entries mapped-safe"
 if printf '%s' "$_rd_out" | grep -q "at-risk"; then
     fail "newline filename invents no at-risk rows"
 else
@@ -1500,7 +1500,7 @@ mkmap 42 "0 0 65536"
 mkproj
 policy '{"containerTrees":["tree"]}'
 rc_doctor "count>1 zero row covers the tree -> rc 0" 0 "$PROJ"
-grep_last_out "daemon uid listed once" grep -qF "0-65535 -- live uid_map"
+grep_last_out "daemon uid listed once" grep -qF "0-65535 — live uid_map"
 if printf '%s' "$_rd_out" | grep -qF "0, 0-"; then
     fail "no duplicate floor row in the display"
 else
@@ -1822,11 +1822,11 @@ rm -rf "$PROCFIX"
 mkmap 42 "0 0 1" "1 $CURUID 65536"
 detproj
 rc_doctor "detect, S evidence, EOF: snippets + rc 1" 1 detect "$PROJ"
-grep_last_out "candidate row (build)" grep -qF "candidate      build --"
-grep_last_out "candidate row (src)" grep -qF "candidate      src --"
+grep_last_out "candidate row (build)" grep -qF "candidate      build —"
+grep_last_out "candidate row (src)" grep -qF "candidate      src —"
 grep_last_out "consent prompt shape [y/N]" grep -qF "? [y/N]"
 grep_last_out "declined snippet prints the entry" grep -qF '{"path": "build",'
-grep_last_out "undeclared result row" grep -qF "left undeclared -- snippets above"
+grep_last_out "undeclared result row" grep -qF "left undeclared — snippets above"
 grep_last_out "root-level evidence warns" grep -qF "sit directly in the project root"
 if [ -e "$PROJ/opk.json" ]; then
     fail "declined detect writes no opk.json"
@@ -1840,7 +1840,7 @@ fi
 detproj
 printf 'y\ny\n' >"$WORK/ans"
 rc_doctor_ans "detect, S evidence, y/y: written, rc 2 (root warn)" 2 "$WORK/ans" detect "$PROJ"
-grep_last_out "declared result row" grep -qF "declared in opk.json -- commit it"
+grep_last_out "declared result row" grep -qF "declared in opk.json — commit it"
 grep -qF '"path": "build"' "$PROJ/opk.json" &&
     grep -qF '"path": "src"' "$PROJ/opk.json" &&
     pass "both consented candidates land in opk.json" ||
@@ -1868,10 +1868,10 @@ if [ "$_rd_rc" = 1 ]; then
 else
     fail "detect, D evidence, EOF: rc 1 (build undeclared) (rc $_rd_rc)"
 fi
-printf '%s' "$_rd_out" | grep -qF "candidate      build --" &&
+printf '%s' "$_rd_out" | grep -qF "candidate      build —" &&
     pass "ignored build/ is a candidate" ||
     fail "ignored build/ is a candidate"
-if printf '%s' "$_rd_out" | grep -qF "candidate      src --"; then
+if printf '%s' "$_rd_out" | grep -qF "candidate      src —"; then
     fail "tracked src/ is no candidate (D evidence needs the ignore answer)"
 else
     pass "tracked src/ is no candidate (D evidence needs the ignore answer)"
@@ -2012,7 +2012,7 @@ printf 'y\n' >"$WORK/ans"
 _rd_rc=0
 _rd_out="$(OPK_INSTALL_CONF="$CONF_ME" OPK_DOCTOR_PROC_ROOT="$PROCFIX" OPK_DOCTOR_OPK="" \
     NO_COLOR=1 setsid sh "$DOCTOR" detect "$PROJ" <"$WORK/ans" 2>&1)" || _rd_rc=$?
-[ "$_rd_rc" = 1 ] && printf '%s' "$_rd_out" | grep -qF "is a symlink -- not writing" &&
+[ "$_rd_rc" = 1 ] && printf '%s' "$_rd_out" | grep -qF "is a symlink — not writing" &&
     pass "symlinked opk.json -> refuse write, rc 1" ||
     {
         fail "symlinked opk.json -> refuse write, rc 1 (rc $_rd_rc)"
@@ -2116,9 +2116,9 @@ mkdir -p "$PROJ/$(printf '\303\234ber')" # non-ASCII (UTF-8 umlaut) dir
 echo u >"$PROJ/$(printf '\303\234ber')/file"
 chmod 000 "$PROJ/locked"
 rc_doctor "detect drops unusable paths, keeps working ones (rc 1)" 1 detect "$PROJ"
-grep_last_out "drop-count warn row" grep -qF "entries dropped -- unusable path forms"
+grep_last_out "drop-count warn row" grep -qF "entries dropped — unusable path forms"
 grep_last_out "drop label names non-ASCII honestly (#356 a A1)" grep -qF "non-ASCII, control or shell-significant characters"
-grep_last_out "incomplete-walk warn row" grep -qF "unreadable entries -- evidence may be incomplete"
+grep_last_out "incomplete-walk warn row" grep -qF "unreadable entries — evidence may be incomplete"
 if printf '%s' "$_rd_out" | grep -qF "qu'ote"; then
     fail "quoted dir never reaches a row"
 else
@@ -2139,8 +2139,8 @@ chmod 755 "$PROJ/locked"
 detproj
 rm -f "${PROJ:?}/.gitignore" # a repo with NO ignore rules: check-ignore rc 1
 rc_doctor "D1: nothing ignored, S evidence -> candidates (rc 1)" 1 detect "$PROJ"
-grep_last_out "D1: candidate appears with an empty ignore set" grep -qF "candidate      build --"
-grep_last_out "D1: second candidate appears too" grep -qF "candidate      src --"
+grep_last_out "D1: candidate appears with an empty ignore set" grep -qF "candidate      build —"
+grep_last_out "D1: second candidate appears too" grep -qF "candidate      src —"
 # broken git + S evidence: the fallback warn row fires AND the
 # subuid-evidence candidates still appear
 _rd_rc=0
@@ -2148,7 +2148,7 @@ _rd_out="$(PATH="$NOGIT:$PATH" OPK_INSTALL_CONF="$CONF" OPK_DOCTOR_PROC_ROOT="$P
     OPK_DOCTOR_OPK="" NO_COLOR=1 setsid sh "$DOCTOR" detect "$PROJ" </dev/null 2>&1)" || _rd_rc=$?
 if [ "$_rd_rc" = 1 ] &&
     printf '%s' "$_rd_out" | grep -qF "git ignore answers unavailable" &&
-    printf '%s' "$_rd_out" | grep -qF "candidate      build --"; then
+    printf '%s' "$_rd_out" | grep -qF "candidate      build —"; then
     pass "D1: no-git fallback keeps S-evidence candidates + warn row"
 else
     fail "D1: no-git fallback keeps S-evidence candidates + warn row (rc $_rd_rc)"

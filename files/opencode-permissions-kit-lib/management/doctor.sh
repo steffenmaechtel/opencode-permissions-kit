@@ -217,7 +217,7 @@ doctor_pairing_guard() {
         doctor_load_policy doctor_classify doctor_examples \
         _doctor_detect_path_ok doctor_roots_append; do
         command -v "$_dpg" >/dev/null 2>&1 || {
-            ui_error "doctor: function '$_dpg' missing from doctor-core.sh -- version-skewed entry/lib pairing, refusing to run"
+            ui_error "doctor: function '$_dpg' missing from doctor-core.sh — version-skewed entry/lib pairing, refusing to run"
             return 1
         }
     done

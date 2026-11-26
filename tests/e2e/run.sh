@@ -1801,11 +1801,11 @@ E 'cd /var/www/vhosts/doctor-det && chmod +t .git && chmod 644 .git/config && ch
 E 'cd /var/www/vhosts/doctor-det && setfacl -b .git/config .git/hooks'
 E 'sudo chown opencode /var/www/vhosts/doctor-det/public/deps.js'
 check "12n: detect proposes the mixed boundary (ignored artifact + human sources)" \
-    E 'cd /var/www/vhosts/doctor-det && opk doctor detect </dev/null >/tmp/ddet-eof.log 2>&1; test $? -eq 1 && grep -q "candidate      public --" /tmp/ddet-eof.log && grep -q "mixed with human-owned files" /tmp/ddet-eof.log && grep -q "one owner for both" /tmp/ddet-eof.log'
+    E 'cd /var/www/vhosts/doctor-det && opk doctor detect </dev/null >/tmp/ddet-eof.log 2>&1; test $? -eq 1 && grep -q "candidate      public —" /tmp/ddet-eof.log && grep -q "mixed with human-owned files" /tmp/ddet-eof.log && grep -q "one owner for both" /tmp/ddet-eof.log'
 check "12n: declined detect prints the paste snippet, writes nothing" \
     E 'test ! -e /var/www/vhosts/doctor-det/opk.json && grep -qF "{\"path\": \"public\"," /tmp/ddet-eof.log'
 check "12n: tracked dev-only dirs are no candidates" \
-    E '! grep -q "candidate      src --" /tmp/ddet-eof.log'
+    E '! grep -q "candidate      src —" /tmp/ddet-eof.log'
 # #785 a C2: the dump arms keep their evidence value but no longer own
 # the exit — a bare `cat` tail returned rc 0 and turned a failing
 # assertion into a PASS (the pre-push e2e runs 3/4 were exactly that
@@ -1838,7 +1838,7 @@ E 'echo out >/var/www/vhosts/doctor-walk/tree/app.min.js'
 check "12o: scan from a subdir discovers the root and reports it" \
     E 'cd /var/www/vhosts/doctor-walk/tree/deep && opk doctor >/tmp/dwalk-scan.log 2>&1; test $? -eq 1 && grep -qF "project root   /var/www/vhosts/doctor-walk" /tmp/dwalk-scan.log && grep -qF "root via       walk-up from /var/www/vhosts/doctor-walk/tree/deep" /tmp/dwalk-scan.log'
 check "12o: the declared tree verdict resolves against the discovered root" \
-    E 'grep -q "tree -- .* entries at-risk" /tmp/dwalk-scan.log'
+    E 'grep -q "tree — .* entries at-risk" /tmp/dwalk-scan.log'
 check "12o: handover me from inside the declared tree warns via walk-up" \
     E 'cd /var/www/vhosts/doctor-walk/tree/deep && opk handover me . --dry-run >/tmp/dwalk-ho.log 2>&1; test $? -eq 0 && grep -q "takes back the declared container tree .tree." /tmp/dwalk-ho.log'
 E 'rm -rf /var/www/vhosts/doctor-walk /tmp/dwalk-*.log'
@@ -1859,9 +1859,9 @@ E 'opk handover opencode /var/www/vhosts/doctor-all/good/tree >/tmp/dall-ho.log 
 check "12p: the healthy project's tree is handed over first" \
     E 'grep -q "handover complete" /tmp/dall-ho.log'
 check "12p: doctor all scans every marker project, worst-of rc 1" \
-    E 'opk doctor all /var/www/vhosts/doctor-all >/tmp/dall.log 2>&1; test $? -eq 1 && grep -q "tree -- .* entries at-risk" /tmp/dall.log && grep -q "mapped-safe" /tmp/dall.log && grep -qF "findings       1 project(s) with at-risk findings" /tmp/dall.log'
+    E 'opk doctor all /var/www/vhosts/doctor-all >/tmp/dall.log 2>&1; test $? -eq 1 && grep -q "tree — .* entries at-risk" /tmp/dall.log && grep -q "mapped-safe" /tmp/dall.log && grep -qF "findings       1 project(s) with at-risk findings" /tmp/dall.log'
 check "12p: one fresh scan section per project" \
-    E 'test "$(grep -c "Doctor -- container-tree ownership" /tmp/dall.log)" = 2'
+    E 'test "$(grep -c "Doctor — container-tree ownership" /tmp/dall.log)" = 2'
 check "12p: a marker-free subtree contributes no project" \
     E 'grep -qF "projects       2 scanned under 1 scan root(s)" /tmp/dall.log'
 E 'rm -rf /var/www/vhosts/doctor-all /tmp/dall*.log'
@@ -1989,14 +1989,14 @@ check "12q: #777/#782 — status names the resolved storage gitdir in its lockou
 check "12q: #777 — opk status renders the same resolved-path lockout row" \
     E 'opk status >/tmp/gh-pt-stsec.log 2>&1; grep -qF "/var/www/gitdirs/perm-check.git/index is root-owned (transient —" /tmp/gh-pt-stsec.log'
 check "12q: #777 — opk doctor classifies the pointer checkout through the storage gitdir" \
-    E 'opk doctor /var/www/vhosts/perm-check >/tmp/gh-pt-dr.log 2>&1; grep -qF "/var/www/gitdirs/perm-check.git/index is root-owned (transient --" /tmp/gh-pt-dr.log'
+    E 'opk doctor /var/www/vhosts/perm-check >/tmp/gh-pt-dr.log 2>&1; grep -qF "/var/www/gitdirs/perm-check.git/index is root-owned (transient —" /tmp/gh-pt-dr.log'
 # #653 W1: heal-drift and planted-content rows on the RESOLVED storage
 # gitdir (plant → observe → restore inside one E arm; opk status exits
 # 2 on the warning rows, so the check observes grep's rc, not status's).
 check "12q: #653 W1 — status reports heal drift on the resolved storage gitdir" \
     E 'sudo chmod -t /var/www/gitdirs/perm-check.git && opk status >/tmp/gh-pt-drift.log 2>&1; grep -qF "/var/www/gitdirs/perm-check.git — sticky bit missing on the gitdir" /tmp/gh-pt-drift.log; _rc=$?; sudo chmod +t /var/www/gitdirs/perm-check.git; test $_rc -eq 0'
 check "12q: #653 W1 — doctor reports the same drift row for the pointer project" \
-    E 'sudo chmod -t /var/www/gitdirs/perm-check.git && opk doctor /var/www/vhosts/perm-check >/tmp/gh-pt-ddrift.log 2>&1; grep -qF "/var/www/gitdirs/perm-check.git -- sticky bit missing on the gitdir" /tmp/gh-pt-ddrift.log; _rc=$?; sudo chmod +t /var/www/gitdirs/perm-check.git; test $_rc -eq 0'
+    E 'sudo chmod -t /var/www/gitdirs/perm-check.git && opk doctor /var/www/vhosts/perm-check >/tmp/gh-pt-ddrift.log 2>&1; grep -qF "/var/www/gitdirs/perm-check.git — sticky bit missing on the gitdir" /tmp/gh-pt-ddrift.log; _rc=$?; sudo chmod +t /var/www/gitdirs/perm-check.git; test $_rc -eq 0'
 check "12q: #653 W1 — status reports planted non-sample hook content" \
     E 'sudo touch /var/www/gitdirs/perm-check.git/hooks/planted && opk status >/tmp/gh-pt-plant.log 2>&1; grep -qF "non-sample entries in /var/www/gitdirs/perm-check.git/hooks" /tmp/gh-pt-plant.log; _rc=$?; sudo rm -f /var/www/gitdirs/perm-check.git/hooks/planted; test $_rc -eq 0'
 # #653 W2: the folded group-access leg — a 1700 tamper on the storage
@@ -2005,7 +2005,7 @@ check "12q: #653 W1 — status reports planted non-sample hook content" \
 check "12q: #653 W2 — status reports the 1700 group-access tamper" \
     E 'sudo chmod 1700 /var/www/gitdirs/perm-check.git && opk status >/tmp/gh-w2-grp.log 2>&1; grep -qF "/var/www/gitdirs/perm-check.git — group access/setgid missing on the gitdir" /tmp/gh-w2-grp.log; _rc=$?; sudo chmod 3770 /var/www/gitdirs/perm-check.git; test $_rc -eq 0'
 check "12q: #653 W2 — doctor reports the same group-access row" \
-    E 'sudo chmod 1700 /var/www/gitdirs/perm-check.git && opk doctor /var/www/vhosts/perm-check >/tmp/gh-w2-grpd.log 2>&1; grep -qF "/var/www/gitdirs/perm-check.git -- group access/setgid missing on the gitdir" /tmp/gh-w2-grpd.log; _rc=$?; sudo chmod 3770 /var/www/gitdirs/perm-check.git; test $_rc -eq 0'
+    E 'sudo chmod 1700 /var/www/gitdirs/perm-check.git && opk doctor /var/www/vhosts/perm-check >/tmp/gh-w2-grpd.log 2>&1; grep -qF "/var/www/gitdirs/perm-check.git — group access/setgid missing on the gitdir" /tmp/gh-w2-grpd.log; _rc=$?; sudo chmod 3770 /var/www/gitdirs/perm-check.git; test $_rc -eq 0'
 # #653 W2 check 3: a planted repo-scope key on the resolved storage
 # gitdir's config (the agent-writable surface the issue names).
 check "12q: #653 W2 — status reports a planted repo-config key" \

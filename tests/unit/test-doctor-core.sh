@@ -262,14 +262,14 @@ _out=$(_hdr_run "0:1
 1000:56" scan "" || true)
 if printf '%s' "$_out" | grep -qF 'project root' &&
     printf '%s' "$_out" | grep -qF 'mapped range' &&
-    printf '%s' "$_out" | grep -qF '0, 1000-1055 -- live uid_map' &&
+    printf '%s' "$_out" | grep -qF '0, 1000-1055 — live uid_map' &&
     ! printf '%s' "$_out" | grep -qF 'mode'; then
     pass "header: verified ranges formatted, no mode row in scan"
 else
     fail "header: verified-range row broken (out=$_out)"
 fi
 _out=$(_hdr_run none scan "" || true)
-if printf '%s' "$_out" | grep -qF 'unverified -- no user namespace' &&
+if printf '%s' "$_out" | grep -qF 'unverified — no user namespace' &&
     printf '%s' "$_out" | grep -qF 'until the backend runs'; then
     pass "header: unverified arm renders the backend-down warn"
 else
@@ -342,8 +342,8 @@ _dgh_run() {
 }
 _dgh_stage
 _out=$(_dgh_run || true)
-if printf '%s' "$_out" | grep -q "git-heal.*OFF -- 'sudo opk git-heal on'" &&
-    printf '%s' "$_out" | grep -q "git-heal-file.*$WORK/dgh/proj/.git/index is $(id -un)-owned -- agent git" &&
+if printf '%s' "$_out" | grep -q "git-heal.*OFF — 'sudo opk git-heal on'" &&
+    printf '%s' "$_out" | grep -q "git-heal-file.*$WORK/dgh/proj/.git/index is $(id -un)-owned — agent git" &&
     printf '%s' "$_out" | grep -q "git-heal-file.*$WORK/dgh/proj/.git/ORIG_HEAD is $(id -un)-owned"; then
     pass "doctor git-heal: OFF state + lockout rows incl. a widened operand"
 else
@@ -351,7 +351,7 @@ else
 fi
 git config -f "$WORK/dgh/devhome/.gitconfig" core.hooksPath "$WORK/dgh/lib/git-heal/hooks"
 _out=$(_dgh_run || true)
-if printf '%s' "$_out" | grep -q 'git-heal.*ON -- developer git ops re-pin' &&
+if printf '%s' "$_out" | grep -q 'git-heal.*ON — developer git ops re-pin' &&
     printf '%s' "$_out" | grep -q 'transient'; then
     pass "doctor git-heal: ON state classifies dev-owned index as transient"
 else
@@ -369,8 +369,8 @@ git -C "$WORK/dgh/ptproj" -c user.email=t@e -c user.name=t commit -q --allow-emp
 mv "$WORK/dgh/ptproj/.git" "$WORK/dgh/ptstor/ptproj.git"
 printf 'gitdir: %s\n' "$WORK/dgh/ptstor/ptproj.git" >"$WORK/dgh/ptproj/.git"
 _out=$(_dgh_run "$WORK/dgh/ptproj" || true)
-if printf '%s' "$_out" | grep -q "git-heal-file.*$WORK/dgh/ptstor/ptproj.git/index is $(id -un)-owned (transient --" &&
-    printf '%s' "$_out" | grep -q "git-heal-file.*$WORK/dgh/ptstor/ptproj.git/HEAD is $(id -un)-owned (transient --"; then
+if printf '%s' "$_out" | grep -q "git-heal-file.*$WORK/dgh/ptstor/ptproj.git/index is $(id -un)-owned (transient —" &&
+    printf '%s' "$_out" | grep -q "git-heal-file.*$WORK/dgh/ptstor/ptproj.git/HEAD is $(id -un)-owned (transient —"; then
     pass "doctor git-heal: a pointer-file project classifies through the resolved gitdir (#777)"
 else
     fail "doctor git-heal: pointer classification (out=$(printf '%s' "$_out" | grep -E 'git-heal' | head -3)) (#777)"
@@ -378,9 +378,9 @@ fi
 # The degrade arm: resolver unavailable -> ONE counted warn row with
 # the fix hint, the state row still renders.
 _out=$(DGH_NO_GHC=1 _dgh_run "$WORK/dgh/ptproj" 2>&1 || true)
-if printf '%s' "$_out" | grep -qF "pointer-file checkout not classified -- kit file" &&
+if printf '%s' "$_out" | grep -qF "pointer-file checkout not classified — kit file" &&
     printf '%s' "$_out" | grep -qF "sh/git-heal-core.sh missing or outdated (fix: sudo opk update)" &&
-    printf '%s' "$_out" | grep -q "git-heal.*ON -- developer git ops re-pin"; then
+    printf '%s' "$_out" | grep -q "git-heal.*ON — developer git ops re-pin"; then
     pass "doctor git-heal: resolver unavailable degrades to a counted warn row (#777)"
 else
     fail "doctor git-heal: resolver-degrade arm (out=$(printf '%s' "$_out" | grep -E 'git-heal' | head -3)) (#777)"
@@ -452,7 +452,7 @@ _ddr_reset() {
     rm -f "${WORK:?}/dgh/proj/.git/hooks/pre-commit"
 }
 _out=$(_dgh_run || true)
-if printf '%s' "$_out" | grep -qF "$WORK/dgh/proj/.git -- sticky bit missing on the gitdir" &&
+if printf '%s' "$_out" | grep -qF "$WORK/dgh/proj/.git — sticky bit missing on the gitdir" &&
     printf '%s' "$_out" | grep -qF "sudo opk update --refresh' / 'opk config refresh"; then
     pass "doctor git-heal: fresh clone renders the sticky-drift row (#653 W1)"
 else
@@ -468,11 +468,11 @@ fi
 chmod 664 "$WORK/dgh/proj/.git/config"
 chmod 775 "$WORK/dgh/proj/.git/hooks"
 _out=$(_dgh_run || true)
-if printf '%s' "$_out" | grep -qF "$WORK/dgh/proj/.git/config -- group-writable" &&
-    printf '%s' "$_out" | grep -qF "$WORK/dgh/proj/.git/hooks -- group-writable"; then
+if printf '%s' "$_out" | grep -qF "$WORK/dgh/proj/.git/config — group-writable" &&
+    printf '%s' "$_out" | grep -qF "$WORK/dgh/proj/.git/hooks — group-writable"; then
     pass "doctor git-heal: group-writable config/hooks render drift rows (#653 W1)"
 else
-    fail "doctor git-heal: group-write rows missing (#653 W1; out=$(printf '%s' "$_out" | grep -E 'config --|hooks --' | head -2))"
+    fail "doctor git-heal: group-write rows missing (#653 W1; out=$(printf '%s' "$_out" | grep -E 'config —|hooks —' | head -2))"
 fi
 _ddr_reset
 : >"$WORK/dgh/proj/.git/hooks/pre-commit"
@@ -491,7 +491,7 @@ _ddr_reset
 _out=$(_dgh_run || true)
 if ! printf '%s' "$_out" | grep -qF 'sticky bit missing' &&
     ! printf '%s' "$_out" | grep -qF 'non-sample entries' &&
-    ! printf '%s' "$_out" | grep -qE '\.git/(config|hooks) -- '; then
+    ! printf '%s' "$_out" | grep -qE '\.git/(config|hooks) — '; then
     pass "doctor git-heal: the fully-healed fixture renders no drift/planted rows (#653 W1 control)"
 else
     fail "doctor git-heal: healed control fired (#653 W1; out=$(printf '%s' "$_out" | grep -E 'heal drift|planted' | head -3))"
@@ -532,7 +532,7 @@ _out=$(
         doctor_git_heal
     ) 2>&1 || true
 )
-if printf '%s' "$_out" | grep -qF "$WORK/dgh/proj/.git/config -- rogue-owned (not $(id -un))" &&
+if printf '%s' "$_out" | grep -qF "$WORK/dgh/proj/.git/config — rogue-owned (not $(id -un))" &&
     ! printf '%s' "$_out" | grep -qF 'sticky bit missing'; then
     pass "doctor git-heal: foreign config owner renders the drift row, sticky stays quiet (#653 W1)"
 else
@@ -545,10 +545,10 @@ if command -v setfacl >/dev/null 2>&1 && command -v getfacl >/dev/null 2>&1; the
     _ddr_reset
     setfacl -m "u:$(id -un):rw" "$WORK/dgh/proj/.git/config"
     _out=$(_dgh_run || true)
-    if printf '%s' "$_out" | grep -qF "$WORK/dgh/proj/.git/config -- group-writable, extended ACLs present"; then
+    if printf '%s' "$_out" | grep -qF "$WORK/dgh/proj/.git/config — group-writable, extended ACLs present"; then
         pass "doctor git-heal: an extended ACL on config renders its drift fragment (#653 W1)"
     else
-        fail "doctor git-heal: ACL arm (out=$(printf '%s' "$_out" | grep -F 'config --' | head -1)) (#653 W1)"
+        fail "doctor git-heal: ACL arm (out=$(printf '%s' "$_out" | grep -F 'config —' | head -1)) (#653 W1)"
     fi
     setfacl -b "$WORK/dgh/proj/.git/config"
 else
@@ -574,7 +574,7 @@ _out=$(
         doctor_git_heal
     ) 2>&1 || true
 )
-if printf '%s' "$_out" | grep -qF 'heal drift ACLs not checked -- getfacl unavailable' &&
+if printf '%s' "$_out" | grep -qF 'heal drift ACLs not checked — getfacl unavailable' &&
     printf '%s' "$_out" | grep -qF 'sticky bit missing'; then
     pass "doctor git-heal: missing getfacl degrades the ACL leg loudly, checks survive (#653 W1)"
 else
@@ -583,7 +583,7 @@ fi
 # Pointer-target arm: drift rows name the RESOLVED storage gitdir (the
 # #777 twin — the ptproj fixture from the pointer classification arm).
 _out=$(_dgh_run "$WORK/dgh/ptproj" || true)
-if printf '%s' "$_out" | grep -qF "$WORK/dgh/ptstor/ptproj.git -- sticky bit missing on the gitdir"; then
+if printf '%s' "$_out" | grep -qF "$WORK/dgh/ptstor/ptproj.git — sticky bit missing on the gitdir"; then
     pass "doctor git-heal: a pointer project's drift rows name the resolved gitdir (#653 W1)"
 else
     fail "doctor git-heal: pointer drift rows (out=$(printf '%s' "$_out" | grep -F 'heal drift' | head -2)) (#653 W1)"
@@ -599,7 +599,7 @@ _ddr_reset
 _out=$(_dgh_run || true)
 printf 'DEFAULT_USER=%s\nOPENCODE_USER=opencode-dgh-agent\nGITDIR_STORAGE=%s\n' "$(id -un)" \
     "$WORK/dgh/ptstor" >"$WORK/dgh/install.conf"
-if ! printf '%s' "$_out" | grep -qE '\.git/(config|hooks) -- ' &&
+if ! printf '%s' "$_out" | grep -qE '\.git/(config|hooks) — ' &&
     ! printf '%s' "$_out" | grep -q "git-heal.*unknown"; then
     pass "doctor git-heal: a quoted DEFAULT_USER compares stripped, state resolves (#785 a B5)"
 else
@@ -643,7 +643,7 @@ _dwt_reset() {
 _dwt_reset
 chmod 1700 "$WORK/dgh/wt2/repo/.git"
 _out=$(_dgh_run "$WORK/dgh/wt2/repo" || true)
-if printf '%s' "$_out" | grep -qF "$WORK/dgh/wt2/repo/.git -- group access/setgid missing on the gitdir" &&
+if printf '%s' "$_out" | grep -qF "$WORK/dgh/wt2/repo/.git — group access/setgid missing on the gitdir" &&
     ! printf '%s' "$_out" | grep -qF 'sticky bit missing on the gitdir'; then
     pass "doctor git-heal: a 1700 gitdir renders the group-access row, sticky stays quiet (#653 W2)"
 else
@@ -652,7 +652,7 @@ fi
 _dwt_reset
 chmod g-rwx,g-s "$WORK/dgh/wt2/repo/.git"
 _out=$(_dgh_run "$WORK/dgh/wt2/repo" || true)
-if printf '%s' "$_out" | grep -qF "$WORK/dgh/wt2/repo/.git -- group access/setgid missing on the gitdir" &&
+if printf '%s' "$_out" | grep -qF "$WORK/dgh/wt2/repo/.git — group access/setgid missing on the gitdir" &&
     [ "$(stat -c %A "$WORK/dgh/wt2/repo/.git")" = 'drwx-----T' ]; then
     pass "doctor git-heal: the fully-stripped group leg renders the row too (--- arm) (#653 W2)"
 else
@@ -704,7 +704,7 @@ rm -f "${WORK:?}/dgh/wt2/cfg-decoy"
 _dwt_reset
 chmod 664 "$WORK/dgh/wt2/repo/.git/worktrees/awt/gitdir"
 _out=$(_dgh_run "$WORK/dgh/wt2/repo" || true)
-if printf '%s' "$_out" | grep -qF "$WORK/dgh/wt2/repo/.git/worktrees/awt/gitdir -- group-writable" &&
+if printf '%s' "$_out" | grep -qF "$WORK/dgh/wt2/repo/.git/worktrees/awt/gitdir — group-writable" &&
     printf '%s' "$_out" | grep -qF 'the heal pins them developer-owned 644 under a sticky'; then
     pass "doctor git-heal: a group-writable registration pointer renders its row (#653 W2)"
 else
@@ -714,7 +714,7 @@ fi
 _dwt_reset
 chmod -t "$WORK/dgh/wt2/repo/.git/worktrees"
 _out=$(_dgh_run "$WORK/dgh/wt2/repo" || true)
-if printf '%s' "$_out" | grep -qF "$WORK/dgh/wt2/repo/.git/worktrees -- sticky bit missing on the collection"; then
+if printf '%s' "$_out" | grep -qF "$WORK/dgh/wt2/repo/.git/worktrees — sticky bit missing on the collection"; then
     pass "doctor git-heal: a non-sticky worktrees collection renders its row (#653 W2)"
 else
     fail "doctor git-heal: collection sticky arm (out=$(printf '%s' "$_out" | grep -F 'worktree' | head -2)) (#653 W2)"
@@ -754,7 +754,7 @@ _out=$(
         doctor_git_heal
     ) 2>&1 || true
 )
-if printf '%s' "$_out" | grep -qF "$WORK/dgh/wt2/repo/.git/worktrees/awt/gitdir -- rogue-owned (not $(id -un))"; then
+if printf '%s' "$_out" | grep -qF "$WORK/dgh/wt2/repo/.git/worktrees/awt/gitdir — rogue-owned (not $(id -un))"; then
     pass "doctor git-heal: a foreign-owned registration pointer renders its row (#653 W2)"
 else
     fail "doctor git-heal: worktree owner arm (out=$(printf '%s' "$_out" | grep -F 'worktree' | head -2)) (#653 W2)"
@@ -763,7 +763,7 @@ fi
 _dwt_reset
 printf 'gitdir: %s\n' "$WORK/dgh/wt2/repo/.git" >"$WORK/dgh/wt2/awt/.git"
 _out=$(_dgh_run "$WORK/dgh/wt2/repo" || true)
-if printf '%s' "$_out" | grep -qF "$WORK/dgh/wt2/repo/.git/worktrees/awt -- its worktree's .git does not" &&
+if printf '%s' "$_out" | grep -qF "$WORK/dgh/wt2/repo/.git/worktrees/awt — its worktree's .git does not" &&
     printf '%s' "$_out" | grep -qF 'swapped pointer'; then
     pass "doctor git-heal: a swapped worktree .git pointer renders the back-reference row (#653 W2)"
 else
@@ -786,7 +786,7 @@ mv "$WORK/dgh/wt2/awt/.git.orig" "$WORK/dgh/wt2/awt/.git"
 _dwt_reset
 printf 'ev\033[31mil\n' >"$WORK/dgh/wt2/repo/.git/worktrees/awt/gitdir"
 _out=$(_dgh_run "$WORK/dgh/wt2/repo" || true)
-if printf '%s' "$_out" | grep -qF "$WORK/dgh/wt2/repo/.git/worktrees/awt/gitdir -- malformed back-reference" &&
+if printf '%s' "$_out" | grep -qF "$WORK/dgh/wt2/repo/.git/worktrees/awt/gitdir — malformed back-reference" &&
     ! printf '%s' "$_out" | grep -qF "$(printf '\033[31m')"; then
     pass "doctor git-heal: a malformed back-reference renders its row without the payload (#653 W2)"
 else
@@ -839,7 +839,7 @@ _out=$(
         doctor_git_heal
     ) 2>&1 || true
 )
-if printf '%s' "$_out" | grep -qF "$WORK/dgh/wt2/repo/.git/worktrees/awt/gitdir -- group-writable"; then
+if printf '%s' "$_out" | grep -qF "$WORK/dgh/wt2/repo/.git/worktrees/awt/gitdir — group-writable"; then
     pass "doctor git-heal: no storage key keeps the strict contract; env GH_STORAGE cannot relax it (#787 a A1/a B2)"
 else
     fail "doctor git-heal: empty-stor strict arm (out=$(printf '%s' "$_out" | grep -F 'worktree' | head -2)) (#787 a A1/a B2)"
