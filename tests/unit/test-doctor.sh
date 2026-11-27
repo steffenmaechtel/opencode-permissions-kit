@@ -917,7 +917,7 @@ chmod 644 "$ALLROOTS"
     _m5src="$WORK/m5-roots"
     _m5dst="$WORK/m5-dst"
     : >"$_m5dst"
-    printf '/var/www/one\n\n  \n/var/www/two\n' >"$_m5src"
+    printf '/home/some-user-max-mustermann/one\n\n  \n/home/some-user-max-mustermann/two\n' >"$_m5src"
     doctor_roots_append "$_m5src" "$_m5dst" &&
         echo M5-APPEND-OK
     [ "$(wc -l <"$_m5dst")" -eq 2 ] && echo M5-FILTERED-OK
@@ -1422,6 +1422,11 @@ fi
 # the design's depth -- hermetic execution of the DEFAULT arm would scan
 # the host's real tree, so the claim is source-pinned instead. (#448:
 # the literals moved with the all block into sh/doctor-core.sh.)
+# BOUND literal (#727): /var/www/vhosts must match the SHIPPED bytes
+# in sh/doctor-core.sh (the [ -d ... ] default scan root) -- a
+# fictional prefix would unpin the product's default, and changing the
+# default root is a product decision, not test hygiene. Carries the
+# matching ALLOW row in test-sandbox-policy.sh.
 _nl_src="$(live_src "$DOCTOR_CORE")" || true
 if printf '%s' "$_nl_src" | grep -qF '[ -d /var/www/vhosts ]' &&
     printf '%s' "$_nl_src" | grep -qF 'projects.conf' &&

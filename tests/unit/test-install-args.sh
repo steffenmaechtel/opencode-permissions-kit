@@ -173,7 +173,7 @@ parse_args --yes
     pass "openchamber policy undecided by default (opt-in)" ||
     fail "openchamber policy undecided by default (opt-in)"
 reset_globals
-parse_args --projects /var/www/vhosts --openchamber-policy yes
+parse_args --projects /home/some-user-max-mustermann/x --openchamber-policy yes
 [ "$OPENCHAMBER_POLICY_OPT" = "yes" ] &&
     pass "--openchamber-policy works after --projects" ||
     fail "--openchamber-policy works after --projects"
@@ -194,7 +194,7 @@ parse_args --yes
     pass "agents migration undecided by default (prompt/--yes recommended)" ||
     fail "agents migration undecided by default"
 reset_globals
-parse_args --projects /var/www/vhosts --migrate-agents copy
+parse_args --projects /home/some-user-max-mustermann/x --migrate-agents copy
 [ "$MIGRATE_AGENTS_OPT" = "copy" ] &&
     pass "--migrate-agents works after --projects" ||
     fail "--migrate-agents works after --projects"
@@ -286,9 +286,9 @@ done
 # The regression this file exists for: flags AFTER --projects used to be
 # silently dropped (the old loop `break`ed out of the parser).
 reset_globals
-parse_args --projects /var/www/vhosts /home/dev/x --yes --secure-git-config
+parse_args --projects /home/some-user-max-mustermann/x /home/some-user-max-mustermann/y --yes --secure-git-config
 if [ "$SKIP_PROMPTS" = true ] && [ "$GIT_FLAG_GIVEN" = true ] &&
-    [ "$PREDEFINED_PROJECTS" = " /var/www/vhosts /home/dev/x" ]; then
+    [ "$PREDEFINED_PROJECTS" = " /home/some-user-max-mustermann/x /home/some-user-max-mustermann/y" ]; then
     pass "--projects does not swallow following flags (--yes/--secure-git-config applied)"
 else
     fail "--projects does not swallow following flags (projects='$PREDEFINED_PROJECTS' yes=$SKIP_PROMPTS git=$GIT_FLAG_GIVEN)"
@@ -297,7 +297,7 @@ fi
 # --container-backend AFTER --projects works too (docs used to require the
 # opposite order).
 reset_globals
-parse_args --projects /var/www/vhosts --container-backend docker-rootless
+parse_args --projects /home/some-user-max-mustermann/x --container-backend docker-rootless
 [ "$CONTAINER_BACKEND_OPT" = "docker-rootless" ] &&
     pass "--container-backend works after --projects" ||
     fail "--container-backend works after --projects"
@@ -321,12 +321,12 @@ expect_rc 1 "--migrate-agents with an invalid value aborts" --yes --migrate-agen
 # Glob metacharacters in --projects values are rejected in parse_args on
 # the RAW argument (0.0.42f S2): the old in-loop gate ran after the
 # for-list pathname expansion and never saw a matching glob.
-expect_rc 1 "--projects value with glob characters aborts" --yes --projects '/var/www/vhosts/*'
+expect_rc 1 "--projects value with glob characters aborts" --yes --projects '/home/some-user-max-mustermann/*'
 expect_rc 1 "--projects value with question mark aborts" --yes --projects '/opt/?vhosts'
 # the bracket class was in the parse arm (*[\\*\\?\\[]*) all along but
 # never pinned — the #665 sweep rides the missing char in.
-expect_rc 1 "--projects value with bracket aborts" --yes --projects '/var/www/vhosts/[x]'
-expect_rc 0 "plain --projects value passes parse_args" --yes --projects /var/www/vhosts
+expect_rc 1 "--projects value with bracket aborts" --yes --projects '/home/some-user-max-mustermann/[x]'
+expect_rc 0 "plain --projects value passes parse_args" --yes --projects /home/some-user-max-mustermann/x
 
 # Whitespace in a --projects value is LEGAL at parse time (issue #372
 # A3): one quoted argument may carry SEVERAL roots — the e2e suites'
@@ -337,16 +337,16 @@ expect_rc 0 "plain --projects value passes parse_args" --yes --projects /var/www
 # behavioral pin is the e2e form itself: it must parse rc 0 and set the
 # flag (a reverted gate or a lost flag both fail this).
 reset_globals
-_cw_out="$( (parse_args --yes --projects '/var/www/vhosts /home/dev/vhosts' &&
+_cw_out="$( (parse_args --yes --projects '/home/some-user-max-mustermann/one /home/some-user-max-mustermann/two' &&
     printf 'ROOTS=[%s] SPACED=%s' "$PREDEFINED_PROJECTS" "$PROJECTS_ARG_SPACED") 2>/dev/null)" || true
 case "$_cw_out" in
-    "ROOTS=[ /var/www/vhosts /home/dev/vhosts] SPACED=true")
+    "ROOTS=[ /home/some-user-max-mustermann/one /home/some-user-max-mustermann/two] SPACED=true")
         pass "multi-root single-argument --projects parses + sets the spaced flag (#372 A3)"
         ;;
     *) fail "multi-root --projects parse (#372 A3; got: ${_cw_out:-abort})" ;;
 esac
 reset_globals
-parse_args --yes --projects /var/www/vhosts
+parse_args --yes --projects /home/some-user-max-mustermann/x
 if [ "$PROJECTS_ARG_SPACED" = false ]; then
     pass "single-argument --projects leaves the spaced flag false (#372 A3)"
 else
