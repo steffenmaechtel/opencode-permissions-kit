@@ -299,7 +299,7 @@ serve_arm() {
 # matches every absolute cwd and pass 2 probes it as a candidate.
 printf '%s\n' "/" >"$WORK/serve/conf-only-slash"
 serve_arm "serve fallback: bare / conf line promotes no fallback" \
-    "$WORK/serve/conf-only-slash" "/srv/not-configured" ""
+    "$WORK/serve/conf-only-slash" "/home/some-user-max-mustermann/not-configured" ""
 # 6b. positive pass-1 arm: trailing-slash root containing the cwd --
 # the guard must not over-skip legitimate spellings.
 printf '%s\n' "$WORK/serve/root/" >"$WORK/serve/conf-trailing"
@@ -310,7 +310,7 @@ serve_arm "serve fallback: trailing-slash root still wins pass 1" \
 # the witness that "" was never a candidate.
 printf '%s\n' "/" "$WORK/serve/root/" >"$WORK/serve/conf-slash-then-root"
 serve_arm "serve fallback: pass 2 skips the / line and picks the root" \
-    "$WORK/serve/conf-slash-then-root" "/srv/not-configured" "$WORK/serve/root"
+    "$WORK/serve/conf-slash-then-root" "/home/some-user-max-mustermann/not-configured" "$WORK/serve/root"
 
 # --- 7. form gate over projects.conf lines (#735) ---------------------------------
 # The wrapper's four conf loops -- cwd validation, refusal listing and

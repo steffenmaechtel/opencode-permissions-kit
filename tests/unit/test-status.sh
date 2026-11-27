@@ -1211,7 +1211,7 @@ if [ -n "$_gap_fn" ]; then
             return 1
         }
         ddev_migrate_projects() { printf ''; }
-        ddev_migrate_home() { printf '/home/x'; }
+        ddev_migrate_home() { printf '/home/some-user-max-mustermann/x'; }
         ui_kv_warn() { :; }
         ui_detail() { :; }
         eval "$_gap_fn"

@@ -2243,37 +2243,42 @@ assert_eq "walk: operand == scan root returns 0 (contract edge, #234 a W4)" "0" 
 assert_eq "walk: operand == scan root stays silent (contract edge, #234 a W4)" "" "$DCS2_OUT"
 
 # Scan-skip stamps: write -> valid; any field mismatch -> invalid; a
-# cksum filename collision must not validate a different root.
+# cksum filename collision must not validate a different root. The
+# stamp roots travel as string KEYS into the cksum-named record
+# (ddev-handover.sh stamp_write/valid) — policy-INPUT, never executed
+# as paths — so the fixtures carry the fictional project-area prefix
+# /srv/some-project-area-max-mustermann/... (#807 w2; valid/invalid
+# compare the same or different key strings, no literal dependency).
 _112_dir=$(mktemp -d)
 OPK_HANDOVER_STAMP_DIR="$_112_dir/stamps"
 export OPK_HANDOVER_STAMP_DIR
 mkdir -p "$_112_dir/stamps"
 # 0.0.40b: guarded like the tamper below (set -e) — a failed stamp write
 # must not abort the suite before the rm -rf/unset cleanup.
-sh -c ". \"\$1\" && ddev_handover_stamp_write \"\$2\" \"\$3\" \"\$4\"" _ "$HANDOVER" "/srv/projects" ocuser ocgroup || true
+sh -c ". \"\$1\" && ddev_handover_stamp_write \"\$2\" \"\$3\" \"\$4\"" _ "$HANDOVER" "/srv/some-project-area-max-mustermann/projects" ocuser ocgroup || true
 check "stamp: written into the override dir" \
     sh -c "ls \"\$1\"/*.stamp >/dev/null 2>&1" _ "$_112_dir/stamps"
-if (. "$HANDOVER" && ddev_handover_stamp_valid "/srv/projects" ocuser ocgroup); then
+if (. "$HANDOVER" && ddev_handover_stamp_valid "/srv/some-project-area-max-mustermann/projects" ocuser ocgroup); then
     pass "stamp: valid for the same root/user/group"
 else
     fail "stamp: valid for the same root/user/group"
 fi
-if (. "$HANDOVER" && if ddev_handover_stamp_valid "/srv/projects" otheruser ocgroup; then exit 1; fi); then
+if (. "$HANDOVER" && if ddev_handover_stamp_valid "/srv/some-project-area-max-mustermann/projects" otheruser ocgroup; then exit 1; fi); then
     pass "stamp: invalid for a different user"
 else
     fail "stamp: invalid for a different user"
 fi
-if (. "$HANDOVER" && if ddev_handover_stamp_valid "/srv/projects" ocuser othergroup; then exit 1; fi); then
+if (. "$HANDOVER" && if ddev_handover_stamp_valid "/srv/some-project-area-max-mustermann/projects" ocuser othergroup; then exit 1; fi); then
     pass "stamp: invalid for a different group"
 else
     fail "stamp: invalid for a different group"
 fi
-if (. "$HANDOVER" && if ddev_handover_stamp_valid "/srv/other" ocuser ocgroup; then exit 1; fi); then
+if (. "$HANDOVER" && if ddev_handover_stamp_valid "/srv/some-project-area-max-mustermann/other" ocuser ocgroup; then exit 1; fi); then
     pass "stamp: invalid for a different root"
 else
     fail "stamp: invalid for a different root"
 fi
-if (. "$HANDOVER" && if ddev_handover_stamp_valid "/srv/never-scanned" ocuser ocgroup; then exit 1; fi); then
+if (. "$HANDOVER" && if ddev_handover_stamp_valid "/srv/some-project-area-max-mustermann/never-scanned" ocuser ocgroup; then exit 1; fi); then
     pass "stamp: invalid when missing entirely"
 else
     fail "stamp: invalid when missing entirely"
@@ -2287,7 +2292,7 @@ fi
 if (
     DDEV_DEV_OWNED=true
     . "$HANDOVER" &&
-        if ddev_handover_stamp_valid "/srv/projects" ocuser ocgroup; then
+        if ddev_handover_stamp_valid "/srv/some-project-area-max-mustermann/projects" ocuser ocgroup; then
             exit 1
         fi
 ); then
@@ -2298,13 +2303,13 @@ fi
 # 0.0.40a F1: the dev user (handback target) is part of the shape — a
 # DEFAULT_USER re-base must invalidate, not wait for --refresh.
 # (0.0.40b: guarded — same set -e cleanup rationale as above.)
-sh -c ". \"\$1\" && ddev_handover_stamp_write \"\$2\" \"\$3\" \"\$4\" \"\$5\"" _ "$HANDOVER" "/srv/projects" ocuser ocgroup devuser || true
-if (. "$HANDOVER" && ddev_handover_stamp_valid "/srv/projects" ocuser ocgroup devuser); then
+sh -c ". \"\$1\" && ddev_handover_stamp_write \"\$2\" \"\$3\" \"\$4\" \"\$5\"" _ "$HANDOVER" "/srv/some-project-area-max-mustermann/projects" ocuser ocgroup devuser || true
+if (. "$HANDOVER" && ddev_handover_stamp_valid "/srv/some-project-area-max-mustermann/projects" ocuser ocgroup devuser); then
     pass "stamp: valid for the same dev user (4-arg shape, 0.0.40a F1)"
 else
     fail "stamp: valid for the same dev user (4-arg shape, 0.0.40a F1)"
 fi
-if (. "$HANDOVER" && if ddev_handover_stamp_valid "/srv/projects" ocuser ocgroup otherdev; then exit 1; fi); then
+if (. "$HANDOVER" && if ddev_handover_stamp_valid "/srv/some-project-area-max-mustermann/projects" ocuser ocgroup otherdev; then exit 1; fi); then
     pass "stamp: invalid for a different dev user (0.0.40a F1)"
 else
     fail "stamp: invalid for a different dev user (0.0.40a F1)"
@@ -2319,7 +2324,7 @@ if [ -n "$_112_stampfile" ]; then
     sed 's/|1|/|99|/' "$_112_stampfile" >"$_112_stampfile.new" &&
         mv "$_112_stampfile.new" "$_112_stampfile" || true
 fi
-if (. "$HANDOVER" && if ddev_handover_stamp_valid "/srv/projects" ocuser ocgroup devuser; then exit 1; fi); then
+if (. "$HANDOVER" && if ddev_handover_stamp_valid "/srv/some-project-area-max-mustermann/projects" ocuser ocgroup devuser; then exit 1; fi); then
     pass "stamp: a scan-rev mismatch invalidates"
 else
     fail "stamp: a scan-rev mismatch invalidates"
@@ -2330,11 +2335,11 @@ fi
 # AFTER the dot (inverse of the #342 DDEV_DEV_OWNED shape): the lib
 # DEFINES this rev, so a pre-dot override is simply overwritten by the
 # sourcing itself.
-sh -c ". \"\$1\" && ddev_handover_stamp_write \"\$2\" \"\$3\" \"\$4\" \"\$5\"" _ "$HANDOVER" "/srv/projects" ocuser ocgroup devuser || true
+sh -c ". \"\$1\" && ddev_handover_stamp_write \"\$2\" \"\$3\" \"\$4\" \"\$5\"" _ "$HANDOVER" "/srv/some-project-area-max-mustermann/projects" ocuser ocgroup devuser || true
 if (
     . "$HANDOVER" &&
         FS_BASELINE_STAMP_REV=99 &&
-        if ddev_handover_stamp_valid "/srv/projects" ocuser ocgroup devuser; then
+        if ddev_handover_stamp_valid "/srv/some-project-area-max-mustermann/projects" ocuser ocgroup devuser; then
             exit 1
         fi
 ); then
@@ -2352,11 +2357,11 @@ fi
 # warns about).
 _112_stampfile=$(ls "$_112_dir/stamps"/*.stamp 2>/dev/null || true)
 if [ -n "$_112_stampfile" ]; then
-    printf '%s\n' '/srv/projects|ocuser|ocgroup|1|off|devuser' >"$_112_stampfile"
+    printf '%s\n' '/srv/some-project-area-max-mustermann/projects|ocuser|ocgroup|1|off|devuser' >"$_112_stampfile"
 else
     fail "stamp: rollout leg setup lost the stamp file (write above failed)"
 fi
-if (. "$HANDOVER" && if ddev_handover_stamp_valid "/srv/projects" ocuser ocgroup devuser; then exit 1; fi); then
+if (. "$HANDOVER" && if ddev_handover_stamp_valid "/srv/some-project-area-max-mustermann/projects" ocuser ocgroup devuser; then exit 1; fi); then
     pass "stamp: a legacy 6-field stamp reads invalid (#696 rollout)"
 else
     fail "stamp: a legacy 6-field stamp reads invalid (#696 rollout)"
