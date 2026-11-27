@@ -1389,7 +1389,7 @@ fi
 # "Quoting-aware test machinery").
 cat >"$WORK/q-words" <<'EOF'
 plain.git
-/var/www/a+b-c.git
+/home/some-user-max-mustermann/a+b-c.git
 it's
 a b.git
 a;b
@@ -1426,8 +1426,8 @@ if [ -z "$_q_fail" ]; then
 else
     fail "_gp_q round-trip failures:$_q_fail"
 fi
-_out=$(_core_run '_gp_q "/var/www/a+b.git"')
-if [ "$_out" = "/var/www/a+b.git" ] && [ -n "$_out" ] &&
+_out=$(_core_run '_gp_q "/home/some-user-max-mustermann/a+b.git"')
+if [ "$_out" = "/home/some-user-max-mustermann/a+b.git" ] && [ -n "$_out" ] &&
     _out=$(_core_run '_gp_q "-dash.git"') && [ "$_out" = "'-dash.git'" ]; then
     pass "_gp_q: a plain word stays bare, a leading dash is quoted (#765 a S3)"
 else
@@ -1759,7 +1759,7 @@ fi
 # _gp_persist_storage carries the value through the environment: a
 # backslash in the storage path survives byte-for-byte (#765 a S2 —
 # `awk -v` turned `\n` into a real newline).
-_s2v='/var/www/a\nb\\c'
+_s2v='/home/some-user-max-mustermann/a\nb\\c'
 printf 'DEFAULT_USER=%s\nGITDIR_STORAGE=/old\n' "$(id -un)" >"$WORK/ic-s2"
 # GP_INSTALL_CONF names the SCRATCH conf: without it the function aims
 # at the real /etc install.conf (a root suite user would write it).
