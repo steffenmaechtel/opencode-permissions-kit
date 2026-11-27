@@ -461,9 +461,11 @@ echo "--- RL3c. env_keep functionally carries the wrapper's configured socket (i
 # leg regressed to the podman shape), starts a wrapper-invoked serve as dev
 # and reads the opencode process's /proc/<pid>/environ — the post-env_reset
 # table sudo exec'd the target with. dev holds NOPASSWD:ALL
-# (Dockerfile.rootless) and the sudo cat needs no privileged capabilities;
-# the pgrep/pkill poll is Dockerfile-pinned (procps) instead of riding
-# docker-ce's Recommends edge (#733 a B1 class).
+# (Dockerfile.rootless). The sudo cat environ read needs cross-uid
+# PTRACE_MODE_READ and rides the harness's --privileged run (lib.sh) — a
+# de-privileged container EPERMs on it (probed, pr-808 a A1). The pgrep/pkill
+# poll is Dockerfile-pinned (procps) instead of riding docker-ce's Recommends
+# edge (#733 a B1 class).
 if [ "$_rootless_ok" = true ]; then
     docker exec -u dev -e OPK_UPDATE_CHECK=0 "$E2E_CONTAINER" \
         sh -c 'cd /tmp && DOCKER_HOST=e2e-export-distractor timeout 45 /usr/local/bin/opencode serve --hostname 127.0.0.1 --port 4196 >/tmp/export-serve.out 2>&1' \
