@@ -401,6 +401,36 @@ Releases are maintainer-only and fully scripted
 is the tag `x.y.z` on `master` plus a fast-forward of the `stable`
 mirror, which must stay **byte-identical** to `master` (§3, Option B).
 
+### Choosing the stamp: patch or minor (soft convention)
+
+The stamp carries no mechanical meaning: the only sites that parse it
+are the `x.y.z` shape gates (`scripts/release.sh`, the
+fetched-VERSION check in `update.sh`, `make check-version`) and
+`update.sh`'s numeric upgrade floor — which compares the INSTALLED
+version against `0.0.14`, never the release target. None of them
+behaves differently for `0.0.62` than for `0.1.0`; both ride the
+identical procedure below. This subsection is a convention for the
+maintainer's judgment, kept consistent by writing it down — not a gate
+any script or review enforces.
+
+- **Patch (`x.y.(z+1)`) is the default** — fix waves, review follow-ups,
+  docs, hardening: releases that ship no new user capability.
+- **Minor (`x.(y+1).0`) is opt-in** — available when the release carries
+  a **feature family**: related capabilities under one theme, landing
+  together, that add new commands or new on-disk operational state and
+  change something a user must notice (a consent prompt, a
+  security-model property, a layout or ownership migration).
+  Recognition help, not admission criteria — the test question is
+  "should users open the notes instead of skimming the number?"
+
+Both directions stay soft: a family may ship as a patch bump (always
+safe), and a minor bump does not imply breaking changes — in SemVer's
+`0.x` space the minor is the loudest attention slot short of `1.0`,
+while the patch says "routine". First planned use: `0.1.0`, carrying
+the git heal + git protection families (issues #644, #651, #653, #704,
+#764, #779) — two families that restructure how the host's `.git`
+trees are owned and healed.
+
 Copy the block, search & replace `0.0.61` with the new version, run the
 lines one by one. The VERSION bump lands on `master` **via PR** (never
 commit on master directly); `make release` then verifies a clean tree,
