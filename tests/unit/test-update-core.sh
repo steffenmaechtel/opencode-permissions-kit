@@ -870,13 +870,27 @@ fi
 # backslash-continued `python3 \` opener matches no arm; the per-file
 # floor pins bound the residual.
 _bare_py=""
+# (pr-0811 a A1) the old feed ran the lister as a pipeline tail (rc =
+# sort's, always 0): a vanished/unreadable files/ tree yielded an empty
+# list and the sweep-ceiling row greened over zero inspected bytes —
+# the #805 class on a directory operand. The lister is rc-mapped first
+# (rc 1 = no file mentions python3 at all — a legitimately clean tree
+# the presence pins cover); the exclusion filter then runs on the
+# captured bytes (stdin operands, no operand-error channel).
+_py_list_rc=0
+_py_raw="$(grep -rl 'python3' "$SCRIPT_DIR/../../files")" || _py_list_rc=$?
+case "$_py_list_rc" in
+    0 | 1) ;;
+    *) fail "sweep ceiling lister: grep rc $_py_list_rc — files/ tree scan error, fails loud (pr-0811 a A1)" ;;
+esac
+_py_list="$(printf '%s' "$_py_raw" | grep -v '\.py$' | sort)"
 while IFS= read -r _pyf; do
     _hits=$(live_src "$_pyf" |
         grep -nE 'python3 (-[A-Za-z]|-$|"|/|\$)' | grep -v 'python3 -I' || true)
     [ -z "$_hits" ] || _bare_py="$_bare_py
 $_pyf: $_hits"
 done <<EOF
-$(grep -rl 'python3' "$SCRIPT_DIR/../../files" | grep -v '\.py$' | sort)
+$_py_list
 EOF
 if [ -z "$_bare_py" ]; then
     pass "sweep ceiling: no bare python3 execution site in files/ (#249, review a C5)"
