@@ -59,10 +59,13 @@ trap _trap_cleanup EXIT INT TERM
 # the sourcing arms. $ADV_SRC's #201 block is an existence-conditioned
 # sourcing group whose absent-file arm is a counted FAIL row, not a
 # raw grep. The W2 mktemp-fallback class sweep below greps the whole
-# files/ tree as a DIRECTORY operand with `|| true` — outside this
-# single-file guard class by shape: a total-tree vanish trips these
-# four guards transitively, a partial-subtree vanish narrows that one
-# sweep silently.)
+# files/ tree as a DIRECTORY operand — outside this single-file guard
+# class by shape, and since #805 rc-mapped in its own case arm: a
+# total-tree vanish trips these four guards transitively, and the
+# scan-error shapes the guards cannot see (a subtree unreadable, an
+# entry vanished mid-walk) die in the sweep's grep rc 2+ arm; a
+# tracked file vanishing under files/ aborts gen-sums and reds the
+# manifest freshness pin in test-fetch-integrity.sh.)
 for _g713 in "$STATUS" "$STATUS_CORE" "$GIT_HEAL_CORE" "$GIT_CHECK_SH"; do
     if [ -f "$_g713" ]; then
         pass "pinned source present: $_g713"
@@ -1866,14 +1869,27 @@ fi
 # multi-line fallbacks (grep is line-scoped). Class history (0.0.48b W2):
 # the /dev/null fallback silently killed the tally and its cleanup rm -f'd
 # the device node when root ran it.
+# (#805) The sweep's operand is a DIRECTORY, so grep rc carries scan-
+# error information the old `|| true` discarded: rc 2 — the tree
+# missing, or an entry unreadable/vanished mid-walk — fell into the
+# empty-hits pass arm over whatever bytes remained (a false-green ROW:
+# coverage loss, not a green suite — the total-tree vanish already
+# trips the four pinned-source guards above). Mapped now like the #713
+# single-file pins, hit-sweep semantics inverted: rc 0 = a hit = fail,
+# rc 1 = clean = pass, rc 2+ = scan error = fail loud. A subtree
+# absent BEFORE the walk is invisible to grep (clean rc 1 over
+# narrowed bytes) — that shape is the manifest freshness pin's arm in
+# test-fetch-integrity.sh (gen-sums aborts on a missing listed file),
+# not this sweep's.
 W2_FIXPATH_A='\$\(([^)|]*[[:space:]])?mktemp[^)]*\)[^|]*\|\|[^|]*=[[:space:]]*[^/]?/(dev/null|tmp|var/tmp)'
 W2_FIXPATH_B='\$\(([^)|]*[[:space:]])?mktemp[^|)]*\|\|[^)]*echo[[:space:]]+[^/]?/(dev/null|tmp|var/tmp)'
-_w2_fall_hits="$(grep -rnE "$W2_FIXPATH_A|$W2_FIXPATH_B" "$SCRIPT_DIR/../../files" || true)"
-if [ -z "$_w2_fall_hits" ]; then
-    pass "W2 class sweep: no mktemp fixed-path fallback in any shipped script (#168)"
-else
-    fail "W2 class sweep: mktemp fixed-path fallback survived (got: $_w2_fall_hits)"
-fi
+_w2_fall_rc=0
+_w2_fall_hits="$(grep -rnE "$W2_FIXPATH_A|$W2_FIXPATH_B" "$SCRIPT_DIR/../../files")" || _w2_fall_rc=$?
+case "$_w2_fall_rc" in
+    0) fail "W2 class sweep: mktemp fixed-path fallback survived (got: $_w2_fall_hits)" ;;
+    1) pass "W2 class sweep: no mktemp fixed-path fallback in any shipped script (#168)" ;;
+    *) fail "W2 class sweep: grep rc $_w2_fall_rc — files/ tree unreadable, sweep fails loud (#805)" ;;
+esac
 # canary (#202 a W1, extended #202 b W1, #202 c W1): the sweep above
 # greps real files/ and finds nothing by design — its FAIL branch never
 # runs in-suite, so a broken regex would stay green while blind. Pin
