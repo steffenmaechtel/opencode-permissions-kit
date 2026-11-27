@@ -651,9 +651,13 @@ _gp_pform_ok() {
 # membership compares would degenerate to /* and migrate's mv
 # destination would land at the filesystem root. The /. spellings
 # (/./, */./*, ./*, */.) join the same arms _gp_root_ok/_gp_pform_ok
-# refuse (#802): a dot-form storage passed every use-time gate while
-# the membership compares "$stor"/* then never matched the real
-# pointer paths — every project classified foreign.
+# refuse (#802). The ./* arm is unreachable behind the absolute gate
+# and stays so the family's verbatim arm line finds this site (the
+# wrapper sibling's note, as-opencode-core.sh); the reachable mid
+# /./ and trailing /. forms are the mechanism: a dot-form storage
+# passed every use-time gate while the membership compares
+# "$stor"/* then never matched the real pointer paths — every
+# project classified foreign.
 _gp_storage_sane() {
     _gpss_s=$1
     case "$_gpss_s" in

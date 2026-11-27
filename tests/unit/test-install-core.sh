@@ -958,10 +958,13 @@ fi
 # carve-out (agent/conventions.md "Interactive prompts"). Comment-
 # stripped grep for the default itself; the rationale comment must
 # exist at the site too. The abort hint's sudo spelling is pinned
-# alongside (#802 W2): the bare 'run: opk update' form was the hint-
-# consistency class's last survivor — update is root-requiring, a
-# non-root follower of the bare hint cannot write the root-owned
-# library.
+# alongside (#802 W2): the bare 'run: opk update' form was the last
+# survivor of the pr-0800 hint-consistency class IN THIS FILE — not
+# a tree-wide clean: bare spellings of root-requiring commands
+# survive on other surfaces (status-core, git-heal-core,
+# ddev-handover; deferred work order, pr-0809 round a). Update is
+# root-requiring: a non-root follower of a bare hint cannot write
+# the root-owned library.
 # The '#428 disposition' grep below is deliberately UN-RIDDEN (#458,
 # conventions.md "Source-counting pins"): it pins a COMMENT literal --
 # the full-line strip rider would delete the very bytes the pin

@@ -1965,15 +1965,17 @@ else
     fi
 fi
 
-# A4d (#802): the /. spellings (/./, */./*, ./*, */.) pass the
-# absolute gate and no pre-#802 form arm matched them — the same
+# A4d (#802): the reachable /. spellings (mid /./, trailing /.) pass
+# the absolute gate and no pre-#802 form arm matched them — the same
 # spellings _gp_root_ok/_gp_pform_ok refuse at init/report time, so
 # use-time was WEAKER than init rigor: a storage re-derived with a
 # dot component between runs passed every use-time gate while the
 # membership compares "$stor"/* then never matched the real pointer
-# paths (every project classified foreign). Refused rc 1 with the
-# class-enumerating sanity message (migrate pinned below); the
-# negative arm is A4c's real-storage leg.
+# paths (every project classified foreign). The ./* arm rides along
+# for family parity (unreachable behind the absolute gate — the
+# wrapper sibling's note). Refused rc 1 with the class-enumerating
+# sanity message (migrate pinned below); the negative arm is A4c's
+# real-storage leg.
 _rc=0
 _out=$(_core_run '_gp_storage_sane "$WORK/storage/."') || _rc=$?
 if [ "$_rc" = 1 ]; then
