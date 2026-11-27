@@ -164,6 +164,12 @@ topic; reject closes as not planned with the `rejected` label set by
 the maintainer's hand (the Promotion section's reject override). The
 label is what tells a later session stale from declined, and the
 producer side reads it (the skill's Search before filing bullets).
+A label this page does not name is the maintainer's own — a
+`reason-…` tag recording why he rejected a topic, first use
+`reason-maintainer-failure` on opk-agent-feedback#77 — and carries
+no loop meaning: nothing counts, filters or closes on it, it
+modifies no loop label it sits beside, and a session reading a
+timeline treats it as his bookkeeping, not a disposition.
 Class rationales and added demands live in the commission and the
 wave's PR body, not on the issue; the only comment-side texts a
 disposition prescribes are the external class's — the landing

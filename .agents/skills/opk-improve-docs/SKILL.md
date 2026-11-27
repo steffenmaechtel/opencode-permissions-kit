@@ -128,6 +128,10 @@ reads it now and later metrics may; the count never does.
   A topic from a LOADED skill is never research-candidate — the
   skill-origin check governs it (global skill: maintainer, no issue;
   repo skill: file normally).
+- A label neither the loop nor this section names (e.g. a
+  `reason-…` tag on a rejected match) is the maintainer's own and
+  changes nothing this skill does with a match — the rule lives in
+  agent/docs-loop.md, Triage.
 
 ## Before posting
 
