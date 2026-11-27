@@ -171,6 +171,29 @@ scan() {
                 if (t !~ /^\/[A-Za-z0-9._\/-]*$/) return 0
                 return 1
             }
+            # Quoted-literal form of isbad (#807 w3 F6): the bytes were
+            # assembled by the quote walk, so they are LITERAL shell
+            # bytes (no glob, no expansion) -- the path-shape char class
+            # is dropped, only the sanctioned prefixes stay ("/etc/a#b"
+            # was green because # defeats the class).
+            function isbad_q(t) {
+                if (substr(t, 1, 1) != "/") return 0
+                if (t ~ /^\/(tmp\/|var\/tmp\/|dev\/null$)/) return 0
+                return 1
+            }
+            # Default-literal extraction (#807 w3 F10): "${V:-/host/path}"
+            # degenerates to the literal /host/path on an empty variable
+            # -- the degenerate-fixed-path shape the rm suffix guard
+            # exists for (tests/AGENTS.md Test sandbox section), blanked
+            # today because the run reads as a variable. match() sets
+            # RSTART/RLENGTH; the ~ operators do not.
+            function dflt_of(str,   d) {
+                if (!match(str, /\$\{[A-Za-z_][A-Za-z0-9_]*:-\/[^}]*\}/)) return ""
+                d = substr(str, RSTART, RLENGTH)
+                sub(/^[^:]*:-/, "", d)
+                sub(/\}$/, "", d)
+                return d
+            }
             function allowed(tok) {
                 if (allow == "") return 0
                 return index("\n" allow "\n", "\n" f "|" tok "\n") > 0
@@ -193,15 +216,79 @@ scan() {
                 if (kind == "ratchet" && allowed(tok)) return
                 printf "%s|%d|%s|%s\n", f, NR, kind, tok
             }
-            # #727 fix B: a quoted run that opens with "/" is a LITERAL
-            # path operand, not a variable -- keep its bytes so check 1
-            # sees them (rm -rf "/srv/x" was invisible: blanked here and
-            # not a ratchet tree). Variable runs keep the X placeholder
-            # (what a variable holds is for the review, tests/AGENTS.md
-            # Test sandbox section).
+            BEGIN {
+                # marker bytes that cannot occur in suite text: a quoted
+                # literal run emits as ONE token -- inner spaces ride as
+                # M so the [ \t]+ split cannot break the operand (#807
+                # w3 F5), literal | & ; ride as M2/M3/M4 so the segment
+                # split cannot cut the token (a sed address such as
+                # /^OK|x|/d is one argument, not three segments), and
+                # any M-family byte in a token marks quote/escape
+                # assembled literal bytes for the widened check.
+                M = sprintf("%c", 1); M2 = sprintf("%c", 2)
+                M3 = sprintf("%c", 3); M4 = sprintf("%c", 4)
+                # quote parity carries ACROSS physical lines (#807 w3
+                # F8): the shell keeps a quoted string open at a
+                # newline, so the walk must too -- before, parity
+                # reset per line and the post-quote tail of the closing
+                # line was invisible. The two shell shapes that do NOT
+                # carry the outer parity -- command substitution (a
+                # fresh quote context) and heredoc bodies (data) -- are
+                # handled by sub_stack and hd_delim (#807 review a F1).
+                indq = 0; insq = 0; qrun = ""
+                sub_stack = ""; hd_delim = ""; hd_dash = 0
+            }
+            # #727 fix B, reshaped by #807 w3: a quoted run of literal
+            # bytes (no "$" inside) is emitted as ONE marker-wrapped
+            # token -- inner spaces ride as M so the token split cannot
+            # break the operand (F5), and the widened isbad_q sees every
+            # literal byte (F6). A variable-carrying run stays the X
+            # placeholder -- what a variable holds is for the review,
+            # tests/AGENTS.md Test sandbox section -- with the one
+            # exception of a ${V:-/default} literal, which is emitted
+            # wrapped too so check 1 can flag the default literal
+            # itself (F10).
             function quote_out(q) {
-                if (substr(q, 1, 1) == "/") return q
+                if (index(q, "$") == 0 && substr(q, 1, 1) == "/") {
+                    gsub(/[ \t]/, M, q)
+                    gsub(/\|/, M2, q)
+                    gsub(/&/, M4, q)
+                    gsub(/;/, M3, q)
+                    return M q
+                }
+                if (q ~ /\$\{[A-Za-z_][A-Za-z0-9_]*:-\//) {
+                    gsub(/[ \t]/, M, q)
+                    return M q
+                }
                 return "X"
+            }
+            # Operand verdict for one command token (#807 w3): marker
+            # tokens restore their spaces and literal separator bytes
+            # and take the widened check; plain tokens keep the strip
+            # chain (parens, glued redirect -- F11 --, trailing
+            # punctuation) and the strict check. Both forms
+            # additionally flag a ${V:-/literal} default (F10).
+            function flag_operand(rt,   t, d) {
+                t = rt
+                if (index(t, M) > 0 || index(t, M2) > 0 || index(t, M3) > 0 || index(t, M4) > 0) {
+                    if (substr(t, 1, 1) == M) t = substr(t, 2)
+                    gsub(M4, "\\&", t)
+                    gsub(M3, ";", t)
+                    gsub(M2, "|", t)
+                    gsub(M, " ", t)
+                    sub(/[ \t]+$/, "", t)
+                    if (isbad_q(t)) { report(t, "mutate"); return }
+                } else {
+                    sub(/^[(=]+/, "", t)
+                    sub(/^[0-9]{0,2}>+/, "", t)
+                    sub(/[,,)&|*]+$/, "", t)
+                    if (isbad(t)) { report(t, "mutate"); return }
+                }
+                d = dflt_of(t)
+                if (d != "") {
+                    gsub(M, " ", d)
+                    if (isbad_q(d)) report(d, "mutate")
+                }
             }
             {
                 # join backslash continuations into logical lines (the
@@ -213,22 +300,88 @@ scan() {
                 }
                 orig = pending $0
                 pending = ""
+                # heredoc bodies are DATA, not code (#807 review a F1):
+                # the shell pairs no quotes inside them, so the walk
+                # must not read them -- one odd apostrophe in a heredoc
+                # prose line used to swallow parity for the whole
+                # remaining file and hide the real rm behind EOF. The
+                # delimiter line itself is code and stays scanned; the
+                # body is skipped until the delimiter repeats (tabs may
+                # lead it under <<-).
+                if (hd_delim != "") {
+                    line = $0
+                    if (hd_dash) sub(/^[ \t]+/, "", line)
+                    if (line == hd_delim) hd_delim = ""
+                    next
+                }
                 probe = orig; sub(/^[ \t]+/, "", probe)
-                if (substr(probe, 1, 1) == "#") next
-                # blank quoted regions: operands-only view (a quoted run
-                # collapses into one placeholder token so quoted variable
-                # destinations still count as operands; escaped quotes are
-                # a documented limitation, none in scope). A run opening
-                # with "/" is a LITERAL path: its bytes stay visible for
-                # check 1 (#727 fix B, quote_out above). The unquoted
-                # trailing comment is cut inside the walk now -- kept
-                # literal bytes may carry "#", so ops is no longer
-                # #-free and a post-hoc index() strip would truncate the
-                # line at a quoted "#".
-                ops = ""; indq = 0; insq = 0; qrun = ""
+                # operands-only view: a quoted run of literal bytes
+                # collapses into ONE marker-wrapped token (quote_out
+                # above); a variable-carrying run into the X placeholder.
+                # A full-comment line is skipped only while NO quote is
+                # open -- inside a quoted continuation the # is string
+                # content (#807 w3 F8).
+                if (substr(probe, 1, 1) == "#" && !indq && !insq) next
+                # heredoc operator in code context: the body follows
+                # (#807 review a F1). Only an unquoted leading-token
+                # delimiter names a heredoc here. The quote class rides
+                # the sq variable -- the program text itself must stay
+                # apostrophe-free (the awk body is a single-quoted
+                # shell string).
+                if (!indq && !insq && substr(probe, 1, 1) != "#" &&
+                    match(orig, "<<-?[ \t]*[" dq sq "]?[A-Za-z_][A-Za-z0-9_]*[" dq sq "]?")) {
+                    d = substr(orig, RSTART, RLENGTH)
+                    hd_dash = (d ~ "^<<-")
+                    sub("^<<-?[ \t]*[" dq sq "]?", "", d)
+                    sub("[" dq sq "]?$", "", d)
+                    hd_delim = d
+                }
+                ops = ""
+                if (!indq && !insq) qrun = ""
+                depth = 0
                 L = length(orig)
                 for (p = 1; p <= L; p++) {
                     ch = substr(orig, p, 1)
+                    # escape pairs (#807 w3 F7): outside sq a backslash
+                    # escapes the NEXT byte -- an escaped quote must not
+                    # toggle parity, an escaped space must not split the
+                    # token (rides as M), an escaped # must not cut.
+                    # Inside sq the backslash is a plain byte (the #287
+                    # d D1 lesson: a sq action ending in a backslash).
+                    if (ch == "\\" && !insq) {
+                        if (p < L) {
+                            nxt = substr(orig, p + 1, 1)
+                            if (indq) { qrun = qrun (nxt == " " || nxt == "\t" ? M : ch nxt) }
+                            else if (nxt == " " || nxt == "\t") { ops = ops M }
+                            else { ops = ops ch nxt }
+                            p++
+                        } else if (indq) { qrun = qrun ch }
+                        continue
+                    }
+                    # command substitution suspends the outer quote
+                    # context -- the shell pairs the quotes inside $( )
+                    # fresh (#807 review a F1: a $(-shape with nested
+                    # quotes ended the line with carried parity open and
+                    # hid the executed tail). The carried parity rides
+                    # the stack; the substitution is walked fresh; the
+                    # matching ) restores it (a ) inside a quote is a
+                    # plain byte; a ) with nothing on the stack is a
+                    # case-arm byte).
+                    if (ch == "$" && p < L && substr(orig, p + 1, 1) == "(") {
+                        sub_stack = sub_stack (indq ? "D" : (insq ? "S" : "N"))
+                        if (indq || insq) ops = ops "X"
+                        indq = 0; insq = 0; qrun = ""
+                        ops = ops ch substr(orig, p + 1, 1)
+                        p++
+                        continue
+                    }
+                    if (ch == ")" && !indq && !insq && length(sub_stack) > 0) {
+                        c = substr(sub_stack, length(sub_stack), 1)
+                        sub_stack = substr(sub_stack, 1, length(sub_stack) - 1)
+                        indq = (c == "D"); insq = (c == "S"); qrun = ""
+                        ops = ops ch
+                        continue
+                    }
                     if (!insq && ch == dq) {
                         if (indq) { indq = 0; ops = ops quote_out(qrun) } else { indq = 1; qrun = "" }
                         continue
@@ -237,10 +390,20 @@ scan() {
                         if (insq) { insq = 0; ops = ops quote_out(qrun) } else { insq = 1; qrun = "" }
                         continue
                     }
-                    if (indq || insq) { qrun = qrun ch; continue }
-                    if (ch == "#") break
+                    if (indq || insq) { qrun = qrun (ch == " " || ch == "\t" ? M : ch); continue }
+                    # the unquoted comment cut keeps ${V#pat} expansions
+                    # intact (#807 w3 F9): a # inside an open ${ } brace
+                    # is an expansion operator, not a comment (#727 moved
+                    # the cut inside the walk so kept literal bytes may
+                    # carry # -- brace depth refines it)
+                    if (ch == "#" && depth == 0) break
+                    if (ch == "{") depth++
+                    if (ch == "}") { if (depth > 0) depth-- }
                     ops = ops ch
                 }
+                # newline inside an open quoted string: rides as M so the
+                # carried qrun stays one token when it closes later (F8)
+                if (indq || insq) qrun = qrun M
 
                 # --- check 2: real-tree literal ratchet (verb-independent;
                 # RAW view so quoted literals count -- 0.0.42g C2).
@@ -272,33 +435,41 @@ scan() {
                         last = ""
                         for (i = n; i > vi; i--) {
                             if (tk[i] == "") continue
-                            if (tk[i] ~ /^[0-9]{0,2}>/) continue
+                            if (tk[i] ~ /^[0-9]{0,2}>/) { flag_operand(tk[i]); continue }
+                            if (tk[i] ~ /^[0-9]{0,2}</) continue
                             if (substr(tk[i], 1, 1) == "-") continue
                             last = tk[i]; break
                         }
-                        if (last != "") {
-                            t = last; sub(/^[(=]+/, "", t); sub(/[,;)&|*]+$/, "", t)
-                            if (isbad(t)) report(t, "mutate")
-                        }
+                        if (last != "") flag_operand(last)
                     } else if (verb == "sed") {
                         hasi = 0
                         for (i = vi + 1; i <= n; i++) if (tk[i] ~ /^-[A-Za-z]*i/) hasi = 1
                         if (!hasi) continue
                         last = ""
+                        cnt = 0
                         for (i = n; i > vi; i--) {
                             if (tk[i] == "") continue
-                            if (tk[i] ~ /^[0-9]{0,2}>/) continue
-                            last = tk[i]; break
+                            if (tk[i] ~ /^[0-9]{0,2}>/) { flag_operand(tk[i]); continue }
+                            if (tk[i] ~ /^[0-9]{0,2}</) continue
+                            # pure flags only: a glued flag+script token
+                            # (-is/a/b/) carries the script and must count
+                            # as an operand -- as a flag it vanished from
+                            # cnt and the file operand stayed alone, a
+                            # class the pre-wave scanner still caught
+                            # (#807 review a F2)
+                            if (tk[i] ~ /^-[A-Za-z]+$/) continue
+                            if (cnt == 0) last = tk[i]
+                            cnt++
                         }
-                        if (last != "") {
-                            t = last; sub(/^[(=]+/, "", t); sub(/[,;)&|*]+$/, "", t)
-                            if (isbad(t)) report(t, "mutate")
-                        }
+                        # cnt == 1: the only operand IS the sed script
+                        # (an address such as /x/d starts with / but is
+                        # no path) -- never flag it; a file operand
+                        # follows only when cnt > 1 (#807 w3)
+                        if (last != "" && cnt > 1) flag_operand(last)
                     } else {
                         for (i = vi + 1; i <= n; i++) {
                             if (tk[i] == "") continue
-                            t = tk[i]; sub(/^[(=]+/, "", t); sub(/[,;)&|*]+$/, "", t)
-                            if (isbad(t)) report(t, "mutate")
+                            flag_operand(tk[i])
                         }
                     }
                 }
@@ -449,6 +620,170 @@ if grep -q "test-probe-qhash.sh|3|mutate|/home/some-user-max-mustermann/probe-ha
     pass "self-probe: a quoted # keeps the later rm segment visible (#727)"
 else
     fail "self-probe: a quoted # must not truncate the operand view (#727)"
+fi
+
+# --- 2e. self-probe: quote-walk hardening (#807 w3, F5-F11) -------------------
+# Seven miss classes reproduced in #806 round a, fixed by the marker-token
+# quote walk. Each probe file carries the REAL byte shape (not a fictional
+# prefix -- the miss detection must see the form it has to catch):
+#   F5  qsp      a space-bearing quoted DESTINATION slipped the
+#                cp/mv/ln/tee/install last-operand rule (the walk emitted
+#                the bytes verbatim, the [ \t]+ split broke the token,
+#                the last operand carried non-absolute leftovers)
+#   F6  qhl      a quoted operand with a # (or any byte outside the old
+#                path-shape class) stayed green -- isbad_q now checks the
+#                literal bytes without the class
+#   F7  escq     an escaped quote inside the string flipped the walker
+#                parity against the shell -- the executed tail after the
+#                real closing quote was invisible (escape pairs consumed
+#                in the walk now; inside sq a backslash stays plain)
+#   F8  mlq      a quoted string over a physical line reset parity per
+#                line -- the closing line's post-quote rm was invisible
+#                (parity carries across records now)
+#   F9  bh       the unquoted # cut truncated at ${V#pat} expansions and
+#                hid the executed tail behind it (brace depth guards the
+#                cut now)
+#   F10 dflt     "${V:-/host/path}" degenerates to the literal default on
+#                an empty variable -- the default literal is flagged
+#                itself; a sanctioned-prefix default stays exempt
+#   F11 gr       a glued redirect target (2>/etc/y) escaped every arm --
+#                the redirect prefix strips and flags in all three arms
+#                (the unquoted form; a quoted glued target,
+#                2>"/etc/x", stays unguarded -- pre-existing residual,
+#                #807 review a F6)
+# The sed-address guard probe pins the false-positive DIRECTION of the
+# widened literal check: a quoted sed ADDRESS ('/x/d') starts with / but
+# is the script argument, never a path -- cnt==1 never flags it, and the
+# segment-splitting | bytes inside a quoted literal ride markers so the
+# address stays one token. Both operand forms of the sed line are
+# pinned: with a file operand (the walk takes the file, never the
+# script) and script-only (the cnt==1 guard never flags the lone
+# script argument).
+{
+    printf '#!/bin/sh\n# probe: space-bearing quoted destination (#807 w3 F5)\ncp /tmp/src "/etc/probe-qsp dst"\nmv /tmp/src "/etc/probe-qsp-mv"\n' \
+        >"$PROBE_DIR/unit/test-probe-qsp.sh"
+    printf '#!/bin/sh\n# probe: quoted operand with a non-class byte (#807 w3 F6)\nrm -rf "/etc/probe-qhl#x"\n' \
+        >"$PROBE_DIR/unit/test-probe-qhl.sh"
+    printf '#!/bin/sh\n# probe: escaped-quote parity (#807 w3 F7)\necho "a\\" b"; rm -rf /etc/probe-escq\n' \
+        >"$PROBE_DIR/unit/test-probe-escq.sh"
+    printf '#!/bin/sh\n# probe: quoted string over a physical line (#807 w3 F8)\nx="first\nsecond"; rm -rf /etc/probe-mlq\n' \
+        >"$PROBE_DIR/unit/test-probe-mlq.sh"
+    printf '#!/bin/sh\n# probe: # cut inside ${V#pat} expansion (#807 w3 F9)\nrm -rf ${V#pat} && rm -rf /etc/probe-bh\n' \
+        >"$PROBE_DIR/unit/test-probe-bh.sh"
+    printf '#!/bin/sh\n# probe: ${V:-/default} literal (#807 w3 F10)\nrm -rf "${V:-/etc/probe-dflt}"\nrm -rf ${V:-/etc/probe-dfltu}\nrm -rf "${WORK:-/var/tmp/fb}/sub"\n' \
+        >"$PROBE_DIR/unit/test-probe-dflt.sh"
+    printf '#!/bin/sh\n# probe: glued redirect target (#807 w3 F11)\nrm -rf /tmp/ok 2>/etc/probe-gr\ncp /tmp/src /tmp/dst 2>/etc/probe-gr-c\nsed -i s/a/b/ "$WORK/f" 2>/etc/probe-gr-s\n' \
+        >"$PROBE_DIR/unit/test-probe-gr.sh"
+    printf '#!/bin/sh\n# probe: quoted sed address must stay green (#807 w3 FP guard)\nsed -i '"'"'/x/d'"'"' "$WORK/m.conf"\nsed -i '"'"'/y/d'"'"'\nrm -rf /etc/probe-sa\n' \
+        >"$PROBE_DIR/unit/test-probe-sa.sh"
+}
+: >"$VIOL"
+if ! scan "$PROBE_DIR/unit" >"$VIOL"; then
+    fail "scan died on the quote-walk probe scan -- checks 1-2 self-probes unreliable (#519)"
+fi
+if grep -q "test-probe-qsp.sh|3|mutate|/etc/probe-qsp dst" "$VIOL" &&
+    grep -q "test-probe-qsp.sh|4|mutate|/etc/probe-qsp-mv" "$VIOL"; then
+    pass "self-probe: space-bearing quoted destinations caught in cp and mv arms (#807 w3 F5)"
+else
+    fail "self-probe: a quoted destination with an inner space must be caught by the last-operand rule (#807 w3 F5)"
+fi
+if grep -q "test-probe-qhl.sh|3|mutate|/etc/probe-qhl#x" "$VIOL"; then
+    pass "self-probe: a quoted operand with a non-class byte is caught (#807 w3 F6)"
+else
+    fail "self-probe: a quoted operand carrying # must be caught despite the old char class (#807 w3 F6)"
+fi
+if grep -q "test-probe-escq.sh|3|mutate|/etc/probe-escq" "$VIOL"; then
+    pass "self-probe: an escaped quote keeps shell parity, executed tail caught (#807 w3 F7)"
+else
+    fail "self-probe: an escaped-quote string must not hide the executed tail behind the real close (#807 w3 F7)"
+fi
+if grep -q "test-probe-mlq.sh|4|mutate|/etc/probe-mlq" "$VIOL"; then
+    pass "self-probe: quote parity carries across the physical line, post-close rm caught (#807 w3 F8)"
+else
+    fail "self-probe: a quoted string over a physical line must not hide the closing line's rm (#807 w3 F8)"
+fi
+if grep -q "test-probe-bh.sh|3|mutate|/etc/probe-bh" "$VIOL" &&
+    ! grep -qF 'test-probe-bh.sh|3|mutate|${V#pat}' "$VIOL"; then
+    pass "self-probe: the # cut spares ${V#pat}, tail behind && caught (#807 w3 F9)"
+else
+    fail "self-probe: a # inside a brace expansion must not cut the operand view (#807 w3 F9)"
+fi
+if grep -q "test-probe-dflt.sh|3|mutate|/etc/probe-dflt" "$VIOL" &&
+    grep -q "test-probe-dflt.sh|4|mutate|/etc/probe-dfltu" "$VIOL" &&
+    ! grep -qF '/var/tmp/fb' "$VIOL"; then
+    pass "self-probe: ${V:-/default} literal flagged in dq and unquoted forms, sanctioned default exempt (#807 w3 F10)"
+else
+    fail "self-probe: a host-path ${V:-/default} literal must be flagged itself; /var/tmp stays exempt (#807 w3 F10)"
+fi
+if grep -q "test-probe-gr.sh|3|mutate|/etc/probe-gr" "$VIOL" &&
+    grep -q "test-probe-gr.sh|4|mutate|/etc/probe-gr-c" "$VIOL" &&
+    grep -q "test-probe-gr.sh|5|mutate|/etc/probe-gr-s" "$VIOL"; then
+    pass "self-probe: glued redirect targets caught in rm, cp and sed -i arms (#807 w3 F11)"
+else
+    fail "self-probe: a glued redirect target must be caught in every mutating arm (#807 w3 F11)"
+fi
+if grep -q "test-probe-sa.sh|5|mutate|/etc/probe-sa" "$VIOL" &&
+    ! grep -qF 'test-probe-sa.sh|3|mutate|/x/d' "$VIOL" &&
+    ! grep -qF 'test-probe-sa.sh|4|mutate|/y/d' "$VIOL"; then
+    pass "self-probe: a quoted sed address stays green with and without a file operand (#807 w3 FP guard)"
+else
+    fail "self-probe: a quoted sed address ('/x/d', '/y/d') must not flag as a mutate path (#807 w3 FP guard)"
+fi
+
+# --- 2f. self-probe: review-a fix wave (F1/F2/F3) -----------------------------
+# Three probes pin the mechanisms the round-a review found unpinned or
+# regressed; the positive exact-token greps carry the discrimination
+# (deleting the mechanism drops the row instead of mismatching a negation):
+#   F1  heredoc  a heredoc body is DATA -- the apostrophe in the prose
+#                line must not open quote parity; the real rm behind EOF
+#                is caught (one odd apostrophe used to swallow parity for
+#                the whole remaining file)
+#   F1  cmdsub   command substitution suspends the outer quote context --
+#                the exact corpus shape (a $(-assignment with nested
+#                quotes) ends its line with carried parity closed and the
+#                rm on the next line is caught
+#   F3  qpipe    literal | ; & inside quoted literals ride markers so the
+#                segment split cannot cut the token -- the exact token
+#                greps fail on a truncated row, and the sed file operand
+#                behind a pipe-bearing quoted address stays visible
+#   F2  sedglued a glued flag+script sed (-is/a/b/) counts its file
+#                operand -- the pure-flag-only skip does not swallow it
+{
+    printf '#!/bin/sh\n# probe: heredoc body is data, code behind EOF is caught (#807 review a F1)\ncat <<EOF\nit'"'"'s fine\nEOF\nrm -rf /etc/probe-hd-after\n' \
+        >"$PROBE_DIR/unit/test-probe-heredoc.sh"
+    printf '#!/bin/sh\n# probe: command substitution resets quote context (#807 review a F1)\nLIBDIR="$(live_src "$INSTALL" | sed -n '"'"'s/^LIBDIR="\\([^"]*\\)"$/\\1/p'"'"' | head -n 1)"\nrm -rf /etc/probe-cs\n' \
+        >"$PROBE_DIR/unit/test-probe-cmdsub.sh"
+    printf '#!/bin/sh\n# probe: literal separators ride markers (#807 review a F3)\nrm -rf '"'"'/etc/probe-pipe|x'"'"'\nrm -rf '"'"'/etc/probe-semi;x'"'"'\nrm -rf '"'"'/etc/probe-amp&x'"'"'\nsed -i '"'"'/a|b/d'"'"' /etc/probe-pf\n' \
+        >"$PROBE_DIR/unit/test-probe-qpipe.sh"
+    printf '#!/bin/sh\n# probe: glued flag+script sed flags its file operand (#807 review a F2)\nsed -is/a/b/ /etc/probe-sg\n' \
+        >"$PROBE_DIR/unit/test-probe-sg.sh"
+}
+: >"$VIOL"
+if ! scan "$PROBE_DIR/unit" >"$VIOL"; then
+    fail "scan died on the review-a probe scan -- checks 1-2 self-probes unreliable (#519)"
+fi
+if grep -q "test-probe-heredoc.sh|6|mutate|/etc/probe-hd-after" "$VIOL"; then
+    pass "self-probe: heredoc body stays data, the real rm behind EOF is caught (#807 review a F1)"
+else
+    fail "self-probe: an apostrophe in a heredoc body must not swallow parity past EOF (#807 review a F1)"
+fi
+if grep -q "test-probe-cmdsub.sh|4|mutate|/etc/probe-cs" "$VIOL"; then
+    pass "self-probe: a command-substitution shape resets quote context, next-line rm caught (#807 review a F1)"
+else
+    fail "self-probe: a \$(-assignment with nested quotes must not carry parity over the executed tail (#807 review a F1)"
+fi
+if grep -qF 'test-probe-qpipe.sh|3|mutate|/etc/probe-pipe|x' "$VIOL" &&
+    grep -qF 'test-probe-qpipe.sh|4|mutate|/etc/probe-semi;x' "$VIOL" &&
+    grep -qF 'test-probe-qpipe.sh|5|mutate|/etc/probe-amp&x' "$VIOL" &&
+    grep -q "test-probe-qpipe.sh|6|mutate|/etc/probe-pf" "$VIOL"; then
+    pass "self-probe: literal | ; & stay inside one token, sed file operand behind a pipe-bearing address caught (#807 review a F3)"
+else
+    fail "self-probe: quoted literals carrying | ; & must reach check 1 whole -- the segment split must not cut them (#807 review a F3)"
+fi
+if grep -q "test-probe-sg.sh|3|mutate|/etc/probe-sg" "$VIOL"; then
+    pass "self-probe: a glued flag+script sed (-is/a/b/) flags its file operand (#807 review a F2)"
+else
+    fail "self-probe: a glued flag+script sed must count the file operand -- the flag skip must not swallow the script (#807 review a F2)"
 fi
 
 # --- 3. rm suffix form: :? empty-var guard (2026-10-06) -----------------------
