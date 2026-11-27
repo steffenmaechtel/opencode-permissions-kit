@@ -112,7 +112,9 @@ lines are skipped):
    quoted or not, in fixture strings as much as in commands.
    Policy-INPUT classes — values handed to
    screening/parsing functions or parse-only argument fixtures, never
-   executed as paths — are allowlisted in the suite with reasons, and
+   executed as paths — are written against fictional prefixes since
+   #727, not allowlisted; the ALLOW list holds BOUND rows only (the
+   literal is the assertion's subject), and
    an ALLOW row can never cover a mutation finding (#727: the
    screener consults the allowlist for ratchet findings only, so the
    exception channel cannot hide an `rm -rf` operand however long it
@@ -125,8 +127,9 @@ lines are skipped):
    that must match shipped bytes, a policy control row), named by an
    in-place bound comment plus the ALLOW entry's reason. Real-prefix
    literals OUTSIDE the trees fall into recorded classes: a residual
-   sweep deferred to issue #807 wave 2 (host-specific homes — the
-   /home/dev fixtures and the agent-home rows; the /var/www family
+   sweep deferred to issue #807 wave 2 (host-specific homes and
+   project areas — the /home/dev fixtures, the agent-home rows and
+   the /srv/* project-area fixtures; the /var/www family
    without vhosts joined the enforced trees in #807 wave 1), the
    blocklist pins' own subjects
    (FHS system-path literals, /etc/nginx, /root/projects, ...), and

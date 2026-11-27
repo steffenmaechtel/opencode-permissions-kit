@@ -38,8 +38,9 @@
 #    carried them for months behind a sed). Tokens under /tmp or
 #    /var/tmp are exempt (sandboxed fixtures are the point); a leading
 #    redirection (2>/path) is stripped before matching (0.0.42g C3).
-#    Policy-INPUT classes (values fed to screening/parsing functions,
-#    never executed) are allowlisted below with reasons -- and an ALLOW
+#    Policy-INPUT literals (values fed to screening/parsing functions,
+#    never executed) belong on fictional prefixes (#727); the ALLOW
+#    list below holds BOUND rows only -- and an ALLOW
 #    row can never cover a MUTATION finding: report() consults the
 #    allowlist for ratchet findings only (#727 fix A).
 #
