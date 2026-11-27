@@ -581,12 +581,12 @@ do_plan_phase() {
             # — the re-configure touches kit config only (user config
             # is detected and kept downstream), the prompt is
             # INTERACTIVE-gated (the curl|bash path never sees it),
-            # and "no" just points at opk update and exits 0. The
+            # and "no" just points at sudo opk update and exits 0. The
             # conventions' carve-out (agent/conventions.md,
             # "Interactive prompts"): y where "no" is the surprising
             # answer for the command's declared intent.
             if ! ui_confirm "Re-configure the existing installation with install.sh?" "y"; then
-                ui_info "Aborted — run: opk update"
+                ui_info "Aborted — run: sudo opk update"
                 exit 0
             fi
         fi

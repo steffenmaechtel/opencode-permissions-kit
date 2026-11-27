@@ -516,7 +516,7 @@ _gp_reheal_storage() {
     [ -d "$_gprs_stor" ] || return 0
     if ! _gp_storage_sane "$_gprs_stor"; then
         ui_warn "storage reheal skipped: the use-time sanity check failed""\
- (non-absolute, bare /, dot-dot, doubled slash, whitespace, glob, or symlinked?): $_gprs_stor"
+ (non-absolute, bare /, dot-dot, dot segment, doubled slash, whitespace, glob, or symlinked?): $_gprs_stor"
         _gprs_failed=1
         return 0
     fi
@@ -649,7 +649,15 @@ _gp_pform_ok() {
 # The bare "/" root is refused too (#794, the sibling class #793
 # closed for _gp_pform_ok): no form arm matches a lone slash, the
 # membership compares would degenerate to /* and migrate's mv
-# destination would land at the filesystem root.
+# destination would land at the filesystem root. The /. spellings
+# (/./, */./*, ./*, */.) join the same arms _gp_root_ok/_gp_pform_ok
+# refuse (#802). The ./* arm is unreachable behind the absolute gate
+# and stays so the family's verbatim arm line finds this site (the
+# wrapper sibling's note, as-opencode-core.sh); the reachable mid
+# /./ and trailing /. forms are the mechanism: a dot-form storage
+# passed every use-time gate while the membership compares
+# "$stor"/* then never matched the real pointer paths — every
+# project classified foreign.
 _gp_storage_sane() {
     _gpss_s=$1
     case "$_gpss_s" in
@@ -658,7 +666,7 @@ _gp_storage_sane() {
     esac
     [ "$_gpss_s" = "/" ] && return 1
     case "$_gpss_s" in
-        *..* | *//* | *[[:space:]]* | *[\*\?\[]*) return 1 ;;
+        *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]* | *[\*\?\[]*) return 1 ;;
     esac
     _gp_nosym "$_gpss_s" || return 1
     [ -L "$_gpss_s" ] && return 1
@@ -848,7 +856,7 @@ _gp_migrate_one() {
     # a too-wide window.
     if ! _gp_storage_sane "$_gpm_stor"; then
         ui_error "storage failed the use-time sanity check (non-absolute, bare /,""\
- dot-dot, doubled slash, whitespace, glob, or symlinked?): $_gpm_stor"
+ dot-dot, dot segment, doubled slash, whitespace, glob, or symlinked?): $_gpm_stor"
         return 1
     fi
 
@@ -998,7 +1006,7 @@ _gp_nail_one() {
     esac
     _gp_storage_sane "$_gpn_stor" || {
         ui_warn "not nailing: storage failed the use-time sanity check""\
- (non-absolute, bare /, dot-dot, doubled slash, whitespace, glob, or symlinked?): $_gpn_stor"
+ (non-absolute, bare /, dot-dot, dot segment, doubled slash, whitespace, glob, or symlinked?): $_gpn_stor"
         return 1
     }
     [ -L "$_gpn_gd" ] && {
@@ -1097,7 +1105,7 @@ _gp_revert_one() {
     # A5: use-time storage sanity.
     _gp_storage_sane "$_gpr_stor" || {
         ui_error "storage failed the use-time sanity check (non-absolute, bare /,""\
- dot-dot, doubled slash, whitespace, glob, or symlinked?) — not reverting: $_gpr_stor"
+ dot-dot, dot segment, doubled slash, whitespace, glob, or symlinked?) — not reverting: $_gpr_stor"
         return 1
     }
     [ -d "$_gpr_tgt" ] || {
