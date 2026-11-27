@@ -448,6 +448,47 @@ if [ "$_rootless_ok" = true ]; then
 fi
 
 echo ""
+echo "--- RL3c. env_keep functionally carries the wrapper's configured socket (issue #734) ---"
+# The run.sh 12e.4 twin for the export-path leg (#733 a B4). On the podman
+# daemonless lane the DOCKER_HOST env_keep carries is the invoking shell's
+# sentinel. On docker-rootless the wrapper OVERWRITES the inherited value
+# before the exec (opencode-as-opencode 142-145: DOCKER_HOST := the configured
+# OPENCODE_DOCKER_HOST) — the value the keep must carry into the opencode
+# process is the CONFIGURED socket, never a sentinel. `serve` is the granted
+# invocation that takes the export path from any cwd
+# (wrapper_container_detect forces CONTAINER_REQUESTED for serve), so the arm
+# plants a DISTRACTOR sentinel in dev's shell (had it survived, the export
+# leg regressed to the podman shape), starts a wrapper-invoked serve as dev
+# and reads the opencode process's /proc/<pid>/environ — the post-env_reset
+# table sudo exec'd the target with. dev holds NOPASSWD:ALL
+# (Dockerfile.rootless). The sudo cat environ read needs cross-uid
+# PTRACE_MODE_READ and rides the harness's --privileged run (lib.sh) — a
+# de-privileged container EPERMs on it (probed, pr-808 a A1). The pgrep/pkill
+# poll is Dockerfile-pinned (procps) instead of riding docker-ce's Recommends
+# edge (#733 a B1 class).
+if [ "$_rootless_ok" = true ]; then
+    docker exec -u dev -e OPK_UPDATE_CHECK=0 "$E2E_CONTAINER" \
+        sh -c 'cd /tmp && DOCKER_HOST=e2e-export-distractor timeout 45 /usr/local/bin/opencode serve --hostname 127.0.0.1 --port 4196 >/tmp/export-serve.out 2>&1' \
+        >/dev/null 2>&1 &
+    E2E_EXPORT_JOB=$!
+    _export_pid=""
+    for _ in $(seq 1 30); do
+        _export_pid="$(E 'sudo pgrep -u opencode -f "serve --hostname 127.0.0.1 --port 4196" | head -1' || true)"
+        [ -n "$_export_pid" ] && break
+        sleep 1
+    done
+    if [ -z "$_export_pid" ]; then
+        echo "  ${RED}WARN${NC}  wrapper serve (export-path probe) pid not found within 30s — environ reads will fail (serve down or still booting under its 45s budget)"
+    fi
+    check "RL3c: env_keep carries the wrapper's CONFIGURED socket across sudo (#734)" \
+        E "sudo cat /proc/${_export_pid:-none}/environ | tr '\\0' '\\n' | grep -Fx 'DOCKER_HOST=$SOCK'"
+    check_fail "RL3c: the invoking-shell sentinel did NOT survive the sudo hop (#734)" \
+        E "sudo cat /proc/${_export_pid:-none}/environ | tr '\\0' '\\n' | grep -Fx 'DOCKER_HOST=e2e-export-distractor'"
+    kill "$E2E_EXPORT_JOB" 2>/dev/null || true
+    E 'sudo pkill -u opencode -f "port 419[6]" >/dev/null 2>&1 || true'
+fi
+
+echo ""
 echo "--- RL4. §9.1 proof with REAL dockerd (soft-only: containers read as opencode UID) ---"
 if [ "$_rootless_ok" = true ]; then
     check "RL4: docker CLI works against the rootless socket as opencode" \

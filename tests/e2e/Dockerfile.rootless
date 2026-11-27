@@ -54,11 +54,13 @@ RUN if [ -n "$APT_ARCHIVE_MIRROR" ]; then \
 # are the kit's own prerequisites (installed again by the helper if missing,
 # harmless to pre-install). iproute2 provides the `ip tuntap` call
 # rootlesskit's slirp4netns setup needs (a userns container can never run
-# dockerd-rootless without it).
+# dockerd-rootless without it). procps is pinned explicitly: docker-ce only
+# Recommends it, and the RL3c environ probe's pgrep/pkill poll must not ride
+# that recommends-edge (the transitive-ride residual class, #733 a B1).
 RUN apt-get update -qq && apt-get install -y --no-install-recommends \
     systemd systemd-sysv dbus \
     sudo curl git acl python3 ca-certificates nodejs npm \
-    uidmap dbus-user-session slirp4netns fuse-overlayfs iproute2 \
+    uidmap dbus-user-session slirp4netns fuse-overlayfs iproute2 procps \
     && rm -rf /var/lib/apt/lists/*
 
 RUN if [ "$GIT_CHANNEL" = "latest" ]; then \
