@@ -954,10 +954,14 @@ fi
 # reddens: install.sh reaching this gate is an explicit invocation
 # whose yes is the purpose; the prompt is INTERACTIVE-gated (the
 # curl|bash path never sees it), the re-configure keeps user config,
-# and "no" just points at opk update and exits 0 — the conventions'
+# and "no" just points at sudo opk update and exits 0 — the conventions'
 # carve-out (agent/conventions.md "Interactive prompts"). Comment-
 # stripped grep for the default itself; the rationale comment must
-# exist at the site too.
+# exist at the site too. The abort hint's sudo spelling is pinned
+# alongside (#802 W2): the bare 'run: opk update' form was the hint-
+# consistency class's last survivor — update is root-requiring, a
+# non-root follower of the bare hint cannot write the root-owned
+# library.
 # The '#428 disposition' grep below is deliberately UN-RIDDEN (#458,
 # conventions.md "Source-counting pins"): it pins a COMMENT literal --
 # the full-line strip rider would delete the very bytes the pin
@@ -966,10 +970,11 @@ fi
 # pinned construct, so the discrimination is inverted by design.
 if live_src "$LIB" |
     grep -qF '"Re-configure the existing installation with install.sh?" "y"' &&
+    live_src "$LIB" | grep -qF 'ui_info "Aborted — run: sudo opk update"' &&
     grep -qF '#428 disposition' "$LIB"; then
-    pass "re-configure ask stays default-y, disposition documented (#428)"
+    pass "re-configure ask stays default-y, abort hint sudo form, disposition documented (#428, #802)"
 else
-    fail "re-configure ask default flipped or undocumented (#428)"
+    fail "re-configure ask default flipped, abort hint spelling drifted, or undocumented (#428, #802)"
 fi
 
 # --- #482 F17: install-side openchamber pin is atomic stage+mv ---------------------

@@ -9,7 +9,8 @@
 #     classification (classic / nailed / unnailed / foreign-pointer /
 #     worktree-reg), the atomic migrate (happy path, skip arms,
 #     collision suffix, worktree repair, rollback, the #793/#794
-#     bare-/ refusals: gate, migrate, revert, storage root), the #779 storage
+#     bare-/ refusals (gate, migrate, revert, storage root) and the
+#     #802 /. dot-form storage refusals), the #779 storage
 #     reheal sweep (drift heal, the symlink/foreign/junk skip gates,
 #     the failure count, the on-pass wiring and its failure
 #     propagation), the storage entry
@@ -819,7 +820,7 @@ ln -s "$WORK/rhs-real" "$WORK/rhs-sym"
 _rc=0
 _out=$(_core_run '_gp_reheal_storage "$WORK/rhs-sym"; _r=$?; printf "flag=%s\n" "$_gprs_failed"; printf "rc=%s\n" "$_r"') || _rc=$?
 if printf '%s' "$_out" | grep -qF 'storage reheal skipped: the use-time sanity check failed' &&
-    printf '%s' "$_out" | grep -qF 'dot-dot, doubled slash, whitespace, glob, or symlinked?' &&
+    printf '%s' "$_out" | grep -qF 'dot-dot, dot segment, doubled slash, whitespace, glob, or symlinked?' &&
     printf '%s' "$_out" | grep -qF 'flag=1' &&
     printf '%s' "$_out" | grep -qF 'rc=0'; then
     pass "reheal: an insane storage skips loud AND fails the pass counter (#779, #783 a A1, b B1; #798 C2)"
@@ -1956,12 +1957,47 @@ else
     _out=$(_core_run 'GP_STORAGE=/ _gp_migrate_one "$WORK/roots/r1/rootstor" yes') || _rc=$?
     if [ "$_rc" = 1 ] &&
         printf '%s' "$_out" | grep -qF 'use-time sanity check (non-absolute, bare /,' &&
-        printf '%s' "$_out" | grep -qF 'dot-dot, doubled slash, whitespace, glob, or symlinked?' &&
+        printf '%s' "$_out" | grep -qF 'dot-dot, dot segment, doubled slash, whitespace, glob, or symlinked?' &&
         [ -d "$WORK/roots/r1/rootstor/.git" ]; then
         pass "security A4c: migrate with a / storage refused before any move (#794)"
     else
         fail "security A4c: migrate /-storage arm (rc=$_rc out=$_out)"
     fi
+fi
+
+# A4d (#802): the /. spellings (/./, */./*, ./*, */.) pass the
+# absolute gate and no pre-#802 form arm matched them — the same
+# spellings _gp_root_ok/_gp_pform_ok refuse at init/report time, so
+# use-time was WEAKER than init rigor: a storage re-derived with a
+# dot component between runs passed every use-time gate while the
+# membership compares "$stor"/* then never matched the real pointer
+# paths (every project classified foreign). Refused rc 1 with the
+# class-enumerating sanity message (migrate pinned below); the
+# negative arm is A4c's real-storage leg.
+_rc=0
+_out=$(_core_run '_gp_storage_sane "$WORK/storage/."') || _rc=$?
+if [ "$_rc" = 1 ]; then
+    pass "security A4d: storage sanity gate refuses the trailing /. spelling (#802)"
+else
+    fail "security A4d: storage trailing-/. arm (rc=$_rc out=$_out)"
+fi
+_rc=0
+_out=$(_core_run '_gp_storage_sane "$WORK/./storage"') || _rc=$?
+if [ "$_rc" = 1 ]; then
+    pass "security A4d: storage sanity gate refuses the mid-path /./ spelling (#802)"
+else
+    fail "security A4d: storage mid-/. arm (rc=$_rc out=$_out)"
+fi
+_mkrepo "$WORK/roots/r1/dotstor"
+_rc=0
+_out=$(_core_run 'GP_STORAGE="$WORK/storage/." _gp_migrate_one "$WORK/roots/r1/dotstor" yes') || _rc=$?
+if [ "$_rc" = 1 ] &&
+    printf '%s' "$_out" | grep -qF 'use-time sanity check (non-absolute, bare /,' &&
+    printf '%s' "$_out" | grep -qF 'dot-dot, dot segment, doubled slash, whitespace, glob, or symlinked?' &&
+    [ -d "$WORK/roots/r1/dotstor/.git" ]; then
+    pass "security A4d: migrate with a /. storage refused before any move (#802)"
+else
+    fail "security A4d: migrate /.-storage arm (rc=$_rc out=$_out)"
 fi
 
 # A5: a symlinked storage is refused at use time (migrate leg).
@@ -2339,7 +2375,7 @@ _out=$(_core_run 'GP_STORAGE="$WORK/storage-sym"
     _gp_nail_one "$WORK/roots/r1/nlsym" "$WORK/storage-sym/nlsym.git"') || _rc=$?
 if [ "$_rc" = 1 ] &&
     printf '%s' "$_out" | grep -qF 'not nailing: storage failed the use-time sanity check' &&
-    printf '%s' "$_out" | grep -qF 'dot-dot, doubled slash, whitespace, glob, or symlinked?'; then
+    printf '%s' "$_out" | grep -qF 'dot-dot, dot segment, doubled slash, whitespace, glob, or symlinked?'; then
     pass "diagnostics C2: the nail sanity refusal enumerates the classes (#798)"
 else
     fail "diagnostics C2: nail sanity arm (rc=$_rc out=$_out)"
@@ -2352,7 +2388,7 @@ _rc=0
 _out=$(_core_run 'GP_STORAGE="$WORK/storage-sym" _gp_revert_one "$WORK/roots/r1/rvsym"') || _rc=$?
 if [ "$_rc" = 1 ] &&
     printf '%s' "$_out" | grep -qF 'storage failed the use-time sanity check' &&
-    printf '%s' "$_out" | grep -qF 'dot-dot, doubled slash, whitespace, glob, or symlinked?' &&
+    printf '%s' "$_out" | grep -qF 'dot-dot, dot segment, doubled slash, whitespace, glob, or symlinked?' &&
     [ -f "$WORK/roots/r1/rvsym/.git" ]; then
     pass "diagnostics C2: the revert sanity refusal enumerates the classes (#798)"
 else
