@@ -590,7 +590,10 @@ fi
 # widened literal check: a quoted sed ADDRESS ('/x/d') starts with / but
 # is the script argument, never a path -- cnt==1 never flags it, and the
 # segment-splitting | bytes inside a quoted literal ride markers so the
-# address stays one token.
+# address stays one token. Both operand forms of the sed line are
+# pinned: with a file operand (the walk takes the file, never the
+# script) and script-only (the cnt==1 guard never flags the lone
+# script argument).
 {
     printf '#!/bin/sh\n# probe: space-bearing quoted destination (#807 w3 F5)\ncp /tmp/src "/etc/probe-qsp dst"\nmv /tmp/src "/etc/probe-qsp-mv"\n' \
         >"$PROBE_DIR/unit/test-probe-qsp.sh"
@@ -606,7 +609,7 @@ fi
         >"$PROBE_DIR/unit/test-probe-dflt.sh"
     printf '#!/bin/sh\n# probe: glued redirect target (#807 w3 F11)\nrm -rf /tmp/ok 2>/etc/probe-gr\ncp /tmp/src /tmp/dst 2>/etc/probe-gr-c\nsed -i s/a/b/ "$WORK/f" 2>/etc/probe-gr-s\n' \
         >"$PROBE_DIR/unit/test-probe-gr.sh"
-    printf '#!/bin/sh\n# probe: quoted sed address must stay green (#807 w3 FP guard)\nsed -i '"'"'/x/d'"'"' "$WORK/m.conf"\nrm -rf /etc/probe-sa\n' \
+    printf '#!/bin/sh\n# probe: quoted sed address must stay green (#807 w3 FP guard)\nsed -i '"'"'/x/d'"'"' "$WORK/m.conf"\nsed -i '"'"'/y/d'"'"'\nrm -rf /etc/probe-sa\n' \
         >"$PROBE_DIR/unit/test-probe-sa.sh"
 }
 : >"$VIOL"
@@ -654,11 +657,12 @@ if grep -q "test-probe-gr.sh|3|mutate|/etc/probe-gr" "$VIOL" &&
 else
     fail "self-probe: a glued redirect target must be caught in every mutating arm (#807 w3 F11)"
 fi
-if grep -q "test-probe-sa.sh|4|mutate|/etc/probe-sa" "$VIOL" &&
-    ! grep -qF 'test-probe-sa.sh|3|mutate|/x/d' "$VIOL"; then
-    pass "self-probe: a quoted sed address stays green, its line still scanned (#807 w3 FP guard)"
+if grep -q "test-probe-sa.sh|5|mutate|/etc/probe-sa" "$VIOL" &&
+    ! grep -qF 'test-probe-sa.sh|3|mutate|/x/d' "$VIOL" &&
+    ! grep -qF 'test-probe-sa.sh|4|mutate|/y/d' "$VIOL"; then
+    pass "self-probe: a quoted sed address stays green with and without a file operand (#807 w3 FP guard)"
 else
-    fail "self-probe: a quoted sed address ('/x/d') must not flag as a mutate path (#807 w3 FP guard)"
+    fail "self-probe: a quoted sed address ('/x/d', '/y/d') must not flag as a mutate path (#807 w3 FP guard)"
 fi
 
 # --- 3. rm suffix form: :? empty-var guard (2026-10-06) -----------------------
