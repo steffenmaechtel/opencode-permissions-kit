@@ -118,10 +118,15 @@ lines are skipped):
    grows). New fixtures are written against fictional open prefixes
    (`/home/some-user-max-mustermann/...` — a home no real host
    carries): the goal is ZERO real host paths in unit tests
-   (maintainer directive, issue #727) — a real-tree literal is
-   legitimate only where the literal IS the assertion's subject (a
-   source pin that must match shipped bytes, a policy control row),
-   named by an in-place bound comment plus the ALLOW entry's reason.
+   (maintainer directive, issue #727). Enforced today are the ratchet
+   trees plus the bound class — a real-tree literal is legitimate
+   only where the literal IS the assertion's subject (a source pin
+   that must match shipped bytes, a policy control row), named by an
+   in-place bound comment plus the ALLOW entry's reason. Real-prefix
+   literals OUTSIDE the trees survive as a recorded residual class
+   (the /var/www family without vhosts, /home/dev fixtures, the
+   agent-home rows): inert policy-INPUT, their sweep deferred to a
+   follow-up issue — recorded, never silently sanctioned.
    Unit-suite-scoped: e2e scripts legitimately name container paths
    (/var/www/vhosts fixtures), so they are not in this check's scope.
    (RM-0043)
@@ -148,4 +153,8 @@ lines are skipped):
 The suite self-probes all three checks (continuation-split `rm`, inert
 and quoted and redirect-glued literals, the unguarded suffix shapes —
 flag orders, bare `rm`, multi-operand — vs the guarded ones, a clean
-sandboxed control) so the guard itself cannot rot silently.
+sandboxed control, and the #727 arms: an ALLOW row never suppressing
+a mutation, quoted literal operands caught in both quote arms, a
+quoted `#` keeping the later segment visible, and the ALLOW block
+rendering its entries verbatim) so the guard itself cannot rot
+silently.

@@ -142,14 +142,16 @@ REJECT="/ /usr /etc /home /root /var /tmp /tmp/build-dir /bin /sbin /lib /lib64 
 relative/path ../etc ./here subdir \
 /home/opencode ///"
 
-# must ACCEPT (dedicated project folders). /var/www is the one
-# deliberate real-tree policy pin: the /var blocklist in path-sane.sh is
-# FHS-complete and spares /var/www as the documented project-home — this
-# row is the writer-side behavioral pin of that exclusion (reader-side:
-# test-uninstall-core). Every other row is a fictional open prefix
-# (#727: real host paths only where the literal IS the assertion's
-# subject; /var/www is not a ratchet tree, so it needs no ALLOW entry —
-# and the fictional home is a name no real host carries).
+# must ACCEPT (dedicated project folders). TWO deliberate real-path
+# policy pins (#727 bound rows -- each literal IS its assertion's
+# subject): /var/www, the documented project-home prefix that
+# path-sane's FHS-complete /var blocklist deliberately spares (the
+# writer-side pin of that exclusion, reader-side: test-uninstall-core);
+# /home/opencode/work, the agent-home SUBDIRECTORY acceptance -- the
+# REJECT table pins the home itself and its dot form, this row is the
+# counterpart proving roots BELOW the agent home stay registrable.
+# Every other row is a fictional open prefix under
+# /home/some-user-max-mustermann/, a home no real host carries.
 ACCEPT="/var/www /home/some-user-max-mustermann/projects \
 /home/some-user-max-mustermann/projects/shop /home/some-user-max-mustermann/roots/ \
 ~/projects ~/dev /srv-not-sys /opt-projects \

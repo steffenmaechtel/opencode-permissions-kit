@@ -103,21 +103,23 @@ PROBE_DIR=""
 # Parse-integrity pin (#727): the ALLOW block above is a double-quoted
 # shell string whose reason lines are STRING CONTENT, not comments. A
 # double-quoted phrase WITH WHITESPACE inside a reason line splits the
-# assignment at the shell level and silently truncates the variable
-# (measured: "screening allows" in a reason comment cut both BOUND rows
-# and reddened the ratchet with a misleading sweep-regression message,
-# one red gate cycle paid -- adjacent quotes without inner spaces
-# merely lose their quote bytes, entries intact); an unescaped
-# expansion char silently empties into the text (measured: $UNDEFINED
-# in a reason line renders blank). The rendered variable must carry
-# every BOUND entry verbatim; the count is the allowlist ratchet -- a
-# new row is a deliberate edit here (#727: growth stays the
-# maintainer's overview, not drift).
+# assignment at the shell level and breaks it loudly (dash: a
+# command-not-found error naming the reason text, rc 127) leaving ALLOW
+# unset, every entry gone (measured: "screening allows" in a reason
+# comment cut both BOUND rows and reddened the ratchet with a
+# misleading sweep-regression message, one red gate cycle paid --
+# adjacent quotes without inner spaces merely lose their quote bytes,
+# entries intact); an unescaped expansion char silently empties into
+# the text (measured: $UNDEFINED in a reason line renders blank -- the
+# count cannot see it, text-level hygiene stays this comment's rule).
+# The rendered variable must carry every BOUND entry verbatim; the
+# count is the allowlist ratchet -- a new row is a deliberate edit
+# here (#727: growth stays the maintainer's overview, not drift).
 _al_entries=$(printf '%s\n' "$ALLOW" | grep -cE '^[a-z].*\|' || true)
 if [ "$_al_entries" -eq 2 ]; then
     pass "ALLOW parses clean: 2 BOUND entries render verbatim (#727)"
 else
-    fail "ALLOW broke while parsing or grew -- reason lines must carry no double quotes/expansions, growth is a conscious count bump (entries=$_al_entries, #727)"
+    fail "ALLOW broke while parsing or grew (entries=$_al_entries, #727)"
 fi
 
 # scan <dir> -- writes "file|line|kind|token" violation rows to $VIOL.
@@ -376,26 +378,33 @@ fi
 # (#727 fix B): quote-blanking used to hide quoted literal operands from
 # check 1, and the raw-view ratchet only knows RATCHET_TREES -- an
 # rm -rf "/srv/x"-style line was fully green. The first probe line must
-# flag as mutate; the second (a quoted VARIABLE operand) must stay
-# exempt -- what a variable holds is the review's job (tests/AGENTS.md,
-# Test sandbox section).
-printf '#!/bin/sh\n# probe: quoted literal (#727)\nrm -rf "/home/some-user-max-mustermann/probe-qlit"\nrm -rf "$PWQLIT"\n' \
-    >"$PROBE_DIR/unit/test-probe-qlit.sh"
+# flag as mutate, and (round a F3, #806) the SECOND exercises the
+# single-quote arm of quote_out -- both quote spellings of a literal
+# operand are pinned, an sq-arm regression cannot pass silently. The
+# last line (a quoted VARIABLE operand) must stay exempt -- what a
+# variable holds is the review's job (tests/AGENTS.md, Test sandbox
+# section).
+{
+    printf '#!/bin/sh\n# probe: quoted literal (#727)\nrm -rf "/home/some-user-max-mustermann/probe-qlit"\n'
+    printf "rm -rf '/home/some-user-max-mustermann/probe-sqlit'\n"
+    printf 'rm -rf "$PWQLIT"\n'
+} >"$PROBE_DIR/unit/test-probe-qlit.sh"
 : >"$VIOL"
 if ! scan "$PROBE_DIR/unit" >"$VIOL"; then
     fail "scan died on the quoted-literal probe -- #727 self-probe unreliable (#519)"
 fi
 _qlit_rows=$(grep -c 'test-probe-qlit.sh' "$VIOL" || true)
-if [ "$_qlit_rows" -eq 1 ] &&
-    grep -q "test-probe-qlit.sh|3|mutate|/home/some-user-max-mustermann/probe-qlit" "$VIOL"; then
-    pass "self-probe: quoted literal rm operand caught, quoted variable stays exempt (#727)"
+if [ "$_qlit_rows" -eq 2 ] &&
+    grep -q "test-probe-qlit.sh|3|mutate|/home/some-user-max-mustermann/probe-qlit" "$VIOL" &&
+    grep -q "test-probe-qlit.sh|4|mutate|/home/some-user-max-mustermann/probe-sqlit" "$VIOL"; then
+    pass "self-probe: quoted literal rm operands caught (dq and sq arms), quoted variable stays exempt (#727)"
 else
-    fail "self-probe: quoted non-tree literal must be caught as mutate only (rows=$_qlit_rows, #727)"
+    fail "self-probe: quoted non-tree literals must be caught as mutate in BOTH quote arms (rows=$_qlit_rows, #727)"
 fi
 
 # --- 2d. self-probe: a quoted "#" must not cut the operand view -------------
 # (#727 fix B rider): kept literal bytes may carry "#" -- a quoted
-# program glued to a later command is the house shape (grep "/a#b" x
+# pattern glued to a later command is the house shape (grep "/a#b" x
 # && rm ...) -- so the unquoted comment cut happens INSIDE the quote
 # walk and the rm segment behind a quoted "#"-bearing literal stays
 # visible to check 1 (a post-hoc index("#") strip over ops would
