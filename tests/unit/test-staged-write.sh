@@ -606,13 +606,13 @@ check "W1 static order: ddev_handover_project_back chowns before chmodding (agen
 # guard masked rc 2 into an empty rewrite that clobbered the file.
 
 PCONF="$WORK/projects.conf"
-printf '/var/www/only-project\n' >"$PCONF"
-if sh -c 'rc=0; out=$(grep -vxF "$1" "$2" 2>/dev/null) || rc=$?; [ "$rc" -le 1 ]' _ "/var/www/only-project" "$PCONF"; then
+printf '/home/some-user-max-mustermann/only-project\n' >"$PCONF"
+if sh -c 'rc=0; out=$(grep -vxF "$1" "$2" 2>/dev/null) || rc=$?; [ "$rc" -le 1 ]' _ "/home/some-user-max-mustermann/only-project" "$PCONF"; then
     pass "C3 (0.0.39g) / F4 (0.0.39h): last-project removal (rc 1) stays benign"
 else
     fail "C3 (0.0.39g) / F4 (0.0.39h): last-project removal (rc 1) stays benign"
 fi
-assert_eq "C3 (0.0.39g) / F4 (0.0.39h): empty result, no stale copy" "" "$(grep -vxF "/var/www/only-project" "$PCONF" 2>/dev/null)"
+assert_eq "C3 (0.0.39g) / F4 (0.0.39h): empty result, no stale copy" "" "$(grep -vxF "/home/some-user-max-mustermann/only-project" "$PCONF" 2>/dev/null)"
 # control: a real read error (grep on a directory) yields rc 2 — the
 # narrowed guard must refuse (the old || true masked this class)
 if sh -c 'rc=0; out=$(grep -vxF "$1" "$2" 2>/dev/null) || rc=$?; [ "$rc" -le 1 ]' _ "x" "$WORK" 2>/dev/null; then

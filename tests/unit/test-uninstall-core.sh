@@ -314,9 +314,11 @@ done
 # must never touch /var/www (the documented project-home area that
 # path-sane's FHS-complete /var blocklist deliberately spares), and the
 # allows-loop proves the screener spares the documented project home
-# itself. A fictional prefix would test a different policy. The
-# allows-loop row carries the matching ALLOW entry in
-# test-sandbox-policy.sh; bare /var/www is not a ratchet tree.
+# itself. A fictional prefix would test a different policy. Both
+# spellings carry their matching ALLOW entries in test-sandbox-policy.sh
+# (bare /var/www is a ratchet tree since #807 w1 -- the rows below are
+# the bound exception, never a sweep backdoor: an ALLOW row cannot cover
+# a mutation finding).
 if printf '%s' "$SCREEN_PATTERNS" | grep -q '/var/www'; then
     fail "screening patterns must not contain /var/www (legit project area)"
 else
@@ -2238,7 +2240,7 @@ cat >"$WORK/gpu-opk" <<'EOF'
 #!/bin/sh
 # the row as the real renderer prints it since #764 / #765 a Q8: the
 # nail command carries the project path
-echo "kv-warn: /var/www/x pointer, NOT nailed (run: sudo opk git-protection nail /var/www/x)"
+echo "kv-warn: /home/some-user-max-mustermann/x pointer, NOT nailed (run: sudo opk git-protection nail /home/some-user-max-mustermann/x)"
 EOF
 chmod 755 "$WORK/gpu-opk"
 printf '#!/bin/sh\nexec "$@"\n' >"$WORK/gpu-bin/sudo"

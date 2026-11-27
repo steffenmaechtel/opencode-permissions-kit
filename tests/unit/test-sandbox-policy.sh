@@ -53,8 +53,11 @@
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT" || exit 1
 
-# Real trees that must never appear as literals in unit suites.
-RATCHET_TREES="/var/www/vhosts /srv/other/outside"
+# Real trees that must never appear as literals in unit suites. /var/www
+# covers the whole family — vhosts included (#807 w1, the residual
+# literal sweep's enforcement backbone: a prefix match subsumes the
+# former /var/www/vhosts-only tree).
+RATCHET_TREES="/var/www /srv/other/outside"
 
 # Allowlist for the ratchet: one "file|token" entry per line, a reason
 # comment above it (house style of the string-continuations guard).
@@ -66,7 +69,9 @@ RATCHET_TREES="/var/www/vhosts /srv/other/outside"
 # subject (a source pin that must match shipped bytes, a policy control
 # row) -- and an ALLOW row can never cover a MUTATION finding (report()
 # enforces it, fix A). Shrunk 15 -> 2 rows by the #727 sweep: the
-# policy-INPUT classes above moved to fictional prefixes.
+# policy-INPUT classes above moved to fictional prefixes. Grew 2 -> 4
+# by #807 w1: the two bare /var/www bound rows joined when the ratchet
+# tree extended to /var/www.
 ALLOW="
 # BOUND (#727): the allows-loop value is the assertion's subject --
 # uninstall-core's screening must SPARE the documented project home
@@ -74,6 +79,18 @@ ALLOW="
 # rejects it). Not replaceable by a fictional prefix without losing
 # the pin.
 tests/unit/test-uninstall-core.sh|/var/www/vhosts
+# BOUND (#807 w1): uninstall-core's own screening GUARD greps
+# SCREEN_PATTERNS for bare /var/www (the documented project-home area
+# path-sane's FHS-complete /var blocklist deliberately spares) and the
+# screening-allows loop feeds bare /var/www as a control row -- the
+# literal is the assertion's subject, a fictional prefix would test a
+# different policy.
+tests/unit/test-uninstall-core.sh|/var/www
+# BOUND (#807 w1): path-sane ACCEPT row -- /var/www is the documented
+# project-home prefix the FHS-complete /var blocklist deliberately
+# spares; the writer-side exclusion pin's literal is its own subject
+# (reader-side twin: the uninstall-core guard row above).
+tests/unit/test-project-paths.sh|/var/www
 # BOUND (#727): default-scan-root source pin over sh/doctor-core.sh
 # (#354, #448) -- the literal is a grep PATTERN that must match the
 # SHIPPED bytes (the [ -d /var/www/vhosts ] default-scan-root line);
@@ -116,10 +133,10 @@ PROBE_DIR=""
 # count is the allowlist ratchet -- a new row is a deliberate edit
 # here (#727: growth stays the maintainer's overview, not drift).
 _al_entries=$(printf '%s\n' "$ALLOW" | grep -cE '^[a-z].*\|' || true)
-if [ "$_al_entries" -eq 2 ]; then
-    pass "ALLOW parses clean: 2 BOUND entries render verbatim (#727)"
+if [ "$_al_entries" -eq 4 ]; then
+    pass "ALLOW parses clean: 4 BOUND entries render verbatim (#727, #807 w1)"
 else
-    fail "ALLOW broke while parsing or grew (entries=$_al_entries, #727)"
+    fail "ALLOW broke while parsing or grew (entries=$_al_entries, #727/#807 w1)"
 fi
 
 # scan <dir> -- writes "file|line|kind|token" violation rows to $VIOL.
@@ -340,6 +357,17 @@ if grep -q "test-probe-quoted.sh|3|ratchet|/var/www/vhosts/probe-quoted" "$VIOL"
     pass "self-probe: quoted real-tree literal is caught (raw view)"
 else
     fail "self-probe: quoted real-tree literal must be caught (0.0.42g C2)"
+fi
+printf '#!/bin/sh\n# probe: /var/www-family literal OUTSIDE vhosts must be caught (#807 w1 tree)\nx="/var/www/probe-family"\n' \
+    >"$PROBE_DIR/unit/test-probe-varwww.sh"
+: >"$VIOL"
+if ! scan "$PROBE_DIR/unit" >"$VIOL"; then
+    fail "scan died on the varwww probe scan -- checks 1-2 self-probes unreliable (#519)"
+fi
+if grep -q "test-probe-varwww.sh|3|ratchet|/var/www/probe-family" "$VIOL"; then
+    pass "self-probe: bare /var/www-family literal is caught (#807 w1)"
+else
+    fail "self-probe: a non-vhosts /var/www literal must be caught by the extended tree (#807 w1)"
 fi
 if grep -q "test-probe-redir.sh|3|ratchet|/var/www/vhosts/probe-redir" "$VIOL"; then
     pass "self-probe: redirect-glued literal is caught"

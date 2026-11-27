@@ -359,16 +359,16 @@ assert_not_contains "non-dict stderr carries no traceback (W12)" "Traceback" "$_
 P514="$(hostile_stdio_python)"
 check "control arm: 7-bit hostility effective (#514)" hostile_stdio_control "$P514"
 F22_ENV="LC_ALL=C LANG=C PYTHONUTF8=0 PYTHONCOERCECLOCALE=0 PYTHONIOENCODING=ascii"
-printf '{"permission": {"read": {"/var/www/\303\274bung/**": "deny"}}}\n' >"$TMP/nonascii.json"
+printf '{"permission": {"read": {"/home/some-user-max-mustermann/\303\274bung/**": "deny"}}}\n' >"$TMP/nonascii.json"
 # shellcheck disable=SC2086  # F22_ENV is a fixed word list, set above
 OUT=$(env PATH="$P514:$PATH" $F22_ENV python3 "$PARSER" "$TMP/nonascii.json" 2>/dev/null || true)
-assert_contains "locale: non-ASCII config decoded, pattern emitted (F22)" "/var/www/übung/**" "$OUT"
+assert_contains "locale: non-ASCII config decoded, pattern emitted (F22)" "/home/some-user-max-mustermann/übung/**" "$OUT"
 assert_exitcode "locale: non-ASCII config exits 0 (F22)" 0 \
     env PATH="$P514:$PATH" $F22_ENV python3 "$PARSER" "$TMP/nonascii.json"
 # stdin path of the same pin (the wrapper pipes `opencode debug config`)
 # shellcheck disable=SC2086
 OUT=$(env PATH="$P514:$PATH" $F22_ENV python3 "$PARSER" - <"$TMP/nonascii.json" 2>/dev/null || true)
-assert_contains "locale: non-ASCII stdin decoded, pattern emitted (F22)" "/var/www/übung/**" "$OUT"
+assert_contains "locale: non-ASCII stdin decoded, pattern emitted (F22)" "/home/some-user-max-mustermann/übung/**" "$OUT"
 # undecodable bytes: the old code escaped as a raw UnicodeDecodeError
 # traceback; the diagnostic + clean rc 1 discriminate the except arm.
 printf '{"permission": {"read": "/var/\377\376/**": "deny"}}\n' >"$TMP/badutf8.json"

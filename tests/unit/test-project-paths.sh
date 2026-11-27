@@ -146,7 +146,9 @@ relative/path ../etc ./here subdir \
 # policy pins (#727 bound rows -- each literal IS its assertion's
 # subject): /var/www, the documented project-home prefix that
 # path-sane's FHS-complete /var blocklist deliberately spares (the
-# writer-side pin of that exclusion, reader-side: test-uninstall-core);
+# writer-side pin of that exclusion, reader-side: test-uninstall-core;
+# its matching ALLOW entry lives in test-sandbox-policy.sh since #807
+# w1 extended the ratchet tree to bare /var/www);
 # /home/opencode/work, the agent-home SUBDIRECTORY acceptance -- the
 # REJECT table pins the home itself and the 0.0.45c S1 dot-form loop
 # below pins /home/opencode/., this row is the counterpart proving

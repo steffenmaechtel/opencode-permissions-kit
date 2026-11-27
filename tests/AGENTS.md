@@ -107,7 +107,8 @@ lines are skipped):
    `ln`, ...) flag only the destination; `sed` only with `-i`.
    Variables are exempt — what they hold is the review's job. (RM-0042)
 2. **Real-tree ratchet** — any path-shaped literal starting with a
-   real-tree prefix (`/var/www/vhosts`, `/srv/other/outside`) fails,
+   real-tree prefix (`/var/www` — the whole family, vhosts included,
+   since issue #807 wave 1 —, `/srv/other/outside`) fails,
    quoted or not, in fixture strings as much as in commands.
    Policy-INPUT classes — values handed to
    screening/parsing functions or parse-only argument fixtures, never
@@ -124,9 +125,10 @@ lines are skipped):
    that must match shipped bytes, a policy control row), named by an
    in-place bound comment plus the ALLOW entry's reason. Real-prefix
    literals OUTSIDE the trees fall into recorded classes: a residual
-   sweep deferred to a follow-up issue (host-specific homes and
-   project areas — the /var/www family without vhosts, /home/dev
-   fixtures, the agent-home rows), the blocklist pins' own subjects
+   sweep deferred to issue #807 wave 2 (host-specific homes — the
+   /home/dev fixtures and the agent-home rows; the /var/www family
+   without vhosts joined the enforced trees in #807 wave 1), the
+   blocklist pins' own subjects
    (FHS system-path literals, /etc/nginx, /root/projects, ...), and
    WSL-context subjects (the /mnt/c mkcert source pins and the
    /mnt/ wsl.conf fixtures — shipped-bytes and conf-fixture
@@ -156,7 +158,8 @@ lines are skipped):
    (RM-0044)
 
 The suite self-probes all three checks (continuation-split `rm`, inert
-and quoted and redirect-glued literals, the unguarded suffix shapes —
+and quoted and redirect-glued literals, the bare /var/www-family
+literal (#807 w1), the unguarded suffix shapes —
 flag orders, bare `rm`, multi-operand — vs the guarded ones, a clean
 sandboxed control, and the #727 arms: an ALLOW row never suppressing
 a mutation, quoted literal operands caught in both quote arms, a

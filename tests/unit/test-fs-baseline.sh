@@ -1614,7 +1614,7 @@ fi
 # this suite's scratch (TMPDIR territory) and their FSB/HO counts prove
 # those prefixes stay processable — the blocklist deliberately leaves
 # them open (the comments in update-core.sh / config.sh name why).
-printf '#660 ops note\n%s\n/\n%s\n%s/\n%s/.\n%s//\n%s\n%s\n.\nfoo\n/var/www/foo bar\n/etc\n/usr\n/var\n/home\n/var/backups\n/home/toc\n/relocated/opencode\n' \
+printf '#660 ops note\n%s\n/\n%s\n%s/\n%s/.\n%s//\n%s\n%s\n.\nfoo\n/home/some-user-max-mustermann/foo bar\n/etc\n/usr\n/var\n/home\n/var/backups\n/home/toc\n/relocated/opencode\n' \
     "$S245/real" "$S245/link" "$S245/link" "$S245/link" "$S245/link" \
     "$S245/dangling" "$S245/real2" >"$S245/conf"
 # #665: a glob-bearing entry rides at the conf tail (the long printf
@@ -1648,7 +1648,7 @@ if [ "$(printf '%s\n' "$S245R_OUT" | grep -c '^FSB: ')" -eq 2 ] &&
     [ "$(printf '%s\n' "$S245R_OUT" | grep -cF "ui_warn: skip $S245/link// (malformed")" -eq 1 ] &&
     [ "$(printf '%s\n' "$S245R_OUT" | grep -cF 'ui_warn: skip . (not an absolute project path)')" -eq 1 ] &&
     [ "$(printf '%s\n' "$S245R_OUT" | grep -cF 'ui_warn: skip foo (not an absolute project path)')" -eq 1 ] &&
-    [ "$(printf '%s\n' "$S245R_OUT" | grep -cF 'ui_warn: skip /var/www/foo bar (malformed')" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245R_OUT" | grep -cF 'ui_warn: skip /home/some-user-max-mustermann/foo bar (malformed')" -eq 1 ] &&
     [ "$(printf '%s\n' "$S245R_OUT" | grep -cF '(system path — never a project root)')" -eq 5 ] &&
     [ "$(printf '%s\n' "$S245R_OUT" | grep -cF 'ui_warn: skip /etc (system path')" -eq 1 ] &&
     [ "$(printf '%s\n' "$S245R_OUT" | grep -cF 'ui_warn: skip /var/backups (system path')" -eq 1 ] &&
@@ -1697,7 +1697,7 @@ if [ "$(printf '%s\n' "$S245U_OUT" | grep -c '^FSB: ')" -eq 2 ] &&
     [ "$(printf '%s\n' "$S245U_OUT" | grep -cF "ui_warn: skip $S245/link// (malformed")" -eq 1 ] &&
     [ "$(printf '%s\n' "$S245U_OUT" | grep -cF 'ui_warn: skip . (not an absolute project path)')" -eq 1 ] &&
     [ "$(printf '%s\n' "$S245U_OUT" | grep -cF 'ui_warn: skip foo (not an absolute project path)')" -eq 1 ] &&
-    [ "$(printf '%s\n' "$S245U_OUT" | grep -cF 'ui_warn: skip /var/www/foo bar (malformed')" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245U_OUT" | grep -cF 'ui_warn: skip /home/some-user-max-mustermann/foo bar (malformed')" -eq 1 ] &&
     [ "$(printf '%s\n' "$S245U_OUT" | grep -cF '(system path — never a project root)')" -eq 5 ] &&
     [ "$(printf '%s\n' "$S245U_OUT" | grep -cF 'ui_warn: skip /etc (system path')" -eq 1 ] &&
     [ "$(printf '%s\n' "$S245U_OUT" | grep -cF 'ui_warn: skip /var/backups (system path')" -eq 1 ] &&

@@ -1804,7 +1804,7 @@ w2_run() {
         while IFS= read -r _st_root; do
             eval "$1"
         done <<EOF
-/var/www/w2-proj
+/home/some-user-max-mustermann/w2-proj
 EOF
         # no inline tail rm: the subshell trap above owns _w2_dir on
         # every path now (normal, abort, signal — #287 a Q6 removed the
@@ -1814,7 +1814,7 @@ EOF
 
 if [ -n "$W2_BLOCK_SHARE" ]; then
     _w2out=$(w2_run "$W2_BLOCK_SHARE" false || true)
-    if printf '%s' "$_w2out" | grep -q '^WARN|ddev share|scan skipped for /var/www/w2-proj' &&
+    if printf '%s' "$_w2out" | grep -q '^WARN|ddev share|scan skipped for /home/some-user-max-mustermann/w2-proj' &&
         ! printf '%s' "$_w2out" | grep -q 'FIND-CALLED' &&
         ! printf '%s' "$_w2out" | grep -q 'RM-CALLED'; then
         pass "W2 share scan: mktemp failure warns loudly, no find, no rm"
@@ -1831,7 +1831,7 @@ if [ -n "$W2_BLOCK_SHARE" ]; then
 fi
 if [ -n "$W2_BLOCK_HOSTS" ]; then
     _w2out=$(w2_run "$W2_BLOCK_HOSTS" false || true)
-    if printf '%s' "$_w2out" | grep -q '^WARN|hosts (win)|scan skipped for /var/www/w2-proj' &&
+    if printf '%s' "$_w2out" | grep -q '^WARN|hosts (win)|scan skipped for /home/some-user-max-mustermann/w2-proj' &&
         ! printf '%s' "$_w2out" | grep -q 'FIND-CALLED' &&
         ! printf '%s' "$_w2out" | grep -q 'RM-CALLED'; then
         pass "W2 hosts scan: mktemp failure warns loudly, no find, no rm"
