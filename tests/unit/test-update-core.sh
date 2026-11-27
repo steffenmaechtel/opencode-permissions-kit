@@ -876,7 +876,7 @@ _bare_py=""
 # the #805 class on a directory operand. The lister is rc-mapped first
 # (rc 1 = no file mentions python3 at all — a legitimately clean tree
 # the presence pins cover); the exclusion filter then runs on the
-# captured bytes (plain file operands, no operand-error channel).
+# captured bytes (stdin operands, no operand-error channel).
 _py_list_rc=0
 _py_raw="$(grep -rl 'python3' "$SCRIPT_DIR/../../files")" || _py_list_rc=$?
 case "$_py_list_rc" in
