@@ -361,6 +361,15 @@ else
     fail "whitespace cause missing from the path-gate refusal (#372 A3)"
 fi
 
+# issue #810: the wedged-binary preflight hint names the sudo spelling —
+# the remediation is followable verbatim, matching the sibling
+# 'sudo opk update' hints.
+if live_src "$INSTALL_CORE" | grep -qF "fix it afterwards (e.g. 'sudo opk update' replaces it)"; then
+    pass "wedged-binary hint names 'sudo opk update' (issue #810)"
+else
+    fail "wedged-binary hint lost the sudo spelling (issue #810)"
+fi
+
 # --- channel stamp (issue #38) -----------------------------------------------
 
 # install.sh stamps the actually-used ref as KIT_CHANNEL into install.conf

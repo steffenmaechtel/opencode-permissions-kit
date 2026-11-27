@@ -1701,4 +1701,14 @@ else
     fail "every projects.conf reader must exclude '#'-lines (loops: ${_pc6:-0} of 3, grep -v -e: ${_pc6b:-0} of 2) (#660 M6)"
 fi
 
+# --- issue #810: the status hint rows carry the sudo spelling ----------------
+# The ddev-runtime remediation rows must be followable verbatim; their
+# sibling rows ('fix: sudo opk update') were already aligned.
+if live_src "$LIB" | grep -qF "missing — run 'sudo opk update' to deploy" &&
+    live_src "$LIB" | grep -qF "not hooked — run 'sudo opk update'"; then
+    pass "ddev hint rows name 'sudo opk update' (issue #810)"
+else
+    fail "ddev hint rows lost the sudo spelling (issue #810)"
+fi
+
 suite_done

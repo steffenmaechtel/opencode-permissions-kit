@@ -2793,6 +2793,16 @@ _n_w9=$(live_src "$HANDOVER" | grep -c 'warn: project-root hand\(back\|over\) in
 [ "$_n_w9" -ge 3 ] &&
     pass "all three project-root warn lines present (#211 b W9)" ||
     fail "all three project-root warn lines present (got $_n_w9) (#211 b W9)"
+
+# issue #810: all four dev-owned-flag retry hints carry the sudo spelling
+# of the update remediation (count 4 = the three single-line hints plus
+# the continuation line of the wrapped one — the class sweep found the
+# wrapped fourth site the issue table missed). A re-wrap that splits a
+# fragment shifts the count and names itself here.
+_n_810=$(live_src "$HANDOVER" | grep -c 'sudo opk update --refresh' || true)
+[ "$_n_810" -eq 4 ] &&
+    pass "all four dev-owned-flag retry hints carry 'sudo opk update --refresh' (issue #810)" ||
+    fail "dev-owned-flag retry hint sudo spelling drifted (got $_n_810 of 4) (issue #810)"
 grep -q 'warn: dev-owned handback incomplete for $dhb_proj (root inode' "$HANDOVER" &&
     pass "root-inode handback warn line present (#211 b W9)" ||
     fail "root-inode handback warn line present (#211 b W9)"

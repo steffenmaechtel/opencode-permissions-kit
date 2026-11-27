@@ -460,7 +460,7 @@ _git_heal_on() {
         exit 1
     fi
     if ! _ghc_pieces_ok; then
-        ui_error "git-heal: heal hooks incomplete under $(_ghc_libdir)/git-heal — run 'opk update' first"
+        ui_error "git-heal: heal hooks incomplete under $(_ghc_libdir)/git-heal — run 'sudo opk update' first"
         exit 1
     fi
     # Sudoers first: without the grant the hooks would fire but the
@@ -480,7 +480,8 @@ _git_heal_on() {
             exit 1
         fi
     else
-        ui_error "git-heal: sudoers-deploy.sh or sudoers.template missing under $(_ghc_libdir) — run 'opk update' first"
+        ui_error "git-heal: sudoers-deploy.sh or sudoers.template missing under""\
+ $(_ghc_libdir) — run 'sudo opk update' first"
         exit 1
     fi
     ui_info "Setting the developer's global core.hooksPath to the kit heal hooks ..."
@@ -591,7 +592,7 @@ _git_heal_on() {
             ui_detail "(pointer-file) checkouts those bits live on the storage"
             ui_detail "gitdir — the git-protection heal sets them at adoption time"
             ui_detail "and re-applies them on every 'sudo opk update' /"
-            ui_detail "'opk git-protection on' (the storage reheal sweep)"
+            ui_detail "'sudo opk git-protection on' (the storage reheal sweep)"
         fi
         rm -f "$_ghc_on_list"
     fi
@@ -654,7 +655,7 @@ _git_heal_status() {
     if _ghc_pieces_ok; then
         ui_detail "kit pieces present (heal script + four hooks)"
     else
-        ui_detail "kit pieces INCOMPLETE under $(_ghc_libdir)/git-heal — run 'opk update'"
+        ui_detail "kit pieces INCOMPLETE under $(_ghc_libdir)/git-heal — run 'sudo opk update'"
     fi
     # Per-gitdir lockout rows: dev-owned operands under a sticky .git
     # lock the agent out until the heal hooks fire (off/foreign) or
