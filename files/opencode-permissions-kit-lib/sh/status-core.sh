@@ -1580,7 +1580,7 @@ _st_ddev_basic() {
     if [ -x "$LIBDIR/bin/ddev-as-opencode" ]; then
         ui_kv_ok "helper" "deployed — $LIBDIR/bin/ddev-as-opencode"
     else
-        ui_kv_warn "helper" "missing — run opk update to deploy"
+        ui_kv_warn "helper" "missing — run 'sudo opk update' to deploy"
     fi
     # ddev() hook row (issue #192): the developer home comes from getent —
     # a hardcoded /home/$DEFAULT_USER missed relocated homes and, on the
@@ -1605,7 +1605,7 @@ _st_ddev_basic() {
             if [ -n "$hooked" ]; then
                 ui_kv_ok "ddev() hook" "active — $hooked"
             elif [ -d "$_st_home" ]; then
-                ui_kv_warn "ddev() hook" "not hooked — run opk update"
+                ui_kv_warn "ddev() hook" "not hooked — run 'sudo opk update'"
             else
                 ui_kv_warn "ddev() hook" "cannot check — home '$_st_home' of '$DEFAULT_USER' missing"
                 ui_detail "if '$DEFAULT_USER' is not your user, the install is broken — reinstall it"

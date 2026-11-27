@@ -2410,7 +2410,7 @@ if [ -n "$_hk_block" ]; then
     printf '# plain rc without kit hooks\n' >"$WORK/hk-homeB/.bashrc"
     _rc=0
     _out=$(_hk_run hk-dev 1000 "$WORK/hk-homeB") || _rc=$?
-    if [ "$_rc" -eq 0 ] && printf '%s' "$_out" | grep -q 'WARN|ddev() hook|not hooked — run opk update'; then
+    if [ "$_rc" -eq 0 ] && printf '%s' "$_out" | grep -qF "WARN|ddev() hook|not hooked — run 'sudo opk update'"; then
         pass "existing home without hook keeps the repairable warning"
     else
         fail "existing home without hook keeps the repairable warning (rc=$_rc out=$_out)"
@@ -2419,7 +2419,7 @@ if [ -n "$_hk_block" ]; then
     _rc=0
     _out=$(_hk_run hk-dev 1000 "$WORK/hk-missing") || _rc=$?
     if [ "$_rc" -eq 0 ] && printf '%s' "$_out" | grep -q 'WARN|ddev() hook|cannot check — home' &&
-        ! printf '%s' "$_out" | grep -q 'run opk update'; then
+        ! printf '%s' "$_out" | grep -q 'opk update'; then
         pass "missing home: cannot-check row, no unfulfillable update advice"
     else
         fail "missing home: cannot-check row, no unfulfillable update advice (rc=$_rc out=$_out)"

@@ -1328,6 +1328,21 @@ else
 fi
 mv "$WORK/pm-aside" "$WORK/lib/git-heal/hooks/post-merge"
 
+# issue #810: the heal errors' bare root-requiring hints carry the sudo
+# prefix now (followable remediations — the house style of the sibling
+# 'sudo opk update' hints). The pieces-gate error wraps under the
+# 120-column ratchet; its pin greps the WRAP's fragments, not the
+# contiguous phrase (conventions.md "Formatting (shfmt)").
+if live_src "$CORE" | grep -qF "heal hooks incomplete under \$(_ghc_libdir)/git-heal — run 'sudo opk update' first" &&
+    live_src "$CORE" | grep -qF 'sudoers-deploy.sh or sudoers.template missing under' &&
+    live_src "$CORE" | grep -qF " \$(_ghc_libdir) — run 'sudo opk update' first" &&
+    live_src "$CORE" | grep -qF "'sudo opk git-protection on' (the storage reheal sweep)" &&
+    live_src "$CORE" | grep -qF "kit pieces INCOMPLETE under \$(_ghc_libdir)/git-heal — run 'sudo opk update'"; then
+    pass "heal hints carry the sudo spelling (issue #810)"
+else
+    fail "heal hints lost the sudo spelling (issue #810)"
+fi
+
 # `off`: kit-owned value unset; foreign untouched; absent no-op.
 git config --file "$WORK/devhome/.gitconfig" core.hooksPath "$WORK/lib/git-heal/hooks"
 _hr_rc=0

@@ -450,7 +450,7 @@ do_plan_phase() {
             log "preflight: existing opencode binary answers --version (major 1)"
         else
             ui_warn "the existing opencode binary does not answer --version (hang or noise) — continuing"
-            ui_detail "the install reuses this binary; fix it afterwards (e.g. 'opk update' replaces it)"
+            ui_detail "the install reuses this binary; fix it afterwards (e.g. 'sudo opk update' replaces it)"
             log "preflight: existing opencode binary unresponsive (probe line: '${_pf_oc_ver:-empty}')"
         fi
     fi

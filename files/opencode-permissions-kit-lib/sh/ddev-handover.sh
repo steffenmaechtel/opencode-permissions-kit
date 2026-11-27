@@ -219,7 +219,7 @@ ddev_devowned_flag() {
             ddf_stat=$(stat -c '%u:%g:%a' "$ddf_cfg" 2>/dev/null) || {
                 printf '%s\n' "  WARNING: dev-owned flag write to $ddf_cfg failed""\
  (cannot stat the committed config — original untouched; retry:""\
- sudo opk config handover \"${1:-}\" or opk update --refresh)" >&2
+ sudo opk config handover \"${1:-}\" or sudo opk update --refresh)" >&2
                 rm -f "$ddf_tmp"
                 return 0
             }
@@ -293,12 +293,12 @@ ddev_devowned_flag() {
                     # is the only retry that reaches the project.
                     printf '%s\n' "  WARNING: dev-owned flag write to $ddf_cfg failed""\
  (original untouched; retry: sudo opk config handover \"${1:-}\" or""\
- opk update --refresh)" >&2
+ sudo opk update --refresh)" >&2
                 fi
             else
                 printf '%s\n' "  WARNING: dev-owned flag write to $ddf_cfg failed""\
  (cannot stage the mode — original untouched; retry:""\
- sudo opk config handover \"${1:-}\" or opk update --refresh)" >&2
+ sudo opk config handover \"${1:-}\" or sudo opk update --refresh)" >&2
             fi
         else
             # 0.0.39h F13: the exec-time recheck tripped (the config or its
@@ -314,7 +314,7 @@ ddev_devowned_flag() {
         # D6). Announce, never go silent (0.0.46a F1 discipline).
         printf '%s\n' "  WARNING: dev-owned flag write to $ddf_cfg failed""\
  (could not stage the new content — original untouched; retry:""\
- sudo opk config handover \"${1:-}\" or opk update --refresh)" >&2
+ sudo opk config handover \"${1:-}\" or sudo opk update --refresh)" >&2
     fi
     rm -f "$ddf_tmp"
     return 0
