@@ -231,8 +231,12 @@ scan() {
                 # F8): the shell keeps a quoted string open at a
                 # newline, so the walk must too -- before, parity
                 # reset per line and the post-quote tail of the closing
-                # line was invisible.
+                # line was invisible. The two shell shapes that do NOT
+                # carry the outer parity -- command substitution (a
+                # fresh quote context) and heredoc bodies (data) -- are
+                # handled by sub_stack and hd_delim (#807 review a F1).
                 indq = 0; insq = 0; qrun = ""
+                sub_stack = ""; hd_delim = ""; hd_dash = 0
             }
             # #727 fix B, reshaped by #807 w3: a quoted run of literal
             # bytes (no "$" inside) is emitted as ONE marker-wrapped
@@ -296,6 +300,20 @@ scan() {
                 }
                 orig = pending $0
                 pending = ""
+                # heredoc bodies are DATA, not code (#807 review a F1):
+                # the shell pairs no quotes inside them, so the walk
+                # must not read them -- one odd apostrophe in a heredoc
+                # prose line used to swallow parity for the whole
+                # remaining file and hide the real rm behind EOF. The
+                # delimiter line itself is code and stays scanned; the
+                # body is skipped until the delimiter repeats (tabs may
+                # lead it under <<-).
+                if (hd_delim != "") {
+                    line = $0
+                    if (hd_dash) sub(/^[ \t]+/, "", line)
+                    if (line == hd_delim) hd_delim = ""
+                    next
+                }
                 probe = orig; sub(/^[ \t]+/, "", probe)
                 # operands-only view: a quoted run of literal bytes
                 # collapses into ONE marker-wrapped token (quote_out
@@ -304,6 +322,20 @@ scan() {
                 # open -- inside a quoted continuation the # is string
                 # content (#807 w3 F8).
                 if (substr(probe, 1, 1) == "#" && !indq && !insq) next
+                # heredoc operator in code context: the body follows
+                # (#807 review a F1). Only an unquoted leading-token
+                # delimiter names a heredoc here. The quote class rides
+                # the sq variable -- the program text itself must stay
+                # apostrophe-free (the awk body is a single-quoted
+                # shell string).
+                if (!indq && !insq && substr(probe, 1, 1) != "#" &&
+                    match(orig, "<<-?[ \t]*[" dq sq "]?[A-Za-z_][A-Za-z0-9_]*[" dq sq "]?")) {
+                    d = substr(orig, RSTART, RLENGTH)
+                    hd_dash = (d ~ "^<<-")
+                    sub("^<<-?[ \t]*[" dq sq "]?", "", d)
+                    sub("[" dq sq "]?$", "", d)
+                    hd_delim = d
+                }
                 ops = ""
                 if (!indq && !insq) qrun = ""
                 depth = 0
@@ -324,6 +356,30 @@ scan() {
                             else { ops = ops ch nxt }
                             p++
                         } else if (indq) { qrun = qrun ch }
+                        continue
+                    }
+                    # command substitution suspends the outer quote
+                    # context -- the shell pairs the quotes inside $( )
+                    # fresh (#807 review a F1: a $(-shape with nested
+                    # quotes ended the line with carried parity open and
+                    # hid the executed tail). The carried parity rides
+                    # the stack; the substitution is walked fresh; the
+                    # matching ) restores it (a ) inside a quote is a
+                    # plain byte; a ) with nothing on the stack is a
+                    # case-arm byte).
+                    if (ch == "$" && p < L && substr(orig, p + 1, 1) == "(") {
+                        sub_stack = sub_stack (indq ? "D" : (insq ? "S" : "N"))
+                        if (indq || insq) ops = ops "X"
+                        indq = 0; insq = 0; qrun = ""
+                        ops = ops ch substr(orig, p + 1, 1)
+                        p++
+                        continue
+                    }
+                    if (ch == ")" && !indq && !insq && length(sub_stack) > 0) {
+                        c = substr(sub_stack, length(sub_stack), 1)
+                        sub_stack = substr(sub_stack, 1, length(sub_stack) - 1)
+                        indq = (c == "D"); insq = (c == "S"); qrun = ""
+                        ops = ops ch
                         continue
                     }
                     if (!insq && ch == dq) {
@@ -395,7 +451,13 @@ scan() {
                             if (tk[i] == "") continue
                             if (tk[i] ~ /^[0-9]{0,2}>/) { flag_operand(tk[i]); continue }
                             if (tk[i] ~ /^[0-9]{0,2}</) continue
-                            if (substr(tk[i], 1, 1) == "-") continue
+                            # pure flags only: a glued flag+script token
+                            # (-is/a/b/) carries the script and must count
+                            # as an operand -- as a flag it vanished from
+                            # cnt and the file operand stayed alone, a
+                            # class the pre-wave scanner still caught
+                            # (#807 review a F2)
+                            if (tk[i] ~ /^-[A-Za-z]+$/) continue
                             if (cnt == 0) last = tk[i]
                             cnt++
                         }
@@ -586,6 +648,9 @@ fi
 #                itself; a sanctioned-prefix default stays exempt
 #   F11 gr       a glued redirect target (2>/etc/y) escaped every arm --
 #                the redirect prefix strips and flags in all three arms
+#                (the unquoted form; a quoted glued target,
+#                2>"/etc/x", stays unguarded -- pre-existing residual,
+#                #807 review a F6)
 # The sed-address guard probe pins the false-positive DIRECTION of the
 # widened literal check: a quoted sed ADDRESS ('/x/d') starts with / but
 # is the script argument, never a path -- cnt==1 never flags it, and the
@@ -663,6 +728,62 @@ if grep -q "test-probe-sa.sh|5|mutate|/etc/probe-sa" "$VIOL" &&
     pass "self-probe: a quoted sed address stays green with and without a file operand (#807 w3 FP guard)"
 else
     fail "self-probe: a quoted sed address ('/x/d', '/y/d') must not flag as a mutate path (#807 w3 FP guard)"
+fi
+
+# --- 2f. self-probe: review-a fix wave (F1/F2/F3) -----------------------------
+# Three probes pin the mechanisms the round-a review found unpinned or
+# regressed; the positive exact-token greps carry the discrimination
+# (deleting the mechanism drops the row instead of mismatching a negation):
+#   F1  heredoc  a heredoc body is DATA -- the apostrophe in the prose
+#                line must not open quote parity; the real rm behind EOF
+#                is caught (one odd apostrophe used to swallow parity for
+#                the whole remaining file)
+#   F1  cmdsub   command substitution suspends the outer quote context --
+#                the exact corpus shape (a $(-assignment with nested
+#                quotes) ends its line with carried parity closed and the
+#                rm on the next line is caught
+#   F3  qpipe    literal | ; & inside quoted literals ride markers so the
+#                segment split cannot cut the token -- the exact token
+#                greps fail on a truncated row, and the sed file operand
+#                behind a pipe-bearing quoted address stays visible
+#   F2  sedglued a glued flag+script sed (-is/a/b/) counts its file
+#                operand -- the pure-flag-only skip does not swallow it
+{
+    printf '#!/bin/sh\n# probe: heredoc body is data, code behind EOF is caught (#807 review a F1)\ncat <<EOF\nit'"'"'s fine\nEOF\nrm -rf /etc/probe-hd-after\n' \
+        >"$PROBE_DIR/unit/test-probe-heredoc.sh"
+    printf '#!/bin/sh\n# probe: command substitution resets quote context (#807 review a F1)\nLIBDIR="$(live_src "$INSTALL" | sed -n '"'"'s/^LIBDIR="\\([^"]*\\)"$/\\1/p'"'"' | head -n 1)"\nrm -rf /etc/probe-cs\n' \
+        >"$PROBE_DIR/unit/test-probe-cmdsub.sh"
+    printf '#!/bin/sh\n# probe: literal separators ride markers (#807 review a F3)\nrm -rf '"'"'/etc/probe-pipe|x'"'"'\nrm -rf '"'"'/etc/probe-semi;x'"'"'\nrm -rf '"'"'/etc/probe-amp&x'"'"'\nsed -i '"'"'/a|b/d'"'"' /etc/probe-pf\n' \
+        >"$PROBE_DIR/unit/test-probe-qpipe.sh"
+    printf '#!/bin/sh\n# probe: glued flag+script sed flags its file operand (#807 review a F2)\nsed -is/a/b/ /etc/probe-sg\n' \
+        >"$PROBE_DIR/unit/test-probe-sg.sh"
+}
+: >"$VIOL"
+if ! scan "$PROBE_DIR/unit" >"$VIOL"; then
+    fail "scan died on the review-a probe scan -- checks 1-2 self-probes unreliable (#519)"
+fi
+if grep -q "test-probe-heredoc.sh|6|mutate|/etc/probe-hd-after" "$VIOL"; then
+    pass "self-probe: heredoc body stays data, the real rm behind EOF is caught (#807 review a F1)"
+else
+    fail "self-probe: an apostrophe in a heredoc body must not swallow parity past EOF (#807 review a F1)"
+fi
+if grep -q "test-probe-cmdsub.sh|4|mutate|/etc/probe-cs" "$VIOL"; then
+    pass "self-probe: a command-substitution shape resets quote context, next-line rm caught (#807 review a F1)"
+else
+    fail "self-probe: a \$(-assignment with nested quotes must not carry parity over the executed tail (#807 review a F1)"
+fi
+if grep -qF 'test-probe-qpipe.sh|3|mutate|/etc/probe-pipe|x' "$VIOL" &&
+    grep -qF 'test-probe-qpipe.sh|4|mutate|/etc/probe-semi;x' "$VIOL" &&
+    grep -qF 'test-probe-qpipe.sh|5|mutate|/etc/probe-amp&x' "$VIOL" &&
+    grep -q "test-probe-qpipe.sh|6|mutate|/etc/probe-pf" "$VIOL"; then
+    pass "self-probe: literal | ; & stay inside one token, sed file operand behind a pipe-bearing address caught (#807 review a F3)"
+else
+    fail "self-probe: quoted literals carrying | ; & must reach check 1 whole -- the segment split must not cut them (#807 review a F3)"
+fi
+if grep -q "test-probe-sg.sh|3|mutate|/etc/probe-sg" "$VIOL"; then
+    pass "self-probe: a glued flag+script sed (-is/a/b/) flags its file operand (#807 review a F2)"
+else
+    fail "self-probe: a glued flag+script sed must count the file operand -- the flag skip must not swallow the script (#807 review a F2)"
 fi
 
 # --- 3. rm suffix form: :? empty-var guard (2026-10-06) -----------------------

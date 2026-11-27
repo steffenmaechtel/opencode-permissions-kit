@@ -96,8 +96,10 @@ review host):
 
 Enforced by `tests/unit/test-sandbox-policy.sh`, three checks over every
 unit suite (backslash-continued commands are joined first; full-comment
-lines are skipped; quote parity carries across physical lines like the
-shell's), and the rm suffix guard over the e2e helper scripts as well:
+lines are skipped; quote parity carries across physical lines for
+multi-line strings, while command substitution resets the quote context
+and heredoc bodies are skipped as data), and the rm suffix guard over
+the e2e helper scripts as well:
 
 1. **Mutation check** — a mutating verb (`rm`, `mkdir`, `chown`,
    `setfacl`, ...) whose operand is a literal absolute path outside the
@@ -108,11 +110,17 @@ shell's), and the rm suffix guard over the e2e helper scripts as well:
    checked verbatim as ONE operand token — inner spaces and non-path
    bytes included (`cp x "/srv/a b"`, `rm -rf "/etc/a#b"` were green
    before) —, an escaped quote keeps the walker's parity with the
-   shell, a glued redirect target (`rm -rf x 2>/etc/y`) strips its
-   prefix and flags in every mutating arm, and a
+   shell, quote parity carries across physical lines for multi-line
+   strings, command substitution resets the walker's quote context
+   and heredoc bodies are skipped as data (both shapes the pre-wave
+   per-line scanner saw by accident — #807 review a), an unquoted
+   glued redirect target (`rm -rf x 2>/etc/y`) strips its prefix and
+   flags in every mutating arm (a QUOTED glued target,
+   `2>"/etc/x"`, stays unguarded — pre-existing residual), and a
    `${V:-/host/path}` default literal flags as itself (a
    `/tmp`/`/var/tmp` default stays exempt; a quoted sed ADDRESS such as
-   `/x/d` is the script argument, never a path).
+   `/x/d` is the script argument, never a path; a glued flag+script
+   spelling `-is/a/b/` counts as the script operand).
    Source-to-destination verbs (`cp`, `mv`,
    `ln`, ...) flag only the destination; `sed` only with `-i`.
    Variables are exempt — what they hold is the review's job — except
