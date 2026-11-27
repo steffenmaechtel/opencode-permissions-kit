@@ -96,16 +96,28 @@ review host):
 
 Enforced by `tests/unit/test-sandbox-policy.sh`, three checks over every
 unit suite (backslash-continued commands are joined first; full-comment
-lines are skipped):
+lines are skipped; quote parity carries across physical lines like the
+shell's), and the rm suffix guard over the e2e helper scripts as well:
 
 1. **Mutation check** — a mutating verb (`rm`, `mkdir`, `chown`,
    `setfacl`, ...) whose operand is a literal absolute path outside the
    sanctioned prefixes fails, quoted or unquoted (a quoted literal
    operand fails like its unquoted form — #727 closed the
    quote-blanking gap that made `rm -rf "/srv/x"` invisible outside
-   the ratchet trees). Source-to-destination verbs (`cp`, `mv`,
+   the ratchet trees). Since #807 w3 the quoted literal bytes are
+   checked verbatim as ONE operand token — inner spaces and non-path
+   bytes included (`cp x "/srv/a b"`, `rm -rf "/etc/a#b"` were green
+   before) —, an escaped quote keeps the walker's parity with the
+   shell, a glued redirect target (`rm -rf x 2>/etc/y`) strips its
+   prefix and flags in every mutating arm, and a
+   `${V:-/host/path}` default literal flags as itself (a
+   `/tmp`/`/var/tmp` default stays exempt; a quoted sed ADDRESS such as
+   `/x/d` is the script argument, never a path).
+   Source-to-destination verbs (`cp`, `mv`,
    `ln`, ...) flag only the destination; `sed` only with `-i`.
-   Variables are exempt — what they hold is the review's job. (RM-0042)
+   Variables are exempt — what they hold is the review's job — except
+   the `${V:-/default}` spelling: the default literal is what the
+   shell WILL use on an empty variable. (RM-0042)
 2. **Real-tree ratchet** — any path-shaped literal starting with a
    real-tree prefix (`/var/www` — the whole family, vhosts included,
    since issue #807 wave 1 —, `/srv/other/outside`) fails,
@@ -145,7 +157,10 @@ lines are skipped):
    /mnt/ wsl.conf fixtures — shipped-bytes and conf-fixture
    subjects, not blocklist rows).
    Unit-suite-scoped: e2e scripts legitimately name container paths
-   (/var/www/vhosts fixtures), so they are not in this check's scope.
+   (/var/www/vhosts fixtures), so checks 1-2 are not in scope there —
+   the quoted-literal mutation class above stays unguarded over the
+   e2e tree, only the rm suffix guard (check 3) scans it (documented
+   asymmetry, #806 a F15).
    (RM-0043)
 3. **rm suffix guard** — any `rm` invocation (flag order and operand
    position aware, statement-scoped) on a variable with a literal suffix
@@ -175,4 +190,10 @@ sandboxed control, and the #727 arms: an ALLOW row never suppressing
 a mutation, quoted literal operands caught in both quote arms, a
 quoted `#` keeping the later segment visible, and the ALLOW block
 rendering its entries verbatim) so the guard itself cannot rot
-silently.
+silently. The #807 w3 quote-walk hardening adds its own arms: a
+space-bearing quoted destination (cp and mv), a quoted operand
+carrying a non-path byte, an escaped-quote parity arm, a quoted
+string over a physical line, the `${V#pat}`-spared comment cut, a
+`${V:-/host/path}` default literal flagged itself with the sanctioned
+default exempt, glued redirect targets in rm/cp/sed arms, and the
+quoted-sed-address false-positive guard.
