@@ -148,10 +148,14 @@ relative/path ../etc ./here subdir \
 # path-sane's FHS-complete /var blocklist deliberately spares (the
 # writer-side pin of that exclusion, reader-side: test-uninstall-core);
 # /home/opencode/work, the agent-home SUBDIRECTORY acceptance -- the
-# REJECT table pins the home itself and its dot form, this row is the
-# counterpart proving roots BELOW the agent home stay registrable.
-# Every other row is a fictional open prefix under
-# /home/some-user-max-mustermann/, a home no real host carries.
+# REJECT table pins the home itself and the 0.0.45c S1 dot-form loop
+# below pins /home/opencode/., this row is the counterpart proving
+# roots BELOW the agent home stay registrable. The remaining rows:
+# three under /home/some-user-max-mustermann/ (the fictional home no
+# real host carries), the top-level fictional names /srv-not-sys,
+# /opt-projects, /data/projects, and the TILDE inputs ~/projects ~/dev
+# -- runtime-expanded screening inputs, not literals (they resolve
+# against PROJECT_TILDE_HOME/$HOME, the runner's home).
 ACCEPT="/var/www /home/some-user-max-mustermann/projects \
 /home/some-user-max-mustermann/projects/shop /home/some-user-max-mustermann/roots/ \
 ~/projects ~/dev /srv-not-sys /opt-projects \

@@ -379,8 +379,9 @@ fi
 # check 1, and the raw-view ratchet only knows RATCHET_TREES -- an
 # rm -rf "/srv/x"-style line was fully green. The first probe line must
 # flag as mutate, and (round a F3, #806) the SECOND exercises the
-# single-quote arm of quote_out -- both quote spellings of a literal
-# operand are pinned, an sq-arm regression cannot pass silently. The
+# quote walk's single-quote branch -- both quote spellings of a
+# literal operand are pinned, an sq-branch regression cannot pass
+# silently. The
 # last line (a quoted VARIABLE operand) must stay exempt -- what a
 # variable holds is the review's job (tests/AGENTS.md, Test sandbox
 # section).
