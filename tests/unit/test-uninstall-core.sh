@@ -309,6 +309,14 @@ for syspath in /var/backups/x /var/opt/x /var/crash/x /var/local/x /var/lock/x; 
         fail "screening rejects $syspath (#377)"
     fi
 done
+# BOUND literals (#727): both /var/www spellings below are the
+# assertion's SUBJECT, not fixture input -- uninstall-core's screening
+# must never touch /var/www (the documented project-home area that
+# path-sane's FHS-complete /var blocklist deliberately spares), and the
+# allows-loop proves the screener spares the documented project home
+# itself. A fictional prefix would test a different policy. The
+# allows-loop row carries the matching ALLOW entry in
+# test-sandbox-policy.sh; bare /var/www is not a ratchet tree.
 if printf '%s' "$SCREEN_PATTERNS" | grep -q '/var/www'; then
     fail "screening patterns must not contain /var/www (legit project area)"
 else
@@ -331,7 +339,7 @@ for projpath in /tmp/x /var/tmp/x; do
         fail "screening must skip scratch prefix without the seam: $projpath (#479 a F10)"
     fi
 done
-for projpath in /var/www/vhosts /var/www /home/dev/x /tmp/x /var/tmp/x; do
+for projpath in /var/www/vhosts /var/www /home/some-user-max-mustermann/x /tmp/x /var/tmp/x; do
     if screen "$projpath"; then
         fail "screening allows $projpath"
     else

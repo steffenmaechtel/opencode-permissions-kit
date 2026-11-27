@@ -100,7 +100,10 @@ lines are skipped):
 
 1. **Mutation check** — a mutating verb (`rm`, `mkdir`, `chown`,
    `setfacl`, ...) whose operand is a literal absolute path outside the
-   sanctioned prefixes fails. Source-to-destination verbs (`cp`, `mv`,
+   sanctioned prefixes fails, quoted or unquoted (a quoted literal
+   operand fails like its unquoted form — #727 closed the
+   quote-blanking gap that made `rm -rf "/srv/x"` invisible outside
+   the ratchet trees). Source-to-destination verbs (`cp`, `mv`,
    `ln`, ...) flag only the destination; `sed` only with `-i`.
    Variables are exempt — what they hold is the review's job. (RM-0042)
 2. **Real-tree ratchet** — any path-shaped literal starting with a
@@ -108,7 +111,17 @@ lines are skipped):
    quoted or not, in fixture strings as much as in commands.
    Policy-INPUT classes — values handed to
    screening/parsing functions or parse-only argument fixtures, never
-   executed as paths — are allowlisted in the suite with reasons.
+   executed as paths — are allowlisted in the suite with reasons, and
+   an ALLOW row can never cover a mutation finding (#727: the
+   screener consults the allowlist for ratchet findings only, so the
+   exception channel cannot hide an `rm -rf` operand however long it
+   grows). New fixtures are written against fictional open prefixes
+   (`/home/some-user-max-mustermann/...` — a home no real host
+   carries): the goal is ZERO real host paths in unit tests
+   (maintainer directive, issue #727) — a real-tree literal is
+   legitimate only where the literal IS the assertion's subject (a
+   source pin that must match shipped bytes, a policy control row),
+   named by an in-place bound comment plus the ALLOW entry's reason.
    Unit-suite-scoped: e2e scripts legitimately name container paths
    (/var/www/vhosts fixtures), so they are not in this check's scope.
    (RM-0043)

@@ -11,8 +11,10 @@
 # a live incident on an external review host).
 #
 # Two checks over the continuation-joined view of each line (full-comment
-# lines skipped): check 1 scans the quote-blanked operand view, check 2
-# the RAW line (quotes included — see its own header below). Checks 3-5
+# lines skipped): check 1 scans the quote-blanked operand view (a quoted
+# run opening with "/" is a LITERAL path and keeps its bytes there, #727
+# fix B), check 2 the RAW line (quotes included — see its own header
+# below). Checks 3-5
 # each run their own scan (sections 3-5: grep, find+python — check 4's
 # detector is tests/unit/lib/trap_detect.py since #498 —, behavioral
 # cells):
@@ -23,7 +25,9 @@
 #    /dev/null fails. All-operand verbs flag every literal; source-to-
 #    destination verbs (cp, mv, ln, install, tee) only the DESTINATION;
 #    sed only its last operand with -i. Variables are exempt -- what
-#    they hold is the review's job.
+#    they hold is the review's job -- and a QUOTED literal operand
+#    fails like its unquoted form (#727 fix B: quote-blanking used to
+#    hide it, and the raw-view ratchet only knows RATCHET_TREES).
 #
 # 2. RATCHET (0.0.42f C3, maintainer directive; raw view 0.0.42g C2):
 #    a literal absolute token STARTING with a real-tree prefix (listed
@@ -35,7 +39,9 @@
 #    /var/tmp are exempt (sandboxed fixtures are the point); a leading
 #    redirection (2>/path) is stripped before matching (0.0.42g C3).
 #    Policy-INPUT classes (values fed to screening/parsing functions,
-#    never executed) are allowlisted below with reasons.
+#    never executed) are allowlisted below with reasons -- and an ALLOW
+#    row can never cover a MUTATION finding: report() consults the
+#    allowlist for ratchet findings only (#727 fix A).
 #
 # Backslash-continued commands are joined before scanning (0.0.42f C3:
 # `rm -rf \` + path-on-next-line was invisible to the line-based scan);
@@ -53,41 +59,25 @@ RATCHET_TREES="/var/www/vhosts /srv/other/outside"
 # Allowlist for the ratchet: one "file|token" entry per line, a reason
 # comment above it (house style of the string-continuations guard).
 # Policy-INPUT class only: values handed to screening/parsing functions
-# or parse-only argument fixtures -- never executed as paths.
+# or parse-only argument fixtures -- never executed as paths. New rows
+# are the LAST resort (#727): write the fixture against a fictional
+# open prefix (/home/some-user-max-mustermann/...) instead; a real-tree
+# literal earns an entry only where the literal IS the assertion's
+# subject (a source pin that must match shipped bytes, a policy control
+# row) -- and an ALLOW row can never cover a MUTATION finding (report()
+# enforces it, fix A). Shrunk 15 -> 2 rows by the #727 sweep: the
+# policy-INPUT classes above moved to fictional prefixes.
 ALLOW="
-# parse_args argument fixtures (parse-only suite -- the values are
-# parsed, never run; the quoted glob probe token extracts to the
-# trailing-slash form, hence the second entry below)
-tests/unit/test-install-args.sh|/var/www/vhosts
-tests/unit/test-install-args.sh|/var/www/vhosts/
-# project_path_sane screening inputs + expected-verdict call fixtures
-# (ACCEPT list carries the bare and trailing-slash form, :147 the
-# space-suffixed client form; the #377 F1 rows add the multi-slash
-# normalization inputs)
-tests/unit/test-project-paths.sh|/var/www/vhosts
-tests/unit/test-project-paths.sh|/var/www/vhosts/
-tests/unit/test-project-paths.sh|/var/www/vhosts//
-tests/unit/test-project-paths.sh|/var/www/vhosts/////
-tests/unit/test-project-paths.sh|/var/www/vhosts/client
-tests/unit/test-project-paths.sh|/var/www/vhosts/client1
-# #670 a L2 writer-refusal arms: cntrl/backslash screening inputs —
-# the gate refuses them before any filesystem act ([ -L ] sits below),
-# policy-INPUT like the rows above
-tests/unit/test-project-paths.sh|/var/www/vhosts/evil
-tests/unit/test-project-paths.sh|/var/www/vhosts/back
-# #665 glob-metacharacter refusal arms + clean-root control: same
-# policy-INPUT class (refused before any filesystem act); the screener
-# derives the stems from the metachar spellings (x*y → x, proj? → proj)
-tests/unit/test-project-paths.sh|/var/www/vhosts/x
-tests/unit/test-project-paths.sh|/var/www/vhosts/proj
-tests/unit/test-project-paths.sh|/var/www/vhosts/plain665
-# screening-pattern loop values fed to greps against the uninstall
-# section lib (#346 wave 4 moved the cluster from test-uninstall.sh to
-# test-uninstall-core.sh with un_projects_revert)
+# BOUND (#727): the allows-loop value is the assertion's subject --
+# uninstall-core's screening must SPARE the documented project home
+# /var/www/vhosts (the screening-allows loop fails when the screener
+# rejects it). Not replaceable by a fictional prefix without losing
+# the pin.
 tests/unit/test-uninstall-core.sh|/var/www/vhosts
-# default-scan-root source pin over doctor.sh (#354): the literal is a
-# grep PATTERN against stripped source (policy-INPUT), never executed
-# as a path
+# BOUND (#727): default-scan-root source pin over sh/doctor-core.sh
+# (#354, #448) -- the literal is a grep PATTERN that must match the
+# SHIPPED bytes (the [ -d /var/www/vhosts ] default-scan-root line);
+# changing the default root is a product decision, not test hygiene.
 tests/unit/test-doctor.sh|/var/www/vhosts
 "
 
@@ -109,6 +99,26 @@ VIOL="$(mktemp)"
 # traps in $( ) — the cells trap their own scratch instead (#287 b C7).
 trap 'rm -f "$TMP" "$VIOL"; [ -n "${PROBE_DIR:-}" ] && rm -rf "$PROBE_DIR"' EXIT INT TERM
 PROBE_DIR=""
+
+# Parse-integrity pin (#727): the ALLOW block above is a double-quoted
+# shell string whose reason lines are STRING CONTENT, not comments. A
+# double-quoted phrase WITH WHITESPACE inside a reason line splits the
+# assignment at the shell level and silently truncates the variable
+# (measured: "screening allows" in a reason comment cut both BOUND rows
+# and reddened the ratchet with a misleading sweep-regression message,
+# one red gate cycle paid -- adjacent quotes without inner spaces
+# merely lose their quote bytes, entries intact); an unescaped
+# expansion char silently empties into the text (measured: $UNDEFINED
+# in a reason line renders blank). The rendered variable must carry
+# every BOUND entry verbatim; the count is the allowlist ratchet -- a
+# new row is a deliberate edit here (#727: growth stays the
+# maintainer's overview, not drift).
+_al_entries=$(printf '%s\n' "$ALLOW" | grep -cE '^[a-z].*\|' || true)
+if [ "$_al_entries" -eq 2 ]; then
+    pass "ALLOW parses clean: 2 BOUND entries render verbatim (#727)"
+else
+    fail "ALLOW broke while parsing or grew -- reason lines must carry no double quotes/expansions, growth is a conscious count bump (entries=$_al_entries, #727)"
+fi
 
 # scan <dir> -- writes "file|line|kind|token" violation rows to $VIOL.
 # The sourced test lib (tests/unit/lib/*.sh) is scanned like a suite --
@@ -154,8 +164,24 @@ scan() {
                 return 0
             }
             function report(tok, kind) {
-                if (allowed(tok)) return
+                # #727 fix A: the allowlist exists for policy-INPUT
+                # strings -- ratchet findings -- ONLY. A mutation
+                # finding fails the suite whatever the allowlist says:
+                # no ALLOW row can ever hide an rm -rf class operand
+                # behind an inert-string exception (probe: the
+                # test-probe-allowmut block below).
+                if (kind == "ratchet" && allowed(tok)) return
                 printf "%s|%d|%s|%s\n", f, NR, kind, tok
+            }
+            # #727 fix B: a quoted run that opens with "/" is a LITERAL
+            # path operand, not a variable -- keep its bytes so check 1
+            # sees them (rm -rf "/srv/x" was invisible: blanked here and
+            # not a ratchet tree). Variable runs keep the X placeholder
+            # (what a variable holds is for the review, tests/AGENTS.md
+            # Test sandbox section).
+            function quote_out(q) {
+                if (substr(q, 1, 1) == "/") return q
+                return "X"
             }
             {
                 # join backslash continuations into logical lines (the
@@ -172,25 +198,29 @@ scan() {
                 # blank quoted regions: operands-only view (a quoted run
                 # collapses into one placeholder token so quoted variable
                 # destinations still count as operands; escaped quotes are
-                # a documented limitation, none in scope)
-                ops = ""; indq = 0; insq = 0
+                # a documented limitation, none in scope). A run opening
+                # with "/" is a LITERAL path: its bytes stay visible for
+                # check 1 (#727 fix B, quote_out above). The unquoted
+                # trailing comment is cut inside the walk now -- kept
+                # literal bytes may carry "#", so ops is no longer
+                # #-free and a post-hoc index() strip would truncate the
+                # line at a quoted "#".
+                ops = ""; indq = 0; insq = 0; qrun = ""
                 L = length(orig)
                 for (p = 1; p <= L; p++) {
                     ch = substr(orig, p, 1)
                     if (!insq && ch == dq) {
-                        if (indq) { indq = 0; ops = ops "X" } else indq = 1
+                        if (indq) { indq = 0; ops = ops quote_out(qrun) } else { indq = 1; qrun = "" }
                         continue
                     }
                     if (!indq && ch == sq) {
-                        if (insq) { insq = 0; ops = ops "X" } else insq = 1
+                        if (insq) { insq = 0; ops = ops quote_out(qrun) } else { insq = 1; qrun = "" }
                         continue
                     }
-                    if (indq || insq) continue
+                    if (indq || insq) { qrun = qrun ch; continue }
+                    if (ch == "#") break
                     ops = ops ch
                 }
-                # strip an unquoted trailing comment (ops is quote-free)
-                hp = index(ops, "#")
-                if (hp > 0) ops = substr(ops, 1, hp - 1)
 
                 # --- check 2: real-tree literal ratchet (verb-independent;
                 # RAW view so quoted literals count -- 0.0.42g C2).
@@ -318,6 +348,68 @@ if grep -q "test-probe-clean.sh" "$VIOL"; then
     fail "self-probe: sandboxed probe must not be flagged"
 else
     pass "self-probe: sandboxed probe passes clean"
+fi
+
+# --- 2b. self-probe: an ALLOW row can never suppress a mutation (#727) -------
+# report() consults the allowlist for ratchet findings only (fix A). The
+# probe token carries a dedicated ALLOW row for this scan, so the ratchet
+# row must vanish while the mutate row survives: the exception channel
+# cannot hide an rm -rf class operand, however long the list grows.
+printf '#!/bin/sh\n# probe: allowlisted token as rm operand must still fail\nrm -rf /var/www/vhosts/probe-allow\n' \
+    >"$PROBE_DIR/unit/test-probe-allowmut.sh"
+: >"$VIOL"
+if ! (
+    ALLOW="$ALLOW
+$PROBE_DIR/unit/test-probe-allowmut.sh|/var/www/vhosts/probe-allow"
+    scan "$PROBE_DIR/unit" >"$VIOL"
+); then
+    fail "scan died on the allow-mutate probe -- #727 self-probe unreliable (#519)"
+fi
+if grep -q "test-probe-allowmut.sh|3|mutate|/var/www/vhosts/probe-allow" "$VIOL" &&
+    ! grep -q "test-probe-allowmut.sh|3|ratchet|/var/www/vhosts/probe-allow" "$VIOL"; then
+    pass "self-probe: ALLOW suppresses the ratchet row, never the mutate row (#727)"
+else
+    fail "self-probe: an ALLOW row must never suppress a mutation finding (#727)"
+fi
+
+# --- 2c. self-probe: a quoted literal operand outside the ratchet trees -----
+# (#727 fix B): quote-blanking used to hide quoted literal operands from
+# check 1, and the raw-view ratchet only knows RATCHET_TREES -- an
+# rm -rf "/srv/x"-style line was fully green. The first probe line must
+# flag as mutate; the second (a quoted VARIABLE operand) must stay
+# exempt -- what a variable holds is the review's job (tests/AGENTS.md,
+# Test sandbox section).
+printf '#!/bin/sh\n# probe: quoted literal (#727)\nrm -rf "/home/some-user-max-mustermann/probe-qlit"\nrm -rf "$PWQLIT"\n' \
+    >"$PROBE_DIR/unit/test-probe-qlit.sh"
+: >"$VIOL"
+if ! scan "$PROBE_DIR/unit" >"$VIOL"; then
+    fail "scan died on the quoted-literal probe -- #727 self-probe unreliable (#519)"
+fi
+_qlit_rows=$(grep -c 'test-probe-qlit.sh' "$VIOL" || true)
+if [ "$_qlit_rows" -eq 1 ] &&
+    grep -q "test-probe-qlit.sh|3|mutate|/home/some-user-max-mustermann/probe-qlit" "$VIOL"; then
+    pass "self-probe: quoted literal rm operand caught, quoted variable stays exempt (#727)"
+else
+    fail "self-probe: quoted non-tree literal must be caught as mutate only (rows=$_qlit_rows, #727)"
+fi
+
+# --- 2d. self-probe: a quoted "#" must not cut the operand view -------------
+# (#727 fix B rider): kept literal bytes may carry "#" -- a quoted
+# program glued to a later command is the house shape (grep "/a#b" x
+# && rm ...) -- so the unquoted comment cut happens INSIDE the quote
+# walk and the rm segment behind a quoted "#"-bearing literal stays
+# visible to check 1 (a post-hoc index("#") strip over ops would
+# truncate the line exactly there).
+printf '#!/bin/sh\n# probe: quoted hash (#727)\ngrep "/a#b" x && rm -rf /home/some-user-max-mustermann/probe-hash\n' \
+    >"$PROBE_DIR/unit/test-probe-qhash.sh"
+: >"$VIOL"
+if ! scan "$PROBE_DIR/unit" >"$VIOL"; then
+    fail "scan died on the quoted-hash probe -- #727 self-probe unreliable (#519)"
+fi
+if grep -q "test-probe-qhash.sh|3|mutate|/home/some-user-max-mustermann/probe-hash" "$VIOL"; then
+    pass "self-probe: a quoted # keeps the later rm segment visible (#727)"
+else
+    fail "self-probe: a quoted # must not truncate the operand view (#727)"
 fi
 
 # --- 3. rm suffix form: :? empty-var guard (2026-10-06) -----------------------

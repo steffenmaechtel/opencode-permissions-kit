@@ -142,10 +142,18 @@ REJECT="/ /usr /etc /home /root /var /tmp /tmp/build-dir /bin /sbin /lib /lib64 
 relative/path ../etc ./here subdir \
 /home/opencode ///"
 
-# must ACCEPT (dedicated project folders)
-ACCEPT="/var/www/vhosts /var/www /var/www/vhosts/client1 /home/dev/projects \
-/home/dev/projects/shop ~/projects ~/dev /srv-not-sys /opt-projects \
-/data/projects /var/www/vhosts/ /home/opencode/work"
+# must ACCEPT (dedicated project folders). /var/www is the one
+# deliberate real-tree policy pin: the /var blocklist in path-sane.sh is
+# FHS-complete and spares /var/www as the documented project-home — this
+# row is the writer-side behavioral pin of that exclusion (reader-side:
+# test-uninstall-core). Every other row is a fictional open prefix
+# (#727: real host paths only where the literal IS the assertion's
+# subject; /var/www is not a ratchet tree, so it needs no ALLOW entry —
+# and the fictional home is a name no real host carries).
+ACCEPT="/var/www /home/some-user-max-mustermann/projects \
+/home/some-user-max-mustermann/projects/shop /home/some-user-max-mustermann/roots/ \
+~/projects ~/dev /srv-not-sys /opt-projects \
+/data/projects /home/opencode/work"
 
 for p in $REJECT; do
     if project_path_sane "$p"; then
@@ -169,12 +177,14 @@ done
 # slash in _PP_NORM. The loop normalizes all of them; "///" strips to
 # empty and refuses (it rides the REJECT table above).
 _pp377=""
-if project_path_sane "/var/www/vhosts//" && [ "$_PP_NORM" = "/var/www/vhosts" ]; then
+if project_path_sane "/home/some-user-max-mustermann/roots//" &&
+    [ "$_PP_NORM" = "/home/some-user-max-mustermann/roots" ]; then
     pass "double trailing slash normalizes away: _PP_NORM clean (#377 F1)"
 else
     fail "double trailing slash must normalize out of _PP_NORM (got '$_PP_NORM') (#377 F1)"
 fi
-if project_path_sane "/var/www/vhosts/////" && [ "$_PP_NORM" = "/var/www/vhosts" ]; then
+if project_path_sane "/home/some-user-max-mustermann/roots/////" &&
+    [ "$_PP_NORM" = "/home/some-user-max-mustermann/roots" ]; then
     pass "five trailing slashes normalize away: _PP_NORM clean (#377 F1)"
 else
     fail "all trailing slashes must normalize out of _PP_NORM (got '$_PP_NORM') (#377 F1)"
@@ -442,12 +452,12 @@ fi
 
 # Paths containing whitespace are rejected: projects.conf is line-based
 # and the install-side writer splits on spaces (0.0.39b C3).
-if project_path_sane "/home/dev/my projects"; then
+if project_path_sane "/home/some-user-max-mustermann/my projects"; then
     fail "rejects paths containing spaces (storage format is space-free)"
 else
     pass "rejects paths containing spaces (storage format is space-free)"
 fi
-if project_path_sane "/var/www/vhosts/client site"; then
+if project_path_sane "/home/some-user-max-mustermann/client site"; then
     fail "rejects paths containing tabs/spaces anywhere"
 else
     pass "rejects paths containing tabs/spaces anywhere"
@@ -458,8 +468,8 @@ fi
 # print $root unsanitized) and doctor refuses them for its own walks —
 # the writer closes the sanctioned registration route. The refusal
 # message itself carries a sanitized copy.
-_ps_l2_out="$(project_path_sane "/var/www/vhosts/evil$(printf '\033')proj" 2>&1 || true)"
-if project_path_sane "/var/www/vhosts/evil$(printf '\033')proj" 2>/dev/null; then
+_ps_l2_out="$(project_path_sane "/home/some-user-max-mustermann/evil$(printf '\033')proj" 2>&1 || true)"
+if project_path_sane "/home/some-user-max-mustermann/evil$(printf '\033')proj" 2>/dev/null; then
     fail "rejects control-byte paths (#670 a L2)"
 else
     pass "rejects control-byte paths (#670 a L2)"
@@ -484,13 +494,13 @@ if grep -qE '_pps=' "$PATH_SANE"; then
 else
     pass "path-sane defines no _pps receiver (#670 b D1)"
 fi
-if project_path_sane '/var/www/vhosts/back\slash'; then
+if project_path_sane '/home/some-user-max-mustermann/back\slash'; then
     fail "rejects backslash paths (#670 a L2)"
 else
     pass "rejects backslash paths (#670 a L2)"
 fi
 # clean UTF-8 stays registrable (the gate is cntrl/backslash, not non-ASCII)
-if project_path_sane "/var/www/vhosts/$(printf '\303\234')mlaut"; then
+if project_path_sane "/home/some-user-max-mustermann/$(printf '\303\234')mlaut"; then
     pass "clean UTF-8 paths stay registrable (#670 a L2)"
 else
     fail "the cntrl gate must not reject clean UTF-8 (#670 a L2)"
@@ -502,7 +512,7 @@ fi
 # /var or every home; "/home/opencode/." additionally defeated the
 # agent-home exclusion. Leading "//x" bypassed the blocklist the same way
 # (bin/opk's form filter refused it all along).
-for p in "/." "/var/." "/home/." "/home/opencode/." "//x" "//" "/srv/x/." "/home/dev/."; do
+for p in "/." "/var/." "/home/." "/home/opencode/." "//x" "//" "/srv/x/." "/home/some-user-max-mustermann/."; do
     if project_path_sane "$p"; then
         fail "rejects trailing-/. or empty-segment form: $p"
     else
@@ -525,7 +535,9 @@ done
 # projects add → project_path_sane returned rc 0 with the glob
 # verbatim in _PP_NORM. The arm closes the class at the writer; the
 # belts and every reader mirror refuse/skip it too (#665 sweep).
-for p in "/var/www/vhosts/x*y" "/var/www/vhosts/proj?" "/var/www/vhosts/[set]"; do
+for p in "/home/some-user-max-mustermann/x*y" \
+    "/home/some-user-max-mustermann/proj?" \
+    "/home/some-user-max-mustermann/[set]"; do
     if project_path_sane "$p"; then
         fail "rejects glob metacharacter: $p (#665)"
     else
@@ -534,8 +546,8 @@ for p in "/var/www/vhosts/x*y" "/var/www/vhosts/proj?" "/var/www/vhosts/[set]"; 
 done
 # control arm: a clean name still passes — the arm refuses the
 # characters, not the shape.
-if project_path_sane "/var/www/vhosts/plain665" &&
-    [ "$_PP_NORM" = "/var/www/vhosts/plain665" ]; then
+if project_path_sane "/home/some-user-max-mustermann/plain665" &&
+    [ "$_PP_NORM" = "/home/some-user-max-mustermann/plain665" ]; then
     pass "clean root still passes the glob arm's case (#665)"
 else
     fail "glob arm must not refuse clean roots (#665)"
