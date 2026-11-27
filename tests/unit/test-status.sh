@@ -1888,7 +1888,7 @@ _w2_fall_hits="$(grep -rnE "$W2_FIXPATH_A|$W2_FIXPATH_B" "$SCRIPT_DIR/../../file
 case "$_w2_fall_rc" in
     0) fail "W2 class sweep: mktemp fixed-path fallback survived (got: $_w2_fall_hits)" ;;
     1) pass "W2 class sweep: no mktemp fixed-path fallback in any shipped script (#168)" ;;
-    *) fail "W2 class sweep: grep rc $_w2_fall_rc — files/ tree unreadable, sweep fails loud (#805)" ;;
+    *) fail "W2 class sweep: grep rc $_w2_fall_rc — files/ tree scan error, sweep fails loud (#805)" ;;
 esac
 # canary (#202 a W1, extended #202 b W1, #202 c W1): the sweep above
 # greps real files/ and finds nothing by design — its FAIL branch never

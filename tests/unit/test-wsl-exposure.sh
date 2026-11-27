@@ -176,8 +176,26 @@ if live_src "$OPK" | awk '/wsl-add-opencode-1-fix\)/,/;;/' | grep -q 'sudo' &&
 else
     fail "opk wsl-add-opencode-1-fix elevates via sudo and runs write_conf"
 fi
-check "opk wsl-add-opencode-1-fix is the ONLY shipped entry point calling write_conf" \
-    sh -c "! grep -rl 'browser_bridge_write_conf' \"\$1\" 2>/dev/null | grep -v 'sh/wsl-browser-bridge.sh$' | grep -v 'bin/opk$' | grep -q ." _ "$SCRIPT_DIR/../../files"
+# (pr-0811 a A2) the raw `! grep` shape passed vacuously at grep rc 2
+# (the documented harness residual — a -r directory target rides it):
+# the lister is rc-mapped first (rc 1 = nothing calls write_conf at
+# all — vacuously unique; the pins above own the call's presence);
+# rc 2+ fails loud instead of greening over uninspected bytes. The
+# exclusion filter runs on the captured bytes; its empty result is the
+# pass case, so its rc-1 carries the `|| true` (L7 guarded
+# empty-match idiom — stdin operands, no operand-error channel here).
+_wsl_uniq_rc=0
+_wsl_uniq_raw="$(grep -rl 'browser_bridge_write_conf' "$SCRIPT_DIR/../../files")" || _wsl_uniq_rc=$?
+case "$_wsl_uniq_rc" in
+    0 | 1) ;;
+    *) fail "wsl write_conf uniqueness lister: grep rc $_wsl_uniq_rc — files/ tree scan error, fails loud (pr-0811 a A2)" ;;
+esac
+_wsl_uniq_hits="$(printf '%s' "$_wsl_uniq_raw" | grep -v 'sh/wsl-browser-bridge.sh$' | grep -v 'bin/opk$')" || true
+if [ -z "$_wsl_uniq_hits" ]; then
+    pass "opk wsl-add-opencode-1-fix is the ONLY shipped entry point calling write_conf"
+else
+    fail "opk wsl-add-opencode-1-fix uniqueness broken — write_conf outside sanctioned files:$_wsl_uniq_hits"
+fi
 check_live "status.sh points at the opt-in bridge command" "$STATUS_CORE" -q 'opk wsl-add-opencode-1-fix'
 if live_src "$STATUS_CORE" | grep -qF 'advisories_version_cmp' &&
     live_src "$STATUS_CORE" | grep -qF '1.18.33' &&
