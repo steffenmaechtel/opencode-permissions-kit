@@ -112,8 +112,11 @@ lines are skipped):
    quoted or not, in fixture strings as much as in commands.
    Policy-INPUT classes — values handed to
    screening/parsing functions or parse-only argument fixtures, never
-   executed as paths — are written against fictional prefixes since
-   #727, not allowlisted; the ALLOW list holds BOUND rows only (the
+   executed as paths — belong on fictional prefixes since #727 (the
+   #807 wave-2 sweep converted the last inert real-prefix fixtures —
+   the /srv/* project-area and the /home/dev-shaped pins — so the
+   class sits on fictional prefixes only now), not allowlisted; the
+   ALLOW list holds BOUND rows only (the
    literal is the assertion's subject), and
    an ALLOW row can never cover a mutation finding (#727: the
    screener consults the allowlist for ratchet findings only, so the
@@ -124,19 +127,21 @@ lines are skipped):
    (maintainer directive, issue #727). Enforced today are the ratchet
    trees plus the bound class — a real-tree literal is legitimate
    only where the literal IS the assertion's subject (a source pin
-   that must match shipped bytes, a policy control row), named by an
-   in-place bound comment plus the ALLOW entry's reason. Real-prefix
-   literals OUTSIDE the trees fall into recorded classes: a residual
-   sweep deferred to issue #807 wave 2 (host-specific homes and
-   project areas — the /home/dev fixtures, the agent-home rows and
-   the /srv/* project-area fixtures; the /var/www family
-   without vhosts joined the enforced trees in #807 wave 1), the
-   blocklist pins' own subjects
-   (FHS system-path literals, /etc/nginx, /root/projects, ...), and
+   that must match shipped bytes, a policy control row, or the
+   agent-home rows — the /home/opencode spellings and the shipped
+   /home/$OPENCODE_USER template outputs — each named by an in-place
+   bound comment plus the ALLOW entry's reason). The #807 wave-2
+   sweep closed the deferred residual classes: the host-specific
+   /home/dev fixtures and the /srv/* project-area fixtures are
+   converted to the fictional prefixes, so no inert real-prefix
+   policy-INPUT remains in the unit suites. The real-prefix literals
+   OUTSIDE the trees are recorded subject classes only: the blocklist
+   pins' own subjects
+   (FHS system-path literals, /etc/nginx, /root/projects, whole-home
+   refusals, ...), and
    WSL-context subjects (the /mnt/c mkcert source pins and the
    /mnt/ wsl.conf fixtures — shipped-bytes and conf-fixture
-   subjects, not blocklist rows). All inert policy-INPUT —
-   recorded, never silently sanctioned.
+   subjects, not blocklist rows).
    Unit-suite-scoped: e2e scripts legitimately name container paths
    (/var/www/vhosts fixtures), so they are not in this check's scope.
    (RM-0043)

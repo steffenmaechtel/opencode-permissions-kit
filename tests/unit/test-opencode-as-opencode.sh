@@ -797,7 +797,7 @@ assert_eq "openchamber guard: pin only -> fix removes the settings line" "1" \
 # bins + pin -> bypass warning, BOTH steps
 mkdir -p "$TMPDIR/oc-both/.config/openchamber"
 oc_mkbin "$TMPDIR/oc-both" opencode opencode2
-printf '{ "opencodeBinary": "/home/dev/.opencode/bin/opencode" }\n' \
+printf '{ "opencodeBinary": "/home/some-user-max-mustermann/.opencode/bin/opencode" }\n' \
     >"$TMPDIR/oc-both/.config/openchamber/settings.json"
 oc_rc=0
 out=$(oc_run "$TMPDIR/oc-both") || oc_rc=$?

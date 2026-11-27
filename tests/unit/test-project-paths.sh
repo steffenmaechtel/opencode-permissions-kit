@@ -351,8 +351,8 @@ fi
 # the developer's home, not be rejected as a /root system path.
 _save_home="$HOME"
 HOME="/root"
-PROJECT_TILDE_HOME="/home/dev"
-if project_path_sane "~/dev" && [ "$_PP_NORM" = "/home/dev/dev" ]; then
+PROJECT_TILDE_HOME="/home/some-user-max-mustermann"
+if project_path_sane "~/dev" && [ "$_PP_NORM" = "/home/some-user-max-mustermann/dev" ]; then
     pass "~ expands against PROJECT_TILDE_HOME under sudo (got $_PP_NORM)"
 else
     fail "~ expands against PROJECT_TILDE_HOME under sudo (got ${_PP_NORM:-nothing})"
@@ -392,12 +392,16 @@ _tth=""
 _tth="$(sh -c '
     . "$1"
     HOME=/root
-    SUDO_USER=dev
+    # Stub user rides the fictional house prefix (#807 w2): the passwd
+    # answer must spell the SAME user the SUDO_USER arm queries and the
+    # home the pin asserts — the getent stub $2 and the home field are
+    # one fixture, not two literals.
+    SUDO_USER=some-user-max-mustermann
     id() { [ "$1" = "-u" ] && printf "0\n"; }
-    getent() { [ "$1" = "passwd" ] && [ "$2" = "dev" ] && printf "x:x:1000:1000::/home/dev:/bin/sh\n"; }
+    getent() { [ "$1" = "passwd" ] && [ "$2" = "some-user-max-mustermann" ] && printf "x:x:1000:1000::/home/some-user-max-mustermann:/bin/sh\n"; }
     path_sane_tilde_home && printf "%s" "$PROJECT_TILDE_HOME"
 ' _ "$PATH_SANE" 2>/dev/null)" || true
-[ "$_tth" = "/home/dev" ] &&
+[ "$_tth" = "/home/some-user-max-mustermann" ] &&
     pass "tilde-home helper: root + SUDO_USER resolves the developer home (#340)" ||
     fail "tilde-home helper: root + SUDO_USER arm (#340; got ${_tth:-nothing})"
 _tth=""

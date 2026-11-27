@@ -1327,7 +1327,11 @@ fi
 # spelling (the compare TARGET itself carries the slash) and the
 # root-run revert ops run over the agent home — the SKIP→OPS flip
 # review e probed old-vs-new. Host-independent: the refusal is
-# lexical, before the [ -d ] gate.
+# lexical, before the [ -d ] gate. BOUND (#807 w2): the /home/opencode
+# spellings below are the assertion's SUBJECTS — the shipped refusal
+# keys on the canonical agent-home literal (/home/<agent> + its
+# trailing-slash form); a fictional prefix would test a different
+# compare target, so the rows stay on the real spelling.
 FOUT=$(_un_loop_out "" false 60000 60002 60001 "/home/opencode /home/opencode/" "opencode/") || true
 if printf '%s' "$FOUT" | grep -qF 'WARN: invalid OPENCODE_USER value in install.conf' &&
     printf '%s' "$FOUT" | grep -q 'Skipping agent home (never a project root): /home/opencode$' &&

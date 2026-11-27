@@ -1951,7 +1951,7 @@ EOF
     ln -sfn "$OCW2F/sudo-b/sudo" "$OCW2ABSB/sudo"
     _ocw2_run() { # <caller-PATH-dir> — fresh fixture, eval the compound
         mkdir -p "$OCW2/case"
-        printf '{ "opencodeBinary": "/home/dev/.opencode/bin/opencode", "port": 3000 }\n' \
+        printf '{ "opencodeBinary": "/home/some-user-max-mustermann/.opencode/bin/opencode", "port": 3000 }\n' \
             >"$OCW2/case/settings.json"
         (
             PATH="$1"

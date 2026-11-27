@@ -331,6 +331,8 @@ expect_rc 0 "plain --projects value passes parse_args" --yes --projects /home/so
 # Whitespace in a --projects value is LEGAL at parse time (issue #372
 # A3): one quoted argument may carry SEVERAL roots — the e2e suites'
 # invocation shape (`--projects "/var/www/vhosts /home/dev/vhosts"`).
+# The literal quotes the real container invocation (e2e scope: container
+# paths are outside this check's unit-suite policy) — not a unit fixture.
 # A parse-time rejection here was an e2e-caught regression; the honest
 # fix records the shape (PROJECTS_ARG_SPACED) so the path-gate refusal
 # in do_plan_phase can name the whitespace cause for fragments. The

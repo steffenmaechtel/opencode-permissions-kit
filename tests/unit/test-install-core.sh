@@ -151,7 +151,11 @@ _out=$(sh -c '
     OPENCODE_USER="octest"
     ui_error() { printf "ui_error: %s\n" "$*" >&2; }
     log() { :; }
-    getent() { [ "$2" = "octest" ] && printf "x:x:1000:1000::/srv/octest:/bin/sh\n"; }
+    # deviating-home stub on a fictional non-/home prefix (#807 w2): the
+    # shadow-home arm only needs a home that MISSES the shipped
+    # /home/$OPENCODE_USER template — the prefix shape (non-/home) is
+    # what the deviation class means.
+    getent() { [ "$2" = "octest" ] && printf "x:x:1000:1000::/srv/some-user-max-mustermann:/bin/sh\n"; }
     id() { [ "$1" = "-gn" ] && printf "octest\n"; }
     install_reuse_home_guard
 ' _ "$LIB" 2>&1) || _rc=$?
@@ -164,7 +168,11 @@ else
     fail "reuse guard: deviating home aborts (rc=$_rc out=$_out)"
 fi
 # matching home -> the HOME guard passes silently (group guard not reached
-# in this leg's shell — separate leg below drives it)
+# in this leg's shell — separate leg below drives it). BOUND (#807 w2): the
+# stub home MUST spell the shipped /home/$OPENCODE_USER template with
+# OPENCODE_USER=octest — the literal is the arm's subject (the silent-pass
+# pin keys on the match); a fictional prefix would test a deviation, not
+# the match.
 _rc=0
 _out=$(sh -c '
     . "$1"
@@ -287,14 +295,17 @@ _out=$(sh -c '
     ui_error() { printf "ui_error: %s\n" "$*" >&2; }
     _ui_read() {
         _n=$((_n + 1))
-        if [ "$_n" -eq 1 ]; then eval "$1=c"; else eval "$1=\"/srv/a /srv/b\""; fi
+        # parse-only fixture input on the fictional project-area prefix
+        # (#807 w2): project_path_sane is stubbed here, the words ride
+        # the selection flow lexically.
+        if [ "$_n" -eq 1 ]; then eval "$1=c"; else eval "$1=\"/srv/some-project-area-max-mustermann/a /srv/some-project-area-max-mustermann/b\""; fi
     }
     _n=0
     project_path_sane() { _PP_NORM="$1"; return 0; }
     install_project_roots_select && printf "ROOTS=[%s]" "${PROJECTS_ROOTS-UNSET}"
 ' _ "$LIB" 2>&1 | tail -n 1) || _rc=$?
 case "$_out" in
-    *"ROOTS=[ /srv/a /srv/b]")
+    *"ROOTS=[ /srv/some-project-area-max-mustermann/a /srv/some-project-area-max-mustermann/b]")
         pass "custom paths join PROJECTS_ROOTS via _PP_NORM (invalid-free path)"
         ;;
     *)
@@ -630,8 +641,8 @@ _out=$(sh -c '
     _ui_read() {
         _n=$((_n + 1))
         if [ "$_n" -eq 1 ]; then eval "$1=c"
-        elif [ "$_n" -eq 2 ]; then eval "$1=\"/srv/x[ab] /srv/ok\""
-        else eval "$1=/srv/ok"; fi
+        elif [ "$_n" -eq 2 ]; then eval "$1=\"/srv/some-project-area-max-mustermann/x[ab] /srv/some-project-area-max-mustermann/ok\""
+        else eval "$1=/srv/some-project-area-max-mustermann/ok"; fi
     }
     _n=0
     project_path_sane() { _PP_NORM="$1"; return 0; }
@@ -640,7 +651,7 @@ _out=$(sh -c '
 case "$_out" in
     *"glob characters"*)
         case "$_out" in
-            *"ROOTS=[ /srv/ok]"*) pass "custom-path glob input rejected, never joins roots (#372 A2)" ;;
+            *"ROOTS=[ /srv/some-project-area-max-mustermann/ok]"*) pass "custom-path glob input rejected, never joins roots (#372 A2)" ;;
             *) fail "glob gate ran but the word leaked into roots (#372 A2 out=$_out)" ;;
         esac
         ;;
@@ -770,7 +781,11 @@ fi
 # between mkdir and cp. Executed: the function is sed-extracted from
 # install-core.sh and run with stubbed sudo (no real /home writes —
 # sandbox policy) and a pass-once agent_home_sane that flips to refusal
-# on its second walk.
+# on its second walk. BOUND (#807 w2): the /home/oc/.agents spellings in
+# the pins below are the shipped /home/$OPENCODE_USER template with
+# OPENCODE_USER=oc — the literal is the asserted output (the operand the
+# exec-time recheck names), never a fixture path; a fictional prefix
+# would unpin the shipped message bytes.
 _MIG_CORE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/install-core.sh"
 _O372W="$(work_new)"
 mkdir -p "$_O372W/dev/.agents/skill-a"
