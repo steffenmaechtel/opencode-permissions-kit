@@ -365,8 +365,8 @@ fi
 # Without PROJECT_TILDE_HOME the old behavior holds (=$HOME) — callers
 # that never set it keep working.
 unset PROJECT_TILDE_HOME
-HOME="/home/tester"
-if project_path_sane "~/dev" && [ "$_PP_NORM" = "/home/tester/dev" ]; then
+HOME="/home/some-user-max-mustermann"
+if project_path_sane "~/dev" && [ "$_PP_NORM" = "/home/some-user-max-mustermann/dev" ]; then
     pass "~ falls back to \$HOME when PROJECT_TILDE_HOME unset"
 else
     fail "~ falls back to \$HOME when PROJECT_TILDE_HOME unset (got ${_PP_NORM:-nothing})"
@@ -419,11 +419,11 @@ _tth="$(sh -c '
 _tth=""
 _tth="$(sh -c '
     . "$1"
-    HOME=/home/tester
+    HOME=/home/some-user-max-mustermann
     id() { [ "$1" = "-u" ] && printf "1000\n"; }
     path_sane_tilde_home && printf "%s" "$PROJECT_TILDE_HOME"
 ' _ "$PATH_SANE" 2>/dev/null)" || true
-[ "$_tth" = "/home/tester" ] &&
+[ "$_tth" = "/home/some-user-max-mustermann" ] &&
     pass "tilde-home helper: non-root keeps \$HOME (#340)" ||
     fail "tilde-home helper: non-root arm (#340; got ${_tth:-nothing})"
 

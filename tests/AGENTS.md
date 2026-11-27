@@ -127,14 +127,16 @@ lines are skipped):
    (maintainer directive, issue #727). Enforced today are the ratchet
    trees plus the bound class — a real-tree literal is legitimate
    only where the literal IS the assertion's subject (a source pin
-   that must match shipped bytes, a policy control row, or the
+   that must match shipped bytes, a policy control row), named by an
+   in-place bound comment plus the ALLOW entry's reason; the
    agent-home rows — the /home/opencode spellings and the shipped
-   /home/$OPENCODE_USER template outputs — each named by an in-place
-   bound comment plus the ALLOW entry's reason). The #807 wave-2
-   sweep closed the deferred residual classes: the host-specific
-   /home/dev fixtures and the /srv/* project-area fixtures are
-   converted to the fictional prefixes, so no inert real-prefix
-   policy-INPUT remains in the unit suites. The real-prefix literals
+   /home/$OPENCODE_USER template outputs — sit on the real prefix
+   OUTSIDE the trees, named by an in-place bound comment (no ALLOW
+   row exists or is needed: /home is no ratchet tree). The #807
+   wave-2 sweep closed the deferred residual classes: the
+   host-specific /home/dev and /home/tester fixtures and the /srv/*
+   project-area fixtures are converted to the fictional prefixes, so
+   no inert real-prefix policy-INPUT remains in the unit suites. The real-prefix literals
    OUTSIDE the trees are recorded subject classes only: the blocklist
    pins' own subjects
    (FHS system-path literals, /etc/nginx, /root/projects, whole-home
