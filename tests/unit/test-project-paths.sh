@@ -152,7 +152,7 @@ relative/path ../etc ./here subdir \
 # below pins /home/opencode/., this row is the counterpart proving
 # roots BELOW the agent home stay registrable. The remaining rows:
 # three under /home/some-user-max-mustermann/ (the fictional home no
-# real host carries), the top-level fictional names /srv-not-sys,
+# real host carries), the fictional names /srv-not-sys,
 # /opt-projects, /data/projects, and the TILDE inputs ~/projects ~/dev
 # -- runtime-expanded screening inputs, not literals (they resolve
 # against PROJECT_TILDE_HOME/$HOME, the runner's home).

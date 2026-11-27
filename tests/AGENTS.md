@@ -123,13 +123,15 @@ lines are skipped):
    only where the literal IS the assertion's subject (a source pin
    that must match shipped bytes, a policy control row), named by an
    in-place bound comment plus the ALLOW entry's reason. Real-prefix
-   literals OUTSIDE the trees survive as a recorded residual class —
-   host-specific homes and project areas only (the /var/www family
-   without vhosts, /home/dev fixtures, the agent-home rows); FHS
-   system-path literals (/etc/nginx, /root/projects, ...) are the
-   blocklist pins' own subjects, not residual. All inert
-   policy-INPUT; the residual sweep is deferred to a follow-up
-   issue — recorded, never silently sanctioned.
+   literals OUTSIDE the trees fall into recorded classes: a residual
+   sweep deferred to a follow-up issue (host-specific homes and
+   project areas — the /var/www family without vhosts, /home/dev
+   fixtures, the agent-home rows), the blocklist pins' own subjects
+   (FHS system-path literals, /etc/nginx, /root/projects, ...), and
+   WSL-context subjects (the /mnt/c mkcert source pins and the
+   /mnt/ wsl.conf fixtures — shipped-bytes and conf-fixture
+   subjects, not blocklist rows). All inert policy-INPUT —
+   recorded, never silently sanctioned.
    Unit-suite-scoped: e2e scripts legitimately name container paths
    (/var/www/vhosts fixtures), so they are not in this check's scope.
    (RM-0043)
