@@ -51,7 +51,7 @@ Optional verified variant — download, check the checksum, then run
 
 ```bash
 curl -fsSL -o /tmp/opk-install.sh https://steffenmaechtel.github.io/opencode-permissions-kit/install.sh &&
-echo "d291ca3c41011944889903f979e2f2400f03c5b031f5bf66086aa705b3de8fd1  /tmp/opk-install.sh" | sha256sum -c - &&
+echo "c8e54b76041760f729b136139aaf6c436275faaec0db0487770e1697e0d4fb4a  /tmp/opk-install.sh" | sha256sum -c - &&
 sudo env KIT_BRANCH=stable bash /tmp/opk-install.sh
 ```
 
