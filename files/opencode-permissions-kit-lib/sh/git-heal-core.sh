@@ -712,7 +712,13 @@ _git_heal_off() {
     _ghc_off_masked=""
     _ghc_off_mask_rc=0
     if [ "$_ghc_off_cur" = "$(_ghc_hooksdir)" ]; then
-        if _ghc_off_unset_kit "$_ghc_off_dev" "$_ghc_off_home"; then
+        # #818 d G1: the helper's echo is discarded here — the merged
+        # value IS the kit path (nothing is masked), the success row
+        # already names what happened, and an uncaptured call would
+        # leak the carrier paths as a bare unlabeled stdout line
+        # outside the ui vocabulary (branches 2/3 capture for the
+        # masked-copy detail).
+        if _ghc_off_unset_kit "$_ghc_off_dev" "$_ghc_off_home" >/dev/null; then
             ui_success "git heal hooks off — core.hooksPath unset for $_ghc_off_dev"
         else
             ui_error "git-heal: could not unset core.hooksPath for $_ghc_off_dev"

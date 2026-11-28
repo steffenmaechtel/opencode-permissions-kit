@@ -57,19 +57,19 @@ fi
 # menu's C = Confirm consented a root install with nobody asked; the
 # STREAMED-gated spelling left that leg open). The mechanism itself —
 # _ui_read's hard-exit on the var with no tty — is pinned by test-ui.
-if live_src "$INSTALL" | grep -qF 'UI_NO_STDIN_FALLBACK=1' &&
-    live_src "$INSTALL" | grep -qF 'export UI_NO_STDIN_FALLBACK'; then
+# #818 d T1: the presence needles are COLUMN-0 ANCHORED — the
+# unconditional spelling is two flush-left lines; ANY gated spelling
+# (multi-line, `;`- or `&&`-joined, indented) misses at least one
+# anchor and reds. The pre-d substring needles were escapable by two
+# natural re-gate spellings (reproduced in the round-d scratch).
+if live_src "$INSTALL" | grep -qE '^UI_NO_STDIN_FALLBACK=1$' &&
+    live_src "$INSTALL" | grep -qE '^export UI_NO_STDIN_FALLBACK$'; then
     pass "install.sh guards headless prompts on BOTH legs (unconditional UI_NO_STDIN_FALLBACK, #818 b U2)"
 else
     fail "install.sh headless prompt guard (#818 b U2)"
 fi
 check_absent "install.sh no longer gates the guard on STREAMED only (#818 b U2)" \
     "$INSTALL" -qF 'if [ "$STREAMED" = true ]; then UI_NO_STDIN_FALLBACK=1; fi'
-# #818 c T1: the two needles above match as substrings — a one-line
-# re-gate carrying BOTH the assignment and the export would pass them
-# and dodge the exact-bytes absence above. The one-line gated pair is
-# forbidden too (the unconditional spelling keeps the two on separate
-# lines).
 check_absent "install.sh guards on neither re-gated spelling (#818 c T1)" \
     "$INSTALL" -qF 'UI_NO_STDIN_FALLBACK=1; export UI_NO_STDIN_FALLBACK'
 

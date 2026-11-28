@@ -255,8 +255,17 @@ ui_confirm() {
     [ "$_d" = "y" ] && _hint="[Y/n]" || _hint="[y/N]"
     printf '  %s %s ' "$_q" "$_hint" >&2
     _ui_read _ans
-    _ans="$(printf '%s' "$_ans" | tr '[:upper:]' '[:lower:]')"
-    [ -z "$_ans" ] && _ans="$_d"
+    # \r stripped kit-wide since #818 d T3/U3: read's IFS trim covers
+    # space/tab but not carriage returns — a CRLF piped answer was
+    # unknown input and resolved to the default (an explicit decline
+    # consenting on every y-default consumer; agent/conventions.md
+    # "Interactive prompts" trimming promise). update.sh's confirm() carries the same strip;
+    # ui_menu's key match below the same. prompt_yn (uninstall's
+    # standalone twin) keeps the residual: recorded in the
+    # uninstall-teardown context (#821/#822), all its call sites
+    # default n. ui_ask returns free text raw — no consent default
+    # rides on it.
+    _ans="$(printf '%s' "$_ans" | tr '[:upper:]' '[:lower:]' | tr -d '\r')"
     case "$_ans" in
         y | yes) return 0 ;;
         n | no) return 1 ;;
@@ -286,7 +295,9 @@ ui_menu() {
     # Keys match case-insensitively (a lowercase "x" must still hit "X|Abort",
     # never fall through to the default — which could be "Confirm"). The
     # canonical key as defined by the caller is printed, not the raw input.
-    _ans="$(printf '%s' "$_ans" | tr '[:upper:]' '[:lower:]')"
+    # \r stripped since #818 d T3/U3: a CRLF key `c\r` would miss every
+    # key and fall through to the default (which can be "Confirm").
+    _ans="$(printf '%s' "$_ans" | tr '[:upper:]' '[:lower:]' | tr -d '\r')"
     _found=''
     for _opt in "$@"; do
         _k=$(printf '%s' "${_opt%%|*}" | tr '[:upper:]' '[:lower:]')

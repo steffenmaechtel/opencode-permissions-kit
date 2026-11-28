@@ -480,6 +480,12 @@ if [ "$_opk_binonly" != true ] && { [ "$_opk_stdin" = true ] ||
     # silently resolves to the default y, an update without any consent
     # on the record (review 0.0.39b C6 closed this for install.sh; the
     # update path lacked it — 0.0.45c S8). See _ui_read in sh/ui.sh.
+    # The arm covers EVERY fetch-side run, not only streamed ones
+    # (#818 c U4/d U2): a deployed run without a local checkout
+    # (SCRIPT_DIR in LIBDIR, no ../../../VERSION) takes the same arm —
+    # its stdin is caller input, not script bytes, but headless it is
+    # EOF or unsupervised, and the y default must not fire there
+    # either.
     # Exported: the re-exec'd copy below inherits it.
     UI_NO_STDIN_FALLBACK=1
     export UI_NO_STDIN_FALLBACK
@@ -1129,8 +1135,10 @@ confirm() {
     # not carriage returns — a CRLF piped decline `n\r` was unknown
     # input and resolved to the y default (an explicit decline
     # consenting a root re-deploy, against conventions' trimming
-    # promise). ui_confirm shares the pre-existing shape kit-wide;
-    # recorded there.
+    # promise). ui_confirm/ui_menu carry the same strip since
+    # #818 d T3; prompt_yn (uninstall's standalone twin, n-default
+    # sites only) keeps the residual, recorded in the teardown
+    # context (#821/#822).
     [ -z "$_uc_ans" ] && _uc_ans="y"
     case "$_uc_ans" in
         y | yes) return 0 ;;
