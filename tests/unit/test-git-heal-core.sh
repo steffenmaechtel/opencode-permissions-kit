@@ -1008,6 +1008,14 @@ if [ "$_hr_rc" -eq 0 ] &&
 else
     fail "core: XDG off leg (rc=$_hr_rc out=$_out value=$(git config --file "$WORK/devhome-xdg/.config/git/config" core.hooksPath 2>/dev/null))"
 fi
+# The CI-lane twin (the followup this leg forced): the unset targets
+# the CARRIER file explicitly — native --global --unset is
+# git-version-dependent (older gits operate on ~/.gitconfig only and
+# the CI unit lane reddened exactly there over an XDG-carried value).
+# The behavioral XDG leg above executes the -f path; this source pin
+# guards its shape.
+check_live "core: off unsets per carrier file, never git-version-dependent --global (#818 a G2)" \
+    "$CORE" -qF 'config -f "$_ghc_off_f" --unset core.hooksPath'
 
 # The #100 consent discipline survives the XDG fix: a foreign value in
 # an XDG-only home is foreign (reported, never touched by off).

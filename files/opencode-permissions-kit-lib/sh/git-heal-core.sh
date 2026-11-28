@@ -658,8 +658,25 @@ _git_heal_off() {
     fi
     _ghc_off_cur=$(_ghc_dev_hooks_path "$_ghc_off_dev")
     if [ "$_ghc_off_cur" = "$(_ghc_hooksdir)" ]; then
-        if _ghc_devgit "$_ghc_off_dev" "$_ghc_off_home" \
-            config --global --unset core.hooksPath; then
+        # Unset where the value LIVES — every carrier file, in the
+        # reader's merge order — never by native --global alone: the
+        # native write/unset target is git-version-dependent (older
+        # gits operate on ~/.gitconfig even when the value sits in
+        # the XDG file; the CI unit lane caught exactly that split
+        # against this repo's own reader, #818 a G2 followup). A copy
+        # in BOTH files is masked-but-real: unset every carrier, or a
+        # stale one resurfaces as the value the next read sees.
+        _ghc_off_unset_ok=1
+        for _ghc_off_f in "$_ghc_off_home/.gitconfig" \
+            "$_ghc_off_home/.config/git/config"; do
+            [ -r "$_ghc_off_f" ] || continue
+            git config -f "$_ghc_off_f" core.hooksPath >/dev/null 2>&1 ||
+                continue
+            _ghc_devgit "$_ghc_off_dev" "$_ghc_off_home" \
+                config -f "$_ghc_off_f" --unset core.hooksPath ||
+                _ghc_off_unset_ok=0
+        done
+        if [ "$_ghc_off_unset_ok" -eq 1 ]; then
             ui_success "git heal hooks off — core.hooksPath unset for $_ghc_off_dev"
         else
             ui_error "git-heal: could not unset core.hooksPath for $_ghc_off_dev"
