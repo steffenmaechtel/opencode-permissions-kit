@@ -667,8 +667,13 @@ doctor_git_heal() {
         _dgh_gc="${GH_GITCONFIG:-$_dgh_home/.gitconfig}"
         _dgh_xgc="${GH_GITCONFIG_XDG:-$_dgh_home/.config/git/config}"
         if [ -n "$_dgh_home" ] && { [ -r "$_dgh_gc" ] || [ -r "$_dgh_xgc" ]; }; then
-            _dgh_cur=$(git config -f "$_dgh_gc" core.hooksPath 2>/dev/null || true)
-            if [ -z "$_dgh_cur" ] && [ -r "$_dgh_xgc" ]; then
+            _dgh_cur=""
+            _dgh_cur_rc=0
+            _dgh_cur=$(git config -f "$_dgh_gc" core.hooksPath 2>/dev/null) ||
+                _dgh_cur_rc=$?
+            # rc 0 + empty = explicitly empty key (the hooks-disable
+            # idiom): per-key masking, no XDG fall-through (#818 b G2)
+            if [ "$_dgh_cur_rc" -ne 0 ] && [ -r "$_dgh_xgc" ]; then
                 _dgh_cur=$(git config -f "$_dgh_xgc" core.hooksPath 2>/dev/null || true)
             fi
             if [ -z "$_dgh_cur" ]; then

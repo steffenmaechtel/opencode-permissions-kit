@@ -1093,17 +1093,31 @@ confirm() {
     # y-default gate without anyone seeing the prompt: _ui_read's
     # /dev/tty leg fails, the stdin fallback reads EOF, and the empty
     # answer resolves to the default — a root re-deploy with no
-    # consent on record. The streamed arm refuses that via
-    # UI_NO_STDIN_FALLBACK (0.0.45c S8); the checkout leg refuses
-    # loud here: an answer that never arrived is not consent. The
-    # legs keep their contracts — a tty answers interactively, piped
-    # stdin with actual bytes (tests, CI feeding answers) answers,
-    # an empty piped line is Enter (the default), only EOF-with-no-
-    # tty aborts. Self-contained on purpose: no ui_confirm dependency
-    # in the refusal path.
+    # consent on record. The checkout leg refuses loud here: an
+    # answer that never arrived is not consent. The legs keep their
+    # contracts — a tty answers interactively (including streamed
+    # shells: curl|bash keeps its controlling tty, 0.0.39b C6), the
+    # UI_NO_STDIN_FALLBACK var set by the streamed arm refuses BEFORE
+    # any stdin read (stdin is script bytes there, #818 b U1), piped
+    # stdin with actual bytes (tests, CI feeding answers, no tty)
+    # answers, an empty piped line is Enter (the default), only
+    # EOF-with-no-tty aborts. Self-contained on purpose: no
+    # ui_confirm dependency in the refusal paths.
     printf '  %s [Y/n] ' "$1" >&2
     if read -r _uc_ans </dev/tty 2>/dev/null; then
         :
+    elif [ "${UI_NO_STDIN_FALLBACK:-}" = "1" ]; then
+        # #818 b U1: the streamed arm's stdin IS the script body — a
+        # stdin fallback here consumes script bytes as the answer and
+        # unknown input resolves to the y default: a root re-deploy
+        # consented from source text (the 0.0.45c S8 class, reopened
+        # when this gate went self-contained). The streamed arm sets
+        # and exports the var before the re-exec; a controlling tty
+        # still answers (the 0.0.39b C6 design: prompts survive
+        # curl|bash shells), only the stdin fallback is refused.
+        printf '  error     no terminal available for the deploy confirmation —\n' >&2
+        printf '            streamed update: re-run with --yes (update gate, #818 b U1)\n' >&2
+        exit 1
     elif ! read -r _uc_ans; then
         printf '  error     no terminal for the deploy confirmation and stdin is at EOF —\n' >&2
         printf '            consent gate, #818 a U2: re-run with --yes, or answer from a tty\n' >&2

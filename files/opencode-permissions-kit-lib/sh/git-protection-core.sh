@@ -612,6 +612,14 @@ _gp_rollback() {
         ui_error "ROLLBACK INCOMPLETE: $_gpb_gd is still external; move it back to $_gpb_p/.git manually"
         return 1
     }
+    # #818 b G4 (the _gp_revert_one twin): the gitdir's HEAD must sit
+    # DIRECTLY under the moved-back .git — a plant surviving the
+    # pre-clear above (immutable bit, re-planted in the rm→mv window)
+    # leaves the gitdir NESTED one level deep while mv exits 0.
+    if [ ! -d "$_gpb_p/.git" ] || [ -L "$_gpb_p/.git" ] || [ ! -e "$_gpb_p/.git/HEAD" ]; then
+        ui_error "ROLLBACK INCOMPLETE: $_gpb_p/.git is not the moved-back gitdir (planted directory?) — inspect manually"
+        return 1
+    fi
     find "$_gpb_p/.git" -type d -exec chmod g+rwxs {} + 2>/dev/null
     find "$_gpb_p/.git" -type f -exec chmod g+rw {} + 2>/dev/null
     return 0

@@ -781,6 +781,26 @@ if [ "$_u2_rc" -eq 0 ]; then
 else
     fail "u2: --yes leg (rc=$_u2_rc) (#818 a U2)"
 fi
+# #818 b U1: the streamed arm's shape — UI_NO_STDIN_FALLBACK set,
+# no controlling terminal, SCRIPT BYTES on stdin (the re-exec'd copy
+# inherits the var; the pre-b confirm consumed the bytes as the
+# answer and unknown input resolved to the y default — the 0.0.45c S8
+# class reopened). The gate must refuse BEFORE reading stdin: under
+# the bug this exact shape confirmed (rc 0, the garbage line eaten);
+# the refusal's rc 1 + message IS the discrimination.
+_u1_rc=0
+_u1_out=$(
+    UI_NO_STDIN_FALLBACK=1 setsid sh -c '. "$1"; YES=false; confirm "Deploy the kit?"' \
+        _ "$_u2_dir/confirm-body.sh" 2>&1 <<'EOF'
+mktemp "${TMPDIR:-/tmp}/opk-fsb-heal.XXXXXXXX" || {
+EOF
+) || _u1_rc=$?
+if [ "$_u1_rc" -eq 1 ] &&
+    printf '%s' "$_u1_out" | grep -qF 'no terminal available for the deploy confirmation'; then
+    pass "u1: streamed arm (var set, script bytes on stdin) refuses before reading stdin (#818 b U1)"
+else
+    fail "u1: streamed leg (rc=$_u1_rc out=$_u1_out) (#818 b U1)"
+fi
 check_absent "update.sh --help no longer claims prompt-free defaults (D2)" \
     "$UPDATE" -qF 'No prompts by default'
 

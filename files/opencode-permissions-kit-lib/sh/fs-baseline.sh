@@ -778,6 +778,10 @@ _fsb_heal_gitdir() {
         printf '  error: mktemp failed (is $TMPDIR writable?) — the git heal cannot scan %s\n' \
             "$_fshg_gd" >&2
         _FSB_ERRORS=$((_FSB_ERRORS + 1))
+        # #818 b S1: a PARTIAL pair failure strands the survivor (the
+        # combined guard sat before registration and removal) —
+        # remove both; the empty one is a verified rm -f no-op.
+        rm -f "$_fshg_ml" "$_fshg_mls" 2>/dev/null
         return 0
     fi
     if command -v _tmp_track >/dev/null 2>&1; then
@@ -810,6 +814,8 @@ _fsb_heal_gitdir() {
             printf '  error: mktemp failed (is $TMPDIR writable?) — the git heal cannot scan %s\n' \
                 "$_fshg_m" >&2
             _FSB_ERRORS=$((_FSB_ERRORS + 1))
+            # #818 b S1: partial pair failure strands no survivor
+            rm -f "$_fshg_cl" "$_fshg_cls" 2>/dev/null
             continue
         fi
         if command -v _tmp_track >/dev/null 2>&1; then

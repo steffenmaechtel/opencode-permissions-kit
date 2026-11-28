@@ -1216,19 +1216,67 @@ esac
 exec $(command -v mktemp) "\$@"
 EOF
 chmod 755 "$F14S/bin/mktemp"
+# isolated TMPDIR (#818 b S1): every mktemp product of the run lands
+# here, so the leg can assert NO STRAND survives — the pre-b guard
+# left the partial pair's survivor behind (created before the
+# combined guard, registered after).
+mkdir -p "$F14S/tmp1"
 F14RC=0
-F14OUT=$(FS_SUDO="" PATH="$F14S/bin:$PATH" \
+F14OUT=$(FS_SUDO="" TMPDIR="$F14S/tmp1" PATH="$F14S/bin:$PATH" \
     sh -c '. "$1" && _FSB_ERRORS=0 && fs_baseline_root "$2" "$3"; echo "ERRS=$_FSB_ERRORS"' \
     _ "$LIB" "$F14S/proj" "$(id -gn)" 2>&1) || F14RC=$?
 if printf '%s\n' "$F14OUT" | grep -qF "error: mktemp failed (is \$TMPDIR writable?) — the git heal cannot scan $F14S/proj/.git" &&
     printf '%s\n' "$F14OUT" | grep -qF "error: mktemp failed (is \$TMPDIR writable?) — the git heal cannot run the symlinked-.git scan under $F14S/proj" &&
     printf '%s\n' "$F14OUT" | grep -q '^ERRS=2$' &&
-    printf '%s\n' "$F14OUT" | grep -qF 'baseline pass(es) failed'; then
-    pass "heal sidecar mktemp guards fire loud, count, and fail the baseline (#818 a S1)"
+    printf '%s\n' "$F14OUT" | grep -qF 'baseline pass(es) failed' &&
+    [ -z "$(ls -A "$F14S/tmp1" 2>/dev/null)" ]; then
+    pass "heal sidecar mktemp guards fire loud, count, fail the baseline, strand nothing (#818 a S1, #818 b S1)"
 else
-    fail "heal sidecar mktemp guards (rc=$F14RC out=$F14OUT) (#818 a S1)"
+    fail "heal sidecar mktemp guards (rc=$F14RC strands=$(ls -A "$F14S/tmp1" 2>/dev/null | tr '\n' ' ') out=$F14OUT) (#818 a S1, #818 b S1)"
 fi
 rm -rf "${F14S:?}"
+
+# --- 10d. the INNER module-child sidecar guard, its own executed leg
+# (#818 b S2/T4): F14's threshold fires the gitdir and driver arms;
+# this one-shot stub fails EXACTLY the fifth heal-template call (the
+# module-container pair's sidecar — call order: driver base, gitdir
+# base, gitdir sidecar, module base, module sidecar), so the inner
+# arm's message is asserted on its own and the failure is attributable
+# to exactly that guard. ERRS=1, everything else completes.
+F14B=$(mktemp -d)
+mkdir -p "$F14B/bin" "$F14B/proj/.git/hooks" "$F14B/proj/.git/modules/real"
+printf 'c\n' >"$F14B/proj/.git/config"
+printf 'x\n' >"$F14B/proj/.git/modules/real/config"
+F14BMK="$F14B/mk-count"
+cat >"$F14B/bin/mktemp" <<EOF
+#!/bin/sh
+case "\$*" in
+*opk-fsb-heal*)
+    _n=\$(cat "$F14BMK" 2>/dev/null || echo 0)
+    _n=\$((_n + 1))
+    printf '%s\n' "\$_n" >"$F14BMK"
+    if [ "\$_n" -eq 5 ]; then
+        echo "mktemp stub: inner sidecar failure leg" >&2
+        exit 1
+    fi
+    ;;
+esac
+exec $(command -v mktemp) "\$@"
+EOF
+chmod 755 "$F14B/bin/mktemp"
+mkdir -p "$F14B/tmp1"
+F14BRC=0
+F14BOUT=$(FS_SUDO="" TMPDIR="$F14B/tmp1" PATH="$F14B/bin:$PATH" \
+    sh -c '. "$1" && _FSB_ERRORS=0 && fs_baseline_root "$2" "$3"; echo "ERRS=$_FSB_ERRORS"' \
+    _ "$LIB" "$F14B/proj" "$(id -gn)" 2>&1) || F14BRC=$?
+if printf '%s\n' "$F14BOUT" | grep -qF "error: mktemp failed (is \$TMPDIR writable?) — the git heal cannot scan $F14B/proj/.git/modules" &&
+    printf '%s\n' "$F14BOUT" | grep -q '^ERRS=1$' &&
+    [ -z "$(ls -A "$F14B/tmp1" 2>/dev/null)" ]; then
+    pass "the inner module sidecar guard fires loud on its own leg (#818 b S2)"
+else
+    fail "inner sidecar guard (rc=$F14BRC strands=$(ls -A "$F14B/tmp1" 2>/dev/null | tr '\n' ' ') out=$F14BOUT) (#818 b S2)"
+fi
+rm -rf "${F14B:?}"
 
 # --- 11. python3 health gate (#223, #221 a W3 shape) ----------------------------------
 # _fsb_count_tee sits in the DATA pipeline of a MUTATING pass: an

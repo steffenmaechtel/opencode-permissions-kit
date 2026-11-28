@@ -131,8 +131,16 @@ _ghc_hooksdir() {
 _ghc_dev_hooks_path() {
     _ghc_dh=$(_ghc_devhome "$1")
     [ -n "$_ghc_dh" ] || return 0
-    _ghc_dv=$(git config -f "$_ghc_dh/.gitconfig" core.hooksPath 2>/dev/null || true)
-    if [ -z "$_ghc_dv" ] && [ -r "$_ghc_dh/.config/git/config" ]; then
+    _ghc_dv=""
+    _ghc_dv_rc=0
+    _ghc_dv=$(git config -f "$_ghc_dh/.gitconfig" core.hooksPath 2>/dev/null) ||
+        _ghc_dv_rc=$?
+    # rc 0 with empty output = the key is EXPLICITLY empty
+    # (`git config --global core.hooksPath ""` — a real hooks-disable
+    # idiom): git's per-key masking applies, the XDG value stays
+    # masked, no fall-through (#818 b G2). rc 1 (absent) or 128 (no
+    # file) = the primary does not define the key → XDG fallback.
+    if [ "$_ghc_dv_rc" -ne 0 ] && [ -r "$_ghc_dh/.config/git/config" ]; then
         _ghc_dv=$(git config -f "$_ghc_dh/.config/git/config" core.hooksPath 2>/dev/null || true)
     fi
     printf '%s' "$_ghc_dv"
@@ -484,7 +492,9 @@ _git_heal_on() {
     if [ -n "$_ghc_on_cur" ] && [ "$_ghc_on_cur" != "$(_ghc_hooksdir)" ]; then
         ui_error "git-heal: core.hooksPath for $_ghc_on_dev holds a foreign value — leaving it untouched"
         ui_detail "($_ghc_on_cur)"
-        ui_detail "remove it yourself as $_ghc_on_dev (git config --global --unset core.hooksPath),"
+        ui_detail "remove it yourself as $_ghc_on_dev (git config --global --unset core.hooksPath, or"
+        ui_detail "delete the core.hooksPath line from ~/.gitconfig / ~/.config/git/config —"
+        ui_detail "the unset can miss the XDG carrier on older gits),"
         ui_detail "then re-run 'sudo opk git-heal on'"
         exit 1
     fi
@@ -658,20 +668,22 @@ _git_heal_off() {
     fi
     _ghc_off_cur=$(_ghc_dev_hooks_path "$_ghc_off_dev")
     if [ "$_ghc_off_cur" = "$(_ghc_hooksdir)" ]; then
-        # Unset where the value LIVES — every carrier file, in the
-        # reader's merge order — never by native --global alone: the
-        # native write/unset target is git-version-dependent (older
-        # gits operate on ~/.gitconfig even when the value sits in
-        # the XDG file; the CI unit lane caught exactly that split
-        # against this repo's own reader, #818 a G2 followup). A copy
-        # in BOTH files is masked-but-real: unset every carrier, or a
-        # stale one resurfaces as the value the next read sees.
+        # Unset where the value LIVES — but only carriers whose OWN
+        # value is the kit path (#818 b G1: the loop first unset every
+        # carrier holding ANY hooksPath and destroyed a FOREIGN value
+        # masked in the XDG file while the merged reader said
+        # "kit-owned" — the #100 consent discipline this family
+        # states 30 lines below). Version-independence via explicit
+        # -f (older gits operate on ~/.gitconfig only; the CI unit
+        # lane caught the split, #818 a G2 followup). A kit copy in
+        # both files is masked-but-real: every kit-owned carrier is
+        # unset, or a stale one resurfaces as the next read's value.
         _ghc_off_unset_ok=1
         for _ghc_off_f in "$_ghc_off_home/.gitconfig" \
             "$_ghc_off_home/.config/git/config"; do
             [ -r "$_ghc_off_f" ] || continue
-            git config -f "$_ghc_off_f" core.hooksPath >/dev/null 2>&1 ||
-                continue
+            _ghc_off_v=$(git config -f "$_ghc_off_f" core.hooksPath 2>/dev/null || true)
+            [ "$_ghc_off_v" = "$(_ghc_hooksdir)" ] || continue
             _ghc_devgit "$_ghc_off_dev" "$_ghc_off_home" \
                 config -f "$_ghc_off_f" --unset core.hooksPath ||
                 _ghc_off_unset_ok=0

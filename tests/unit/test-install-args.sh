@@ -51,6 +51,21 @@ else
     exit 1
 fi
 
+# #818 b U2: the headless guard covers the CHECKOUT leg too — the var
+# is set and exported unconditionally (a headless checkout-run without
+# --yes used to resolve every prompt to its default: the "Proceed?"
+# menu's C = Confirm consented a root install with nobody asked; the
+# STREAMED-gated spelling left that leg open). The mechanism itself —
+# _ui_read's hard-exit on the var with no tty — is pinned by test-ui.
+if live_src "$INSTALL" | grep -qF 'UI_NO_STDIN_FALLBACK=1' &&
+    live_src "$INSTALL" | grep -qF 'export UI_NO_STDIN_FALLBACK'; then
+    pass "install.sh guards headless prompts on BOTH legs (unconditional UI_NO_STDIN_FALLBACK, #818 b U2)"
+else
+    fail "install.sh headless prompt guard (#818 b U2)"
+fi
+check_absent "install.sh no longer gates the guard on STREAMED only (#818 b U2)" \
+    "$INSTALL" -qF 'if [ "$STREAMED" = true ]; then UI_NO_STDIN_FALLBACK=1; fi'
+
 eval "$(extract_func "$INSTALL" parse_args)"
 
 reset_globals() {

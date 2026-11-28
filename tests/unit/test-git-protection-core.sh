@@ -1705,6 +1705,50 @@ else
     fail "unnest pre-clear arm (rc=$_rc out=$_out)"
 fi
 
+# #818 b G4 (the _gp_revert_one twin's leg): _gp_rollback carries the
+# same dir-aware pre-clear AND the post-move shape check — a plant at
+# .git is cleared and ours lands FLAT (rc 0); the shape check's
+# refusal arm rides the same stub shape as revert's (a nest → loud
+# rc 1). The F4-shape fixture: plant + junk, ours aside.
+mkdir -p "$WORK/f4rb/p" "$WORK/f4rb/t/.git/objects" "$WORK/f4rb/p/.git/plant"
+printf 'ref: x\n' >"$WORK/f4rb/t/.git/HEAD"
+printf 'junk\n' >"$WORK/f4rb/p/.git/plant/j"
+_rc=0
+_out=$(GP_F4RBT="$WORK/f4rb/t/.git" GP_F4RBP="$WORK/f4rb/p" _core_run \
+    '_gp_rollback "$GP_F4RBP" "$GP_F4RBT"') || _rc=$?
+if [ "$_rc" = 0 ] &&
+    [ -e "$WORK/f4rb/p/.git/HEAD" ] &&
+    [ -d "$WORK/f4rb/p/.git/objects" ] &&
+    [ ! -e "$WORK/f4rb/p/.git/plant" ]; then
+    pass "rollback: a planted directory at .git is cleared, ours lands flat (#818 b G4)"
+else
+    fail "rollback pre-clear leg (rc=$_rc out=$_out) (#818 b G4)"
+fi
+# the post-move shape check: an rm-stub nest (the plant re-appears
+# between the pre-clear's rm and the mv) must fail LOUD — mv nests
+# ours inside with rc 0 and the shape check turns that into rc 1.
+mkdir -p "$WORK/f4rb2/bin" "$WORK/f4rb2/p" "$WORK/f4rb2/t/.git/objects"
+printf 'ref: x\n' >"$WORK/f4rb2/t/.git/HEAD"
+cat >"$WORK/f4rb2/bin/rm" <<EOF
+#!/bin/sh
+if [ "\$1" = "-f" ] && [ "\$2" = "$WORK/f4rb2/p/.git" ]; then
+    /bin/rm -f "\$2" && mkdir "\$2"
+    exit \$?
+fi
+exec /bin/rm "\$@"
+EOF
+chmod 755 "$WORK/f4rb2/bin/rm"
+_rc=0
+_out=$(GP_F4RB2T="$WORK/f4rb2/t/.git" GP_F4RB2P="$WORK/f4rb2/p" PATH="$WORK/f4rb2/bin:$WORK/bin:/usr/bin:/bin" _core_run \
+    'PATH="$WORK/f4rb2/bin:$WORK/bin:/usr/bin:/bin"; export PATH; _gp_rollback "$GP_F4RB2P" "$GP_F4RB2T"') || _rc=$?
+if [ "$_rc" = 1 ] &&
+    printf '%s' "$_out" | grep -qF 'not the moved-back gitdir' &&
+    [ -d "$WORK/f4rb2/p/.git/.git" ]; then
+    pass "rollback: a plant surviving into the mv fails the shape check loud (#818 b G4)"
+else
+    fail "rollback shape-check leg (rc=$_rc nested=$([ -d "$WORK/f4rb2/p/.git/.git" ] && echo y || echo n) out=$_out) (#818 b G4)"
+fi
+
 # the rows (#765 a S3): a path the migration form gate refuses gets NO
 # command (adopt would refuse it) and names the rename; a path with a
 # shell metacharacter gets its command with the path single-quoted; a

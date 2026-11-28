@@ -439,6 +439,13 @@ printf '#!/bin/sh\nprintf "%%s\\n" "$*" >>"%s"\nexit 0\n' \
     "$WORK/g1-chown.log" >"$WORK/g1bin/chown"
 chmod +x "$WORK/g1bin/chown"
 _g1_live="$(id -gn "$(id -un)")"
+# Leg (a) discriminates the conf-wins regression on every host, but
+# the username-hardcode regression only where the running user's
+# primary group is NOT the same-named usergroup (#818 b T1: on
+# useradd-default hosts — CI runner images — the old spec's log line
+# is byte-identical to the pinned one). Leg (b) below is the
+# environment-independent backstop for exactly that regression; the
+# pair is sound, the condition is named.
 : >"$WORK/g1-chown.log"
 _hr_rc=0
 _hr_out=$(env PATH="$WORK/g1bin:$PATH" GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 \
@@ -1016,6 +1023,29 @@ fi
 # guards its shape.
 check_live "core: off unsets per carrier file, never git-version-dependent --global (#818 a G2)" \
     "$CORE" -qF 'config -f "$_ghc_off_f" --unset core.hooksPath'
+# #818 b G1: the consent discipline holds for MASKED carriers — a
+# foreign value in the XDG file under a kit-owned ~/.gitconfig (the
+# merged reader says kit) must survive `off` untouched. The first
+# wave's loop unset ANY carrier and destroyed it (probed in the
+# round-b scratch: xdg value gone after off).
+mkdir -p "${WORK:?}/devhome-b/.config/git"
+printf '[core]\n\thooksPath = %s\n' "$WORK/lib/git-heal/hooks" >"$WORK/devhome-b/.gitconfig"
+git config --file "$WORK/devhome-b/.config/git/config" core.hooksPath /leftover-foreign-b
+_hr_rc=0
+_out=$(GH_LIBDIR="$WORK/lib" GH_DEV_HOME="$WORK/devhome-b" GH_SUDO="" \
+    GH_PROJECTS_CONF="$CONF" GH_LOG="$LOG" GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 \
+    GH_AGENT_USER="$(id -un)" INSTALL_CONF="$WORK/install.conf" \
+    sh -c '. "$1"; ui_info() { :; }; ui_success() { echo "ok: $*"; }; \
+        ui_detail() { :; }; ui_error() { echo "ERR: $*" >&2; }; _git_heal_off' \
+    _ "$CORE" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] &&
+    [ -z "$(git config --file "$WORK/devhome-b/.gitconfig" core.hooksPath 2>/dev/null)" ] &&
+    [ "$(git config --file "$WORK/devhome-b/.config/git/config" core.hooksPath 2>/dev/null)" = /leftover-foreign-b ]; then
+    pass "core: off leaves a masked foreign XDG value untouched, unsets only kit carriers (#818 b G1)"
+else
+    fail "core: masked-foreign leg (rc=$_hr_rc gitconfig=$(git config --file "$WORK/devhome-b/.gitconfig" core.hooksPath 2>/dev/null) xdg=$(git config --file "$WORK/devhome-b/.config/git/config" core.hooksPath 2>/dev/null)) (#818 b G1)"
+fi
+rm -rf "${WORK:?}/devhome-b"
 
 # The #100 consent discipline survives the XDG fix: a foreign value in
 # an XDG-only home is foreign (reported, never touched by off).
@@ -1029,16 +1059,39 @@ else
 fi
 
 # Git's merge order under the merged reader: ~/.gitconfig wins per
-# key when both files exist — a kit value in XDG does not mask a
-# foreign value in ~/.gitconfig.
+# key when both files exist — a KIT value in XDG must not mask a
+# foreign value in ~/.gitconfig (#818 b T2: the pre-b fixture left
+# the foreign /dev/null in the XDG carrier, so every reader variant —
+# primary-only, XDG-only, either precedence — answered foreign and
+# the pin could not red; the XDG carrier now holds the KIT value: a
+# reader with inverted precedence says ON here and reds).
+git config --file "$WORK/devhome-xdg/.config/git/config" \
+    core.hooksPath "$WORK/lib/git-heal/hooks"
 printf '[core]\n\thooksPath = /foreign-from-gitconfig\n' >"$WORK/devhome-xdg/.gitconfig"
-_out=$(GH_DEV_HOME="$WORK/devhome-xdg" INSTALL_CONF="$WORK/install.conf" sh -c \
+_out=$(GH_LIBDIR="$WORK/lib" GH_DEV_HOME="$WORK/devhome-xdg" INSTALL_CONF="$WORK/install.conf" sh -c \
     '. "$1"; ui_error() { echo "ERR: $*" >&2; }; _ghc_state' _ "$CORE" 2>&1)
 if [ "$_out" = foreign ]; then
     pass "core: ~/.gitconfig wins per key over the XDG value (git merge order, #818 a G2)"
 else
     fail "core: gitconfig-precedence state (got $_out)"
 fi
+# #818 b G2: an explicitly EMPTY ~/.gitconfig hooksPath (the
+# `git config --global core.hooksPath ""` hooks-disable idiom) MASKS
+# the XDG value per git's per-key precedence — the reader must not
+# fall through to the XDG carrier (pre-b: state said foreign over an
+# XDG value git itself never honors; probed in the round-b scratch:
+# rc 0 with empty output is the masked shape).
+mkdir -p "${WORK:?}/devhome-b2/.config/git"
+printf '[core]\n\thooksPath =\n' >"$WORK/devhome-b2/.gitconfig"
+git config --file "$WORK/devhome-b2/.config/git/config" core.hooksPath /foreign-xdg-b2
+_out=$(GH_LIBDIR="$WORK/lib" GH_DEV_HOME="$WORK/devhome-b2" INSTALL_CONF="$WORK/install.conf" sh -c \
+    '. "$1"; ui_error() { echo "ERR: $*" >&2; }; _ghc_state' _ "$CORE" 2>&1)
+if [ "$_out" = off ]; then
+    pass "core: an explicitly empty gitconfig hooksPath masks the XDG value (state off, #818 b G2)"
+else
+    fail "core: empty-value masking leg (got $_out) (#818 b G2)"
+fi
+rm -rf "${WORK:?}/devhome-b2"
 rm -f "${WORK:?}/devhome-xdg/.gitconfig"
 rm -rf "${WORK:?}/devhome-xdg"
 
@@ -1135,10 +1188,28 @@ if [ "$_hr_rc" -eq 0 ] &&
 else
     fail "core: version-warn leg (rc=$_hr_rc out=$_out) (#818 a G5)"
 fi
+# The no-warn control (#818 b T3: through a version stub — the real
+# git made the leg environment-fragile: on the kit's own tested floor
+# 2.30.x the lib warns BY DESIGN and the leg false-reds; the stub
+# answers --version deterministically as a modern git).
+mkdir -p "$WORK/g5bin2"
+cat >"$WORK/g5bin2/git" <<EOF
+#!/bin/sh
+if [ "\$1" = "--version" ]; then
+    echo "git version 2.56.1"
+    exit 0
+fi
+exec $(command -v git) "\$@"
+EOF
+chmod 755 "$WORK/g5bin2/git"
 _hr_rc=0
-_out=$(_core_run 'SD_SUDO="" SD_VISUDO="$WORK/visudo" SD_CONF_DIR="$WORK/etc" \
-    SD_SUDOERS_D="$WORK/sdd" GH_PROJECTS_CONF="$WORK/on-projects.conf" \
-    HOME="$WORK/devhome" _git_heal_on') || _hr_rc=$?
+_out=$( (
+    PATH="$WORK/g5bin2:$PATH"
+    export PATH
+    _core_run 'SD_SUDO="" SD_VISUDO="$WORK/visudo" SD_CONF_DIR="$WORK/etc" \
+        SD_SUDOERS_D="$WORK/sdd" GH_PROJECTS_CONF="$WORK/on-projects.conf" \
+        HOME="$WORK/devhome" _git_heal_on'
+) 2>&1) || _hr_rc=$?
 if [ "$_hr_rc" -eq 0 ] && ! printf '%s' "$_out" | grep -qF 'below 2.31'; then
     pass "core: on shows no version warn on git >= 2.31 (#818 a G5)"
 else

@@ -386,6 +386,13 @@ if printf '%s' "$_out" | grep -q 'git-heal.*ON — developer git ops re-pin'; th
 else
     fail "doctor git-heal: XDG-only ON row missing (out=$(printf '%s' "$_out" | head -3)) (#818 a G2)"
 fi
+# #818 b G2, the twin's share (the status twin's comment carries the
+# mechanism): source pins for the rc-aware primary read and the
+# rc-gated XDG fallback.
+check_live "doctor git-heal: the twin reads the primary rc-aware, empty masks (#818 b G2)" \
+    "$LIB" -qF '_dgh_cur=$(git config -f "$_dgh_gc" core.hooksPath 2>/dev/null) ||'
+check_live "doctor git-heal: the twin's XDG fallback is rc-gated (#818 b G2)" \
+    "$LIB" -qF '[ "$_dgh_cur_rc" -ne 0 ] && [ -r "$_dgh_xgc" ]'
 rm -rf "${WORK:?}/dgh-xdg"
 
 # --- #777: a POINTER-FILE checkout classifies through the resolved

@@ -430,8 +430,13 @@ status_section_git_heal() {
     _st_gh_xgc="${GH_GITCONFIG_XDG:-$_st_gh_home/.config/git/config}"
     _st_gh_state=unknown
     if [ -n "$_st_gh_home" ] && { [ -r "$_st_gh_gc" ] || [ -r "$_st_gh_xgc" ]; }; then
-        _st_gh_cur=$(git config -f "$_st_gh_gc" core.hooksPath 2>/dev/null || true)
-        if [ -z "$_st_gh_cur" ] && [ -r "$_st_gh_xgc" ]; then
+        _st_gh_cur=""
+        _st_gh_cur_rc=0
+        _st_gh_cur=$(git config -f "$_st_gh_gc" core.hooksPath 2>/dev/null) ||
+            _st_gh_cur_rc=$?
+        # rc 0 + empty = explicitly empty key (the hooks-disable
+        # idiom): per-key masking, no XDG fall-through (#818 b G2)
+        if [ "$_st_gh_cur_rc" -ne 0 ] && [ -r "$_st_gh_xgc" ]; then
             _st_gh_cur=$(git config -f "$_st_gh_xgc" core.hooksPath 2>/dev/null || true)
         fi
         if [ -z "$_st_gh_cur" ]; then

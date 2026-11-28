@@ -952,6 +952,15 @@ if printf '%s' "$_out" | grep -q 'git-heal.*ON — developer git ops re-pin'; th
 else
     fail "git-heal section: XDG-only ON row missing (out=$(printf '%s' "$_out" | head -3)) (#818 a G2)"
 fi
+# #818 b G2, the twin's share: the rc-aware primary read (an
+# explicitly empty ~/.gitconfig hooksPath MASKS the XDG value —
+# git's per-key precedence; the pre-b reader fell through). The
+# core reader's behavioral leg lives in test-git-heal-core; this
+# source pin guards the twin's shape.
+check_live "git-heal section: the twin reads the primary rc-aware, empty masks (#818 b G2)" \
+    "$LIB" -qF '_st_gh_cur=$(git config -f "$_st_gh_gc" core.hooksPath 2>/dev/null) ||'
+check_live "git-heal section: the twin's XDG fallback is rc-gated (#818 b G2)" \
+    "$LIB" -qF '[ "$_st_gh_cur_rc" -ne 0 ] && [ -r "$_st_gh_xgc" ]'
 rm -rf "${WORK:?}/ghs-xdg"
 git config -f "$WORK/ghs/devhome/.gitconfig" --unset core.hooksPath
 
