@@ -419,11 +419,21 @@ status_section_git_heal() {
         ui_kv_warn "kit pieces" "incomplete under $LIBDIR/git-heal (fix: sudo opk update)"
     # State: read the developer's global gitconfig directly (status runs
     # unsudoed as the invoking user -- normally the developer).
+    # XDG-aware (#818 a G2): the global layer is ~/.gitconfig merged
+    # over ~/.config/git/config (per key the ~/.gitconfig value wins);
+    # the heal's write leg is native --global and lands in XDG when
+    # ~/.gitconfig is absent, so a ~/.gitconfig-only reader reports a
+    # wrong state for XDG-only homes. GH_GITCONFIG / GH_GITCONFIG_XDG
+    # are the unit-suite overrides.
     _st_gh_home=$(getent passwd "$DEFAULT_USER" 2>/dev/null | cut -d: -f6)
     _st_gh_gc="${GH_GITCONFIG:-$_st_gh_home/.gitconfig}"
+    _st_gh_xgc="${GH_GITCONFIG_XDG:-$_st_gh_home/.config/git/config}"
     _st_gh_state=unknown
-    if [ -n "$_st_gh_home" ] && [ -r "$_st_gh_gc" ]; then
+    if [ -n "$_st_gh_home" ] && { [ -r "$_st_gh_gc" ] || [ -r "$_st_gh_xgc" ]; }; then
         _st_gh_cur=$(git config -f "$_st_gh_gc" core.hooksPath 2>/dev/null || true)
+        if [ -z "$_st_gh_cur" ] && [ -r "$_st_gh_xgc" ]; then
+            _st_gh_cur=$(git config -f "$_st_gh_xgc" core.hooksPath 2>/dev/null || true)
+        fi
         if [ -z "$_st_gh_cur" ]; then
             _st_gh_state=off
         elif [ "$_st_gh_cur" = "$LIBDIR/git-heal/hooks" ]; then
@@ -442,7 +452,8 @@ status_section_git_heal() {
             ;;
         foreign)
             ui_kv "git-heal" "OFF — core.hooksPath holds a foreign value ($_st_gh_cur)"
-            ui_detail "the heal hooks are not in effect; 'sudo opk git-heal on' would retake the path"
+            ui_detail "the heal hooks are not in effect; 'sudo opk git-heal on' refuses foreign values —"
+            ui_detail "remove the value yourself, then re-run it (git heal on guard, #818 a G3)"
             ;;
         unknown)
             ui_kv "git-heal" "unknown — cannot read the developer's global gitconfig"

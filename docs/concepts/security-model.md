@@ -114,7 +114,11 @@ from agent-writable surfaces there:
   plus the conflict pseudo-refs, each only when it exists —
   to the agent user after every developer git operation, via a narrow
   root heal (`git-heal/heal-index-head`) behind a sudoers grant. The
-  carrier set is measured, not assumed: `post-index-change` fires on
+  carrier set is measured, not assumed — and version-gated:
+  `post-index-change` needs **git ≥ 2.31** (the hook type arrived
+  there; the kit's tested floor is git 2.30, and on an older git the
+  index-write family has no carrier at all — `opk git-heal on` warns
+  below 2.31). On git ≥ 2.31, `post-index-change` fires on
   EVERY index write — mutating commands (`add`, `reset`, `read-tree`)
   and refreshing `git status` runs on a stale cache (IDE refreshes
   while the agent edits) alike — but not on a fresh-cache status that

@@ -1843,6 +1843,65 @@ else
     fail "revert: missing-target arm (rc=$_rc out=$_out)"
 fi
 
+# #818 a G4: the rm→mv plant window, two deterministic stub legs (the
+# real window is sub-second).
+#   (1) PRE-CLEAR leg — a directory takes the .git name between the
+#       pointer gates and the chattr (the chattr stub plants): revert
+#       must CLEAR the plant, land the gitdir flat, and stay rc 0 (the
+#       old code nested ours inside the plant with rc 0 and only the
+#       generic trailing status warn);
+#   (2) POST-MOVE leg — the plant lands between rm and mv (the rm stub
+#       plants): the mv nests ours inside with rc 0, and the post-move
+#       shape check must catch it LOUD (rc 1, the sharp message) with
+#       the evidence left for manual recovery.
+_mkrepo "$WORK/roots/r1/g4a"
+_core_run '_gp_migrate_one "$WORK/roots/r1/g4a" yes' >/dev/null
+mkdir -p "$WORK/g4bin1"
+cat >"$WORK/g4bin1/chattr" <<'EOF'
+#!/bin/sh
+printf 'chattr %s\n' "$*" >>"${GP_STUB_LOG:?}"
+rm -f "$2.nailed"
+rm -f "$2"
+mkdir -p "$2"
+printf 'plant\n' >"$2/plant-junk"
+exit 0
+EOF
+chmod 755 "$WORK/g4bin1/chattr"
+_rc=0
+_out=$(PATH="$WORK/g4bin1:$WORK/bin:/usr/bin:/bin" _core_run \
+    'PATH="$WORK/g4bin1:$WORK/bin:/usr/bin:/bin"; export PATH; _gp_revert_one "$WORK/roots/r1/g4a"') || _rc=$?
+if [ "$_rc" = 0 ] &&
+    [ -f "$WORK/roots/r1/g4a/.git/HEAD" ] &&
+    [ ! -e "$WORK/roots/r1/g4a/.git/plant-junk" ] &&
+    git -C "$WORK/roots/r1/g4a" status --porcelain >/dev/null 2>&1; then
+    pass "revert: a directory planted at .git is cleared, the gitdir lands flat, rc 0 (#818 a G4)"
+else
+    fail "revert: pre-clear leg (rc=$_rc head=$([ -e "$WORK/roots/r1/g4a/.git/HEAD" ] && echo y || echo n) out=$_out) (#818 a G4)"
+fi
+
+_mkrepo "$WORK/roots/r1/g4b"
+_core_run '_gp_migrate_one "$WORK/roots/r1/g4b" yes' >/dev/null
+mkdir -p "$WORK/g4bin2"
+cat >"$WORK/g4bin2/rm" <<EOF
+#!/bin/sh
+if [ "\$1" = "-f" ] && [ "\$2" = "$WORK/roots/r1/g4b/.git" ]; then
+    /bin/rm -f "\$2" && mkdir "\$2"
+    exit \$?
+fi
+exec /bin/rm "\$@"
+EOF
+chmod 755 "$WORK/g4bin2/rm"
+_rc=0
+_out=$(PATH="$WORK/g4bin2:$WORK/bin:/usr/bin:/bin" _core_run \
+    'PATH="$WORK/g4bin2:$WORK/bin:/usr/bin:/bin"; export PATH; _gp_revert_one "$WORK/roots/r1/g4b"') || _rc=$?
+if [ "$_rc" = 1 ] &&
+    printf '%s' "$_out" | grep -qF 'not the moved-back gitdir' &&
+    [ -d "$WORK/roots/r1/g4b/.git/g4b.git" ]; then
+    pass "revert: a plant surviving into the mv nests ours with rc 0 — the shape check fails it loud (#818 a G4)"
+else
+    fail "revert: post-move leg (rc=$_rc nested=$([ -d "$WORK/roots/r1/g4b/.git/g4b.git" ] && echo y || echo n) out=$_out) (#818 a G4)"
+fi
+
 # --- 10. round-a security arms (#754 a) ---------------------------------------------
 
 printf '%s\n' "$WORK/roots/r1" >"$CONF"

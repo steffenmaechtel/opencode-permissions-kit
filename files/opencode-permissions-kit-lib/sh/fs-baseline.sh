@@ -763,49 +763,67 @@ _fsb_heal_gitdir() {
     # a hooks-less planted gitdir escape pinning silently. A SYMLINKED
     # container or child dodges every -type d scan — surfaced as a
     # warn, never followed (#655 b C3).
-    _fshg_ml=$(mktemp "${TMPDIR:-/tmp}/opk-fsb-heal.XXXXXXXX") || {
+    _fshg_ml=$(mktemp "${TMPDIR:-/tmp}/opk-fsb-heal.XXXXXXXX") ||
+        _fshg_ml=""
+    # The symlink scans' sidecar is its own mktemp file (#818 a S1):
+    # it used to be opened by plain `>` at a name nobody had created
+    # (base + l) — in a 1777 TMPDIR any local user can watch the base
+    # appear and plant a symlink at exactly that sidecar name, and the
+    # root-run redirect then truncated THROUGH the link (arbitrary
+    # file corruption). A redirect into a file THIS run created with
+    # O_EXCL is the same trust the base lists always had.
+    _fshg_mls=$(mktemp "${TMPDIR:-/tmp}/opk-fsb-heal.XXXXXXXX") ||
+        _fshg_mls=""
+    if [ -z "$_fshg_ml" ] || [ -z "$_fshg_mls" ]; then
         printf '  error: mktemp failed (is $TMPDIR writable?) — the git heal cannot scan %s\n' \
             "$_fshg_gd" >&2
         _FSB_ERRORS=$((_FSB_ERRORS + 1))
         return 0
-    }
+    fi
     if command -v _tmp_track >/dev/null 2>&1; then
         _tmp_track "$_fshg_ml"
-        # the sidecar (base + l) too (#655 c S2): created by the
-        # companion scan's redirect below — same abort-leak class the
-        # base registration closes.
-        _tmp_track "${_fshg_ml}l"
+        # the sidecar registers under its own real name now (#655 c S2
+        # abort-leak class, re-anchored by #818 a S1): the old base+l
+        # spelling tracked a name that did not even exist yet.
+        _tmp_track "$_fshg_mls"
     fi
     _fsb_sudo find "$_fshg_gd" -type d -name modules -print >"$_fshg_ml" ||
         _fsb_heal_err "$_fshg_gd" "the modules scan (find)"
-    _fsb_sudo find "$_fshg_gd" -type l -name modules -print 2>/dev/null >"${_fshg_ml}l" &&
+    _fsb_sudo find "$_fshg_gd" -type l -name modules -print 2>/dev/null >"$_fshg_mls" &&
         while IFS= read -r _fshg_sl; do
             [ -n "$_fshg_sl" ] || continue
             printf '  warn: git heal: symlinked modules dir not followed — %s (its gitdirs are outside this heal)\n' \
                 "$_fshg_sl" >&2
-        done <"${_fshg_ml}l"
-    rm -f "${_fshg_ml}l"
+        done <"$_fshg_mls"
+    rm -f "$_fshg_mls"
     while IFS= read -r _fshg_m; do
         [ -n "$_fshg_m" ] || continue
         _fsb_heal_pin "$1" "$2" "$3" "$_fshg_m" 1755
-        _fshg_cl=$(mktemp "${TMPDIR:-/tmp}/opk-fsb-heal.XXXXXXXX") || {
+        _fshg_cl=$(mktemp "${TMPDIR:-/tmp}/opk-fsb-heal.XXXXXXXX") ||
+            _fshg_cl=""
+        # Sidecar twin of the container scan (#818 a S1 — same class
+        # the _fshg_mls comment above carries): mktemp-created, never
+        # a plain-`>` open at an unclaimed name.
+        _fshg_cls=$(mktemp "${TMPDIR:-/tmp}/opk-fsb-heal.XXXXXXXX") ||
+            _fshg_cls=""
+        if [ -z "$_fshg_cl" ] || [ -z "$_fshg_cls" ]; then
             printf '  error: mktemp failed (is $TMPDIR writable?) — the git heal cannot scan %s\n' \
                 "$_fshg_m" >&2
             _FSB_ERRORS=$((_FSB_ERRORS + 1))
             continue
-        }
+        fi
         if command -v _tmp_track >/dev/null 2>&1; then
             _tmp_track "$_fshg_cl"
-            _tmp_track "${_fshg_cl}l"
+            _tmp_track "$_fshg_cls"
         fi
         _fsb_sudo find "$_fshg_m" -mindepth 1 -maxdepth 1 -type d -print >"$_fshg_cl" ||
             _fsb_heal_err "$_fshg_m" "the module-gitdir scan (find)"
-        _fsb_sudo find "$_fshg_m" -mindepth 1 -maxdepth 1 -type l -print 2>/dev/null >"${_fshg_cl}l" &&
+        _fsb_sudo find "$_fshg_m" -mindepth 1 -maxdepth 1 -type l -print 2>/dev/null >"$_fshg_cls" &&
             while IFS= read -r _fshg_sl; do
                 [ -n "$_fshg_sl" ] || continue
                 printf '  warn: git heal: symlinked module entry not followed — %s\n' "$_fshg_sl" >&2
-            done <"${_fshg_cl}l"
-        rm -f "${_fshg_cl}l"
+            done <"$_fshg_cls"
+        rm -f "$_fshg_cls"
         while IFS= read -r _fshg_c; do
             [ -n "$_fshg_c" ] || continue
             _fsb_heal_pin "$1" "$2" "$3" "$_fshg_c" 1755
@@ -879,7 +897,6 @@ _fsb_heal_git() {
     }
     if command -v _tmp_track >/dev/null 2>&1; then
         _tmp_track "$_fsh_list"
-        _tmp_track "${_fsh_list}l"
     fi
     _fsb_sudo find "$_fsh_root" -type d -name .git -print >"$_fsh_list" ||
         _fsb_heal_err "$_fsh_root" "the .git scan (find)"
@@ -935,14 +952,28 @@ _fsb_heal_git() {
     # back-reference row (the registration's gitdir file still names
     # it); an UNREGISTERED symlinked .git stays this scan's warn (a
     # documented residual — the status walk cannot see it).
-    if _fsb_sudo find "$_fsh_root" -type l -name .git -print 2>/dev/null >"${_fsh_list}l"; then
+    # Sidecar twin of the .git-symlink scan (#818 a S1 — same class
+    # the _fshg_mls comment in _fsb_heal_gitdir carries): its own
+    # mktemp file, never a plain-`>` open at an unclaimed (base + l)
+    # name. The base list above is already consumed and removed by the
+    # time this scan runs, so the sidecar stands on its own here.
+    _fsh_lists=$(mktemp "${TMPDIR:-/tmp}/opk-fsb-heal.XXXXXXXX") || {
+        printf '  error: mktemp failed (is $TMPDIR writable?) — the git heal cannot run the symlinked-.git scan under %s\n' \
+            "$_fsh_root" >&2
+        _FSB_ERRORS=$((_FSB_ERRORS + 1))
+        return 0
+    }
+    if command -v _tmp_track >/dev/null 2>&1; then
+        _tmp_track "$_fsh_lists"
+    fi
+    if _fsb_sudo find "$_fsh_root" -type l -name .git -print 2>/dev/null >"$_fsh_lists"; then
         while IFS= read -r _fsh_sl; do
             [ -n "$_fsh_sl" ] || continue
             printf '  warn: git heal: symlinked .git not followed — %s (its hooks/config are outside this heal)\n' \
                 "$_fsh_sl" >&2
-        done <"${_fsh_list}l"
+        done <"$_fsh_lists"
     fi
-    rm -f "${_fsh_list}l"
+    rm -f "$_fsh_lists"
     return 0
 }
 

@@ -122,10 +122,20 @@ _ghc_hooksdir() {
 
 # _ghc_dev_hooks_path <devuser>: the developer's current global
 # core.hooksPath value ('' when unset or the gitconfig unreadable).
+# XDG-aware (#818 a G2): git's global layer is ~/.gitconfig MERGED
+# over ~/.config/git/config — per key the ~/.gitconfig value wins. The
+# write legs are native `--global` and land in XDG whenever
+# ~/.gitconfig is absent (probed on git 2.56.1: no ~/.gitconfig gets
+# created), so a reader addressing ~/.gitconfig only sees "unset" in
+# an XDG-only home while the hooks keep firing.
 _ghc_dev_hooks_path() {
     _ghc_dh=$(_ghc_devhome "$1")
     [ -n "$_ghc_dh" ] || return 0
-    git config -f "$_ghc_dh/.gitconfig" core.hooksPath 2>/dev/null || true
+    _ghc_dv=$(git config -f "$_ghc_dh/.gitconfig" core.hooksPath 2>/dev/null || true)
+    if [ -z "$_ghc_dv" ] && [ -r "$_ghc_dh/.config/git/config" ]; then
+        _ghc_dv=$(git config -f "$_ghc_dh/.config/git/config" core.hooksPath 2>/dev/null || true)
+    fi
+    printf '%s' "$_ghc_dv"
 }
 
 # _ghc_state: echoes on | off | foreign | unknown. `foreign` means a
@@ -138,11 +148,14 @@ _ghc_state() {
         echo unknown
         return 0
     }
-    _ghc_st_gc="$_ghc_st_home/.gitconfig"
-    [ -r "$_ghc_st_gc" ] || {
+    # XDG-aware readability gate (#818 a G2): either global file being
+    # readable makes the state readable — an XDG-only home is a
+    # readable home, not "unknown".
+    if [ ! -r "$_ghc_st_home/.gitconfig" ] &&
+        [ ! -r "$_ghc_st_home/.config/git/config" ]; then
         echo unknown
         return 0
-    }
+    fi
     _ghc_st_cur=$(_ghc_dev_hooks_path "$_ghc_st_dev")
     if [ -z "$_ghc_st_cur" ]; then
         echo off
@@ -459,6 +472,22 @@ _git_heal_on() {
         ui_error "git-heal: no home for user $_ghc_on_dev — cannot set core.hooksPath"
         exit 1
     fi
+    # Foreign-value guard (#818 a G3, the issue #100 consent
+    # discipline): `on` is the one leg that WRITES the global
+    # core.hooksPath, and it used to overwrite a foreign value (a
+    # developer's lefthook/pre-commit setup) unrecoverably — while
+    # off, uninstall and status all deliberately refuse foreign
+    # values. Refuse loud BEFORE anything is touched (the sudoers
+    # render below would already be a mutation), name the value, leave
+    # it untouched.
+    _ghc_on_cur=$(_ghc_dev_hooks_path "$_ghc_on_dev")
+    if [ -n "$_ghc_on_cur" ] && [ "$_ghc_on_cur" != "$(_ghc_hooksdir)" ]; then
+        ui_error "git-heal: core.hooksPath for $_ghc_on_dev holds a foreign value — leaving it untouched"
+        ui_detail "($_ghc_on_cur)"
+        ui_detail "remove it yourself as $_ghc_on_dev (git config --global --unset core.hooksPath),"
+        ui_detail "then re-run 'sudo opk git-heal on'"
+        exit 1
+    fi
     if ! _ghc_pieces_ok; then
         ui_error "git-heal: heal hooks incomplete under $(_ghc_libdir)/git-heal — run 'sudo opk update' first"
         exit 1
@@ -485,6 +514,24 @@ _git_heal_on() {
         exit 1
     fi
     ui_info "Setting the developer's global core.hooksPath to the kit heal hooks ..."
+    # #818 a G5: post-index-change needs git >= 2.31 (the hook type
+    # arrived there; the kit's tested floor is 2.30 — git-check.sh).
+    # Below 2.31 the index-write family (add/reset/read-tree/stale
+    # status refresh) has NO carrier — git does not know the hook name
+    # — and the miss is invisible: the audit log only records
+    # successes. Warn at activation (soft floor, never an abort — the
+    # other three carriers still cover their operations; the probe
+    # runs through the developer's own git invocation shape).
+    _ghc_on_gitver=$(_ghc_devgit "$_ghc_on_dev" "$_ghc_on_home" --version 2>/dev/null || true)
+    _ghc_on_gv=$(printf '%s\n' "$_ghc_on_gitver" |
+        sed -n 's/^git version \([0-9]*\)\.\([0-9]*\).*/\1 \2/p')
+    [ -n "$_ghc_on_gv" ] || _ghc_on_gv="0 0"
+    if printf '%s\n' "$_ghc_on_gv" |
+        awk '{ exit ($1 < 2 || ($1 == 2 && $2 < 31)) ? 0 : 1 }'; then
+        ui_warn "git-heal: git $_ghc_on_gitver is below 2.31 — the post-index-change carrier"
+        ui_warn "never fires there (the index-write family: add/reset/read-tree/stale status);"
+        ui_warn "the other three hooks cover their operations; upgrade git for full coverage"
+    fi
     if ! _ghc_devgit "$_ghc_on_dev" "$_ghc_on_home" \
         config --global core.hooksPath "$(_ghc_hooksdir)"; then
         ui_error "git-heal: could not write core.hooksPath for $_ghc_on_dev"
@@ -646,7 +693,8 @@ _git_heal_status() {
             # across the two surfaces the how-to documents as parallel.
             ui_info "git-heal: OFF — core.hooksPath holds a foreign value"
             ui_info "        ($(_ghc_dev_hooks_path "$_ghc_stt_dev")) — heal hooks not in effect;"
-            ui_info "        'sudo opk git-heal on' would retake the path"
+            ui_info "        'sudo opk git-heal on' refuses foreign values (git heal on"
+            ui_info "        guard, #818 a G3): remove the value yourself, then re-run it"
             ;;
         unknown)
             ui_info "git-heal: UNKNOWN — cannot read the developer's gitconfig"

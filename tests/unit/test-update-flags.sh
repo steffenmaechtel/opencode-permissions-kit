@@ -734,6 +734,53 @@ if live_src "$UPDATE" | grep -qF 'UI_NO_STDIN_FALLBACK=1' &&
 else
     fail "streamed update never reads the confirm answer from the script stream (S8)"
 fi
+
+# --- #818 a U2: the checkout leg's headless guard ---------------------------------
+# The deploy gate's confirm() (extracted from update.sh, comment-stripped
+# via live_src — an unextractable body fails every leg below loud) runs
+# DETACHED (setsid: no controlling terminal), stdin at EOF: the y default
+# must NOT fire — the gate refuses loud instead (a root re-deploy with no
+# consent on record was the defect). Piped stdin carrying actual bytes
+# still answers (n declines; an empty line is Enter, the documented y
+# default), and --yes short-circuits before any read.
+_u2_dir="$WORK/u2"
+mkdir -p "$_u2_dir"
+live_src "$UPDATE" | awk '/^confirm\(\) \{/,/^\}/' >"$_u2_dir/confirm-body.sh"
+check "u2: the confirm body is extractable and carries the guard (#818 a U2)" \
+    sh -c 'grep -qF "no terminal for the deploy confirmation" "$1"' _ "$_u2_dir/confirm-body.sh"
+_u2_rc=0
+_u2_out=$(setsid sh -c '. "$1"; YES=false; confirm "Deploy the kit?"' \
+    _ "$_u2_dir/confirm-body.sh" </dev/null 2>&1) || _u2_rc=$?
+if [ "$_u2_rc" -eq 1 ] &&
+    printf '%s' "$_u2_out" | grep -qF 'no terminal for the deploy confirmation and stdin is at EOF'; then
+    pass "u2: headless checkout-run refuses the deploy gate (no tty + EOF, #818 a U2)"
+else
+    fail "u2: headless leg (rc=$_u2_rc out=$_u2_out) (#818 a U2)"
+fi
+_u2_rc=0
+printf 'n\n' | setsid sh -c '. "$1"; YES=false; confirm "Deploy the kit?"' \
+    _ "$_u2_dir/confirm-body.sh" >/dev/null 2>&1 || _u2_rc=$?
+if [ "$_u2_rc" -eq 1 ]; then
+    pass "u2: piped stdin with a real answer still declines on n (#818 a U2)"
+else
+    fail "u2: piped-n leg (rc=$_u2_rc) (#818 a U2)"
+fi
+_u2_rc=0
+printf '\n' | setsid sh -c '. "$1"; YES=false; confirm "Deploy the kit?"' \
+    _ "$_u2_dir/confirm-body.sh" >/dev/null 2>&1 || _u2_rc=$?
+if [ "$_u2_rc" -eq 0 ]; then
+    pass "u2: a piped empty line is Enter — the documented y default holds (#818 a U2)"
+else
+    fail "u2: piped-Enter leg (rc=$_u2_rc) (#818 a U2)"
+fi
+_u2_rc=0
+setsid sh -c '. "$1"; YES=true; confirm "Deploy the kit?"' \
+    _ "$_u2_dir/confirm-body.sh" </dev/null >/dev/null 2>&1 || _u2_rc=$?
+if [ "$_u2_rc" -eq 0 ]; then
+    pass "u2: --yes short-circuits before any read (headless stays green, #818 a U2)"
+else
+    fail "u2: --yes leg (rc=$_u2_rc) (#818 a U2)"
+fi
 check_absent "update.sh --help no longer claims prompt-free defaults (D2)" \
     "$UPDATE" -qF 'No prompts by default'
 
@@ -1896,7 +1943,10 @@ fi
 # the surprising/riskier answer", agent/conventions.md "Interactive
 # prompts"). Comment-stripped grep for the default itself; the
 # rationale comment must exist at the site too.
-if live_src "$UPDATE" | grep -qF 'ui_confirm "$1" "y"' &&
+# Since #818 a U2 the gate is self-contained (EOF-with-no-tty refuses
+# loud instead of defaulting — see the u2 block above); the y default
+# lives in the empty-answer line now, still #428's deliberate default.
+if live_src "$UPDATE" | grep -qF '[ -z "$_uc_ans" ] && _uc_ans="y"' &&
     grep -qF '#428 disposition' "$UPDATE"; then
     pass "re-deploy confirm stays default-y, disposition documented (#428)"
 else

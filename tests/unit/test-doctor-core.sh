@@ -358,6 +358,36 @@ else
     fail "doctor git-heal: ON rows broken (out=$(printf '%s' "$_out" | head -4))"
 fi
 
+# #818 a G2, the doctor twin: the XDG-only home renders ON through the
+# XDG seam (a ~/.gitconfig-only reader said "unknown" while the hooks
+# were active). Inline subshell mirroring _dgh_run with the two
+# gitconfig seams swapped.
+mkdir -p "$WORK/dgh-xdg/.config/git" "$WORK/dgh-xdg/devhome"
+git config --file "$WORK/dgh-xdg/.config/git/config" \
+    core.hooksPath "$WORK/dgh/lib/git-heal/hooks"
+_out=$(
+    (
+        PATH="$STUB:$PATH"
+        export PATH NO_COLOR=1 GH_GITCONFIG="$WORK/dgh-xdg/devhome/.gitconfig" \
+            GH_GITCONFIG_XDG="$WORK/dgh-xdg/.config/git/config" \
+            GH_LIBDIR="$WORK/dgh/lib"
+        . "$UI_LIB"
+        . "$LIB"
+        # shellcheck disable=SC1090
+        . "$_dgh_repo_lib/sh/git-heal-core.sh"
+        INSTALL_CONF="$WORK/dgh/install.conf"
+        DOCTOR_ROOT="$WORK/dgh/proj"
+        DOCTOR_USER=opencode-dgh-agent
+        doctor_git_heal
+    ) 2>&1 || true
+)
+if printf '%s' "$_out" | grep -q 'git-heal.*ON — developer git ops re-pin'; then
+    pass "doctor git-heal: XDG-only home renders ON (hooksPath in ~/.config/git/config, #818 a G2)"
+else
+    fail "doctor git-heal: XDG-only ON row missing (out=$(printf '%s' "$_out" | head -3)) (#818 a G2)"
+fi
+rm -rf "${WORK:?}/dgh-xdg"
+
 # --- #777: a POINTER-FILE checkout classifies through the resolved
 # gitdir — before, doctor's per-project row rendered nothing at all
 # for an adopted project (the [ -d .git ] gate never fired). Fixture:

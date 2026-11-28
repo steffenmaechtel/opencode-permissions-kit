@@ -1126,11 +1126,37 @@ _gp_revert_one() {
     # path demands starts with exactly this step.
     chattr -i "$_gpr_p/.git" 2>/dev/null ||
         ui_warn "chattr -i failed on $_gpr_p/.git — an immutable pointer blocks the removal below"
+    # #818 a G4, the _gp_rollback/_gp_unnest/D8-migrate template: a
+    # DIRECTORY planted at the .git name in the rm→mv window makes mv
+    # move the gitdir INSIDE the plant with rc 0 — the trailing
+    # status verify caught that only as a generic warn. A non-symlink
+    # directory at the .git name is never legit project data here
+    # (this run's own gate proved the pointer shape before the nail;
+    # the one theoretical exception — a racing developer git init —
+    # nested silently under the pre-fix behavior, strictly worse).
+    if [ -d "$_gpr_p/.git" ] && [ ! -L "$_gpr_p/.git" ]; then
+        rm -rf "$_gpr_p/.git" || {
+            ui_error "revert: cannot remove the planted directory at $_gpr_p/.git"
+            ui_error "(manual recovery: sudo chattr -i $_gpr_p/.git, rm -rf $_gpr_p/.git,"
+            ui_error " mv $_gpr_tgt $_gpr_p/.git)"
+            return 1
+        }
+    fi
     rm -f "$_gpr_p/.git"
     mv "$_gpr_tgt" "$_gpr_p/.git" || {
         ui_error "mv back failed: $_gpr_tgt -> $_gpr_p/.git (manual recovery: sudo chattr -i $_gpr_p/.git, then mv)"
         return 1
     }
+    # #818 a G4, the post-move shape check: the gitdir's HEAD must sit
+    # DIRECTLY under the moved-back .git — a plant surviving the
+    # pre-clear (immutable bit, chmod-gated removal) leaves the gitdir
+    # NESTED one level deep while mv exits 0. The existing trailing
+    # status verify stays (it checks the working tree, not the shape).
+    if [ ! -d "$_gpr_p/.git" ] || [ -L "$_gpr_p/.git" ] || [ ! -e "$_gpr_p/.git/HEAD" ]; then
+        ui_error "revert verify: $_gpr_p/.git is not the moved-back gitdir —"
+        ui_error "a planted directory may hold it one level deep (inspect: $_gpr_p/.git)"
+        return 1
+    fi
     find "$_gpr_p/.git" -type d -exec chmod g+rwxs {} + 2>/dev/null
     find "$_gpr_p/.git" -type f -exec chmod g+rw {} + 2>/dev/null
     # worktree pointers still point into the (now moved-away) storage

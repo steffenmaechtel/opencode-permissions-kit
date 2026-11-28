@@ -82,6 +82,7 @@ asks before removing the kit block; your own entries always stay.
 | `OPENCHAMBER_POLICY` | `yes` = the OpenChamber policy pin is active |
 | `KIT_CHANNEL` | Ref installs/updates track (`stable`, `master`, a feature branch, or a pinned tag) |
 | `OPENCODE_GROUP` | Always the `opencode` usergroup (informational) |
+| `GITDIR_STORAGE` | git-protection storage root for relocated `.git` dirs (`none` = declined) |
 | `VERSION` | Deployed kit version |
 
 Removed keys: `HARD_DENY_REMOVED` — a 0.0.11–0.0.14-era migration

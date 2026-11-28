@@ -69,14 +69,20 @@ Outside kit-managed roots they are silent no-ops (no sudo call, no
 output). They never fail your git operation: if the heal cannot run
 (sudo unavailable), you get one stderr line and the operation completes.
 
-The carrier set is measured, not assumed: `post-index-change` fires on
-every index write — mutating commands (`add`, `reset`, `read-tree`) and
-refreshing `git status` runs on a stale cache (IDE refreshes while the
-agent edits) alike — but not on a fresh-cache status that writes
-nothing, which is exactly the case where nothing flipped. Pull/merge
-(including fast-forward) rides `post-merge`; checkouts and switches
-ride `post-checkout`. There is no `post-reset` hook in git;
-`post-index-change` covers that whole family. The #678 measurement
+The carrier set is measured, not assumed — and version-gated:
+`post-index-change` needs **git ≥ 2.31** (the hook type arrived
+there; the kit's tested floor is git 2.30). On an older git the hook
+name is simply unknown, so the index-write family has no carrier at
+all there and the miss is silent — `opk git-heal on` warns when it
+detects a git below 2.31. On git ≥ 2.31, `post-index-change` fires
+on every index write — mutating commands (`add`, `reset`,
+`read-tree`) and refreshing `git status` runs on a stale cache (IDE
+refreshes while the agent edits) alike — but not on a fresh-cache
+status that writes nothing, which is exactly the case where nothing
+flipped. Pull/merge (including fast-forward) rides `post-merge`;
+checkouts and switches ride `post-checkout`. There is no
+`post-reset` hook in git; `post-index-change` covers that whole
+family. The #678 measurement
 added the conflict-state carriers: the resolution `git add` fires
 `post-index-change` with the merge-state set present
 (`MERGE_HEAD`/`MERGE_MSG`/`MERGE_MODE`/`AUTO_MERGE`; the per-operation
