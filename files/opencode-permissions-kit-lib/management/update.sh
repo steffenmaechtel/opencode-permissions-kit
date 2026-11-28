@@ -480,6 +480,12 @@ if [ "$_opk_binonly" != true ] && { [ "$_opk_stdin" = true ] ||
     # silently resolves to the default y, an update without any consent
     # on the record (review 0.0.39b C6 closed this for install.sh; the
     # update path lacked it — 0.0.45c S8). See _ui_read in sh/ui.sh.
+    # The arm covers EVERY fetch-side run, not only streamed ones
+    # (#818 c U4/d U2): a deployed run without a local checkout
+    # (SCRIPT_DIR in LIBDIR, no ../../../VERSION) takes the same arm —
+    # its stdin is caller input, not script bytes, but headless it is
+    # EOF or unsupervised, and the y default must not fire there
+    # either.
     # Exported: the re-exec'd copy below inherits it.
     UI_NO_STDIN_FALLBACK=1
     export UI_NO_STDIN_FALLBACK
@@ -683,10 +689,15 @@ else
         echo ""
     }
     ui_kv() { printf '  %-14s %s\n' "$1" "$2"; }
-    # 0.0.45d W4: the body's confirm() calls ui_confirm — without a
-    # stub a ui.sh-less update died rc 127 at the confirm prompt
-    # instead of failing with a re-deploy hint (0.0.45c C9 fixed the
-    # same class in config.sh; the C9 sweep missed this fallback).
+    # 0.0.45d W4 (historical): the body's confirm() used to call
+    # ui_confirm — without a stub a ui.sh-less update died rc 127 at
+    # the confirm prompt instead of failing with a re-deploy hint
+    # (0.0.45c C9 fixed the same class in config.sh; the C9 sweep
+    # missed this fallback). Since #818 a U2 the deploy gate's
+    # confirm() is self-contained (its refusal path must not depend
+    # on the library), but the stub stays: it is the loud-fail shape
+    # for every OTHER ui_confirm consumer a ui.sh-less update can
+    # reach, and the pairing guard below lists the name.
     # Loud-fail stub: non-interactive paths keep working, the one
     # prompt fails with a message instead of "command not found".
     _ui_no_prompt() {
@@ -1083,7 +1094,57 @@ confirm() {
     # the message itself promises configs stay untouched — and
     # unattended runs pass --yes and never see it.
     [ "$YES" = true ] && return 0
-    ui_confirm "$1" "y"
+    # #818 a U2: a headless checkout-run (ssh -n, cron, CI — no
+    # controlling terminal, stdin already at EOF) used to resolve this
+    # y-default gate without anyone seeing the prompt: _ui_read's
+    # /dev/tty leg fails, the stdin fallback reads EOF, and the empty
+    # answer resolves to the default — a root re-deploy with no
+    # consent on record. The checkout leg refuses loud here: an
+    # answer that never arrived is not consent. The legs keep their
+    # contracts — a tty answers interactively (including streamed
+    # shells: curl|bash keeps its controlling tty, 0.0.39b C6), the
+    # UI_NO_STDIN_FALLBACK var set by the streamed arm refuses BEFORE
+    # any stdin read (stdin is script bytes there, #818 b U1), piped
+    # stdin with actual bytes (tests, CI feeding answers, no tty)
+    # answers, an empty piped line is Enter (the default), only
+    # EOF-with-no-tty aborts. Self-contained on purpose: no
+    # ui_confirm dependency in the refusal paths.
+    printf '  %s [Y/n] ' "$1" >&2
+    if read -r _uc_ans </dev/tty 2>/dev/null; then
+        :
+    elif [ "${UI_NO_STDIN_FALLBACK:-}" = "1" ]; then
+        # #818 b U1: the streamed arm's stdin IS the script body — a
+        # stdin fallback here consumes script bytes as the answer and
+        # unknown input resolves to the y default: a root re-deploy
+        # consented from source text (the 0.0.45c S8 class, reopened
+        # when this gate went self-contained). The arm covers every
+        # fetch-side run — streamed AND deployed without a local
+        # checkout (#818 c U4): both carry the var, both must
+        # refuse. A controlling tty still answers (the 0.0.39b C6
+        # design: prompts survive curl|bash shells).
+        printf '  error     no terminal available for the deploy confirmation —\n' >&2
+        printf '            update gate, #818 b U1: re-run with --yes, or answer from a tty\n' >&2
+        exit 1
+    elif ! read -r _uc_ans; then
+        printf '  error     no terminal for the deploy confirmation and stdin is at EOF —\n' >&2
+        printf '            consent gate, #818 a U2: re-run with --yes, or answer from a tty\n' >&2
+        exit 1
+    fi
+    _uc_ans=$(printf '%s' "$_uc_ans" | tr '[:upper:]' '[:lower:]' | tr -d '\r')
+    # \r stripped (#818 c U6): read's IFS trim covers space/tab but
+    # not carriage returns — a CRLF piped decline `n\r` was unknown
+    # input and resolved to the y default (an explicit decline
+    # consenting a root re-deploy, against conventions' trimming
+    # promise). ui_confirm/ui_menu carry the same strip since
+    # #818 d T3; prompt_yn (uninstall's standalone twin, n-default
+    # sites only) keeps the residual, recorded in the teardown
+    # context (#821/#822).
+    [ -z "$_uc_ans" ] && _uc_ans="y"
+    case "$_uc_ans" in
+        y | yes) return 0 ;;
+        n | no) return 1 ;;
+        *) return 0 ;;
+    esac
 }
 
 # --- phase logic: sh/update-core.sh (issue #346, wave 2) -----------------------

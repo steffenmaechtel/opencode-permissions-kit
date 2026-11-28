@@ -69,6 +69,10 @@
 #                     (default /etc/opencode-permissions-kit/projects.conf)
 #   GH_AGENT_USER     agent user (default: OPENCODE_USER from
 #                     install.conf, else the literal "opencode")
+#   GH_AGENT_GROUP    agent group override (default: OPENCODE_GROUP
+#                     from install.conf, else the literal "opencode",
+#                     overruled by the agent's LIVE primary group —
+#                     the config.sh sharing-group resolution, #818 a G1)
 #   GH_ALLOW_NONROOT  relax the root gate (tests chown to the running
 #                     user, which is a permitted no-op chown)
 #   GH_CONF_RELAX     relax the conf-line system-path/agent-home arms
@@ -111,6 +115,21 @@ esac
 _gh_agent="${GH_AGENT_USER:-$(sed -n 's/^OPENCODE_USER=//p' \
     /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -n 1 | sed 's/^"//;s/"$//')}"
 _gh_agent="${_gh_agent:-opencode}"
+
+# Agent group (#818 a G1): the chown spec below used to hardcode the
+# group to the agent USERNAME — wherever the agent's primary group is
+# not a same-named usergroup (pre-existing-user installs), chown died
+# per-operand on the nonexistent group operand (a silently dead heal,
+# the hook discards stderr) or flipped the operand into a foreign
+# same-named group. Resolved exactly the way config.sh resolves the
+# sharing group: OPENCODE_GROUP from the conf (canonical literal
+# fallback), and the LIVE primary group of the agent user wins over
+# any stale conf entry.
+_gh_group="${GH_AGENT_GROUP:-$(sed -n 's/^OPENCODE_GROUP=//p' \
+    /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -n 1 | sed 's/^"//;s/"$//')}"
+_gh_group="${_gh_group:-opencode}"
+_gh_live_group="$(id -gn "$_gh_agent" 2>/dev/null || true)"
+[ -n "$_gh_live_group" ] && _gh_group="$_gh_live_group"
 
 # _gh_root_ok <line>: reader-side conf-line gate (files.md contract:
 # every consumer that runs root operations over the roots re-validates
@@ -267,7 +286,7 @@ for f in index HEAD ORIG_HEAD REBASE_HEAD packed-refs \
     # chown -h: even if the operand were swapped to a symlink in the
     # check-to-act window, -h chowns the link inode itself, never the
     # target it points at (L5: re-check paired with the act).
-    if chown -h "$_gh_agent:$_gh_agent" -- "$p" 2>/dev/null; then
+    if chown -h "$_gh_agent:$_gh_group" -- "$p" 2>/dev/null; then
         printf '%s caller_uid=%s gitdir=%s healed %s\n' \
             "$(date '+%F %T')" "${SUDO_UID:-?}" "$gd" "$f" >>"$_gh_log" 2>/dev/null ||
             say "healed $p but could not append $_gh_log"

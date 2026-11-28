@@ -122,10 +122,32 @@ _ghc_hooksdir() {
 
 # _ghc_dev_hooks_path <devuser>: the developer's current global
 # core.hooksPath value ('' when unset or the gitconfig unreadable).
+# XDG-aware (#818 a G2): git's global layer is ~/.gitconfig MERGED
+# over ~/.config/git/config — per key the ~/.gitconfig value wins. The
+# write legs are native `--global` and land in XDG whenever
+# ~/.gitconfig is absent (probed on git 2.56.1: no ~/.gitconfig gets
+# created), so a reader addressing ~/.gitconfig only sees "unset" in
+# an XDG-only home while the hooks keep firing.
 _ghc_dev_hooks_path() {
     _ghc_dh=$(_ghc_devhome "$1")
     [ -n "$_ghc_dh" ] || return 0
-    git config -f "$_ghc_dh/.gitconfig" core.hooksPath 2>/dev/null || true
+    _ghc_dv=""
+    _ghc_dv_rc=0
+    _ghc_dv=$(git config -f "$_ghc_dh/.gitconfig" core.hooksPath 2>/dev/null) ||
+        _ghc_dv_rc=$?
+    # rc 0 with empty output = the key is EXPLICITLY empty
+    # (`git config --global core.hooksPath ""` — a real hooks-disable
+    # idiom): git's per-key masking applies, the XDG value stays
+    # masked, no fall-through (#818 b G2). Any non-zero rc (rc 1:
+    # key absent or file missing — the probed 2.56.1 table; rc 128:
+    # malformed file — both non-zero either way) = the primary does
+    # not define the key → XDG fallback (#818 c G3: the rc
+    # attribution corrected; the code treats every non-zero rc
+    # identically, so version drift is behavior-safe).
+    if [ "$_ghc_dv_rc" -ne 0 ] && [ -r "$_ghc_dh/.config/git/config" ]; then
+        _ghc_dv=$(git config -f "$_ghc_dh/.config/git/config" core.hooksPath 2>/dev/null || true)
+    fi
+    printf '%s' "$_ghc_dv"
 }
 
 # _ghc_state: echoes on | off | foreign | unknown. `foreign` means a
@@ -138,11 +160,14 @@ _ghc_state() {
         echo unknown
         return 0
     }
-    _ghc_st_gc="$_ghc_st_home/.gitconfig"
-    [ -r "$_ghc_st_gc" ] || {
+    # XDG-aware readability gate (#818 a G2): either global file being
+    # readable makes the state readable — an XDG-only home is a
+    # readable home, not "unknown".
+    if [ ! -r "$_ghc_st_home/.gitconfig" ] &&
+        [ ! -r "$_ghc_st_home/.config/git/config" ]; then
         echo unknown
         return 0
-    }
+    fi
     _ghc_st_cur=$(_ghc_dev_hooks_path "$_ghc_st_dev")
     if [ -z "$_ghc_st_cur" ]; then
         echo off
@@ -459,6 +484,24 @@ _git_heal_on() {
         ui_error "git-heal: no home for user $_ghc_on_dev — cannot set core.hooksPath"
         exit 1
     fi
+    # Foreign-value guard (#818 a G3, the issue #100 consent
+    # discipline): `on` is the one leg that WRITES the global
+    # core.hooksPath, and it used to overwrite a foreign value (a
+    # developer's lefthook/pre-commit setup) unrecoverably — while
+    # off, uninstall and status all deliberately refuse foreign
+    # values. Refuse loud BEFORE anything is touched (the sudoers
+    # render below would already be a mutation), name the value, leave
+    # it untouched.
+    _ghc_on_cur=$(_ghc_dev_hooks_path "$_ghc_on_dev")
+    if [ -n "$_ghc_on_cur" ] && [ "$_ghc_on_cur" != "$(_ghc_hooksdir)" ]; then
+        ui_error "git-heal: core.hooksPath for $_ghc_on_dev holds a foreign value — leaving it untouched"
+        ui_detail "($_ghc_on_cur)"
+        ui_detail "remove it yourself as $_ghc_on_dev (git config --global --unset core.hooksPath, or"
+        ui_detail "delete the core.hooksPath line from ~/.gitconfig / ~/.config/git/config —"
+        ui_detail "the unset can miss the XDG carrier on older gits),"
+        ui_detail "then re-run 'sudo opk git-heal on'"
+        exit 1
+    fi
     if ! _ghc_pieces_ok; then
         ui_error "git-heal: heal hooks incomplete under $(_ghc_libdir)/git-heal — run 'sudo opk update' first"
         exit 1
@@ -485,6 +528,24 @@ _git_heal_on() {
         exit 1
     fi
     ui_info "Setting the developer's global core.hooksPath to the kit heal hooks ..."
+    # #818 a G5: post-index-change needs git >= 2.31 (the hook type
+    # arrived there; the kit's tested floor is 2.30 — git-check.sh).
+    # Below 2.31 the index-write family (add/reset/read-tree/stale
+    # status refresh) has NO carrier — git does not know the hook name
+    # — and the miss is invisible: the audit log only records
+    # successes. Warn at activation (soft floor, never an abort — the
+    # other three carriers still cover their operations; the probe
+    # runs through the developer's own git invocation shape).
+    _ghc_on_gitver=$(_ghc_devgit "$_ghc_on_dev" "$_ghc_on_home" --version 2>/dev/null || true)
+    _ghc_on_gv=$(printf '%s\n' "$_ghc_on_gitver" |
+        sed -n 's/^git version \([0-9]*\)\.\([0-9]*\).*/\1 \2/p')
+    [ -n "$_ghc_on_gv" ] || _ghc_on_gv="0 0"
+    if printf '%s\n' "$_ghc_on_gv" |
+        awk '{ exit ($1 < 2 || ($1 == 2 && $2 < 31)) ? 0 : 1 }'; then
+        ui_warn "git-heal: git $_ghc_on_gitver is below 2.31 — the post-index-change carrier"
+        ui_warn "never fires there (the index-write family: add/reset/read-tree/stale status);"
+        ui_warn "the other three hooks cover their operations; upgrade git for full coverage"
+    fi
     if ! _ghc_devgit "$_ghc_on_dev" "$_ghc_on_home" \
         config --global core.hooksPath "$(_ghc_hooksdir)"; then
         ui_error "git-heal: could not write core.hooksPath for $_ghc_on_dev"
@@ -602,6 +663,36 @@ _git_heal_on() {
     ui_success "hooks stay off for the developer; hooksPath=$(_ghc_hooksdir))"
 }
 
+# _ghc_off_unset_kit <dev> <home>: unset every carrier file whose OWN
+# value is the kit hooksdir — kit bytes only, the #100 consent
+# discipline: a foreign value is never modified, only reported.
+# Version-independent by explicit -f (older gits operate on
+# ~/.gitconfig only; the CI unit lane caught that split, #818 a G2
+# followup). A kit copy in both files is masked-but-real: every
+# kit-owned carrier is unset, or a stale one resurfaces as the next
+# read's value. Echoes the carrier paths actually unset; rc 1 when
+# any unset failed.
+_ghc_off_unset_kit() {
+    _ghouk_dev=$1
+    _ghouk_home=$2
+    _ghouk_ok=1
+    _ghouk_unsets=""
+    for _ghouk_f in "$_ghouk_home/.gitconfig" \
+        "$_ghouk_home/.config/git/config"; do
+        [ -r "$_ghouk_f" ] || continue
+        _ghouk_v=$(git config -f "$_ghouk_f" core.hooksPath 2>/dev/null || true)
+        [ "$_ghouk_v" = "$(_ghc_hooksdir)" ] || continue
+        if _ghc_devgit "$_ghouk_dev" "$_ghouk_home" \
+            config -f "$_ghouk_f" --unset core.hooksPath; then
+            _ghouk_unsets="$_ghouk_unsets $_ghouk_f"
+        else
+            _ghouk_ok=0
+        fi
+    done
+    printf '%s' "${_ghouk_unsets# }"
+    [ "$_ghouk_ok" -eq 1 ]
+}
+
 _git_heal_off() {
     _ghc_off_dev=$(_ghc_devuser)
     _ghc_off_home=$(_ghc_devhome "$_ghc_off_dev")
@@ -610,21 +701,45 @@ _git_heal_off() {
         exit 1
     fi
     _ghc_off_cur=$(_ghc_dev_hooks_path "$_ghc_off_dev")
+    # #818 c G1: the merged read can say foreign or empty while a
+    # KIT-OWNED copy sits masked in a carrier (the on-leg itself
+    # writes XDG whenever ~/.gitconfig is absent; a later foreign
+    # writer or the documented hooks-disable empty value masks it —
+    # the hooks RESURRECT when the mask clears). The kit's own copy
+    # is kit bytes, never #100-protected: every branch sweeps the
+    # carriers and unsets kit-owned values, with a detail line when
+    # a masked copy was removed. Foreign carriers stay untouched.
+    _ghc_off_masked=""
+    _ghc_off_mask_rc=0
     if [ "$_ghc_off_cur" = "$(_ghc_hooksdir)" ]; then
-        if _ghc_devgit "$_ghc_off_dev" "$_ghc_off_home" \
-            config --global --unset core.hooksPath; then
+        # #818 d G1: the helper's echo is discarded here — the merged
+        # value IS the kit path (nothing is masked), the success row
+        # already names what happened, and an uncaptured call would
+        # leak the carrier paths as a bare unlabeled stdout line
+        # outside the ui vocabulary (branches 2/3 capture for the
+        # masked-copy detail).
+        if _ghc_off_unset_kit "$_ghc_off_dev" "$_ghc_off_home" >/dev/null; then
             ui_success "git heal hooks off — core.hooksPath unset for $_ghc_off_dev"
         else
             ui_error "git-heal: could not unset core.hooksPath for $_ghc_off_dev"
             exit 1
         fi
     elif [ -z "$_ghc_off_cur" ]; then
+        _ghc_off_masked=$(_ghc_off_unset_kit "$_ghc_off_dev" "$_ghc_off_home") ||
+            _ghc_off_mask_rc=$?
         ui_success "git heal hooks already off (no core.hooksPath set)"
     else
-        # Kit-owned bytes only (the issue #100 consent discipline): a
-        # foreign value is never modified, only reported.
+        _ghc_off_masked=$(_ghc_off_unset_kit "$_ghc_off_dev" "$_ghc_off_home") ||
+            _ghc_off_mask_rc=$?
         ui_success "git heal hooks off — core.hooksPath holds a foreign value"
         ui_detail "($_ghc_off_cur) — left untouched"
+    fi
+    if [ -n "$_ghc_off_masked" ]; then
+        ui_detail "masked kit-owned copy unset from: $_ghc_off_masked"
+    fi
+    if [ "$_ghc_off_mask_rc" -ne 0 ]; then
+        ui_error "git-heal: could not unset a masked kit-owned core.hooksPath for $_ghc_off_dev"
+        exit 1
     fi
 }
 
@@ -646,7 +761,8 @@ _git_heal_status() {
             # across the two surfaces the how-to documents as parallel.
             ui_info "git-heal: OFF — core.hooksPath holds a foreign value"
             ui_info "        ($(_ghc_dev_hooks_path "$_ghc_stt_dev")) — heal hooks not in effect;"
-            ui_info "        'sudo opk git-heal on' would retake the path"
+            ui_info "        'sudo opk git-heal on' refuses foreign values (git heal on"
+            ui_info "        guard, #818 a G3): remove the value yourself, then re-run it"
             ;;
         unknown)
             ui_info "git-heal: UNKNOWN — cannot read the developer's gitconfig"

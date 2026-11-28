@@ -34,9 +34,17 @@ Implementation:
 | Context | Helper |
 |---|---|
 | Scripts that source `ui.sh` | `ui_confirm "Question?" <y\|n>` |
+| `update.sh`'s deploy gate | local `confirm` — see the note below |
 | install.sh menus | `ui_menu` (keys like `1`/`C`/`A`/`X`, default highlighted) |
 | uninstall.sh (standalone, no ui.sh) | local `prompt_yn` (same display rules) |
 | opk with a damaged library | fallback `ui_confirm` in `bin/opk` (same display rules) |
+
+The `update.sh` deploy-gate row: the gate is deliberately
+self-contained — its refusal paths must not depend on the library
+being loadable (a ui.sh-less update still has to refuse consent
+loudly, not die rc 127 at the prompt). It honors the same
+display/input rules, the headless-EOF refusal, and
+`UI_NO_STDIN_FALLBACK` for the streamed arm.
 
 - Free-text questions (`ui_ask`) show `[default] >` — different shape on
   purpose, they are not confirmations. (RM-0036)

@@ -37,12 +37,25 @@ above the root, opencode cannot reach it at all.
 
 ### Manual equivalent
 
+The four sharing passes of `projects add` (the group baseline's order
+in `files/opencode-permissions-kit-lib/sh/fs-baseline.sh` — group,
+per-directory setgid + `g+rwx`, per-file `g+rw`, default ACLs):
+
 ```bash
 echo /var/www/vhosts/new-project | sudo tee -a /etc/opencode-permissions-kit/projects.conf
 sudo chgrp -R opencode /var/www/vhosts/new-project
-sudo chmod g+s /var/www/vhosts/new-project
+sudo find /var/www/vhosts/new-project -type d -exec chmod g+rwxs {} +
+sudo find /var/www/vhosts/new-project -type f -exec chmod g+rw {} +
 sudo setfacl -R -d -m g:opencode:rwx /var/www/vhosts/new-project
 ```
+
+Two more things `projects add` does after those passes, in the same
+run: the **`.git` re-narrowing heal** (`.git/config` and
+`.git/hooks` pinned developer-owned `644`/`755`, no group write, no
+ACLs — the sharing passes just granted exactly that) and the baseline
+stamp that lets later `opk update` runs skip an unchanged tree.
+Without them a manually prepared tree still works — but the first
+stamp-invalidated update re-runs the full baseline over it.
 
 ## List configured directories
 

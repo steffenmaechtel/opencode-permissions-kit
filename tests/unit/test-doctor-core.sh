@@ -358,6 +358,43 @@ else
     fail "doctor git-heal: ON rows broken (out=$(printf '%s' "$_out" | head -4))"
 fi
 
+# #818 a G2, the doctor twin: the XDG-only home renders ON through the
+# XDG seam (a ~/.gitconfig-only reader said "unknown" while the hooks
+# were active). Inline subshell mirroring _dgh_run with the two
+# gitconfig seams swapped.
+mkdir -p "$WORK/dgh-xdg/.config/git" "$WORK/dgh-xdg/devhome"
+git config --file "$WORK/dgh-xdg/.config/git/config" \
+    core.hooksPath "$WORK/dgh/lib/git-heal/hooks"
+_out=$(
+    (
+        PATH="$STUB:$PATH"
+        export PATH NO_COLOR=1 GH_GITCONFIG="$WORK/dgh-xdg/devhome/.gitconfig" \
+            GH_GITCONFIG_XDG="$WORK/dgh-xdg/.config/git/config" \
+            GH_LIBDIR="$WORK/dgh/lib"
+        . "$UI_LIB"
+        . "$LIB"
+        # shellcheck disable=SC1090
+        . "$_dgh_repo_lib/sh/git-heal-core.sh"
+        INSTALL_CONF="$WORK/dgh/install.conf"
+        DOCTOR_ROOT="$WORK/dgh/proj"
+        DOCTOR_USER=opencode-dgh-agent
+        doctor_git_heal
+    ) 2>&1 || true
+)
+if printf '%s' "$_out" | grep -q 'git-heal.*ON — developer git ops re-pin'; then
+    pass "doctor git-heal: XDG-only home renders ON (hooksPath in ~/.config/git/config, #818 a G2)"
+else
+    fail "doctor git-heal: XDG-only ON row missing (out=$(printf '%s' "$_out" | head -3)) (#818 a G2)"
+fi
+# #818 b G2, the twin's share (the status twin's comment carries the
+# mechanism): source pins for the rc-aware primary read and the
+# rc-gated XDG fallback.
+check_live "doctor git-heal: the twin reads the primary rc-aware, empty masks (#818 b G2)" \
+    "$LIB" -qF '_dgh_cur=$(git config -f "$_dgh_gc" core.hooksPath 2>/dev/null) ||'
+check_live "doctor git-heal: the twin's XDG fallback is rc-gated (#818 b G2)" \
+    "$LIB" -qF '[ "$_dgh_cur_rc" -ne 0 ] && [ -r "$_dgh_xgc" ]'
+rm -rf "${WORK:?}/dgh-xdg"
+
 # --- #777: a POINTER-FILE checkout classifies through the resolved
 # gitdir — before, doctor's per-project row rendered nothing at all
 # for an adopted project (the [ -d .git ] gate never fired). Fixture:

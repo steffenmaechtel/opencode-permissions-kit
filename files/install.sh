@@ -385,7 +385,16 @@ fi
 # A streamed install's stdin IS the script body (curl | sudo bash): the
 # prompt helpers must never fall back to reading it — they would consume
 # script bytes as the answer (review 0.0.39b C6). See _ui_read in ui.sh.
-if [ "$STREAMED" = true ]; then UI_NO_STDIN_FALLBACK=1; fi
+# Unconditional since #818 b U2: a headless CHECKOUT run (cron, CI,
+# ssh -T, no --yes) has stdin at EOF and no controlling tty — the
+# stdin fallback would resolve every prompt to its default, and the
+# "Proceed?" menu's default IS C = Confirm: a root install consented
+# by nobody (the round-a U2 class on this entry point; install-core.sh
+# names the headless-checkout shape itself at its --yes skip arm).
+# The tty-first leg keeps interactive checkout shells answering; --yes
+# runs never prompt (SKIP_PROMPTS clears INTERACTIVE before any ask).
+UI_NO_STDIN_FALLBACK=1
+export UI_NO_STDIN_FALLBACK
 # Shape gate (#376 B3 class sweep — update.sh's twin, same mirror file):
 # the streamed/fetched VERSION is remote-mirror content stamped into
 # install.conf (sourced by root); update.sh gates it to exactly x.y.z

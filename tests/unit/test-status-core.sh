@@ -922,6 +922,48 @@ else
     fail "git-heal section: foreign row broken (out=$(printf '%s' "$_out" | head -4))"
 fi
 
+# #818 a G2, the status twin: the XDG-only home. GH_GITCONFIG points
+# at a primary that does not exist, GH_GITCONFIG_XDG carries the kit
+# value — the row must render ON (a ~/.gitconfig-only reader said
+# "unknown" while the hooks were active). The inline subshell mirrors
+# _ghs_run with the two gitconfig seams swapped.
+mkdir -p "$WORK/ghs-xdg/.config/git" "$WORK/ghs-xdg/devhome"
+git config --file "$WORK/ghs-xdg/.config/git/config" \
+    core.hooksPath "$WORK/ghs/lib/git-heal/hooks"
+_out=$(
+    (
+        PATH="$STUB:$PATH"
+        export PATH NO_COLOR=1 GH_GITCONFIG="$WORK/ghs-xdg/devhome/.gitconfig" \
+            GH_GITCONFIG_XDG="$WORK/ghs-xdg/.config/git/config"
+        . "$UI_LIB"
+        . "$LIB"
+        # shellcheck disable=SC1090
+        . "$GH_CORE"
+        DEFAULT_USER="$(id -un)"
+        OPENCODE_USER=opencode-ghs-agent
+        LIBDIR="$WORK/ghs/lib"
+        INSTALL_CONF="$WORK/ghs/install.conf"
+        PROJECTS_CONF="$WORK/ghs/projects.conf"
+        status_section_git_heal
+    ) 2>&1 || true
+)
+if printf '%s' "$_out" | grep -q 'git-heal.*ON — developer git ops re-pin'; then
+    pass "git-heal section: XDG-only home renders ON (hooksPath in ~/.config/git/config, #818 a G2)"
+else
+    fail "git-heal section: XDG-only ON row missing (out=$(printf '%s' "$_out" | head -3)) (#818 a G2)"
+fi
+# #818 b G2, the twin's share: the rc-aware primary read (an
+# explicitly empty ~/.gitconfig hooksPath MASKS the XDG value —
+# git's per-key precedence; the pre-b reader fell through). The
+# core reader's behavioral leg lives in test-git-heal-core; this
+# source pin guards the twin's shape.
+check_live "git-heal section: the twin reads the primary rc-aware, empty masks (#818 b G2)" \
+    "$LIB" -qF '_st_gh_cur=$(git config -f "$_st_gh_gc" core.hooksPath 2>/dev/null) ||'
+check_live "git-heal section: the twin's XDG fallback is rc-gated (#818 b G2)" \
+    "$LIB" -qF '[ "$_st_gh_cur_rc" -ne 0 ] && [ -r "$_st_gh_xgc" ]'
+rm -rf "${WORK:?}/ghs-xdg"
+git config -f "$WORK/ghs/devhome/.gitconfig" --unset core.hooksPath
+
 # --- 5. Leak scan section: the no-config leg at function level -------------------
 # The section derives SCAN_CFG from OPENCODE_USER's home itself (pure
 # movement — no env seam was added), so only the no-config leg runs

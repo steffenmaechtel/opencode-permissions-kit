@@ -124,6 +124,17 @@ scope_files() {
 measure_file() {
     _mf="$1"
     _ml="$2"
+    # Readability guard (#818 a T1, the fail-loud detector-sweep
+    # discipline): an unreadable scope file used to die inside awk
+    # with a stderr-only diagnostic and NO row — the growth loop
+    # greened over it (a false-green growth channel: the file simply
+    # stopped being measured) and --regen silently dropped its
+    # baseline row. Die loud with the name, keep stdout the data
+    # channel, carry the failure in the rc.
+    [ -r "$_mf" ] || {
+        printf 'line length ratchet: unreadable scope file: %s\n' "$_mf" >&2
+        return 1
+    }
     case "$_mf" in
         *.md) _mfm=1 ;;
         *) _mfm=0 ;;
@@ -140,15 +151,39 @@ measure_file() {
         fm && infm { if ($0 == "---") infm = 0; next }
         { sub(/^[[:space:]]+/, "") }
         length > lim { s += length - lim; c++ }
-        END { if (s > 0) printf "%s %d %d\n", f, s, c }' "$_mf"
+        END { if (s > 0) printf "%s %d %d\n", f, s, c }' "$_mf" || {
+        printf 'line length ratchet: awk failed on %s (mid-read error?)\n' "$_mf" >&2
+        return 1
+    }
 }
 
 # --regen: rewrite the baseline from the current tree (deliberate
 # exception path -- review the diff, never regenerate to silence a fail).
+# Atomic since #818 a T1: rows land in scratch, the baseline is replaced
+# only after the whole walk succeeded — a partial regen (an unreadable
+# scope file aborts the loop mid-way) must never leave a half-written
+# baseline behind. Empty output refuses loud too (agent/conventions.md
+# "Fail-loud detector sweeps": zero measured files is not a clean
+# verdict — it would silently wipe the baseline and
+# green every later check over nothing).
 if [ "${1:-}" = "--regen" ]; then
+    _regen_tmp="$(work_new_file)" || {
+        echo "line length ratchet: FAILED (scratch creation failed, TMPDIR=${TMPDIR:-unset})" >&2
+        exit 1
+    }
+    _regen_rc=0
     scope_files | sort -u | while IFS= read -r f; do
-        measure_file "$f" "$LIMIT"
-    done >"$BASELINE"
+        measure_file "$f" "$LIMIT" || exit 1
+    done >"$_regen_tmp" || _regen_rc=$?
+    if [ "$_regen_rc" -ne 0 ]; then
+        echo "line length ratchet: FAILED (--regen aborted: a scope file was unreadable — named on stderr above)" >&2
+        exit 1
+    fi
+    if [ ! -s "$_regen_tmp" ]; then
+        echo "line length ratchet: FAILED (--regen measured no files — scope walk broken, or the tree hit zero deliberately: re-baseline by hand)" >&2
+        exit 1
+    fi
+    mv "$_regen_tmp" "$BASELINE"
     echo "baseline regenerated: $(wc -l <"$BASELINE" | tr -d ' ') entries -> $BASELINE"
     exit 0
 fi
@@ -213,11 +248,93 @@ else
     echo "  PROBE BROKEN: fm-only='$_p1' prose='$_p2' non-md='$_p3' unclosed='$_p4' pseudo='$_p5'" >>"$TMP_PROBE"
 fi
 
+# #818 a T1, the readability guard: an unreadable scope file must die
+# loud with its name (rc 1, stderr row, no stdout row) — it used to
+# contribute no row at all, greening the growth channel and silently
+# dropping its baseline row on --regen. chmod 000 cannot block a root
+# reader (disclosed skip, the #318 a B3 root gate).
+if [ "$(id -u)" -eq 0 ]; then
+    echo "  pin skipped: readability leg needs a non-root uid (root reads through 000) (#818 a T1)"
+else
+    printf 'short\n' >"$PROBE_DIR/probe6.md"
+    chmod 000 "$PROBE_DIR/probe6.md"
+    _p6rc=0
+    _p6err=$(measure_file "$PROBE_DIR/probe6.md" "$LIMIT" 2>&1) || _p6rc=$?
+    if [ "$_p6rc" -eq 1 ] &&
+        printf '%s' "$_p6err" | grep -qF "unreadable scope file: $PROBE_DIR/probe6.md"; then
+        echo "  probe ok: unreadable scope file dies loud with its name (#818 a T1)"
+    else
+        echo "  PROBE BROKEN: readability guard rc=$_p6rc err='$_p6err' (#818 a T1)" >>"$TMP_PROBE"
+    fi
+    chmod 644 "$PROBE_DIR/probe6.md"
+fi
+
+# #818 a T1, the --regen mirror: the regen path refuses an unreadable
+# scope file (rc 1) AND leaves the baseline untouched — rows land in
+# scratch and the move happens only after a fully successful walk; an
+# EMPTY scope refuses too (zero measured files would silently wipe the
+# baseline and green every later check over nothing). Runs a mirrored
+# copy of this suite (harness + baseline) in a scratch tree, cwd inside
+# it — scope_files() walks the cwd's files/ tree.
+T1M="$(work_new)" || {
+    echo "line length ratchet: FAILED (scratch creation failed, TMPDIR=${TMPDIR:-unset})" >&2
+    exit 1
+}
+_t1_dir="$(dirname "$0")"
+mkdir -p "$T1M/tests/unit/lib" "$T1M/files/x"
+cp "$_t1_dir/test-line-length.sh" "$T1M/tests/unit/"
+cp "$_t1_dir/lib/harness.sh" "$T1M/tests/unit/lib/"
+cp "$BASELINE" "$T1M/tests/unit/line-length-baseline.txt"
+cp "$BASELINE" "$T1M/baseline-orig.txt"
+_longline="$(printf 'a%.0s' $(seq 1 130))"
+printf 'printf "%%s" "%s"\n' "$_longline" >"$T1M/files/x/long.sh"
+printf 'printf "%%s" "%s"\n' "$_longline" >"$T1M/files/x/long2.sh"
+_reg_out=""
+if [ "$(id -u)" -eq 0 ]; then
+    echo "  pin skipped: regen-refusal leg needs a non-root uid (root reads through 000) (#818 a T1)"
+else
+    chmod 000 "$T1M/files/x/long2.sh"
+    _reg_rc=0
+    _reg_out=$(cd "$T1M" && sh tests/unit/test-line-length.sh --regen 2>&1) || _reg_rc=$?
+    if [ "$_reg_rc" -eq 1 ] &&
+        printf '%s' "$_reg_out" | grep -qF 'unreadable scope file' &&
+        printf '%s' "$_reg_out" | grep -qF 'regen aborted' &&
+        cmp -s "$T1M/tests/unit/line-length-baseline.txt" "$T1M/baseline-orig.txt"; then
+        echo "  probe ok: --regen refuses an unreadable scope file, baseline untouched (#818 a T1)"
+    else
+        echo "  PROBE BROKEN: regen refusal rc=$_reg_rc baseline-kept=$(cmp -s "$T1M/tests/unit/line-length-baseline.txt" "$T1M/baseline-orig.txt" && echo y || echo n) out='$(printf '%s' "$_reg_out" | tail -2)' (#818 a T1)" >>"$TMP_PROBE"
+    fi
+    chmod 644 "$T1M/files/x/long2.sh"
+fi
+# the empty-scope refusal (any uid): no files/ tree at all → the regen
+# must refuse loud instead of wiping the baseline to zero rows.
+rm -rf "${T1M:?}/files"
+_reg_rc=0
+_reg_out=$(cd "$T1M" && sh tests/unit/test-line-length.sh --regen 2>&1) || _reg_rc=$?
+if [ "$_reg_rc" -eq 1 ] &&
+    printf '%s' "$_reg_out" | grep -qF 'measured no files' &&
+    cmp -s "$T1M/tests/unit/line-length-baseline.txt" "$T1M/baseline-orig.txt"; then
+    echo "  probe ok: --regen refuses an empty scope, baseline untouched (#818 a T1)"
+else
+    echo "  PROBE BROKEN: empty-scope refusal rc=$_reg_rc out='$(printf '%s' "$_reg_out" | tail -2)' (#818 a T1)" >>"$TMP_PROBE"
+fi
+rm -rf "${T1M:?}"
+
 # Current state: "path sum count" for every scope file with excess > 0.
 # Paths in this repo contain no spaces (word-splitting over find is safe).
+# #818 a T1: an unreadable scope file aborts the walk loud (the rc of
+# the pipeline carries the loop's exit) instead of greening over a
+# file that stopped being measured. An empty TMP_CUR with a non-empty
+# baseline is already caught by the stale-baseline check below; empty
+# plus empty is the legitimate zero-tree state.
+_cur_rc=0
 scope_files | sort -u | while IFS= read -r f; do
-    measure_file "$f" "$LIMIT"
-done >"$TMP_CUR"
+    measure_file "$f" "$LIMIT" || exit 1
+done >"$TMP_CUR" || _cur_rc=$?
+if [ "$_cur_rc" -ne 0 ]; then
+    echo "line length ratchet: FAILED (a scope file was unreadable — named on stderr above)"
+    exit 1
+fi
 
 rc=0
 

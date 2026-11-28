@@ -41,7 +41,8 @@ WORK=$(mktemp -d)
 _trap_cleanup() {
     rm -rf "${WORK:-}" "${TR:-}" "${V9ROOT:-}" "${STUBBIN:-}" \
         "${_bstub:-}" "${SW:-}" "${F1DIR:-}" "${F1STUB:-}" \
-        "${F1SP:-}" "${F1SPD:-}" "${F1SPS:-}" "${F12S:-}"
+        "${F1SP:-}" "${F1SPD:-}" "${F1SPS:-}" "${F12S:-}" \
+        "${F14S:-}" "${F14B:-}"
 }
 trap _trap_cleanup EXIT INT TERM
 
@@ -397,9 +398,13 @@ case "$(stat -c %a "$HG10/proj")" in
         ;;
 esac
 
-# d S2: the sidecar registrations — a RECORDING _tmp_track over a heal
-# run with symlinks (all three sidecar shapes fire: driver .git scan,
-# container scan, child scan) must log the opk-fsb-heal stems.
+# d S2 + #818 a S1: the temp registrations — a RECORDING _tmp_track
+# over a heal run with symlinks (all three sidecar shapes fire: driver
+# .git scan, container scan, child scan) must log the opk-fsb-heal
+# stems, and (S1) every logged name must ALREADY be a regular file at
+# registration time: the sidecars are their own mktemp files now, and
+# under the pre-S1 form the base+l names were tracked before the
+# redirect ever created them.
 HG11="$WORK/healtrack"
 HG11_TRACK="$HG11/tracked"
 mkdir -p "$HG11/proj/contgit/.git/hooks" "$HG11/proj/realgit/.git/hooks" \
@@ -411,20 +416,51 @@ ln -s "$HG11/tgt" "$HG11/proj/realgit/.git/modules/lnk-child"
 F12_TRACK="$HG11_TRACK" FS_SUDO="" \
     sh -c '. "$1" && _tmp_track() { printf "%s\n" "$1" >> "$F12_TRACK"; } \
     && fs_baseline_root "$2" "$3"' _ "$LIB" "$HG11/proj" "$HGGRP" >/dev/null 2>&1
-# This fixture deterministically registers FOUR sidecars: the driver's
-# .git-symlink scan (empty here — its .git dirs are real), two module
-# container scans (contgit's fires on a real symlink, realgit's is
-# empty) and realgit's child scan (fires on the symlinked child). Empty
-# sidecars still register — the contract is abort-leak coverage. The
-# grep matches the EXACT sidecar shape (stem + 8 mktemp chars + l): a
-# bare mktemp name is exactly 8 chars after the stem — one SHORT of
-# the 9 the {8}l$ pattern requires — so bare names can never match
-# even when their last random char is itself an l (which was the old
-# .*l$ form's ~6%/run flake, #655 e S1).
-if grep -cE 'opk-fsb-heal\.[A-Za-z0-9]{8}l$' "$HG11_TRACK" 2>/dev/null | grep -q '^4$'; then
-    pass "heal: all sidecar temps registered with _tmp_track (d S2)"
+# This fixture deterministically registers EIGHT opk-fsb-heal files
+# (#818 a S1): FOUR bases (driver .git scan + two gitdir modules scans
+# + realgit's module child scan) and FOUR sidecars (the driver's
+# .git-symlink scan — empty here, its .git dirs are real — two module
+# container scans — contgit's fires on a real symlink, realgit's is
+# empty — and realgit's child scan, which fires on the symlinked
+# child). Empty scans still register — the contract is abort-leak
+# coverage. All eight are bare mktemp names (stem + 8 chars); the
+# pre-S1 {8}l$ flake discriminator is gone with the base+l spelling
+# itself.
+if grep -cE 'opk-fsb-heal\.[A-Za-z0-9]{8}$' "$HG11_TRACK" 2>/dev/null | grep -q '^8$'; then
+    pass "heal: all scan temps (bases + sidecars) registered with _tmp_track (d S2, #818 a S1)"
 else
-    fail "heal: all sidecar temps registered with _tmp_track (d S2) — got: $(cat "$HG11_TRACK" 2>/dev/null | tr '\n' ' ')"
+    fail "heal: all scan temps (bases + sidecars) registered with _tmp_track (d S2, #818 a S1) — got: $(cat "$HG11_TRACK" 2>/dev/null | tr '\n' ' ')"
+fi
+
+# #818 a S1, the security property itself: every temp a heal run
+# registers is a REGULAR FILE at registration time (mktemp's O_EXCL
+# product — never a plain-`>` open at an unclaimed name a 1777-TMPDIR
+# neighbor could have planted a symlink at). The stat-recording
+# _tmp_track fires while the file exists; under the pre-S1 form the
+# sidecar names were tracked before any redirect created them, so
+# this leg redds exactly on the old shape.
+HG11_STAT="$HG11/stattrack"
+F12_TRACK="$HG11_STAT" FS_SUDO="" \
+    sh -c '. "$1" && _tmp_track() {
+        if [ -f "$1" ] && [ ! -L "$1" ]; then _t=reg; else _t=planted-or-missing; fi
+        printf "%s %s\n" "$1" "$_t" >> "$F12_TRACK"
+    } && fs_baseline_root "$2" "$3"' _ "$LIB" "$HG11/proj" "$HGGRP" >/dev/null 2>&1
+if [ -s "$HG11_STAT" ] && awk '$2 != "reg" { bad = 1 } END { exit bad ? 1 : 0 }' "$HG11_STAT"; then
+    pass "heal: every registered scan temp is a regular file at registration time (#818 a S1)"
+else
+    fail "heal: every registered scan temp is a regular file at registration time (#818 a S1) — got: $(cat "$HG11_STAT" 2>/dev/null | tr '\n' ' ')"
+fi
+
+# #818 a S1, the class guard (L2 sweep pinned): no shipped file opens a
+# redirect at a braced-variable-plus-l name anymore — the base+l
+# sidecar spelling WAS the S1 class (an unclaimed name, a plain
+# truncating open, root-run). The closing sweep found the class only
+# in fs-baseline.sh; this pin keeps the whole shipped tree free of
+# the shape.
+if grep -rEq '>"\$\{[A-Za-z_][A-Za-z0-9_]*\}l"' "$SCRIPT_DIR/../../files" 2>/dev/null; then
+    fail "shipped tree: plain redirect at a base+l sidecar name still present (#818 a S1) — $(grep -rlE '>"\$\{[A-Za-z_][A-Za-z0-9_]*\}l"' "$SCRIPT_DIR/../../files" 2>/dev/null | tr '\n' ' ')"
+else
+    pass "shipped tree: no plain redirect at a base+l sidecar name anywhere (#818 a S1)"
 fi
 
 rm -rf "$HG" "$HGS" "$HGF" "$HGFSTUB" "$HG4" "$HG5" "$HG6" "$HG7" "$HG9" "$HG9BIN" "$HG10" "$HG11"
@@ -1149,6 +1185,99 @@ else
     fail "dead TMPDIR pass guard (rc=$F13RC out=$F13OUT mode=$(stat -c %a "$F13S/root/f" 2>/dev/null)) (#431)"
 fi
 rm -rf "$F13S"
+
+# --- 10c. heal-sidecar mktemp guards, failure legs EXECUTED (#818 a S1) ---------
+# The #431 pin covers the PASS guards; S1 added three heal-sidecar
+# guards whose named-cause arms need their own executed leg (L1). A
+# PATH-stubbed mktemp serves the first two opk-fsb-heal calls (the
+# driver and gitdir bases) and fails every later heal-template call:
+# the gitdir sidecar guard fires ("cannot scan <gitdir>", the gitdir
+# heal skips, ERRS+1) and the driver's symlinked-.git sidecar guard
+# fires after the loop ("cannot run the symlinked-.git scan", ERRS+1)
+# — the whole baseline fails loud (F10), never a partial-heal green.
+# Pass templates (opk-fsb-pass) delegate to the real mktemp untouched.
+F14S=$(mktemp -d)
+mkdir -p "$F14S/bin" "$F14S/proj/.git/hooks" "$F14S/proj/.git/modules/real"
+printf 'c\n' >"$F14S/proj/.git/config"
+printf 'x\n' >"$F14S/proj/.git/modules/real/config"
+F14MK="$F14S/mk-count"
+cat >"$F14S/bin/mktemp" <<EOF
+#!/bin/sh
+case "\$*" in
+*opk-fsb-heal*)
+    _n=\$(cat "$F14MK" 2>/dev/null || echo 0)
+    _n=\$((_n + 1))
+    printf '%s\n' "\$_n" >"$F14MK"
+    if [ "\$_n" -ge 3 ]; then
+        echo "mktemp stub: S1 sidecar failure leg" >&2
+        exit 1
+    fi
+    ;;
+esac
+exec $(command -v mktemp) "\$@"
+EOF
+chmod 755 "$F14S/bin/mktemp"
+# isolated TMPDIR (#818 b S1): every mktemp product of the run lands
+# here, so the leg can assert NO STRAND survives — the pre-b guard
+# left the partial pair's survivor behind (created before the
+# combined guard, registered after).
+mkdir -p "$F14S/tmp1"
+F14RC=0
+F14OUT=$(FS_SUDO="" TMPDIR="$F14S/tmp1" PATH="$F14S/bin:$PATH" \
+    sh -c '. "$1" && _FSB_ERRORS=0 && fs_baseline_root "$2" "$3"; echo "ERRS=$_FSB_ERRORS"' \
+    _ "$LIB" "$F14S/proj" "$(id -gn)" 2>&1) || F14RC=$?
+if printf '%s\n' "$F14OUT" | grep -qF "error: mktemp failed (is \$TMPDIR writable?) — the git heal cannot scan $F14S/proj/.git" &&
+    printf '%s\n' "$F14OUT" | grep -qF "error: mktemp failed (is \$TMPDIR writable?) — the git heal cannot run the symlinked-.git scan under $F14S/proj" &&
+    printf '%s\n' "$F14OUT" | grep -q '^ERRS=2$' &&
+    printf '%s\n' "$F14OUT" | grep -qF 'baseline pass(es) failed' &&
+    [ -z "$(ls -A "$F14S/tmp1" 2>/dev/null)" ]; then
+    pass "heal sidecar mktemp guards fire loud, count, fail the baseline, strand nothing (#818 a S1, #818 b S1)"
+else
+    fail "heal sidecar mktemp guards (rc=$F14RC strands=$(ls -A "$F14S/tmp1" 2>/dev/null | tr '\n' ' ') out=$F14OUT) (#818 a S1, #818 b S1)"
+fi
+rm -rf "${F14S:?}"
+
+# --- 10d. the INNER module-child sidecar guard, its own executed leg
+# (#818 b S2/T4): F14's threshold fires the gitdir and driver arms;
+# this one-shot stub fails EXACTLY the fifth heal-template call (the
+# module-container pair's sidecar — call order: driver base, gitdir
+# base, gitdir sidecar, module base, module sidecar), so the inner
+# arm's message is asserted on its own and the failure is attributable
+# to exactly that guard. ERRS=1, everything else completes.
+F14B=$(mktemp -d)
+mkdir -p "$F14B/bin" "$F14B/proj/.git/hooks" "$F14B/proj/.git/modules/real"
+printf 'c\n' >"$F14B/proj/.git/config"
+printf 'x\n' >"$F14B/proj/.git/modules/real/config"
+F14BMK="$F14B/mk-count"
+cat >"$F14B/bin/mktemp" <<EOF
+#!/bin/sh
+case "\$*" in
+*opk-fsb-heal*)
+    _n=\$(cat "$F14BMK" 2>/dev/null || echo 0)
+    _n=\$((_n + 1))
+    printf '%s\n' "\$_n" >"$F14BMK"
+    if [ "\$_n" -eq 5 ]; then
+        echo "mktemp stub: inner sidecar failure leg" >&2
+        exit 1
+    fi
+    ;;
+esac
+exec $(command -v mktemp) "\$@"
+EOF
+chmod 755 "$F14B/bin/mktemp"
+mkdir -p "$F14B/tmp1"
+F14BRC=0
+F14BOUT=$(FS_SUDO="" TMPDIR="$F14B/tmp1" PATH="$F14B/bin:$PATH" \
+    sh -c '. "$1" && _FSB_ERRORS=0 && fs_baseline_root "$2" "$3"; echo "ERRS=$_FSB_ERRORS"' \
+    _ "$LIB" "$F14B/proj" "$(id -gn)" 2>&1) || F14BRC=$?
+if printf '%s\n' "$F14BOUT" | grep -qF "error: mktemp failed (is \$TMPDIR writable?) — the git heal cannot scan $F14B/proj/.git/modules" &&
+    printf '%s\n' "$F14BOUT" | grep -q '^ERRS=1$' &&
+    [ -z "$(ls -A "$F14B/tmp1" 2>/dev/null)" ]; then
+    pass "the inner module sidecar guard fires loud on its own leg (#818 b S2)"
+else
+    fail "inner sidecar guard (rc=$F14BRC strands=$(ls -A "$F14B/tmp1" 2>/dev/null | tr '\n' ' ') out=$F14BOUT) (#818 b S2)"
+fi
+rm -rf "${F14B:?}"
 
 # --- 11. python3 health gate (#223, #221 a W3 shape) ----------------------------------
 # _fsb_count_tee sits in the DATA pipeline of a MUTATING pass: an

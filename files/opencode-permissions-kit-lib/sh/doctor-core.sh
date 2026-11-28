@@ -656,13 +656,26 @@ doctor_git_heal() {
     done
     # State: the developer's global gitconfig, read directly (rows stay
     # descriptive; the lockout row below is where a warning lands).
+    # XDG-aware (#818 a G2, the status-core twin's comment carries the
+    # mechanism): ~/.gitconfig merged over ~/.config/git/config, the
+    # ~/.gitconfig value winning per key; GH_GITCONFIG /
+    # GH_GITCONFIG_XDG are the unit-suite overrides.
     _dgh_state=unknown
     _dgh_cur=""
     if [ -n "$_dgh_dev" ]; then
         _dgh_home=$(getent passwd "$_dgh_dev" 2>/dev/null | cut -d: -f6)
         _dgh_gc="${GH_GITCONFIG:-$_dgh_home/.gitconfig}"
-        if [ -n "$_dgh_home" ] && [ -r "$_dgh_gc" ]; then
-            _dgh_cur=$(git config -f "$_dgh_gc" core.hooksPath 2>/dev/null || true)
+        _dgh_xgc="${GH_GITCONFIG_XDG:-$_dgh_home/.config/git/config}"
+        if [ -n "$_dgh_home" ] && { [ -r "$_dgh_gc" ] || [ -r "$_dgh_xgc" ]; }; then
+            _dgh_cur=""
+            _dgh_cur_rc=0
+            _dgh_cur=$(git config -f "$_dgh_gc" core.hooksPath 2>/dev/null) ||
+                _dgh_cur_rc=$?
+            # rc 0 + empty = explicitly empty key (the hooks-disable
+            # idiom): per-key masking, no XDG fall-through (#818 b G2)
+            if [ "$_dgh_cur_rc" -ne 0 ] && [ -r "$_dgh_xgc" ]; then
+                _dgh_cur=$(git config -f "$_dgh_xgc" core.hooksPath 2>/dev/null || true)
+            fi
             if [ -z "$_dgh_cur" ]; then
                 _dgh_state=off
             elif [ "$_dgh_cur" = "$_dgh_lib/git-heal/hooks" ]; then
@@ -683,7 +696,8 @@ doctor_git_heal() {
             ;;
         foreign)
             ui_kv "git-heal" "OFF — core.hooksPath holds a foreign value ($_dgh_cur)"
-            ui_detail "the heal hooks are not in effect; 'sudo opk git-heal on' would retake the path"
+            ui_detail "the heal hooks are not in effect; 'sudo opk git-heal on' refuses foreign values —"
+            ui_detail "remove the value yourself, then re-run it (git heal on guard, #818 a G3)"
             ;;
         unknown) ui_kv "git-heal" "unknown — cannot read the developer's global gitconfig" ;;
     esac

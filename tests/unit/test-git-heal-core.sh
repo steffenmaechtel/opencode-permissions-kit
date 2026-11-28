@@ -422,6 +422,58 @@ else
     fail "heal: chown-fail arm (rc=$_hr_rc out=$_hr_out)"
 fi
 
+# --- 3c. heal-index-head: the group resolution (#818 a G1) -------------------------
+# The chown spec's group operand used to be the agent username spelled
+# twice — a dead heal (chown: invalid group) wherever the agent's
+# primary group is not a same-named usergroup (pre-existing-user
+# installs). A recording chown stub observes the spec the run actually
+# hands to chown(1):
+#   (a) an agent user that EXISTS: the live primary group must WIN over
+#       any conf-stale GH_AGENT_GROUP (the config.sh "Sharing group"
+#       order: live value over stale conf entry);
+#   (b) an agent user that does NOT exist: the conf value stands with
+#       the canonical literal fallback — this leg discriminates the
+#       old hardcoded user:user spec directly.
+mkdir -p "$WORK/g1bin"
+printf '#!/bin/sh\nprintf "%%s\\n" "$*" >>"%s"\nexit 0\n' \
+    "$WORK/g1-chown.log" >"$WORK/g1bin/chown"
+chmod +x "$WORK/g1bin/chown"
+_g1_live="$(id -gn "$(id -un)")"
+# Leg (a) discriminates the conf-wins regression on every host, but
+# the username-hardcode regression only where the running user's
+# primary group is NOT the same-named usergroup (#818 b T1: on
+# useradd-default hosts — CI runner images — the old spec's log line
+# is byte-identical to the pinned one). Leg (b) below is the
+# environment-independent backstop for exactly that regression; the
+# pair is sound, the condition is named.
+: >"$WORK/g1-chown.log"
+_hr_rc=0
+_hr_out=$(env PATH="$WORK/g1bin:$PATH" GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 \
+    GH_AGENT_USER="$(id -un)" GH_AGENT_GROUP=zzz-stale-conf \
+    GH_PROJECTS_CONF="$CONF" GH_LOG="$LOG" \
+    "$HEAL" "$WORK/repo3/.git" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] &&
+    grep -qF -- "-h $(id -un):$_g1_live --" "$WORK/g1-chown.log" &&
+    ! grep -qF 'zzz-stale-conf' "$WORK/g1-chown.log"; then
+    pass "heal: chown spec uses the agent's LIVE primary group, conf value loses (#818 a G1)"
+else
+    fail "heal: live-group leg (rc=$_hr_rc spec=$(cat "$WORK/g1-chown.log" 2>/dev/null | tr '\n' ' '))"
+fi
+: >"$WORK/g1-chown.log"
+_hr_rc=0
+_hr_out=$(env PATH="$WORK/g1bin:$PATH" GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 \
+    GH_AGENT_USER=opk-g1-nonexistent GH_AGENT_GROUP=zzz-divgrp \
+    GH_PROJECTS_CONF="$CONF" GH_LOG="$LOG" \
+    "$HEAL" "$WORK/repo3/.git" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] &&
+    grep -qF -- '-h opk-g1-nonexistent:zzz-divgrp --' "$WORK/g1-chown.log"; then
+    pass "heal: chown spec resolves the group (conf leg), never user:user (#818 a G1)"
+else
+    fail "heal: conf-group leg (rc=$_hr_rc spec=$(cat "$WORK/g1-chown.log" 2>/dev/null | tr '\n' ' '))"
+fi
+check_live "heal: the chown operand carries the resolved group, not the username (#818 a G1)" \
+    "$HEAL" -qF 'chown -h "$_gh_agent:$_gh_group"'
+
 _hr_rc=0
 _hr_out=$(env GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 GH_AGENT_USER="$(id -un)" GH_PROJECTS_CONF="$CONF" \
     GH_LOG="$WORK/no-such-dir/x/heal.log" "$HEAL" "$WORK/repo3/.git" 2>&1) || _hr_rc=$?
@@ -871,6 +923,7 @@ _ui_stubs() {
     ui_success() { echo "success: $*"; }
     ui_detail() { echo "detail: $*"; }
     ui_error() { echo "error: $*" >&2; }
+    ui_warn() { echo "warn: $*"; }
 }
 _core_run() { # <expr>: sources ui stubs + core with the scratch env
     (
@@ -928,6 +981,222 @@ else
     fail "core: state unknown (got $_out)"
 fi
 
+# #818 a G2: XDG-only homes. The write legs are native --global, which
+# lands in ~/.config/git/config whenever that file exists and
+# ~/.gitconfig does not (probed on git 2.56.1 — no ~/.gitconfig is
+# created, --unset removes the key from XDG); the read legs used to
+# address ~/.gitconfig only, so `on` activated while `off` printed
+# "already off" and the hooks kept firing, and status said unknown.
+mkdir -p "${WORK:?}/devhome-xdg/.config/git"
+git config --file "$WORK/devhome-xdg/.config/git/config" \
+    core.hooksPath "$WORK/lib/git-heal/hooks"
+_out=$(GH_LIBDIR="$WORK/lib" GH_DEV_HOME="$WORK/devhome-xdg" INSTALL_CONF="$WORK/install.conf" sh -c \
+    '. "$1"; ui_error() { echo "ERR: $*" >&2; }; _ghc_state' _ "$CORE" 2>&1)
+if [ "$_out" = on ]; then
+    pass "core: state on for an XDG-only home (hooksPath lives in ~/.config/git/config, #818 a G2)"
+else
+    fail "core: XDG-only state on (got $_out)"
+fi
+
+# The MED's harm leg: `off` on an XDG-only home actually unsets the
+# kit-owned value (it used to print "already off" while the hooks
+# kept firing).
+_hr_rc=0
+_out=$(GH_LIBDIR="$WORK/lib" GH_DEV_HOME="$WORK/devhome-xdg" GH_SUDO="" \
+    GH_PROJECTS_CONF="$CONF" GH_LOG="$LOG" GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 \
+    GH_AGENT_USER="$(id -un)" INSTALL_CONF="$WORK/install.conf" \
+    sh -c '. "$1"; ui_info() { :; }; ui_success() { echo "ok: $*"; }; \
+        ui_detail() { :; }; ui_error() { echo "ERR: $*" >&2; }; _git_heal_off' \
+    _ "$CORE" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] &&
+    [ -z "$(git config --file "$WORK/devhome-xdg/.config/git/config" core.hooksPath 2>/dev/null)" ] &&
+    printf '%s' "$_out" | grep -qF 'core.hooksPath unset'; then
+    pass "core: off unsets the kit-owned hooksPath in an XDG-only home (#818 a G2)"
+else
+    fail "core: XDG off leg (rc=$_hr_rc out=$_out value=$(git config --file "$WORK/devhome-xdg/.config/git/config" core.hooksPath 2>/dev/null))"
+fi
+# The CI-lane twin (the followup this leg forced): the unset targets
+# the CARRIER file explicitly — native --global --unset is
+# git-version-dependent (older gits operate on ~/.gitconfig only and
+# the CI unit lane reddened exactly there over an XDG-carried value).
+# The behavioral XDG leg above executes the -f path; this source pin
+# guards its shape (the helper since #818 c G1).
+check_live "core: off unsets per carrier file, never git-version-dependent --global (#818 a G2)" \
+    "$CORE" -qF 'config -f "$_ghouk_f" --unset core.hooksPath'
+# #818 b G1: the consent discipline holds for MASKED carriers — a
+# foreign value in the XDG file under a kit-owned ~/.gitconfig (the
+# merged reader says kit) must survive `off` untouched. The first
+# wave's loop unset ANY carrier and destroyed it (probed in the
+# round-b scratch: xdg value gone after off).
+mkdir -p "${WORK:?}/devhome-b/.config/git"
+printf '[core]\n\thooksPath = %s\n' "$WORK/lib/git-heal/hooks" >"$WORK/devhome-b/.gitconfig"
+git config --file "$WORK/devhome-b/.config/git/config" core.hooksPath /leftover-foreign-b
+_hr_rc=0
+_out=$(GH_LIBDIR="$WORK/lib" GH_DEV_HOME="$WORK/devhome-b" GH_SUDO="" \
+    GH_PROJECTS_CONF="$CONF" GH_LOG="$LOG" GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 \
+    GH_AGENT_USER="$(id -un)" INSTALL_CONF="$WORK/install.conf" \
+    sh -c '. "$1"; ui_info() { :; }; ui_success() { echo "ok: $*"; }; \
+        ui_detail() { :; }; ui_error() { echo "ERR: $*" >&2; }; _git_heal_off' \
+    _ "$CORE" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] &&
+    [ -z "$(git config --file "$WORK/devhome-b/.gitconfig" core.hooksPath 2>/dev/null)" ] &&
+    [ "$(git config --file "$WORK/devhome-b/.config/git/config" core.hooksPath 2>/dev/null)" = /leftover-foreign-b ]; then
+    pass "core: off leaves a masked foreign XDG value untouched, unsets only kit carriers (#818 b G1)"
+else
+    fail "core: masked-foreign leg (rc=$_hr_rc gitconfig=$(git config --file "$WORK/devhome-b/.gitconfig" core.hooksPath 2>/dev/null) xdg=$(git config --file "$WORK/devhome-b/.config/git/config" core.hooksPath 2>/dev/null)) (#818 b G1)"
+fi
+rm -rf "${WORK:?}/devhome-b"
+
+# #818 c G1: the mask's other side — a KIT-OWNED XDG copy under a
+# foreign primary (the shape the on-leg itself creates when
+# ~/.gitconfig is absent, later masked): every branch sweeps the
+# carriers, the kit copy is unset and NAMED, the foreign mask stays
+# untouched. Pre-c: the copy survived and the hooks resurrected when
+# the user cleared the mask (probed in the round-c scratch).
+mkdir -p "${WORK:?}/devhome-c/.config/git"
+printf '[core]\n\thooksPath = /foreign-mask-c\n' >"$WORK/devhome-c/.gitconfig"
+git config --file "$WORK/devhome-c/.config/git/config" \
+    core.hooksPath "$WORK/lib/git-heal/hooks"
+_hr_rc=0
+_out=$(GH_LIBDIR="$WORK/lib" GH_DEV_HOME="$WORK/devhome-c" GH_SUDO="" \
+    GH_PROJECTS_CONF="$CONF" GH_LOG="$LOG" GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 \
+    GH_AGENT_USER="$(id -un)" INSTALL_CONF="$WORK/install.conf" \
+    sh -c '. "$1"; ui_info() { :; }; ui_success() { echo "ok: $*"; }; \
+        ui_detail() { echo "detail: $*"; }; ui_error() { echo "ERR: $*" >&2; }; _git_heal_off' \
+    _ "$CORE" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] &&
+    [ "$(git config --file "$WORK/devhome-c/.gitconfig" core.hooksPath 2>/dev/null)" = /foreign-mask-c ] &&
+    [ -z "$(git config --file "$WORK/devhome-c/.config/git/config" core.hooksPath 2>/dev/null)" ] &&
+    printf '%s' "$_out" | grep -qF "masked kit-owned copy unset from: $WORK/devhome-c/.config/git/config" &&
+    printf '%s' "$_out" | grep -qF '/foreign-mask-c) — left untouched'; then
+    pass "core: off unsets the masked kit-owned XDG copy and names it, the foreign mask stays (#818 c G1)"
+else
+    fail "core: masked-kit leg (rc=$_hr_rc mask=$(git config --file "$WORK/devhome-c/.gitconfig" core.hooksPath 2>/dev/null) kit=$(git config --file "$WORK/devhome-c/.config/git/config" core.hooksPath 2>/dev/null) out=$_out) (#818 c G1)"
+fi
+rm -rf "${WORK:?}/devhome-c"
+
+# #818 d T2: the fail-loud arm's executing leg — a MULTI-VALUED kit
+# carrier in a masked branch (the read's last value is the kit path →
+# the gate passes; `git config --unset` refuses a multi-valued key,
+# rc 5) → the helper returns 1 → the arm fires: its message + exit 1
+# (pre-d nothing executed this path; a dropped capture or exit would
+# report off-success over the surviving copy). Deterministic on every
+# git (multi-value semantics stable), root-independent.
+mkdir -p "${WORK:?}/devhome-d/.config/git"
+printf '[core]\n\thooksPath = /foreign-mask-d\n' >"$WORK/devhome-d/.gitconfig"
+git config --file "$WORK/devhome-d/.config/git/config" \
+    core.hooksPath "$WORK/lib/git-heal/hooks"
+git config --file "$WORK/devhome-d/.config/git/config" \
+    --add core.hooksPath "$WORK/lib/git-heal/hooks"
+_hr_rc=0
+_out=$(GH_LIBDIR="$WORK/lib" GH_DEV_HOME="$WORK/devhome-d" GH_SUDO="" \
+    GH_PROJECTS_CONF="$CONF" GH_LOG="$LOG" GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 \
+    GH_AGENT_USER="$(id -un)" INSTALL_CONF="$WORK/install.conf" \
+    sh -c '. "$1"; ui_info() { :; }; ui_success() { echo "ok: $*"; }; \
+        ui_detail() { echo "detail: $*"; }; ui_error() { echo "ERR: $*" >&2; }; _git_heal_off' \
+    _ "$CORE" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 1 ] &&
+    printf '%s' "$_out" | grep -qF 'could not unset a masked kit-owned core.hooksPath' &&
+    [ "$(git config --file "$WORK/devhome-d/.config/git/config" core.hooksPath 2>/dev/null)" = "$WORK/lib/git-heal/hooks" ]; then
+    pass "core: a failing masked unset fails the off loud (rc 1, arm message, copy intact) (#818 d T2)"
+else
+    fail "core: masked-failure leg (rc=$_hr_rc kit=$(git config --file "$WORK/devhome-d/.config/git/config" core.hooksPath 2>/dev/null) out=$_out) (#818 d T2)"
+fi
+rm -rf "${WORK:?}/devhome-d"
+
+# #818 d G3: the branch-2 sweep — the hooks-disable EMPTY mask over a
+# kit-owned XDG copy (the fix's own first-class motivation): off says
+# "already off" AND unsets the masked copy, rc 0.
+mkdir -p "${WORK:?}/devhome-e/.config/git"
+printf '[core]\n\thooksPath =\n' >"$WORK/devhome-e/.gitconfig"
+git config --file "$WORK/devhome-e/.config/git/config" \
+    core.hooksPath "$WORK/lib/git-heal/hooks"
+_hr_rc=0
+_out=$(GH_LIBDIR="$WORK/lib" GH_DEV_HOME="$WORK/devhome-e" GH_SUDO="" \
+    GH_PROJECTS_CONF="$CONF" GH_LOG="$LOG" GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 \
+    GH_AGENT_USER="$(id -un)" INSTALL_CONF="$WORK/install.conf" \
+    sh -c '. "$1"; ui_info() { :; }; ui_success() { echo "ok: $*"; }; \
+        ui_detail() { echo "detail: $*"; }; ui_error() { echo "ERR: $*" >&2; }; _git_heal_off' \
+    _ "$CORE" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] &&
+    [ -z "$(git config --file "$WORK/devhome-e/.config/git/config" core.hooksPath 2>/dev/null)" ] &&
+    printf '%s' "$_out" | grep -qF 'already off' &&
+    printf '%s' "$_out" | grep -qF 'masked kit-owned copy unset from'; then
+    pass "core: the empty-mask sweep unsets the kit copy and says already-off (#818 d G3)"
+else
+    fail "core: empty-mask leg (rc=$_hr_rc kit=$(git config --file "$WORK/devhome-e/.config/git/config" core.hooksPath 2>/dev/null) out=$_out) (#818 d G3)"
+fi
+rm -rf "${WORK:?}/devhome-e"
+
+# #818 d G1: branch 1 discards the helper's echo — the carrier PATHS
+# must not appear in a successful off's output (the pre-d uncaptured
+# call leaked them as a bare unlabeled stdout line).
+mkdir -p "${WORK:?}/devhome-f"
+printf '[core]\n\thooksPath = %s\n' "$WORK/lib/git-heal/hooks" >"$WORK/devhome-f/.gitconfig"
+_hr_rc=0
+_out=$(GH_LIBDIR="$WORK/lib" GH_DEV_HOME="$WORK/devhome-f" GH_SUDO="" \
+    GH_PROJECTS_CONF="$CONF" GH_LOG="$LOG" GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 \
+    GH_AGENT_USER="$(id -un)" INSTALL_CONF="$WORK/install.conf" \
+    sh -c '. "$1"; ui_info() { :; }; ui_success() { echo "ok: $*"; }; \
+        ui_detail() { echo "detail: $*"; }; ui_error() { echo "ERR: $*" >&2; }; _git_heal_off' \
+    _ "$CORE" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] &&
+    printf '%s' "$_out" | grep -qF 'core.hooksPath unset' &&
+    ! printf '%s' "$_out" | grep -qF "$WORK/devhome-f/.gitconfig"; then
+    pass "core: a successful off leaks no bare carrier-path line (#818 d G1)"
+else
+    fail "core: branch-1 echo leak leg (rc=$_hr_rc out=$_out) (#818 d G1)"
+fi
+rm -rf "${WORK:?}/devhome-f"
+
+# The #100 consent discipline survives the XDG fix: a foreign value in
+# an XDG-only home is foreign (reported, never touched by off).
+git config --file "$WORK/devhome-xdg/.config/git/config" core.hooksPath /dev/null
+_out=$(GH_DEV_HOME="$WORK/devhome-xdg" INSTALL_CONF="$WORK/install.conf" sh -c \
+    '. "$1"; ui_error() { echo "ERR: $*" >&2; }; _ghc_state' _ "$CORE" 2>&1)
+if [ "$_out" = foreign ]; then
+    pass "core: state foreign for a foreign XDG value (consent discipline, #818 a G2)"
+else
+    fail "core: XDG foreign state (got $_out)"
+fi
+
+# Git's merge order under the merged reader: ~/.gitconfig wins per
+# key when both files exist — a KIT value in XDG must not mask a
+# foreign value in ~/.gitconfig (#818 b T2: the pre-b fixture left
+# the foreign /dev/null in the XDG carrier, so every reader variant —
+# primary-only, XDG-only, either precedence — answered foreign and
+# the pin could not red; the XDG carrier now holds the KIT value: a
+# reader with inverted precedence says ON here and reds).
+git config --file "$WORK/devhome-xdg/.config/git/config" \
+    core.hooksPath "$WORK/lib/git-heal/hooks"
+printf '[core]\n\thooksPath = /foreign-from-gitconfig\n' >"$WORK/devhome-xdg/.gitconfig"
+_out=$(GH_LIBDIR="$WORK/lib" GH_DEV_HOME="$WORK/devhome-xdg" INSTALL_CONF="$WORK/install.conf" sh -c \
+    '. "$1"; ui_error() { echo "ERR: $*" >&2; }; _ghc_state' _ "$CORE" 2>&1)
+if [ "$_out" = foreign ]; then
+    pass "core: ~/.gitconfig wins per key over the XDG value (git merge order, #818 a G2)"
+else
+    fail "core: gitconfig-precedence state (got $_out)"
+fi
+# #818 b G2: an explicitly EMPTY ~/.gitconfig hooksPath (the
+# `git config --global core.hooksPath ""` hooks-disable idiom) MASKS
+# the XDG value per git's per-key precedence — the reader must not
+# fall through to the XDG carrier (pre-b: state said foreign over an
+# XDG value git itself never honors; probed in the round-b scratch:
+# rc 0 with empty output is the masked shape).
+mkdir -p "${WORK:?}/devhome-b2/.config/git"
+printf '[core]\n\thooksPath =\n' >"$WORK/devhome-b2/.gitconfig"
+git config --file "$WORK/devhome-b2/.config/git/config" core.hooksPath /foreign-xdg-b2
+_out=$(GH_LIBDIR="$WORK/lib" GH_DEV_HOME="$WORK/devhome-b2" INSTALL_CONF="$WORK/install.conf" sh -c \
+    '. "$1"; ui_error() { echo "ERR: $*" >&2; }; _ghc_state' _ "$CORE" 2>&1)
+if [ "$_out" = off ]; then
+    pass "core: an explicitly empty gitconfig hooksPath masks the XDG value (state off, #818 b G2)"
+else
+    fail "core: empty-value masking leg (got $_out) (#818 b G2)"
+fi
+rm -rf "${WORK:?}/devhome-b2"
+rm -f "${WORK:?}/devhome-xdg/.gitconfig"
+rm -rf "${WORK:?}/devhome-xdg"
+
 # `on`: pieces + sudoers re-render + dev gitconfig + one-time heal sweep.
 mkdir -p "$WORK/lib/sh" "$WORK/lib/templates" "$WORK/etc" "$WORK/sdd" "$WORK/zone/onroot"
 cp "$REPO_FILES/sh/sudoers-deploy.sh" "$WORK/lib/sh/"
@@ -965,6 +1234,88 @@ if printf '%s' "$_out" | grep -qF 'operand sweep only: the gitdir-level bits (st
     pass "core: on separates the operand sweep from the fs-baseline bits (#695)"
 else
     fail "core: on must separate operand sweep and fs-baseline bits (#695)"
+fi
+
+# #818 a G3: on refuses a foreign core.hooksPath BEFORE anything is
+# touched — the old leg overwrote the developer's value (a lefthook/
+# pre-commit setup) unrecoverably while off/uninstall/status refuse
+# foreign values by design (the #100 consent discipline). The clean
+# arm (no value / the kit value) is the on pin above; this is the
+# foreign arm: rc 1, the value untouched, NO sudoers re-render.
+git config --file "$WORK/devhome/.gitconfig" core.hooksPath /leftover-foreign-hooks
+rm -rf "${WORK:?}/etc-g3" "${WORK:?}/sdd-g3"
+_hr_rc=0
+_out=$(_core_run 'SD_SUDO="" SD_VISUDO="$WORK/visudo" SD_CONF_DIR="$WORK/etc-g3" \
+    SD_SUDOERS_D="$WORK/sdd-g3" GH_PROJECTS_CONF="$WORK/on-projects.conf" \
+    HOME="$WORK/devhome" _git_heal_on') || _hr_rc=$?
+if [ "$_hr_rc" -eq 1 ] &&
+    [ "$(git config --file "$WORK/devhome/.gitconfig" core.hooksPath)" = /leftover-foreign-hooks ] &&
+    [ ! -f "$WORK/etc-g3/sudoers" ] &&
+    printf '%s' "$_out" | grep -qF 'holds a foreign value — leaving it untouched'; then
+    pass "core: on refuses a foreign hooksPath before touching anything (#818 a G3)"
+else
+    fail "core: foreign-refuse leg (rc=$_hr_rc value=$(git config --file "$WORK/devhome/.gitconfig" core.hooksPath) sudoers=$([ -f "$WORK/etc-g3/sudoers" ] && echo rendered || echo none) out=$_out) (#818 a G3)"
+fi
+# restore the kit-owned value: later on-arms run the clean leg
+git config --file "$WORK/devhome/.gitconfig" core.hooksPath "$WORK/lib/git-heal/hooks"
+
+# #818 a G5: the activation version probe. A git stub answers
+# --version with 2.30.1 (the kit's tested floor) and delegates
+# everything else to the real git: `on` must WARN (soft floor, never
+# an abort — the write still lands) naming the dead carrier; a clean
+# re-run with the real git (>= 2.31) shows no warn line.
+mkdir -p "$WORK/g5bin"
+cat >"$WORK/g5bin/git" <<EOF
+#!/bin/sh
+if [ "\$1" = "--version" ]; then
+    echo "git version 2.30.1"
+    exit 0
+fi
+exec $(command -v git) "\$@"
+EOF
+chmod 755 "$WORK/g5bin/git"
+printf '%s\n' "$WORK/zone/onroot" >"$WORK/on-projects.conf"
+_hr_rc=0
+_out=$( (
+    PATH="$WORK/g5bin:$PATH"
+    export PATH
+    _core_run 'SD_SUDO="" SD_VISUDO="$WORK/visudo" SD_CONF_DIR="$WORK/etc" \
+        SD_SUDOERS_D="$WORK/sdd" GH_PROJECTS_CONF="$WORK/on-projects.conf" \
+        HOME="$WORK/devhome" _git_heal_on'
+) 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] &&
+    printf '%s' "$_out" | grep -qF 'below 2.31 — the post-index-change carrier' &&
+    [ "$(git config --file "$WORK/devhome/.gitconfig" core.hooksPath)" = "$WORK/lib/git-heal/hooks" ]; then
+    pass "core: on warns below git 2.31 (dead carrier named), still activates (#818 a G5)"
+else
+    fail "core: version-warn leg (rc=$_hr_rc out=$_out) (#818 a G5)"
+fi
+# The no-warn control (#818 b T3: through a version stub — the real
+# git made the leg environment-fragile: on the kit's own tested floor
+# 2.30.x the lib warns BY DESIGN and the leg false-reds; the stub
+# answers --version deterministically as a modern git).
+mkdir -p "$WORK/g5bin2"
+cat >"$WORK/g5bin2/git" <<EOF
+#!/bin/sh
+if [ "\$1" = "--version" ]; then
+    echo "git version 2.56.1"
+    exit 0
+fi
+exec $(command -v git) "\$@"
+EOF
+chmod 755 "$WORK/g5bin2/git"
+_hr_rc=0
+_out=$( (
+    PATH="$WORK/g5bin2:$PATH"
+    export PATH
+    _core_run 'SD_SUDO="" SD_VISUDO="$WORK/visudo" SD_CONF_DIR="$WORK/etc" \
+        SD_SUDOERS_D="$WORK/sdd" GH_PROJECTS_CONF="$WORK/on-projects.conf" \
+        HOME="$WORK/devhome" _git_heal_on'
+) 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] && ! printf '%s' "$_out" | grep -qF 'below 2.31'; then
+    pass "core: on shows no version warn on git >= 2.31 (#818 a G5)"
+else
+    fail "core: version-warn control leg (rc=$_hr_rc out=$_out) (#818 a G5)"
 fi
 # #710 a B1: the tee sits on the DATA path — a broken python3 (the
 # health probe fails) must degrade to the cat passthrough: the sweep

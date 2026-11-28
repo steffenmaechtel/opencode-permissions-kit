@@ -199,10 +199,12 @@ ui_plan() {
 
 # Read one answer line into the variable named by $1. The controlling tty
 # is preferred (prompts survive `curl | bash` installs with redirected
-# stdin); the stdin fallback stays for pipe-fed runs (tests, CI). But a
-# caller whose stdin IS the script stream (install.sh in streamed mode)
-# sets UI_NO_STDIN_FALLBACK=1 and gets a hard error instead of script
-# bytes being consumed as the answer (review 0.0.39b C6).
+# stdin); the stdin fallback stays for pipe-fed runs on callers that do
+# NOT set the guard (update.sh's checkout leg keeps answering piped
+# bytes). Callers whose stdin IS the script stream — or whose every
+# headless run must refuse rather than default-resolve, install.sh
+# since #818 b U2 on both legs — set UI_NO_STDIN_FALLBACK=1 and get a
+# hard error instead (review 0.0.39b C6).
 _ui_read() {
     # No IFS= on purpose (#189 a W2): read's field splitting trims
     # leading/trailing whitespace, so a padded answer (" y", "no ")
@@ -212,7 +214,11 @@ _ui_read() {
         return 0
     fi
     if [ "${UI_NO_STDIN_FALLBACK:-}" = "1" ]; then
-        printf '  error     no terminal available for this prompt — rerun with --yes or from a checkout\n' >&2
+        # "from a checkout" dropped (#818 c U1/S2): the guard is
+        # unconditional on install.sh since #818 b U2 — a headless
+        # checkout re-run refuses identically; only --yes or a real
+        # terminal answers.
+        printf '  error     no terminal available for this prompt — rerun with --yes or from an interactive shell\n' >&2
         exit 1
     fi
     read -r "$1" || :
@@ -249,8 +255,17 @@ ui_confirm() {
     [ "$_d" = "y" ] && _hint="[Y/n]" || _hint="[y/N]"
     printf '  %s %s ' "$_q" "$_hint" >&2
     _ui_read _ans
-    _ans="$(printf '%s' "$_ans" | tr '[:upper:]' '[:lower:]')"
-    [ -z "$_ans" ] && _ans="$_d"
+    # \r stripped kit-wide since #818 d T3/U3: read's IFS trim covers
+    # space/tab but not carriage returns — a CRLF piped answer was
+    # unknown input and resolved to the default (an explicit decline
+    # consenting on every y-default consumer; agent/conventions.md
+    # "Interactive prompts" trimming promise). update.sh's confirm() carries the same strip;
+    # ui_menu's key match below the same. prompt_yn (uninstall's
+    # standalone twin) keeps the residual: recorded in the
+    # uninstall-teardown context (#821/#822), all its call sites
+    # default n. ui_ask returns free text raw — no consent default
+    # rides on it.
+    _ans="$(printf '%s' "$_ans" | tr '[:upper:]' '[:lower:]' | tr -d '\r')"
     case "$_ans" in
         y | yes) return 0 ;;
         n | no) return 1 ;;
@@ -280,7 +295,9 @@ ui_menu() {
     # Keys match case-insensitively (a lowercase "x" must still hit "X|Abort",
     # never fall through to the default — which could be "Confirm"). The
     # canonical key as defined by the caller is printed, not the raw input.
-    _ans="$(printf '%s' "$_ans" | tr '[:upper:]' '[:lower:]')"
+    # \r stripped since #818 d T3/U3: a CRLF key `c\r` would miss every
+    # key and fall through to the default (which can be "Confirm").
+    _ans="$(printf '%s' "$_ans" | tr '[:upper:]' '[:lower:]' | tr -d '\r')"
     _found=''
     for _opt in "$@"; do
         _k=$(printf '%s' "${_opt%%|*}" | tr '[:upper:]' '[:lower:]')

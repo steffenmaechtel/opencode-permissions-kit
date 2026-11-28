@@ -193,6 +193,18 @@ gate_out=$(printf 'yes\n' | UI_NO_STDIN_FALLBACK=1 setsid sh -c ". \"\$1\"; ui_a
 check "no-tty gate: UI_NO_STDIN_FALLBACK hard-exits with guidance" \
     sh -c "[ \"\$1\" -ne 0 ] && printf '%s' \"\$2\" | grep -q 'no terminal available'" _ "$gate_rc" "$gate_out"
 
+# #818 d T3/U3: CRLF answers — a piped `n\r` must DECLINE on a
+# y-default ui_confirm (read's IFS trim misses \r; pre-d it resolved
+# to the default = consent). ui_menu's key match carries the same
+# strip: a CRLF `x\r` must hit "X|Abort", not fall to the default.
+crlf_rc=0
+printf 'n\r\n' | setsid sh -c ". \"\$1\"; ui_confirm \"Proceed?\" \"y\"" _ "$UI" >/dev/null 2>&1 || crlf_rc=$?
+check "ui_confirm: a CRLF decline declines, not consents (#818 d T3)" \
+    sh -c "[ \"\$1\" -eq 1 ]" _ "$crlf_rc"
+crlf_out=$(printf 'x\r\n' | setsid sh -c ". \"\$1\"; ui_menu \"Mode?\" \"1\" \"1|Standard\" \"X|Abort\"; echo \"rc=\$? ans=\$_ans\"" _ "$UI" 2>/dev/null | tail -1)
+check "ui_menu: a CRLF key hits its key, not the default (#818 d T3)" \
+    sh -c "printf '%s' \"\$1\" | grep -q 'ans=X'" _ "$crlf_out"
+
 menu_err=$(setsid sh -c ". \"\$1\"; ui_menu \"Mode?\" \"1\" \"1|Standard\"" _ "$UI" 2>&1 >/dev/null </dev/null)
 if printf %s "$menu_err" | grep -q 'Mode?'; then
     pass "ui_menu prints the menu to stderr"
