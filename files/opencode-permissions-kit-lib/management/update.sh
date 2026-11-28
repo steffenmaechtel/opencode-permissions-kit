@@ -1111,19 +1111,26 @@ confirm() {
         # stdin fallback here consumes script bytes as the answer and
         # unknown input resolves to the y default: a root re-deploy
         # consented from source text (the 0.0.45c S8 class, reopened
-        # when this gate went self-contained). The streamed arm sets
-        # and exports the var before the re-exec; a controlling tty
-        # still answers (the 0.0.39b C6 design: prompts survive
-        # curl|bash shells), only the stdin fallback is refused.
+        # when this gate went self-contained). The arm covers every
+        # fetch-side run — streamed AND deployed without a local
+        # checkout (#818 c U4): both carry the var, both must
+        # refuse. A controlling tty still answers (the 0.0.39b C6
+        # design: prompts survive curl|bash shells).
         printf '  error     no terminal available for the deploy confirmation —\n' >&2
-        printf '            streamed update: re-run with --yes (update gate, #818 b U1)\n' >&2
+        printf '            update gate, #818 b U1: re-run with --yes, or answer from a tty\n' >&2
         exit 1
     elif ! read -r _uc_ans; then
         printf '  error     no terminal for the deploy confirmation and stdin is at EOF —\n' >&2
         printf '            consent gate, #818 a U2: re-run with --yes, or answer from a tty\n' >&2
         exit 1
     fi
-    _uc_ans=$(printf '%s' "$_uc_ans" | tr '[:upper:]' '[:lower:]')
+    _uc_ans=$(printf '%s' "$_uc_ans" | tr '[:upper:]' '[:lower:]' | tr -d '\r')
+    # \r stripped (#818 c U6): read's IFS trim covers space/tab but
+    # not carriage returns — a CRLF piped decline `n\r` was unknown
+    # input and resolved to the y default (an explicit decline
+    # consenting a root re-deploy, against conventions' trimming
+    # promise). ui_confirm shares the pre-existing shape kit-wide;
+    # recorded there.
     [ -z "$_uc_ans" ] && _uc_ans="y"
     case "$_uc_ans" in
         y | yes) return 0 ;;

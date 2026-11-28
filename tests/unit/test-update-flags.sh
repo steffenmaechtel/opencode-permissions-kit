@@ -773,6 +773,18 @@ if [ "$_u2_rc" -eq 0 ]; then
 else
     fail "u2: piped-Enter leg (rc=$_u2_rc) (#818 a U2)"
 fi
+# #818 c U6: a CRLF decline must DECLINE — read's IFS trim covers
+# space/tab but not \r, so `n\r` reached the case as unknown input and
+# resolved to the y default (an explicit decline consenting a root
+# re-deploy). The \r strip closes it; the leg pins the shape.
+_u2_rc=0
+printf 'n\r\n' | setsid sh -c '. "$1"; YES=false; confirm "Deploy the kit?"' \
+    _ "$_u2_dir/confirm-body.sh" >/dev/null 2>&1 || _u2_rc=$?
+if [ "$_u2_rc" -eq 1 ]; then
+    pass "u6: a CRLF piped decline declines, not consents (#818 c U6)"
+else
+    fail "u6: CRLF decline leg (rc=$_u2_rc) (#818 c U6)"
+fi
 _u2_rc=0
 setsid sh -c '. "$1"; YES=true; confirm "Deploy the kit?"' \
     _ "$_u2_dir/confirm-body.sh" </dev/null >/dev/null 2>&1 || _u2_rc=$?

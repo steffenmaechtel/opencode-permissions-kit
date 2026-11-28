@@ -1748,6 +1748,31 @@ if [ "$_rc" = 1 ] &&
 else
     fail "rollback shape-check leg (rc=$_rc nested=$([ -d "$WORK/f4rb2/p/.git/.git" ] && echo y || echo n) out=$_out) (#818 b G4)"
 fi
+# #818 c G2 (the third member's leg): _gp_unnest's move-back nests
+# ours inside a re-planted dir with rc 0 pre-c (probed in the
+# round-c scratch — no warning, the caller's recovery line never
+# printed); the shape check turns the nest into a loud rc 1.
+mkdir -p "$WORK/f4un/bin" "$WORK/f4un/p" "$WORK/f4un/t/.git/objects"
+printf 'ref: x\n' >"$WORK/f4un/t/.git/HEAD"
+cat >"$WORK/f4un/bin/rm" <<EOF
+#!/bin/sh
+if [ "\$1" = "-f" ] && [ "\$2" = "$WORK/f4un/p/.git" ]; then
+    /bin/rm -f "\$2" && mkdir "\$2"
+    exit \$?
+fi
+exec /bin/rm "\$@"
+EOF
+chmod 755 "$WORK/f4un/bin/rm"
+_rc=0
+_out=$(GP_F4UNT="$WORK/f4un/t" GP_F4UNP="$WORK/f4un/p" PATH="$WORK/f4un/bin:$WORK/bin:/usr/bin:/bin" _core_run \
+    'PATH="$WORK/f4un/bin:$WORK/bin:/usr/bin:/bin"; export PATH; _gp_unnest "$GP_F4UNT" "$GP_F4UNP"') || _rc=$?
+if [ "$_rc" = 1 ] &&
+    printf '%s' "$_out" | grep -qF 'is not the moved-back gitdir' &&
+    [ -d "$WORK/f4un/p/.git/.git" ]; then
+    pass "unnest: a plant surviving into the mv fails the shape check loud (#818 c G2)"
+else
+    fail "unnest shape-check leg (rc=$_rc nested=$([ -d "$WORK/f4un/p/.git/.git" ] && echo y || echo n) out=$_out) (#818 c G2)"
+fi
 
 # the rows (#765 a S3): a path the migration form gate refuses gets NO
 # command (adopt would refuse it) and names the rename; a path with a

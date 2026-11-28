@@ -65,6 +65,13 @@ else
 fi
 check_absent "install.sh no longer gates the guard on STREAMED only (#818 b U2)" \
     "$INSTALL" -qF 'if [ "$STREAMED" = true ]; then UI_NO_STDIN_FALLBACK=1; fi'
+# #818 c T1: the two needles above match as substrings — a one-line
+# re-gate carrying BOTH the assignment and the export would pass them
+# and dodge the exact-bytes absence above. The one-line gated pair is
+# forbidden too (the unconditional spelling keeps the two on separate
+# lines).
+check_absent "install.sh guards on neither re-gated spelling (#818 c T1)" \
+    "$INSTALL" -qF 'UI_NO_STDIN_FALLBACK=1; export UI_NO_STDIN_FALLBACK'
 
 eval "$(extract_func "$INSTALL" parse_args)"
 

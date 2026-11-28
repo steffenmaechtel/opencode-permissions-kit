@@ -41,7 +41,8 @@ WORK=$(mktemp -d)
 _trap_cleanup() {
     rm -rf "${WORK:-}" "${TR:-}" "${V9ROOT:-}" "${STUBBIN:-}" \
         "${_bstub:-}" "${SW:-}" "${F1DIR:-}" "${F1STUB:-}" \
-        "${F1SP:-}" "${F1SPD:-}" "${F1SPS:-}" "${F12S:-}"
+        "${F1SP:-}" "${F1SPD:-}" "${F1SPS:-}" "${F12S:-}" \
+        "${F14S:-}" "${F14B:-}"
 }
 trap _trap_cleanup EXIT INT TERM
 

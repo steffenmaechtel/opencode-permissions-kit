@@ -138,8 +138,12 @@ _ghc_dev_hooks_path() {
     # rc 0 with empty output = the key is EXPLICITLY empty
     # (`git config --global core.hooksPath ""` — a real hooks-disable
     # idiom): git's per-key masking applies, the XDG value stays
-    # masked, no fall-through (#818 b G2). rc 1 (absent) or 128 (no
-    # file) = the primary does not define the key → XDG fallback.
+    # masked, no fall-through (#818 b G2). Any non-zero rc (rc 1:
+    # key absent or file missing — the probed 2.56.1 table; rc 128:
+    # malformed file — both non-zero either way) = the primary does
+    # not define the key → XDG fallback (#818 c G3: the rc
+    # attribution corrected; the code treats every non-zero rc
+    # identically, so version drift is behavior-safe).
     if [ "$_ghc_dv_rc" -ne 0 ] && [ -r "$_ghc_dh/.config/git/config" ]; then
         _ghc_dv=$(git config -f "$_ghc_dh/.config/git/config" core.hooksPath 2>/dev/null || true)
     fi
@@ -659,6 +663,36 @@ _git_heal_on() {
     ui_success "hooks stay off for the developer; hooksPath=$(_ghc_hooksdir))"
 }
 
+# _ghc_off_unset_kit <dev> <home>: unset every carrier file whose OWN
+# value is the kit hooksdir — kit bytes only, the #100 consent
+# discipline: a foreign value is never modified, only reported.
+# Version-independent by explicit -f (older gits operate on
+# ~/.gitconfig only; the CI unit lane caught that split, #818 a G2
+# followup). A kit copy in both files is masked-but-real: every
+# kit-owned carrier is unset, or a stale one resurfaces as the next
+# read's value. Echoes the carrier paths actually unset; rc 1 when
+# any unset failed.
+_ghc_off_unset_kit() {
+    _ghouk_dev=$1
+    _ghouk_home=$2
+    _ghouk_ok=1
+    _ghouk_unsets=""
+    for _ghouk_f in "$_ghouk_home/.gitconfig" \
+        "$_ghouk_home/.config/git/config"; do
+        [ -r "$_ghouk_f" ] || continue
+        _ghouk_v=$(git config -f "$_ghouk_f" core.hooksPath 2>/dev/null || true)
+        [ "$_ghouk_v" = "$(_ghc_hooksdir)" ] || continue
+        if _ghc_devgit "$_ghouk_dev" "$_ghouk_home" \
+            config -f "$_ghouk_f" --unset core.hooksPath; then
+            _ghouk_unsets="$_ghouk_unsets $_ghouk_f"
+        else
+            _ghouk_ok=0
+        fi
+    done
+    printf '%s' "${_ghouk_unsets# }"
+    [ "$_ghouk_ok" -eq 1 ]
+}
+
 _git_heal_off() {
     _ghc_off_dev=$(_ghc_devuser)
     _ghc_off_home=$(_ghc_devhome "$_ghc_off_dev")
@@ -667,40 +701,39 @@ _git_heal_off() {
         exit 1
     fi
     _ghc_off_cur=$(_ghc_dev_hooks_path "$_ghc_off_dev")
+    # #818 c G1: the merged read can say foreign or empty while a
+    # KIT-OWNED copy sits masked in a carrier (the on-leg itself
+    # writes XDG whenever ~/.gitconfig is absent; a later foreign
+    # writer or the documented hooks-disable empty value masks it —
+    # the hooks RESURRECT when the mask clears). The kit's own copy
+    # is kit bytes, never #100-protected: every branch sweeps the
+    # carriers and unsets kit-owned values, with a detail line when
+    # a masked copy was removed. Foreign carriers stay untouched.
+    _ghc_off_masked=""
+    _ghc_off_mask_rc=0
     if [ "$_ghc_off_cur" = "$(_ghc_hooksdir)" ]; then
-        # Unset where the value LIVES — but only carriers whose OWN
-        # value is the kit path (#818 b G1: the loop first unset every
-        # carrier holding ANY hooksPath and destroyed a FOREIGN value
-        # masked in the XDG file while the merged reader said
-        # "kit-owned" — the #100 consent discipline this family
-        # states 30 lines below). Version-independence via explicit
-        # -f (older gits operate on ~/.gitconfig only; the CI unit
-        # lane caught the split, #818 a G2 followup). A kit copy in
-        # both files is masked-but-real: every kit-owned carrier is
-        # unset, or a stale one resurfaces as the next read's value.
-        _ghc_off_unset_ok=1
-        for _ghc_off_f in "$_ghc_off_home/.gitconfig" \
-            "$_ghc_off_home/.config/git/config"; do
-            [ -r "$_ghc_off_f" ] || continue
-            _ghc_off_v=$(git config -f "$_ghc_off_f" core.hooksPath 2>/dev/null || true)
-            [ "$_ghc_off_v" = "$(_ghc_hooksdir)" ] || continue
-            _ghc_devgit "$_ghc_off_dev" "$_ghc_off_home" \
-                config -f "$_ghc_off_f" --unset core.hooksPath ||
-                _ghc_off_unset_ok=0
-        done
-        if [ "$_ghc_off_unset_ok" -eq 1 ]; then
+        if _ghc_off_unset_kit "$_ghc_off_dev" "$_ghc_off_home"; then
             ui_success "git heal hooks off — core.hooksPath unset for $_ghc_off_dev"
         else
             ui_error "git-heal: could not unset core.hooksPath for $_ghc_off_dev"
             exit 1
         fi
     elif [ -z "$_ghc_off_cur" ]; then
+        _ghc_off_masked=$(_ghc_off_unset_kit "$_ghc_off_dev" "$_ghc_off_home") ||
+            _ghc_off_mask_rc=$?
         ui_success "git heal hooks already off (no core.hooksPath set)"
     else
-        # Kit-owned bytes only (the issue #100 consent discipline): a
-        # foreign value is never modified, only reported.
+        _ghc_off_masked=$(_ghc_off_unset_kit "$_ghc_off_dev" "$_ghc_off_home") ||
+            _ghc_off_mask_rc=$?
         ui_success "git heal hooks off — core.hooksPath holds a foreign value"
         ui_detail "($_ghc_off_cur) — left untouched"
+    fi
+    if [ -n "$_ghc_off_masked" ]; then
+        ui_detail "masked kit-owned copy unset from: $_ghc_off_masked"
+    fi
+    if [ "$_ghc_off_mask_rc" -ne 0 ]; then
+        ui_error "git-heal: could not unset a masked kit-owned core.hooksPath for $_ghc_off_dev"
+        exit 1
     fi
 }
 

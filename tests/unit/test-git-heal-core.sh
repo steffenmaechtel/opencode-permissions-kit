@@ -1020,9 +1020,9 @@ fi
 # git-version-dependent (older gits operate on ~/.gitconfig only and
 # the CI unit lane reddened exactly there over an XDG-carried value).
 # The behavioral XDG leg above executes the -f path; this source pin
-# guards its shape.
+# guards its shape (the helper since #818 c G1).
 check_live "core: off unsets per carrier file, never git-version-dependent --global (#818 a G2)" \
-    "$CORE" -qF 'config -f "$_ghc_off_f" --unset core.hooksPath'
+    "$CORE" -qF 'config -f "$_ghouk_f" --unset core.hooksPath'
 # #818 b G1: the consent discipline holds for MASKED carriers — a
 # foreign value in the XDG file under a kit-owned ~/.gitconfig (the
 # merged reader says kit) must survive `off` untouched. The first
@@ -1046,6 +1046,34 @@ else
     fail "core: masked-foreign leg (rc=$_hr_rc gitconfig=$(git config --file "$WORK/devhome-b/.gitconfig" core.hooksPath 2>/dev/null) xdg=$(git config --file "$WORK/devhome-b/.config/git/config" core.hooksPath 2>/dev/null)) (#818 b G1)"
 fi
 rm -rf "${WORK:?}/devhome-b"
+
+# #818 c G1: the mask's other side — a KIT-OWNED XDG copy under a
+# foreign primary (the shape the on-leg itself creates when
+# ~/.gitconfig is absent, later masked): every branch sweeps the
+# carriers, the kit copy is unset and NAMED, the foreign mask stays
+# untouched. Pre-c: the copy survived and the hooks resurrected when
+# the user cleared the mask (probed in the round-c scratch).
+mkdir -p "${WORK:?}/devhome-c/.config/git"
+printf '[core]\n\thooksPath = /foreign-mask-c\n' >"$WORK/devhome-c/.gitconfig"
+git config --file "$WORK/devhome-c/.config/git/config" \
+    core.hooksPath "$WORK/lib/git-heal/hooks"
+_hr_rc=0
+_out=$(GH_LIBDIR="$WORK/lib" GH_DEV_HOME="$WORK/devhome-c" GH_SUDO="" \
+    GH_PROJECTS_CONF="$CONF" GH_LOG="$LOG" GH_ALLOW_NONROOT=1 GH_CONF_RELAX=1 \
+    GH_AGENT_USER="$(id -un)" INSTALL_CONF="$WORK/install.conf" \
+    sh -c '. "$1"; ui_info() { :; }; ui_success() { echo "ok: $*"; }; \
+        ui_detail() { echo "detail: $*"; }; ui_error() { echo "ERR: $*" >&2; }; _git_heal_off' \
+    _ "$CORE" 2>&1) || _hr_rc=$?
+if [ "$_hr_rc" -eq 0 ] &&
+    [ "$(git config --file "$WORK/devhome-c/.gitconfig" core.hooksPath 2>/dev/null)" = /foreign-mask-c ] &&
+    [ -z "$(git config --file "$WORK/devhome-c/.config/git/config" core.hooksPath 2>/dev/null)" ] &&
+    printf '%s' "$_out" | grep -qF 'masked kit-owned copy unset from' &&
+    printf '%s' "$_out" | grep -qF '/foreign-mask-c) — left untouched'; then
+    pass "core: off unsets the masked kit-owned XDG copy and names it, the foreign mask stays (#818 c G1)"
+else
+    fail "core: masked-kit leg (rc=$_hr_rc mask=$(git config --file "$WORK/devhome-c/.gitconfig" core.hooksPath 2>/dev/null) kit=$(git config --file "$WORK/devhome-c/.config/git/config" core.hooksPath 2>/dev/null) out=$_out) (#818 c G1)"
+fi
+rm -rf "${WORK:?}/devhome-c"
 
 # The #100 consent discipline survives the XDG fix: a foreign value in
 # an XDG-only home is foreign (reported, never touched by off).

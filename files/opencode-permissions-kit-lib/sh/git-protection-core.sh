@@ -708,6 +708,16 @@ _gp_unnest() {
     fi
     rm -f "$_gpun_p/.git"
     mv "$_gpun_t/.git" "$_gpun_p/.git" || return 1
+    # #818 c G2 (the third template member — revert: round a,
+    # rollback: round b): the gitdir's HEAD must sit DIRECTLY under
+    # the moved-back .git — a directory re-planted in the rm→mv
+    # window nests the gitdir one level deep while mv exits 0, and
+    # the caller's manual-recovery line fires on rc 1 only.
+    if [ ! -d "$_gpun_p/.git" ] || [ -L "$_gpun_p/.git" ] || [ ! -e "$_gpun_p/.git/HEAD" ]; then
+        ui_error "collision recovery incomplete: $_gpun_p/.git is not the moved-back gitdir —"
+        ui_error "(planted directory?) — inspect manually"
+        return 1
+    fi
     rmdir "$_gpun_t" 2>/dev/null ||
         ui_warn "could not remove the planted dir $_gpun_t — next run suffixes past it"
     return 0

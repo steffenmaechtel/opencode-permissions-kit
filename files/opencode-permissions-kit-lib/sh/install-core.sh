@@ -849,7 +849,9 @@ do_plan_phase() {
         # --yes without --projects (0.0.44a V6): every sibling prompt
         # honors SKIP_PROMPTS — this selection loop was the one hold-out,
         # and on EOF without a controlling tty (checkout-mode runs from
-        # cron/CI/ssh -T: no UI_NO_STDIN_FALLBACK there) it spun forever
+        # cron/CI/ssh -T: the guard is unconditional since #818 b U2,
+        # a headless run hard-exits at the first prompt long before
+        # here) it spun forever
         # on `invalid selection ''`. The --yes default is the skip: user
         # + wrapper, no project baseline.
         PROJECTS_ROOTS=""
